@@ -1,0 +1,22 @@
+services:
+  backend:
+    build: ./backend
+    container_name: clinia-backend
+    ports:
+      - "4000:4000"
+    networks:
+      - clinia-net
+
+  frontend:
+    build: ./frontend
+    container_name: clinia-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - clinia-net
+
+networks:
+  clinia-net:
+    driver: bridge
