@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import { safeParseMedicalAI } from "./utils/aiParser.js";
 
 const app = express();
 app.use(cors());
@@ -64,7 +65,9 @@ NE REMPLACE PAS le jugement clinique.
         });
 
         const text = aiResponse.choices[0].message.content;
-        res.json({ analysis: text });
+        const structured = safeParseMedicalAI(text);
+        res.json({ analysis: structured });
+
 
     } catch (err) {
         console.error("OpenAI error:", err);
