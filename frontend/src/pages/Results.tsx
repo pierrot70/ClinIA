@@ -43,8 +43,9 @@ const Results: React.FC = () => {
 
                 const json = await res.json();
 
-                if (!json.analysis) {
+                if (!json || !json.analysis) {
                     setAiError(true);
+                    setAnalysis({ patient_summary: "", treatments: [] });
                     return;
                 }
 
