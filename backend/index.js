@@ -7,7 +7,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- Mock simple ---
+// --- Mock simple (existant) ---
 app.get("/api/treatments", (req, res) => {
     res.json({
         diagnosis: "Hypertension essentielle (mock)",
@@ -37,6 +37,47 @@ app.post("/api/ai/analyze", async (req, res) => {
         if (!diagnosis) {
             return res.status(400).json({ error: "Diagnosis is required." });
         }
+
+        // --------------------------------------------------------
+        // 🌟 MODE MOCK IA (activé si CLINIA_MOCK_AI=true dans .env)
+        // --------------------------------------------------------
+        if (process.env.CLINIA_MOCK_AI === "true") {
+            console.log("🟡 ClinIA: MODE MOCK IA ACTIVÉ");
+
+            return res.json({
+                analysis: {
+                    patient_summary:
+                        "Votre tension est légèrement élevée. Un changement de mode de vie ou certains médicaments peuvent aider à la contrôler.",
+                    treatments: [
+                        {
+                            name: "Modifications du mode de vie",
+                            justification:
+                                "Toujours recommandé en première intention pour réduire la pression artérielle.",
+                            contraindications: [],
+                            efficacy: 55
+                        },
+                        {
+                            name: "Ramipril",
+                            justification:
+                                "IEC efficace pour abaisser la pression artérielle et protéger les reins.",
+                            contraindications: ["Grossesse", "Angio-œdème"],
+                            efficacy: 85
+                        },
+                        {
+                            name: "Indapamide",
+                            justification:
+                                "Diurétique thiazidique recommandé chez les patients de plus de 50 ans.",
+                            contraindications: ["Hypokaliémie sévère"],
+                            efficacy: 78
+                        }
+                    ]
+                }
+            });
+        }
+
+        // --------------------------------------------------------
+        // 🌟 MODE IA RÉELLE (OpenAI)
+        // --------------------------------------------------------
 
         const prompt = `
 Tu es ClinIA, un assistant clinique conçu pour aider les médecins.
@@ -82,8 +123,8 @@ Règles :
         });
 
         const text = aiResponse.choices[0].message.content;
-        const structured = safeParseMedicalAI(text);
 
+        const structured = safeParseMedicalAI(text);
         res.json({ analysis: structured });
 
     } catch (err) {
