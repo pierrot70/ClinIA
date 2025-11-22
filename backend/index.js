@@ -2,7 +2,9 @@ import express from "express";
 import cors from "cors";
 import { safeParseMedicalAI } from "./utils/aiParser.js";
 import OpenAI from "openai";
-import { getMockForDiagnosis } from "./mocks/clinicalMocks.js";
+//import { getMockForDiagnosis } from "./mocks/clinicalMocks.js";
+import { getMockForDiagnosis } from "./utils/mockLoader.js";
+
 
 const app = express();
 app.use(cors());
