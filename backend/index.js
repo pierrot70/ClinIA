@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import { safeParseMedicalAI } from "./utils/aiParser.js";
 import OpenAI from "openai";
+import { getMockForDiagnosis } from "./mocks/clinicalMocks.js";
 
 const app = express();
 app.use(cors());
@@ -38,41 +39,12 @@ app.post("/api/ai/analyze", async (req, res) => {
             return res.status(400).json({ error: "Diagnosis is required." });
         }
 
-        // --------------------------------------------------------
-        // 🌟 MODE MOCK IA (activé si CLINIA_MOCK_AI=true dans .env)
-        // --------------------------------------------------------
+        // --- MODE MOCK IA (activé si .env -> CLINIA_MOCK_AI=true) ----
         if (process.env.CLINIA_MOCK_AI === "true") {
-            console.log("🟡 ClinIA: MODE MOCK IA ACTIVÉ");
+            console.log("🟡 ClinIA: MODE MOCK IA (AVANCÉ) ACTIVÉ");
 
-            return res.json({
-                analysis: {
-                    patient_summary:
-                        "Votre tension est légèrement élevée. Un changement de mode de vie ou certains médicaments peuvent aider à la contrôler.",
-                    treatments: [
-                        {
-                            name: "Modifications du mode de vie",
-                            justification:
-                                "Toujours recommandé en première intention pour réduire la pression artérielle.",
-                            contraindications: [],
-                            efficacy: 55
-                        },
-                        {
-                            name: "Ramipril",
-                            justification:
-                                "IEC efficace pour abaisser la pression artérielle et protéger les reins.",
-                            contraindications: ["Grossesse", "Angio-œdème"],
-                            efficacy: 85
-                        },
-                        {
-                            name: "Indapamide",
-                            justification:
-                                "Diurétique thiazidique recommandé chez les patients de plus de 50 ans.",
-                            contraindications: ["Hypokaliémie sévère"],
-                            efficacy: 78
-                        }
-                    ]
-                }
-            });
+            const mock = getMockForDiagnosis(diagnosis);
+            return res.json({ analysis: mock });
         }
 
         // --------------------------------------------------------
