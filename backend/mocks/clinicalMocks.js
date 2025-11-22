@@ -132,6 +132,34 @@ export const mockMigraine = {
     ]
 };
 
+export const mockHeartFailure = {
+    patient_summary:
+        "Vous présentez une insuffisance cardiaque. Certains traitements peuvent alléger les symptômes, protéger le cœur et réduire les risques d’hospitalisation.",
+    treatments: [
+        {
+            name: "Inhibiteurs SGLT2 (ex: Dapagliflozine)",
+            justification:
+                "Ont démontré une réduction des hospitalisations et de la mortalité, même chez les non-diabétiques.",
+            contraindications: ["Insuffisance rénale sévère", "Déshydratation"],
+            efficacy: 85
+        },
+        {
+            name: "Bêtabloquants",
+            justification:
+                "Ralentissent le rythme cardiaque et diminuent la charge de travail du cœur.",
+            contraindications: ["Asthme sévère", "Bradycardie"],
+            efficacy: 75
+        },
+        {
+            name: "Diurétiques de l’anse (ex: Furosémide)",
+            justification:
+                "Réduisent la congestion, l'œdème et la dyspnée.",
+            contraindications: ["Déshydratation", "Insuffisance rénale aiguë"],
+            efficacy: 65
+        }
+    ]
+};
+
 export function getMockForDiagnosis(diagnosis = "") {
     const d = diagnosis.toLowerCase();
 
@@ -149,6 +177,9 @@ export function getMockForDiagnosis(diagnosis = "") {
 
     if (d.includes("migra"))
         return mockMigraine;
+
+    if (d.includes("insuffis") || d.includes("cardia") || d.includes("icc"))
+        return mockHeartFailure;
 
     // fallback générique
     return {
