@@ -1,9 +1,11 @@
 import express from "express";
 import cors from "cors";
-import { safeParseMedicalAI } from "./utils/aiParser.js";
+//import { safeParseMedicalAI } from "./utils/aiParser.js";
 import OpenAI from "openai";
 //import { getMockForDiagnosis } from "./mocks/clinicalMocks.js";
-import { getMockForDiagnosis } from "./utils/mockLoader.js";
+//import { getMockForDiagnosis } from "./utils/mockLoader.js";
+import { safeParseMedicalAI } from "./utils/aiParser.js";
+import { getMockForDiagnosis, getAllMocks, saveAllMocks } from "./utils/mockLoader.js";
 
 
 const app = express();
@@ -26,6 +28,30 @@ app.get("/api/treatments", (req, res) => {
 app.get("/health", (req, res) => {
     res.json({ status: "ok" });
 });
+
+// --- Mock Studio API : récupérer tous les mocks ---
+app.get("/api/mocks", (req, res) => {
+    try {
+        const mocks = getAllMocks();
+        res.json(mocks);
+    } catch (err) {
+        console.error("Error reading mocks:", err);
+        res.status(500).json({ error: "Cannot read mocks" });
+    }
+});
+
+// --- Mock Studio API : sauvegarder tous les mocks ---
+app.put("/api/mocks", (req, res) => {
+    try {
+        const newData = req.body;
+        saveAllMocks(newData);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error("Error saving mocks:", err);
+        res.status(400).json({ error: "Cannot save mocks", details: err.message });
+    }
+});
+
 
 // --- OpenAI config ---
 const openai = new OpenAI({
