@@ -1,51 +1,48 @@
 import React from "react";
 
-interface Row {
+export interface Treatment {
     name: string;
     justification: string;
-    contraindications: string;
+    contraindications: string[] | string;
+    efficacy: number;
 }
 
-interface Props {
-    rows: Row[];
+interface AITreatmentTableProps {
+    treatments: Treatment[];
 }
 
-const AITreatmentTable: React.FC<Props> = ({ rows }) => {
-    if (!rows.length) return null;
-
+const AITreatmentTable: React.FC<AITreatmentTableProps> = ({ treatments }) => {
     return (
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-            <h3 className="text-sm font-semibold text-gray-800 mb-4">
-                🧬 Tableau clinique généré automatiquement
-            </h3>
+        <div className="p-6 bg-white shadow-lg rounded-xl border border-gray-200">
+            <h2 className="text-xl font-semibold mb-4 text-blue-700">
+                Options thérapeutiques proposées
+            </h2>
 
-            <div className="overflow-x-auto">
-                <table className="min-w-full text-sm border border-gray-300 rounded-lg">
-                    <thead className="bg-gray-100 text-gray-700">
-                    <tr>
-                        <th className="p-2 border">Traitement</th>
-                        <th className="p-2 border">Justification</th>
-                        <th className="p-2 border">Contre-indications</th>
+            <table className="w-full border-collapse text-sm">
+                <thead>
+                <tr className="bg-gray-100">
+                    <th className="p-3 border">Traitement</th>
+                    <th className="p-3 border">Justification</th>
+                    <th className="p-3 border">Contre-indications</th>
+                    <th className="p-3 border">Efficacité</th>
+                </tr>
+                </thead>
+
+                <tbody>
+                {treatments.map((t, i) => (
+                    <tr key={i} className="border">
+                        <td className="p-3 border font-semibold">{t.name}</td>
+                        <td className="p-3 border">{t.justification}</td>
+                        <td className="p-3 border text-red-600">
+                            {Array.isArray(t.contraindications)
+                                ? t.contraindications.join(", ")
+                                : t.contraindications}
+                        </td>
+                        <td className="p-3 border">{t.efficacy}%</td>
                     </tr>
-                    </thead>
-
-                    <tbody>
-                    {rows.map((row, idx) => (
-                        <tr key={idx} className="odd:bg-white even:bg-gray-50">
-                            <td className="p-2 border align-top font-medium text-gray-900">
-                                {row.name}
-                            </td>
-                            <td className="p-2 border align-top text-gray-800 whitespace-pre-wrap">
-                                {row.justification}
-                            </td>
-                            <td className="p-2 border align-top text-gray-800 whitespace-pre-wrap">
-                                {row.contraindications}
-                            </td>
-                        </tr>
-                    ))}
-                    </tbody>
-                </table>
-            </div>
+                ))}
+                </tbody>
+            </table>
         </div>
     );
 };

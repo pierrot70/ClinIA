@@ -1,68 +1,27 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, Link } from "react-router-dom";
+
 import {
     hypertensionTreatments,
     anticipatedQuestions,
 } from "../data/hypertension";
+
 import TreatmentCard from "../components/TreatmentCard";
 import ChartCard from "../components/ChartCard";
 import QuestionCard from "../components/QuestionCard";
 import AICard from "../components/AICard";
-import { parseAIResponse } from "../utils/aiParser";
 import AITreatmentTable from "../components/AITreatmentTable";
 
-// 🌟 Extraction automatique tableau clinique
-function extractTreatmentRows(text: string) {
-    const rows: any[] = [];
-
-    const blocks = text
-        .split(/\n\s*\n/) // paragraphes
-        .map((b) => b.trim())
-        .filter((b) => b.length > 0);
-
-    for (const block of blocks) {
-        const nameMatch =
-            block.match(/^[-•]?\s*([A-Za-zéèêàïîôç \(\)\/0-9]+)/);
-
-        if (!nameMatch) continue;
-
-        const name = nameMatch[1];
-
-        const justification = block.includes("Justification")
-            ? block.split("Justification")[1].split("Contre")[0].trim()
-            : "";
-
-        const contraindications = block.includes("Contre-indications")
-            ? block.split("Contre-indications")[1].trim()
-            : "";
-
-        if (name && (justification || contraindications)) {
-            rows.push({
-                name,
-                justification: justification || "-",
-                contraindications: contraindications || "-",
-            });
-        }
-    }
-
-    return rows;
-}
-
-const useQuery = () => {
-    return new URLSearchParams(useLocation().search);
-};
+const useQuery = () => new URLSearchParams(useLocation().search);
 
 const Results: React.FC = () => {
     const query = useQuery();
-    const q =
-        query.get("q") || "Hypertension essentielle grade 1";
+    const q = query.get("q") || "Hypertension essentielle grade 1";
 
     const top = hypertensionTreatments[0];
 
     // 🌟 États IA
-    const [aiResponse, setAiResponse] = useState<string | null>(null);
-    const [parsedAI, setParsedAI] = useState<any>(null);
-    const [tableRows, setTableRows] = useState<any[]>([]);
+    const [analysis, setAnalysis] = useState<any>(null);
     const [loadingAI, setLoadingAI] = useState(true);
     const [aiError, setAiError] = useState(false);
 
@@ -83,17 +42,15 @@ const Results: React.FC = () => {
                 });
 
                 const json = await res.json();
-                const raw = json.analysis || "Aucune analyse reçue.";
 
-                setAiResponse(raw);
+                if (!json.analysis) {
+                    setAiError(true);
+                    return;
+                }
 
-                // Extraction sections IA
-                const structured = parseAIResponse(raw);
-                setParsedAI(structured);
+                // 🎯 NOUVEAU : données structurées venant du backend
+                setAnalysis(json.analysis);
 
-                // Extraction tableau clinique
-                const table = extractTreatmentRows(raw);
-                setTableRows(table);
             } catch (err) {
                 console.error("Erreur IA:", err);
                 setAiError(true);
@@ -114,69 +71,24 @@ const Results: React.FC = () => {
                 </p>
                 <h1 className="text-2xl font-semibold text-gray-900">{q}</h1>
                 <p className="text-sm text-gray-600 max-w-2xl">
-                    Résumé généré à partir de données simulées pour démontrer la manière
-                    dont ClinIA pourrait guider les décisions thérapeutiques.
+                    Résumé généré à partir d’une analyse simulée pour illustrer
+                    la manière dont ClinIA pourrait aider à guider les décisions
+                    thérapeutiques.
                 </p>
             </header>
 
-            {/* ------------------------------ ANALYSE IA + TABLEAU ------------------------------ */}
+            {/* ------------------------------ ANALYSE IA ------------------------------ */}
             <section className="space-y-4">
+
                 <AICard
                     loading={loadingAI}
                     error={aiError}
-                    text={aiResponse}
+                    text={analysis?.patient_summary}
                 />
 
-                {/* Sections IA */}
-                {parsedAI && (
-                    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-6">
-                        {/* Options thérapeutiques */}
-                        {parsedAI.options.length > 0 && (
-                            <div>
-                                <h3 className="text-sm font-semibold text-gray-800 mb-2">
-                                    🩺 Options thérapeutiques
-                                </h3>
-                                <ul className="list-disc ml-6 text-sm text-gray-700 space-y-1">
-                                    {parsedAI.options.map((o: string, i: number) => (
-                                        <li key={i}>{o}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-
-                        {/* Contre-indications */}
-                        {parsedAI.contraindications.length > 0 && (
-                            <div>
-                                <h3 className="text-sm font-semibold text-gray-800 mb-2">
-                                    ⚠️ Contre-indications
-                                </h3>
-                                <ul className="list-disc ml-6 text-sm text-gray-700 space-y-1">
-                                    {parsedAI.contraindications.map(
-                                        (c: string, i: number) => (
-                                            <li key={i}>{c}</li>
-                                        )
-                                    )}
-                                </ul>
-                            </div>
-                        )}
-
-                        {/* Résumé patient */}
-                        {parsedAI.summary.length > 0 && (
-                            <div>
-                                <h3 className="text-sm font-semibold text-gray-800 mb-2">
-                                    🧍 Résumé patient
-                                </h3>
-                                <p className="text-sm text-gray-700 leading-relaxed">
-                                    {parsedAI.summary.join(" ")}
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* 🌟 Tableau clinique généré automatiquement */}
-                {tableRows.length > 0 && (
-                    <AITreatmentTable rows={tableRows} />
+                {/* Tableau structuré ClinIA */}
+                {analysis?.treatments && analysis.treatments.length > 0 && (
+                    <AITreatmentTable treatments={analysis.treatments} />
                 )}
             </section>
 
@@ -229,8 +141,8 @@ const Results: React.FC = () => {
                     Questions fréquentes (simulation)
                 </h2>
                 <p className="text-xs text-gray-500">
-                    Ces réponses sont simulées pour illustrer la manière dont ClinIA
-                    pourrait anticiper les interrogations d’un clinicien.
+                    Ces réponses sont simulées pour illustrer la manière dont
+                    ClinIA pourrait anticiper les interrogations d’un clinicien.
                 </p>
 
                 <div className="space-y-2">

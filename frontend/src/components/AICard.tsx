@@ -6,33 +6,34 @@ interface AICardProps {
     text: string | null;
 }
 
-const AICard: React.FC<AICardProps> = ({ loading, error, text }) => {
+export default function AICard({ loading, error, text }: AICardProps) {
+    if (loading) {
+        return (
+            <div className="p-6 bg-white border rounded-xl shadow-sm">
+                <p className="text-gray-500 text-sm">Analyse IA en cours…</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="p-6 bg-white border rounded-xl shadow-sm">
+                <p className="text-red-600 font-semibold">
+                    Erreur lors de l'analyse IA
+                </p>
+            </div>
+        );
+    }
+
     return (
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-4">
+        <div className="p-6 bg-white border rounded-xl shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                🧍 Résumé pour le patient
+            </h3>
 
-            <h2 className="text-sm font-semibold text-gray-800">
-                Analyse clinique assistée par IA
-            </h2>
-
-            {loading && (
-                <p className="text-xs text-gray-500 animate-pulse">
-                    Analyse en cours… merci de patienter.
-                </p>
-            )}
-
-            {error && (
-                <p className="text-xs text-red-500">
-                    Une erreur est survenue. Impossible d’obtenir l’analyse IA.
-                </p>
-            )}
-
-            {text && (
-                <div className="prose prose-sm max-w-none text-gray-800 whitespace-pre-wrap leading-relaxed">
-                    {text}
-                </div>
-            )}
+            <p className="text-gray-700 leading-relaxed text-sm">
+                {text || "Aucun résumé reçu."}
+            </p>
         </div>
     );
-};
-
-export default AICard;
+}
