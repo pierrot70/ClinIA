@@ -1,6 +1,9 @@
 {
   "hypertension": {
-    "match": ["hyperten", "hta"],
+    "match": [
+      "hyperten",
+      "hta"
+    ],
     "patient_summary": "Votre tension est élevée. Une combinaison de changements de mode de vie et de médicaments peut aider à la réduire.",
     "treatments": [
       {
@@ -12,59 +15,79 @@
       {
         "name": "Amlodipine",
         "justification": "Calcium-bloquant efficace chez les patients plus âgés.",
-        "contraindications": ["Hypotension sévère"],
+        "contraindications": [
+          "Hypotension sévère"
+        ],
         "efficacy": 82
       }
     ]
   },
-
   "diabete_type_2": {
-    "match": ["diab", "glyc", "type 2"],
+    "match": [
+      "diab",
+      "glyc",
+      "type 2"
+    ],
     "patient_summary": "Votre glycémie est élevée, ce qui indique un diabète de type 2.",
     "treatments": [
       {
         "name": "Metformine",
-        "justification": "Traitement de première intention.",
-        "contraindications": ["Insuffisance rénale sévère"],
+        "justification": "Traitement de première intentions.",
+        "contraindications": [
+          "Insuffisance rénale sévère"
+        ],
         "efficacy": 90
       }
     ]
   },
-
   "cholesterol": {
-    "match": ["cholest", "ldl", "dyslip"],
+    "match": [
+      "cholest",
+      "ldl",
+      "dyslip"
+    ],
     "patient_summary": "Votre taux de cholestérol LDL est trop élevé.",
     "treatments": [
       {
         "name": "Statines",
         "justification": "Traitement de référence pour réduire les LDL.",
-        "contraindications": ["Maladie hépatique"],
+        "contraindications": [
+          "Maladie hépatique"
+        ],
         "efficacy": 85
       }
     ]
   },
-
   "insuffisance_cardiaque": {
-    "match": ["insuffis", "cardia", "icc"],
+    "match": [
+      "insuffis",
+      "cardia",
+      "icc"
+    ],
     "patient_summary": "Vous présentez une insuffisance cardiaque. Certains traitements protègent le cœur et réduisent les hospitalisations.",
     "treatments": [
       {
         "name": "Inhibiteurs SGLT2",
         "justification": "Diminuent les hospitalisations et la mortalité.",
-        "contraindications": ["Insuffisance rénale sévère"],
+        "contraindications": [
+          "Insuffisance rénale sévère"
+        ],
         "efficacy": 85
       },
       {
         "name": "Bêtabloquants",
         "justification": "Réduisent la charge de travail du cœur.",
-        "contraindications": ["Asthme sévère"],
+        "contraindications": [
+          "Asthme sévère"
+        ],
         "efficacy": 75
       }
     ]
   },
-
   "asthme": {
-    "match": ["asth"],
+    "match": [
+      "asth"
+    ],
     "patient_summary": "Vous présentez un asthme. Le traitement améliore la respiration.",
     "treatments": [
       {
@@ -75,7 +98,6 @@
       }
     ]
   },
-
   "_fallback": {
     "match": [],
     "patient_summary": "Aucun mock spécifique trouvé. Exemple générique.",

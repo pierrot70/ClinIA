@@ -1,9 +1,8 @@
 import express from "express";
 import cors from "cors";
-//import { safeParseMedicalAI } from "./utils/aiParser.js";
+import jwt from "jsonwebtoken";
+
 import OpenAI from "openai";
-//import { getMockForDiagnosis } from "./mocks/clinicalMocks.js";
-//import { getMockForDiagnosis } from "./utils/mockLoader.js";
 import { safeParseMedicalAI } from "./utils/aiParser.js";
 import { getMockForDiagnosis, getAllMocks, saveAllMocks } from "./utils/mockLoader.js";
 
@@ -11,6 +10,46 @@ import { getMockForDiagnosis, getAllMocks, saveAllMocks } from "./utils/mockLoad
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+function requireAdmin(req, res, next) {
+    const auth = req.headers.authorization || "";
+    const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+
+    if (!token) {
+        return res.status(401).json({ error: "Admin token missing" });
+    }
+
+    try {
+        const payload = jwt.verify(token, process.env.JWT_SECRET);
+        if (payload.role !== "admin") {
+            return res.status(403).json({ error: "Forbidden" });
+        }
+        next();
+    } catch (err) {
+        console.error("JWT error:", err.message);
+        return res.status(401).json({ error: "Invalid or expired token" });
+    }
+}
+
+// --- Admin login (JWT) ---
+app.post("/api/admin/login", (req, res) => {
+    const { username, password } = req.body;
+
+    if (
+        username !== process.env.CLINIA_ADMIN_USERNAME ||
+        password !== process.env.CLINIA_ADMIN_PASSWORD
+    ) {
+        return res.status(401).json({ error: "Identifiants invalides" });
+    }
+
+    const token = jwt.sign(
+        { role: "admin" },
+        process.env.JWT_SECRET,
+        { expiresIn: "8h" }
+    );
+
+    res.json({ token });
+});
 
 // --- Mock simple (existant) ---
 app.get("/api/treatments", (req, res) => {
@@ -30,7 +69,7 @@ app.get("/health", (req, res) => {
 });
 
 // --- Mock Studio API : récupérer tous les mocks ---
-app.get("/api/mocks", (req, res) => {
+app.get("/api/mocks", requireAdmin, (req, res) => {
     try {
         const mocks = getAllMocks();
         res.json(mocks);
@@ -41,7 +80,7 @@ app.get("/api/mocks", (req, res) => {
 });
 
 // --- Mock Studio API : sauvegarder tous les mocks ---
-app.put("/api/mocks", (req, res) => {
+app.put("/api/mocks", requireAdmin, (req, res) => {
     try {
         const newData = req.body;
         saveAllMocks(newData);
@@ -51,7 +90,6 @@ app.put("/api/mocks", (req, res) => {
         res.status(400).json({ error: "Cannot save mocks", details: err.message });
     }
 });
-
 
 // --- OpenAI config ---
 const openai = new OpenAI({

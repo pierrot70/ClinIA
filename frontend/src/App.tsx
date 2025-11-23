@@ -9,8 +9,9 @@ import PatientSummary from "./pages/PatientSummary";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 
-// 🆕 Import de la page Mock Studio
 import MockStudio from "./pages/MockStudio";
+// 🆕 Import obligatoire pour que le bouton Admin fonctionne
+import AdminLogin from "./pages/AdminLogin";
 
 const App: React.FC = () => {
     return (
@@ -24,10 +25,10 @@ const App: React.FC = () => {
                     <Route path="/quick" element={<QuickMode />} />
                     <Route path="/patient-summary" element={<PatientSummary />} />
 
-                    {/* 🆕 Route Mock Studio */}
+                    {/* 🆕 Admin */}
+                    <Route path="/admin-login" element={<AdminLogin />} />
                     <Route path="/mock-studio" element={<MockStudio />} />
 
-                    {/* Catch-all */}
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </main>
