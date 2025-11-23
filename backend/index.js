@@ -1,16 +1,35 @@
+//-----------------------------------------------------
+// 1. IMPORTS
+//-----------------------------------------------------
 import express from "express";
 import cors from "cors";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
+import dotenv from "dotenv";
 
 import OpenAI from "openai";
 import { safeParseMedicalAI } from "./utils/aiParser.js";
-import { getMockForDiagnosis, getAllMocks, saveAllMocks } from "./utils/mockLoader.js";
+import {
+    getMockForDiagnosis,
+    getAllMocks,
+    saveAllMocks
+} from "./utils/mockLoader.js";
 
+import { AdminUser } from "./models/AdminUser.js";
 
+dotenv.config();
+
+//-----------------------------------------------------
+// 2. EXPRESS INIT
+//-----------------------------------------------------
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+//-----------------------------------------------------
+// 3. MIDDLEWARE EVALUEUR DE TOKEN ADMIN
+//-----------------------------------------------------
 function requireAdmin(req, res, next) {
     const auth = req.headers.authorization || "";
     const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
@@ -31,19 +50,41 @@ function requireAdmin(req, res, next) {
     }
 }
 
-// --- Admin login (JWT) ---
-app.post("/api/admin/login", (req, res) => {
+//-----------------------------------------------------
+// 4. ROUTE TEMPORAIRE POUR CRÉER L’ADMIN (À SUPPRIMER)
+//-----------------------------------------------------
+app.post("/api/admin/init", async (req, res) => {
     const { username, password } = req.body;
 
-    if (
-        username !== process.env.CLINIA_ADMIN_USERNAME ||
-        password !== process.env.CLINIA_ADMIN_PASSWORD
-    ) {
-        return res.status(401).json({ error: "Identifiants invalides" });
+    const exists = await AdminUser.findOne({ username });
+    if (exists) return res.status(400).json({ error: "Admin already exists" });
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    const admin = new AdminUser({ username, passwordHash });
+    await admin.save();
+
+    res.json({ ok: true });
+});
+
+//-----------------------------------------------------
+// 5. LOGIN ADMIN (bcrypt + JWT)
+//-----------------------------------------------------
+app.post("/api/admin/login", async (req, res) => {
+    const { username, password } = req.body;
+
+    const user = await AdminUser.findOne({ username });
+    if (!user) {
+        return res.status(401).json({ error: "Utilisateur admin inconnu" });
+    }
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+        return res.status(401).json({ error: "Mot de passe invalide" });
     }
 
     const token = jwt.sign(
-        { role: "admin" },
+        { role: "admin", id: user._id },
         process.env.JWT_SECRET,
         { expiresIn: "8h" }
     );
@@ -51,7 +92,31 @@ app.post("/api/admin/login", (req, res) => {
     res.json({ token });
 });
 
-// --- Mock simple (existant) ---
+//-----------------------------------------------------
+// 6. ROUTES MOCK STUDIO (protégées)
+//-----------------------------------------------------
+app.get("/api/mocks", requireAdmin, (req, res) => {
+    try {
+        res.json(getAllMocks());
+    } catch (err) {
+        console.error("Error reading mocks:", err);
+        res.status(500).json({ error: "Cannot read mocks" });
+    }
+});
+
+app.put("/api/mocks", requireAdmin, (req, res) => {
+    try {
+        saveAllMocks(req.body);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error("Error saving mocks:", err);
+        res.status(400).json({ error: "Cannot save mocks", details: err.message });
+    }
+});
+
+//-----------------------------------------------------
+// 7. ROUTES STANDARD
+//-----------------------------------------------------
 app.get("/api/treatments", (req, res) => {
     res.json({
         diagnosis: "Hypertension essentielle (mock)",
@@ -63,40 +128,20 @@ app.get("/api/treatments", (req, res) => {
     });
 });
 
-// --- Health check ---
 app.get("/health", (req, res) => {
     res.json({ status: "ok" });
 });
 
-// --- Mock Studio API : récupérer tous les mocks ---
-app.get("/api/mocks", requireAdmin, (req, res) => {
-    try {
-        const mocks = getAllMocks();
-        res.json(mocks);
-    } catch (err) {
-        console.error("Error reading mocks:", err);
-        res.status(500).json({ error: "Cannot read mocks" });
-    }
-});
-
-// --- Mock Studio API : sauvegarder tous les mocks ---
-app.put("/api/mocks", requireAdmin, (req, res) => {
-    try {
-        const newData = req.body;
-        saveAllMocks(newData);
-        res.json({ ok: true });
-    } catch (err) {
-        console.error("Error saving mocks:", err);
-        res.status(400).json({ error: "Cannot save mocks", details: err.message });
-    }
-});
-
-// --- OpenAI config ---
+//-----------------------------------------------------
+// 8. OPENAI CLIENT
+//-----------------------------------------------------
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
 
-// --- Route IA principale ---
+//-----------------------------------------------------
+// 9. ROUTE IA PRINCIPALE
+//-----------------------------------------------------
 app.post("/api/ai/analyze", async (req, res) => {
     try {
         const { diagnosis, patient } = req.body;
@@ -105,64 +150,37 @@ app.post("/api/ai/analyze", async (req, res) => {
             return res.status(400).json({ error: "Diagnosis is required." });
         }
 
-        // --- MODE MOCK IA (activé si .env -> CLINIA_MOCK_AI=true) ----
+        //--------------------------------------------------
+        // MODE MOCK IA
+        //--------------------------------------------------
         if (process.env.CLINIA_MOCK_AI === "true") {
-            console.log("🟡 ClinIA: MODE MOCK IA (AVANCÉ) ACTIVÉ");
-
+            console.log("🟡 ClinIA: MODE MOCK IA ACTIVÉ");
             const mock = getMockForDiagnosis(diagnosis);
             return res.json({ analysis: mock });
         }
 
-        // --------------------------------------------------------
-        // 🌟 MODE IA RÉELLE (OpenAI)
-        // --------------------------------------------------------
-
+        //--------------------------------------------------
+        // MODE IA OPENAI
+        //--------------------------------------------------
         const prompt = `
-Tu es ClinIA, un assistant clinique conçu pour aider les médecins.
-Tu DOIS répondre STRICTEMENT en JSON, sans aucun texte avant ou après.
+Tu es ClinIA, assistant clinique.
+Répond STRICTEMENT en JSON — aucun texte hors JSON.
 
-Diagnostic fourni : ${diagnosis}
-
-Contexte patient (simulé et non réel) :
-${JSON.stringify(patient, null, 2)}
-
-FORMAT JSON OBLIGATOIRE :
-
-{
-  "patient_summary": "Phrase courte expliquant la situation au patient.",
-  "treatments": [
-    {
-      "name": "Nom du traitement",
-      "justification": "Justification médicale courte.",
-      "contraindications": [
-        "Contre-indication 1",
-        "Contre-indication 2"
-      ],
-      "efficacy": 85
-    }
-  ]
-}
-
-Règles :
-- "efficacy" est un nombre de 0 à 100.
-- Les contre-indications doivent être un tableau de chaînes.
-- Pas d’essais expérimentaux.
-- Ne remplace jamais le jugement clinique.
+Diagnostic : ${diagnosis}
+Patient : ${JSON.stringify(patient, null, 2)}
         `;
 
         const aiResponse = await openai.chat.completions.create({
             model: process.env.OPENAI_MODEL,
             response_format: { type: "json_object" },
             messages: [
-                { role: "system", content: "Tu es ClinIA, assistant clinique." },
+                { role: "system", content: "ClinIA assistant clinique." },
                 { role: "user", content: prompt }
             ],
             temperature: 0.1
         });
 
-        const text = aiResponse.choices[0].message.content;
-
-        const structured = safeParseMedicalAI(text);
+        const structured = safeParseMedicalAI(aiResponse.choices[0].message.content);
         res.json({ analysis: structured });
 
     } catch (err) {
@@ -171,4 +189,18 @@ Règles :
     }
 });
 
-app.listen(4000, () => console.log("Backend ClinIA sur port 4000"));
+//-----------------------------------------------------
+// 10. MONGO CONNEXION
+//-----------------------------------------------------
+mongoose.connect(process.env.MONGO_URI + "/clinia", {
+    authSource: "admin"
+})
+    .then(() => console.log("MongoDB connecté (ClinIA)"))
+    .catch(err => console.error("Erreur MongoDB:", err));
+
+//-----------------------------------------------------
+// 11. LANCEMENT SERVEUR
+//-----------------------------------------------------
+app.listen(4000, () =>
+    console.log("Backend ClinIA sur http://localhost:4000 🚀")
+);
