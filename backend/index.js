@@ -53,19 +53,19 @@ function requireAdmin(req, res, next) {
 //-----------------------------------------------------
 // 4. ROUTE TEMPORAIRE POUR CRÉER L’ADMIN (À SUPPRIMER)
 //-----------------------------------------------------
-app.post("/api/admin/init", async (req, res) => {
-    const { username, password } = req.body;
-
-    const exists = await AdminUser.findOne({ username });
-    if (exists) return res.status(400).json({ error: "Admin already exists" });
-
-    const passwordHash = await bcrypt.hash(password, 12);
-
-    const admin = new AdminUser({ username, passwordHash });
-    await admin.save();
-
-    res.json({ ok: true });
-});
+// app.post("/api/admin/init", async (req, res) => {
+//     const { username, password } = req.body;
+//
+//     const exists = await AdminUser.findOne({ username });
+//     if (exists) return res.status(400).json({ error: "Admin already exists" });
+//
+//     const passwordHash = await bcrypt.hash(password, 12);
+//
+//     const admin = new AdminUser({ username, passwordHash });
+//     await admin.save();
+//
+//     res.json({ ok: true });
+// });
 
 //-----------------------------------------------------
 // 5. LOGIN ADMIN (bcrypt + JWT)
@@ -192,9 +192,7 @@ Patient : ${JSON.stringify(patient, null, 2)}
 //-----------------------------------------------------
 // 10. MONGO CONNEXION
 //-----------------------------------------------------
-mongoose.connect(process.env.MONGO_URI + "/clinia", {
-    authSource: "admin"
-})
+mongoose.connect(`${process.env.MONGO_URI}/clinia?authSource=admin`)
     .then(() => console.log("MongoDB connecté (ClinIA)"))
     .catch(err => console.error("Erreur MongoDB:", err));
 
