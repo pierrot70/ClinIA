@@ -26,7 +26,7 @@ const App: React.FC = () => {
                     <Route path="/patient-summary" element={<PatientSummary />} />
 
                     {/* 🆕 Admin */}
-                    <Route path="/admin-login" element={<AdminLogin />} />
+                    <Route path="/admin/login" element={<AdminLogin />} />
                     <Route path="/mock-studio" element={<MockStudio />} />
 
                     <Route path="*" element={<Navigate to="/" replace />} />

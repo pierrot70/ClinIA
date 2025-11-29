@@ -37,7 +37,7 @@ const MockStudio: React.FC = () => {
             const token = localStorage.getItem("clinia_admin_token");
 
             if (!token) {
-                navigate("/admin-login");
+                navigate("/admin/login");
                 return;
             }
 
@@ -50,7 +50,7 @@ const MockStudio: React.FC = () => {
 
                 if (res.status === 401 || res.status === 403) {
                     localStorage.removeItem("clinia_admin_token");
-                    navigate("/admin-login");
+                    navigate("/admin/login");
                     return;
                 }
 
@@ -92,7 +92,7 @@ const MockStudio: React.FC = () => {
             const token = localStorage.getItem("clinia_admin_token");
 
             if (!token) {
-                navigate("/admin-login");
+                navigate("/admin/login");
                 return;
             }
 
@@ -107,7 +107,7 @@ const MockStudio: React.FC = () => {
 
             if (res.status === 401 || res.status === 403) {
                 localStorage.removeItem("clinia_admin_token");
-                navigate("/admin-login");
+                navigate("/admin/login");
                 return;
             }
 
