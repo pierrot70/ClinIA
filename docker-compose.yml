@@ -1,62 +1,48 @@
+version: "3.9"
+
 services:
   mongo:
     image: mongo:7
-    container_name: clinia-mongo
     restart: always
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example123
     volumes:
       - mongo_data:/data/db
-    networks:
-      - clinia-net
 
   mongo-express:
     image: mongo-express:1
-    container_name: clinia-mongo-express
     restart: always
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: root
       ME_CONFIG_MONGODB_ADMINPASSWORD: example123
       ME_CONFIG_MONGODB_SERVER: mongo
     ports:
-      - "8081:8081"
+      - "8081:8081"    # Coolify expose ce port automatiquement
     depends_on:
       - mongo
-    networks:
-      - clinia-net
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: clinia-backend
+    restart: always
     environment:
-      MONGO_URI: mongodb://root:example123@mongo:27017
+      MONGO_URI: mongodb://root:example123@mongo:27017/clinia?authSource=admin
       JWT_SECRET: ${JWT_SECRET}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-    ports:
-      - "4000:4000"
+      OPENAI_MODEL: gpt-4.1-mini
+      CLINIA_MOCK_AI: true
     depends_on:
       - mongo
-    networks:
-      - clinia-net
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: clinia-frontend
-    ports:
-      - "8080:80"
+    restart: always
     depends_on:
       - backend
-    networks:
-      - clinia-net
-
-networks:
-  clinia-net:
-    driver: bridge
 
 volumes:
   mongo_data:

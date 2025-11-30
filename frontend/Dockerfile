@@ -2,23 +2,15 @@
 FROM node:20-alpine AS build
 
 WORKDIR /app
-
-# Copie package.json + package-lock.json si existant
 COPY package*.json ./
-
 RUN npm install
-
-# Copie tout le code
 COPY . .
-
 RUN npm run build
 
-# Production stage
+# Prod stage
 FROM nginx:1.27-alpine
 
 COPY --from=build /app/dist /usr/share/nginx/html
-
-RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
