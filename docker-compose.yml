@@ -15,7 +15,7 @@ services:
       ME_CONFIG_MONGODB_ADMINUSERNAME: root
       ME_CONFIG_MONGODB_ADMINPASSWORD: example123
       ME_CONFIG_MONGODB_SERVER: mongo
-    expose:
+    ports:
       - "8081:8081"
     depends_on:
       - mongo
@@ -31,7 +31,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: gpt-4.1-mini
       CLINIA_MOCK_AI: "true"
-    expose:
+    ports:
       - "4000:4000"
     depends_on:
       - mongo
@@ -41,8 +41,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     restart: always
-    expose:
-      - "8080:80"
+    ports:
+      - "8082:80"
     depends_on:
       - backend
 
