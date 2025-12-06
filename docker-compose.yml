@@ -12,8 +12,10 @@ services:
     image: mongo-express:1
     restart: always
     environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: root
-      ME_CONFIG_MONGODB_ADMINPASSWORD: example123
+      ME_CONFIG_BASICAUTH_USERNAME: "plasante"
+      ME_CONFIG_BASICAUTH_PASSWORD: "321eRRe!p"
+      ME_CONFIG_MONGODB_ADMINUSERNAME: "root"
+      ME_CONFIG_MONGODB_ADMINPASSWORD: "321eRRe!p"
       ME_CONFIG_MONGODB_SERVER: mongo
     ports:
       - "8081:8081"
