@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, Link } from "react-router-dom";
 
 import { hypertensionTreatments, anticipatedQuestions } from "../data/hypertension";
@@ -25,6 +25,12 @@ const Results: React.FC = () => {
     // ✅ IMPORTANT: same-origin pour que ça marche en prod (Coolify/DO) et en local (avec proxy Vite)
     const AI_ENDPOINT = "/api/ai/analyze";
 
+    // 🔁 Toggle: IA réelle (forceReal=true)
+    const [realAI, setRealAI] = useState(false);
+
+    // (optionnel) Empêche de spammer le backend si tu recliques trop vite
+    const canToggle = useMemo(() => !loadingAI, [loadingAI]);
+
     // 🌟 Appel IA
     useEffect(() => {
         const fetchAI = async () => {
@@ -38,6 +44,8 @@ const Results: React.FC = () => {
                     body: JSON.stringify({
                         diagnosis: q,
                         patient: { age: 55, bp: "140/90", simulated: true },
+                        // ✅ Le backend doit respecter ce flag (forceReal)
+                        forceReal: realAI,
                     }),
                 });
 
@@ -56,7 +64,6 @@ const Results: React.FC = () => {
                     return;
                 }
 
-                // 🎯 données structurées venant du backend
                 setAnalysis(json.analysis);
             } catch (err) {
                 console.error("Erreur IA:", err);
@@ -68,20 +75,49 @@ const Results: React.FC = () => {
         };
 
         fetchAI();
-    }, [q]);
+    }, [q, realAI]);
 
     return (
         <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
             {/* ------------------------------ HEADER ------------------------------ */}
             <header className="space-y-2">
-                <p className="text-xs text-gray-500 uppercase tracking-wide">
-                    Diagnostic saisi
-                </p>
-                <h1 className="text-2xl font-semibold text-gray-900">{q}</h1>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Diagnostic saisi</p>
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <h1 className="text-2xl font-semibold text-gray-900">{q}</h1>
+
+                    {/* ✅ Bouton IA réelle */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            disabled={!canToggle}
+                            onClick={() => setRealAI((v) => !v)}
+                            className={`px-3 py-2 rounded-lg text-xs font-medium border transition disabled:opacity-50 ${
+                                realAI
+                                    ? "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700"
+                                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                            }`}
+                            title="Force une requête réelle (OpenAI) au lieu du mock"
+                        >
+                            {realAI ? "IA réelle: ON" : "IA réelle: OFF"}
+                        </button>
+
+                        <span className="text-[11px] text-gray-500">
+              {realAI ? "Requête OpenAI" : "Réponse mock"}
+            </span>
+                    </div>
+                </div>
+
                 <p className="text-sm text-gray-600 max-w-2xl">
-                    Résumé généré à partir d’une analyse simulée pour illustrer la manière
-                    dont ClinIA pourrait aider à guider les décisions thérapeutiques.
+                    Résumé généré à partir d’une analyse simulée pour illustrer la manière dont ClinIA
+                    pourrait aider à guider les décisions thérapeutiques.
                 </p>
+
+                {realAI && (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 max-w-2xl">
+                        ⚠️ IA réelle activée : ceci peut consommer des crédits OpenAI.
+                    </p>
+                )}
             </header>
 
             {/* ------------------------------ ANALYSE IA ------------------------------ */}
@@ -104,19 +140,12 @@ const Results: React.FC = () => {
                         Pour ce scénario, <span className="font-semibold">{top.name}</span>{" "}
                         est proposé comme agent de première ligne.
                     </p>
-                    <p className="text-xs text-gray-500 mt-2">
-                        Contenu fictif à des fins de démonstration.
-                    </p>
+                    <p className="text-xs text-gray-500 mt-2">Contenu fictif à des fins de démonstration.</p>
                 </div>
                 <div className="text-right text-sm">
                     <div className="text-xs text-gray-500">Efficacité simulée</div>
-                    <div className="text-3xl font-semibold text-primary">
-                        {Math.round(top.efficacy * 100)}%
-                    </div>
-                    <Link
-                        to="/quick"
-                        className="mt-2 inline-block text-xs text-primary hover:underline"
-                    >
+                    <div className="text-3xl font-semibold text-primary">{Math.round(top.efficacy * 100)}%</div>
+                    <Link to="/quick" className="mt-2 inline-block text-xs text-primary hover:underline">
                         Voir le mode résumé →
                     </Link>
                 </div>
@@ -136,12 +165,10 @@ const Results: React.FC = () => {
 
             {/* ------------------------------ QUESTIONS ------------------------------ */}
             <section className="space-y-3">
-                <h2 className="text-sm font-semibold text-gray-800">
-                    Questions fréquentes (simulation)
-                </h2>
+                <h2 className="text-sm font-semibold text-gray-800">Questions fréquentes (simulation)</h2>
                 <p className="text-xs text-gray-500">
-                    Ces réponses sont simulées pour illustrer la manière dont ClinIA
-                    pourrait anticiper les interrogations d’un clinicien.
+                    Ces réponses sont simulées pour illustrer la manière dont ClinIA pourrait anticiper les
+                    interrogations d’un clinicien.
                 </p>
 
                 <div className="space-y-2">
