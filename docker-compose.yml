@@ -35,6 +35,18 @@ services:
       CLINIA_MOCK_AI: "true"
     ports:
       - "4000:4000"
+    labels:
+      - "traefik.enable=true"
+
+      # API sur le même domaine, seulement pour /api
+      - "traefik.http.routers.clinia-api-https.rule=(Host(`clinique-ai.ca`) || Host(`www.clinique-ai.ca`)) && PathPrefix(`/api`)"
+      - "traefik.http.routers.clinia-api-https.entrypoints=https"
+      - "traefik.http.routers.clinia-api-https.tls=true"
+      - "traefik.http.routers.clinia-api-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.clinia-api-https.priority=100"
+
+      - "traefik.http.services.clinia-api.loadbalancer.server.port=4000"
+      - "traefik.http.routers.clinia-api-https.service=clinia-api"
     depends_on:
       - mongo
 
