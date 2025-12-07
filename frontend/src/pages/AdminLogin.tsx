@@ -2,7 +2,12 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+// En prod (DigitalOcean), on veut appeler /api sur le même domaine (https://clinique-ai.ca)
+// En dev local, on peut utiliser VITE_API_URL (ex: http://localhost:4000) ou fallback localhost.
+const API_URL =
+    import.meta.env.PROD
+        ? "" // same-origin
+        : (import.meta.env.VITE_API_URL || "http://localhost:4000");
 
 const AdminLogin: React.FC = () => {
     const [username, setUsername] = useState("admin");
@@ -24,16 +29,16 @@ const AdminLogin: React.FC = () => {
                 body: JSON.stringify({ username, password }),
             });
 
+            const data = await res.json().catch(() => ({}));
+
             if (!res.ok) {
-                const j = await res.json().catch(() => ({}));
-                throw new Error(j.error || "Erreur de connexion");
+                throw new Error(data.error || "Erreur de connexion");
             }
 
-            const data = await res.json();
             localStorage.setItem("clinia_admin_token", data.token);
             navigate("/mock-studio");
         } catch (err: any) {
-            setError(err.message || "Erreur inconnue");
+            setError(err?.message || "Erreur inconnue");
         } finally {
             setLoading(false);
         }
@@ -64,6 +69,7 @@ const AdminLogin: React.FC = () => {
                         className="w-full border rounded-lg px-3 py-2 text-sm"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
+                        autoComplete="username"
                     />
                 </div>
 
@@ -76,6 +82,7 @@ const AdminLogin: React.FC = () => {
                         className="w-full border rounded-lg px-3 py-2 text-sm"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="current-password"
                     />
                 </div>
 
