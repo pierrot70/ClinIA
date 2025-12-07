@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, Link } from "react-router-dom";
 
-import {
-    hypertensionTreatments,
-    anticipatedQuestions,
-} from "../data/hypertension";
+import { hypertensionTreatments, anticipatedQuestions } from "../data/hypertension";
 
 import TreatmentCard from "../components/TreatmentCard";
 import ChartCard from "../components/ChartCard";
@@ -25,14 +22,17 @@ const Results: React.FC = () => {
     const [loadingAI, setLoadingAI] = useState(true);
     const [aiError, setAiError] = useState(false);
 
-    const API_URL =
-        import.meta.env.VITE_API_URL || "http://localhost:4000";
+    // ✅ IMPORTANT: same-origin pour que ça marche en prod (Coolify/DO) et en local (avec proxy Vite)
+    const AI_ENDPOINT = "/api/ai/analyze";
 
     // 🌟 Appel IA
     useEffect(() => {
         const fetchAI = async () => {
+            setLoadingAI(true);
+            setAiError(false);
+
             try {
-                const res = await fetch(`${API_URL}/api/ai/analyze`, {
+                const res = await fetch(AI_ENDPOINT, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -41,7 +41,14 @@ const Results: React.FC = () => {
                     }),
                 });
 
-                const json = await res.json();
+                const json = await res.json().catch(() => ({}));
+
+                if (!res.ok) {
+                    console.error("Erreur API analyze:", res.status, json);
+                    setAiError(true);
+                    setAnalysis({ patient_summary: "", treatments: [] });
+                    return;
+                }
 
                 if (!json || !json.analysis) {
                     setAiError(true);
@@ -49,19 +56,19 @@ const Results: React.FC = () => {
                     return;
                 }
 
-                // 🎯 NOUVEAU : données structurées venant du backend
+                // 🎯 données structurées venant du backend
                 setAnalysis(json.analysis);
-
             } catch (err) {
                 console.error("Erreur IA:", err);
                 setAiError(true);
+                setAnalysis({ patient_summary: "", treatments: [] });
             } finally {
                 setLoadingAI(false);
             }
         };
 
         fetchAI();
-    }, [q, API_URL]);
+    }, [q]);
 
     return (
         <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
@@ -72,20 +79,14 @@ const Results: React.FC = () => {
                 </p>
                 <h1 className="text-2xl font-semibold text-gray-900">{q}</h1>
                 <p className="text-sm text-gray-600 max-w-2xl">
-                    Résumé généré à partir d’une analyse simulée pour illustrer
-                    la manière dont ClinIA pourrait aider à guider les décisions
-                    thérapeutiques.
+                    Résumé généré à partir d’une analyse simulée pour illustrer la manière
+                    dont ClinIA pourrait aider à guider les décisions thérapeutiques.
                 </p>
             </header>
 
             {/* ------------------------------ ANALYSE IA ------------------------------ */}
             <section className="space-y-4">
-
-                <AICard
-                    loading={loadingAI}
-                    error={aiError}
-                    text={analysis?.patient_summary}
-                />
+                <AICard loading={loadingAI} error={aiError} text={analysis?.patient_summary} />
 
                 {/* Tableau structuré ClinIA */}
                 {analysis?.treatments && analysis.treatments.length > 0 && (
@@ -100,8 +101,7 @@ const Results: React.FC = () => {
                         Traitement suggéré (simulation)
                     </h2>
                     <p className="text-sm text-gray-700">
-                        Pour ce scénario,{" "}
-                        <span className="font-semibold">{top.name}</span>{" "}
+                        Pour ce scénario, <span className="font-semibold">{top.name}</span>{" "}
                         est proposé comme agent de première ligne.
                     </p>
                     <p className="text-xs text-gray-500 mt-2">
@@ -109,9 +109,7 @@ const Results: React.FC = () => {
                     </p>
                 </div>
                 <div className="text-right text-sm">
-                    <div className="text-xs text-gray-500">
-                        Efficacité simulée
-                    </div>
+                    <div className="text-xs text-gray-500">Efficacité simulée</div>
                     <div className="text-3xl font-semibold text-primary">
                         {Math.round(top.efficacy * 100)}%
                     </div>
@@ -142,17 +140,13 @@ const Results: React.FC = () => {
                     Questions fréquentes (simulation)
                 </h2>
                 <p className="text-xs text-gray-500">
-                    Ces réponses sont simulées pour illustrer la manière dont
-                    ClinIA pourrait anticiper les interrogations d’un clinicien.
+                    Ces réponses sont simulées pour illustrer la manière dont ClinIA
+                    pourrait anticiper les interrogations d’un clinicien.
                 </p>
 
                 <div className="space-y-2">
                     {anticipatedQuestions.map((qa) => (
-                        <QuestionCard
-                            key={qa.question}
-                            question={qa.question}
-                            answer={qa.answer}
-                        />
+                        <QuestionCard key={qa.question} question={qa.question} answer={qa.answer} />
                     ))}
                 </div>
             </section>
