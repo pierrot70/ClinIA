@@ -2,13 +2,11 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-// En prod (DigitalOcean), on veut appeler /api sur le même domaine (https://clinique-ai.ca)
-// En dev local, on peut utiliser VITE_API_URL (ex: http://localhost:4000) ou fallback localhost.
-const API_URL =
-    import.meta.env.PROD
-        ? "" // same-origin
-        : (import.meta.env.VITE_API_URL || "http://localhost:4000");
-
+// IMPORTANT:
+// On utilise toujours une URL relative (same-origin).
+// - En prod (Coolify/DO): Traefik route /api -> backend ✅
+// - En local: configure un proxy Vite /api -> http://localhost:4000 ✅
+// Donc: aucun VITE_API_URL, aucun import.meta.env.PROD nécessaire.
 const AdminLogin: React.FC = () => {
     const [username, setUsername] = useState("admin");
     const [password, setPassword] = useState("");
@@ -23,7 +21,7 @@ const AdminLogin: React.FC = () => {
         setLoading(true);
 
         try {
-            const res = await fetch(`${API_URL}/api/admin/login`, {
+            const res = await fetch("/api/admin/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ username, password }),
@@ -62,7 +60,7 @@ const AdminLogin: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
-                        Nom d'utilisateur
+                        Nom d&apos;utilisateur
                     </label>
                     <input
                         type="text"
