@@ -10,11 +10,7 @@ import dotenv from "dotenv";
 
 import OpenAI from "openai";
 import { safeParseMedicalAI } from "./utils/aiParser.js";
-import {
-    getMockForDiagnosis,
-    getAllMocks,
-    saveAllMocks
-} from "./utils/mockLoader.js";
+import { getMockForDiagnosis, getAllMocks, saveAllMocks } from "./utils/mockLoader.js";
 
 import { AdminUser } from "./models/AdminUser.js";
 
@@ -51,23 +47,6 @@ function requireAdmin(req, res, next) {
 }
 
 //-----------------------------------------------------
-// 4. ROUTE TEMPORAIRE POUR CRÉER L’ADMIN (À SUPPRIMER)
-//-----------------------------------------------------
-// app.post("/api/admin/init", async (req, res) => {
-//     const { username, password } = req.body;
-//
-//     const exists = await AdminUser.findOne({ username });
-//     if (exists) return res.status(400).json({ error: "Admin already exists" });
-//
-//     const passwordHash = await bcrypt.hash(password, 12);
-//
-//     const admin = new AdminUser({ username, passwordHash });
-//     await admin.save();
-//
-//     res.json({ ok: true });
-// });
-
-//-----------------------------------------------------
 // 5. LOGIN ADMIN (bcrypt + JWT)
 //-----------------------------------------------------
 app.post("/api/admin/login", async (req, res) => {
@@ -83,11 +62,9 @@ app.post("/api/admin/login", async (req, res) => {
         return res.status(401).json({ error: "Mot de passe invalide" });
     }
 
-    const token = jwt.sign(
-        { role: "admin", id: user._id },
-        process.env.JWT_SECRET,
-        { expiresIn: "8h" }
-    );
+    const token = jwt.sign({ role: "admin", id: user._id }, process.env.JWT_SECRET, {
+        expiresIn: "8h",
+    });
 
     res.json({ token });
 });
@@ -123,8 +100,8 @@ app.get("/api/treatments", (req, res) => {
         treatments: [
             { name: "Indapamide", efficacy: 94 },
             { name: "Amlodipine", efficacy: 89 },
-            { name: "Candesartan", efficacy: 85 }
-        ]
+            { name: "Candesartan", efficacy: 85 },
+        ],
     });
 });
 
@@ -136,8 +113,34 @@ app.get("/health", (req, res) => {
 // 8. OPENAI CLIENT
 //-----------------------------------------------------
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
+    apiKey: process.env.OPENAI_API_KEY,
 });
+
+//-----------------------------------------------------
+// 8.1 NORMALISATION IA (garantit patient_summary + treatments)
+//-----------------------------------------------------
+function normalizeAnalysis(raw) {
+    const obj = raw && typeof raw === "object" ? raw : {};
+
+    const patient_summary =
+        obj.patient_summary ??
+        obj.patientSummary ??
+        obj.summary ??
+        obj.summary_patient ??
+        obj.patient?.summary ??
+        "";
+
+    const treatmentsRaw =
+        obj.treatments ??
+        obj.treatment_plan ??
+        obj.recommended_treatments ??
+        obj.recommendations ??
+        [];
+
+    const treatments = Array.isArray(treatmentsRaw) ? treatmentsRaw : [];
+
+    return { patient_summary, treatments };
+}
 
 //-----------------------------------------------------
 // 9. ROUTE IA PRINCIPALE
@@ -157,19 +160,37 @@ app.post("/api/ai/analyze", async (req, res) => {
         if (useMock) {
             console.log("🟡 ClinIA: MODE MOCK IA ACTIVÉ (forceReal=false)");
             const mock = getMockForDiagnosis(diagnosis);
-            return res.json({ analysis: mock });
+            return res.json({ analysis: normalizeAnalysis(mock) }); // ✅ toujours normalisé
         }
 
-        console.log("🟢 ClinIA: MODE IA RÉEL (OpenAI) (forceReal=true ou CLINIA_MOCK_AI!=true)");
+        console.log("🟢 ClinIA: MODE IA RÉEL (OpenAI)");
 
-        // --- ton code OpenAI ICI (inchangé) ---
+        // ✅ Prompt strict avec schéma attendu
         const prompt = `
 Tu es ClinIA, assistant clinique.
-Répond STRICTEMENT en JSON — aucun texte hors JSON.
+Répond STRICTEMENT en JSON (un seul objet), sans texte hors JSON.
 
-Diagnostic : ${diagnosis}
-Patient : ${JSON.stringify(patient, null, 2)}
-    `;
+Tu dois produire EXACTEMENT cette forme:
+{
+  "patient_summary": "string",
+  "treatments": [
+    {
+      "name": "string",
+      "justification": "string",
+      "contraindications": ["string"],
+      "efficacy": 0
+    }
+  ]
+}
+
+Règles:
+- patient_summary: 1-3 phrases max.
+- efficacy: nombre entre 0 et 100.
+- contraindications: tableau (vide si aucune).
+
+Diagnostic: ${diagnosis}
+Patient: ${JSON.stringify(patient ?? {}, null, 2)}
+`;
 
         const aiResponse = await openai.chat.completions.create({
             model: process.env.OPENAI_MODEL,
@@ -181,14 +202,15 @@ Patient : ${JSON.stringify(patient, null, 2)}
             temperature: 0.1,
         });
 
-        const structured = safeParseMedicalAI(aiResponse.choices[0].message.content);
+        const raw = safeParseMedicalAI(aiResponse.choices[0].message.content);
+        const structured = normalizeAnalysis(raw);
+
         return res.json({ analysis: structured });
     } catch (err) {
         console.error("OpenAI error:", err);
         return res.status(500).json({ error: "Erreur IA", details: err.message });
     }
 });
-
 
 //-----------------------------------------------------
 // 10. MONGO CONNEXION
@@ -201,6 +223,4 @@ mongoose
 //-----------------------------------------------------
 // 11. LANCEMENT SERVEUR
 //-----------------------------------------------------
-app.listen(4000, () =>
-    console.log("Backend ClinIA sur http://localhost:4000 🚀")
-);
+app.listen(4000, () => console.log("Backend ClinIA sur http://localhost:4000 🚀"));
