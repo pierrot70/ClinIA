@@ -4,7 +4,7 @@ services:
     restart: always
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: 321eRRe!p
+      MONGO_INITDB_ROOT_PASSWORD: "321eRRe!p"
     volumes:
       - mongo_data:/data/db
 
@@ -13,9 +13,9 @@ services:
     restart: always
     environment:
       ME_CONFIG_BASICAUTH_USERNAME: plasante
-      ME_CONFIG_BASICAUTH_PASSWORD: 321eRRe!p
+      ME_CONFIG_BASICAUTH_PASSWORD: "321eRRe!p"
       ME_CONFIG_MONGODB_ADMINUSERNAME: root
-      ME_CONFIG_MONGODB_ADMINPASSWORD: 321eRRe!p
+      ME_CONFIG_MONGODB_ADMINPASSWORD: "321eRRe!p"
       ME_CONFIG_MONGODB_SERVER: mongo
     ports:
       - "8081:8081"
@@ -44,12 +44,27 @@ services:
       dockerfile: Dockerfile
     restart: always
     ports:
-      - "8082:80"
+      - "8082:80" # debug direct (http://clinique-ai.ca:8082)
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`clinique-ai.ca`) || Host(`www.clinique-ai.ca`)"
-      - "traefik.http.routers.frontend.entrypoints=http"
-      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+
+      # --- HTTP -> HTTPS redirect
+      - "traefik.http.routers.clinia-frontend-http.rule=Host(`clinique-ai.ca`) || Host(`www.clinique-ai.ca`)"
+      - "traefik.http.routers.clinia-frontend-http.entrypoints=http"
+      - "traefik.http.routers.clinia-frontend-http.middlewares=clinia-redirect-to-https"
+      - "traefik.http.middlewares.clinia-redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.clinia-redirect-to-https.redirectscheme.permanent=true"
+
+      # --- HTTPS (443) with Let's Encrypt via Coolify's Traefik
+      - "traefik.http.routers.clinia-frontend-https.rule=Host(`clinique-ai.ca`) || Host(`www.clinique-ai.ca`)"
+      - "traefik.http.routers.clinia-frontend-https.entrypoints=https"
+      - "traefik.http.routers.clinia-frontend-https.tls=true"
+      - "traefik.http.routers.clinia-frontend-https.tls.certresolver=letsencrypt"
+
+      # --- service port inside container
+      - "traefik.http.services.clinia-frontend.loadbalancer.server.port=80"
+      - "traefik.http.routers.clinia-frontend-http.service=clinia-frontend"
+      - "traefik.http.routers.clinia-frontend-https.service=clinia-frontend"
     depends_on:
       - backend
 
