@@ -192,9 +192,10 @@ Patient : ${JSON.stringify(patient, null, 2)}
 //-----------------------------------------------------
 // 10. MONGO CONNEXION
 //-----------------------------------------------------
-mongoose.connect(`${process.env.MONGO_URI}/clinia?authSource=admin`)
+mongoose
+    .connect(process.env.MONGO_URI)
     .then(() => console.log("MongoDB connecté (ClinIA)"))
-    .catch(err => console.error("Erreur MongoDB:", err));
+    .catch((err) => console.error("Erreur MongoDB:", err));
 
 //-----------------------------------------------------
 // 11. LANCEMENT SERVEUR
