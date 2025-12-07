@@ -24,6 +24,38 @@ app.use(cors());
 app.use(express.json());
 
 //-----------------------------------------------------
+// 🔒 GLOBAL Rate limit OpenAI: 1 requête / 5 minutes (tous clients confondus)
+// - Appliqué seulement si on va appeler OpenAI (pas en mock)
+//-----------------------------------------------------
+const AI_GLOBAL_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+let aiGlobalNextAllowedAt = 0;
+
+function rateLimitGlobalAI(req, res, next) {
+    const now = Date.now();
+
+    if (now < aiGlobalNextAllowedAt) {
+        const retryAfterSec = Math.ceil((aiGlobalNextAllowedAt - now) / 1000);
+        res.setHeader("Retry-After", String(retryAfterSec));
+        res.setHeader("X-RateLimit-Limit", "1");
+        res.setHeader("X-RateLimit-Remaining", "0");
+        res.setHeader("X-RateLimit-Reset", String(Math.ceil(aiGlobalNextAllowedAt / 1000)));
+        return res.status(429).json({
+            error: "Too many requests",
+            details: "Global rate limit: 1 real AI request per 5 minutes",
+            retry_after_seconds: retryAfterSec,
+        });
+    }
+
+    // Autorise cette requête et bloque les suivantes jusqu'à +5 min
+    aiGlobalNextAllowedAt = now + AI_GLOBAL_WINDOW_MS;
+
+    res.setHeader("X-RateLimit-Limit", "1");
+    res.setHeader("X-RateLimit-Remaining", "0");
+    res.setHeader("X-RateLimit-Reset", String(Math.ceil(aiGlobalNextAllowedAt / 1000)));
+    return next();
+}
+
+//-----------------------------------------------------
 // 3. MIDDLEWARE EVALUEUR DE TOKEN ADMIN
 //-----------------------------------------------------
 function requireAdmin(req, res, next) {
@@ -158,15 +190,17 @@ app.post("/api/ai/analyze", async (req, res) => {
         const useMock = process.env.CLINIA_MOCK_AI === "true" && forceReal !== true;
 
         if (useMock) {
-            console.log("🟡 ClinIA: MODE MOCK IA ACTIVÉ (forceReal=false)");
+            console.log("🟡 ClinIA: MODE MOCK IA");
             const mock = getMockForDiagnosis(diagnosis);
-            return res.json({ analysis: normalizeAnalysis(mock) }); // ✅ toujours normalisé
+            return res.json({ analysis: normalizeAnalysis(mock) });
         }
 
-        console.log("🟢 ClinIA: MODE IA RÉEL (OpenAI)");
+        // ✅ GLOBAL rate limit: 1 vraie requête / 5 minutes
+        return rateLimitGlobalAI(req, res, async () => {
+            try {
+                console.log("🟢 ClinIA: MODE IA RÉEL (OpenAI) [rate-limited global]");
 
-        // ✅ Prompt strict avec schéma attendu
-        const prompt = `
+                const prompt = `
 Tu es ClinIA, assistant clinique.
 Répond STRICTEMENT en JSON (un seul objet), sans texte hors JSON.
 
@@ -192,22 +226,26 @@ Diagnostic: ${diagnosis}
 Patient: ${JSON.stringify(patient ?? {}, null, 2)}
 `;
 
-        const aiResponse = await openai.chat.completions.create({
-            model: process.env.OPENAI_MODEL,
-            response_format: { type: "json_object" },
-            messages: [
-                { role: "system", content: "ClinIA assistant clinique." },
-                { role: "user", content: prompt },
-            ],
-            temperature: 0.1,
+                const aiResponse = await openai.chat.completions.create({
+                    model: process.env.OPENAI_MODEL,
+                    response_format: { type: "json_object" },
+                    messages: [
+                        { role: "system", content: "ClinIA assistant clinique." },
+                        { role: "user", content: prompt },
+                    ],
+                    temperature: 0.1,
+                });
+
+                const raw = safeParseMedicalAI(aiResponse.choices[0].message.content);
+                const structured = normalizeAnalysis(raw);
+                return res.json({ analysis: structured });
+            } catch (err) {
+                console.error("OpenAI error:", err);
+                return res.status(500).json({ error: "Erreur IA", details: err.message });
+            }
         });
-
-        const raw = safeParseMedicalAI(aiResponse.choices[0].message.content);
-        const structured = normalizeAnalysis(raw);
-
-        return res.json({ analysis: structured });
     } catch (err) {
-        console.error("OpenAI error:", err);
+        console.error("Route error:", err);
         return res.status(500).json({ error: "Erreur IA", details: err.message });
     }
 });
