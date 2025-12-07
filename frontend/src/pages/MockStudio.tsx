@@ -2,8 +2,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
-
 type Treatment = {
     name: string;
     justification: string;
@@ -30,7 +28,7 @@ const MockStudio: React.FC = () => {
     const navigate = useNavigate();
 
     // ------------------------------------------
-    // 🔐 Charger les mocks AVEC VÉRIFICATION JWT
+    // 🔐 Charger les mocks (JWT obligatoire)
     // ------------------------------------------
     useEffect(() => {
         const fetchMocks = async () => {
@@ -42,7 +40,7 @@ const MockStudio: React.FC = () => {
             }
 
             try {
-                const res = await fetch(`${API_URL}/api/mocks`, {
+                const res = await fetch("/api/mocks", {
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },
@@ -96,7 +94,7 @@ const MockStudio: React.FC = () => {
                 return;
             }
 
-            const res = await fetch(`${API_URL}/api/mocks`, {
+            const res = await fetch("/api/mocks", {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -145,6 +143,7 @@ const MockStudio: React.FC = () => {
 
     const handleDeleteCondition = () => {
         if (!selectedKey) return;
+        // eslint-disable-next-line no-restricted-globals
         if (!confirm(`Supprimer "${selectedKey}" ?`)) return;
 
         setMocks((prev) => {
@@ -217,16 +216,18 @@ const MockStudio: React.FC = () => {
             </header>
 
             {error && (
-                <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>
+                <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm">
+                    {error}
+                </div>
             )}
 
             {info && (
-                <div className="p-3 rounded-lg bg-green-50 text-green-700 text-sm">{info}</div>
+                <div className="p-3 rounded-lg bg-green-50 text-green-700 text-sm">
+                    {info}
+                </div>
             )}
 
-            {/* Layout */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* ---- Liste diagnostics ---- */}
                 <aside className="md:col-span-1 border rounded-xl bg-white p-3 space-y-3">
                     <div className="flex items-center justify-between mb-2">
                         <h2 className="text-sm font-semibold text-gray-800">
@@ -264,7 +265,6 @@ const MockStudio: React.FC = () => {
                     </p>
                 </aside>
 
-                {/* ---- Éditeur ---- */}
                 <main className="md:col-span-2 border rounded-xl bg-white p-4 space-y-4">
                     {!selectedKey || !current ? (
                         <p className="text-sm text-gray-500">
@@ -277,9 +277,7 @@ const MockStudio: React.FC = () => {
                                     <h2 className="text-lg font-semibold text-gray-900">
                                         {selectedKey}
                                     </h2>
-                                    <p className="text-xs text-gray-500">
-                                        Clé interne du mock.
-                                    </p>
+                                    <p className="text-xs text-gray-500">Clé interne du mock.</p>
                                 </div>
 
                                 <button
@@ -290,7 +288,6 @@ const MockStudio: React.FC = () => {
                                 </button>
                             </div>
 
-                            {/* Match */}
                             <div>
                                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                                     Mots-clés (match)
@@ -312,7 +309,6 @@ const MockStudio: React.FC = () => {
                                 />
                             </div>
 
-                            {/* Résumé patient */}
                             <div>
                                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                                     Résumé patient
@@ -329,7 +325,6 @@ const MockStudio: React.FC = () => {
                                 />
                             </div>
 
-                            {/* Traitements */}
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-sm font-semibold text-gray-800">
@@ -344,7 +339,10 @@ const MockStudio: React.FC = () => {
                                 </div>
 
                                 {current.treatments.map((t, index) => (
-                                    <div key={index} className="border rounded-lg p-3 space-y-2 text-sm">
+                                    <div
+                                        key={index}
+                                        className="border rounded-lg p-3 space-y-2 text-sm"
+                                    >
                                         <div className="flex items-center justify-between">
                                             <input
                                                 type="text"
@@ -367,7 +365,6 @@ const MockStudio: React.FC = () => {
                                             </button>
                                         </div>
 
-                                        {/* Justification */}
                                         <div>
                                             <label className="block text-xs font-semibold text-gray-600 mb-1">
                                                 Justification
@@ -378,14 +375,16 @@ const MockStudio: React.FC = () => {
                                                 onChange={(e) =>
                                                     updateCurrentEntry((prev) => {
                                                         const c = [...prev.treatments];
-                                                        c[index] = { ...c[index], justification: e.target.value };
+                                                        c[index] = {
+                                                            ...c[index],
+                                                            justification: e.target.value,
+                                                        };
                                                         return { ...prev, treatments: c };
                                                     })
                                                 }
                                             />
                                         </div>
 
-                                        {/* CI + efficacité */}
                                         <div className="grid grid-cols-2 gap-2">
                                             <div>
                                                 <label className="block text-xs font-semibold text-gray-600 mb-1">
