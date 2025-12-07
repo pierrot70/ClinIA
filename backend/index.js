@@ -24,35 +24,54 @@ app.use(cors());
 app.use(express.json());
 
 //-----------------------------------------------------
-// 🔒 GLOBAL Rate limit OpenAI: 1 requête / 5 minutes (tous clients confondus)
-// - Appliqué seulement si on va appeler OpenAI (pas en mock)
+// 🔒 GLOBAL Rate limit OpenAI (tous clients confondus)
+// Configurable via ENV:
+// - CLINIA_REAL_AI_WINDOW_SECONDS (default 300 = 5 min)
+// - CLINIA_REAL_AI_MAX (default 1)
+// Appliqué seulement si on va appeler OpenAI (pas en mock)
 //-----------------------------------------------------
-const AI_GLOBAL_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
-let aiGlobalNextAllowedAt = 0;
+const AI_GLOBAL_WINDOW_MS =
+    (Number(process.env.CLINIA_REAL_AI_WINDOW_SECONDS) || 300) * 1000;
+
+const AI_GLOBAL_MAX = Number(process.env.CLINIA_REAL_AI_MAX) || 1;
+
+// État global en mémoire (OK pour 1 droplet / 1 instance)
+let aiGlobal = { windowStart: 0, count: 0 };
 
 function rateLimitGlobalAI(req, res, next) {
     const now = Date.now();
 
-    if (now < aiGlobalNextAllowedAt) {
-        const retryAfterSec = Math.ceil((aiGlobalNextAllowedAt - now) / 1000);
+    // reset fenêtre si expirée
+    if (!aiGlobal.windowStart || now - aiGlobal.windowStart >= AI_GLOBAL_WINDOW_MS) {
+        aiGlobal = { windowStart: now, count: 0 };
+    }
+
+    if (aiGlobal.count >= AI_GLOBAL_MAX) {
+        const resetAt = aiGlobal.windowStart + AI_GLOBAL_WINDOW_MS;
+        const retryAfterSec = Math.ceil((resetAt - now) / 1000);
+
         res.setHeader("Retry-After", String(retryAfterSec));
-        res.setHeader("X-RateLimit-Limit", "1");
+        res.setHeader("X-RateLimit-Limit", String(AI_GLOBAL_MAX));
         res.setHeader("X-RateLimit-Remaining", "0");
-        res.setHeader("X-RateLimit-Reset", String(Math.ceil(aiGlobalNextAllowedAt / 1000)));
+        res.setHeader("X-RateLimit-Reset", String(Math.ceil(resetAt / 1000)));
+
         return res.status(429).json({
             error: "Too many requests",
-            details: "Global rate limit: 1 real AI request per 5 minutes",
+            details: `Global rate limit: ${AI_GLOBAL_MAX} real AI request(s) per ${Math.round(
+                AI_GLOBAL_WINDOW_MS / 1000
+            )} seconds`,
             retry_after_seconds: retryAfterSec,
         });
     }
 
-    // Autorise cette requête et bloque les suivantes jusqu'à +5 min
-    aiGlobalNextAllowedAt = now + AI_GLOBAL_WINDOW_MS;
+    aiGlobal.count += 1;
 
-    res.setHeader("X-RateLimit-Limit", "1");
-    res.setHeader("X-RateLimit-Remaining", "0");
-    res.setHeader("X-RateLimit-Reset", String(Math.ceil(aiGlobalNextAllowedAt / 1000)));
-    return next();
+    const resetAt = aiGlobal.windowStart + AI_GLOBAL_WINDOW_MS;
+    res.setHeader("X-RateLimit-Limit", String(AI_GLOBAL_MAX));
+    res.setHeader("X-RateLimit-Remaining", String(Math.max(0, AI_GLOBAL_MAX - aiGlobal.count)));
+    res.setHeader("X-RateLimit-Reset", String(Math.ceil(resetAt / 1000)));
+
+    next();
 }
 
 //-----------------------------------------------------
@@ -195,10 +214,14 @@ app.post("/api/ai/analyze", async (req, res) => {
             return res.json({ analysis: normalizeAnalysis(mock) });
         }
 
-        // ✅ GLOBAL rate limit: 1 vraie requête / 5 minutes
+        // ✅ GLOBAL rate limit configurable via ENV (seulement pour l'IA réelle)
         return rateLimitGlobalAI(req, res, async () => {
             try {
-                console.log("🟢 ClinIA: MODE IA RÉEL (OpenAI) [rate-limited global]");
+                console.log(
+                    `🟢 ClinIA: MODE IA RÉEL (OpenAI) [global rate limit: ${AI_GLOBAL_MAX}/${Math.round(
+                        AI_GLOBAL_WINDOW_MS / 1000
+                    )}s]`
+                );
 
                 const prompt = `
 Tu es ClinIA, assistant clinique.
