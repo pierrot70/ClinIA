@@ -53,19 +53,19 @@ function requireAdmin(req, res, next) {
 //-----------------------------------------------------
 // 4. ROUTE TEMPORAIRE POUR CRÉER L’ADMIN (À SUPPRIMER)
 //-----------------------------------------------------
-app.post("/api/admin/init", async (req, res) => {
-    const { username, password } = req.body;
-
-    const exists = await AdminUser.findOne({ username });
-    if (exists) return res.status(400).json({ error: "Admin already exists" });
-
-    const passwordHash = await bcrypt.hash(password, 12);
-
-    const admin = new AdminUser({ username, passwordHash });
-    await admin.save();
-
-    res.json({ ok: true });
-});
+// app.post("/api/admin/init", async (req, res) => {
+//     const { username, password } = req.body;
+//
+//     const exists = await AdminUser.findOne({ username });
+//     if (exists) return res.status(400).json({ error: "Admin already exists" });
+//
+//     const passwordHash = await bcrypt.hash(password, 12);
+//
+//     const admin = new AdminUser({ username, passwordHash });
+//     await admin.save();
+//
+//     res.json({ ok: true });
+// });
 
 //-----------------------------------------------------
 // 5. LOGIN ADMIN (bcrypt + JWT)
@@ -144,50 +144,51 @@ const openai = new OpenAI({
 //-----------------------------------------------------
 app.post("/api/ai/analyze", async (req, res) => {
     try {
-        const { diagnosis, patient } = req.body;
+        const { diagnosis, patient, forceReal } = req.body;
 
         if (!diagnosis) {
             return res.status(400).json({ error: "Diagnosis is required." });
         }
 
-        //--------------------------------------------------
-        // MODE MOCK IA
-        //--------------------------------------------------
-        if (process.env.CLINIA_MOCK_AI === "true") {
-            console.log("🟡 ClinIA: MODE MOCK IA ACTIVÉ");
+        // ✅ Toggle par requête:
+        // - si CLINIA_MOCK_AI=true -> on MOCK, SAUF si forceReal=true
+        const useMock = process.env.CLINIA_MOCK_AI === "true" && forceReal !== true;
+
+        if (useMock) {
+            console.log("🟡 ClinIA: MODE MOCK IA ACTIVÉ (forceReal=false)");
             const mock = getMockForDiagnosis(diagnosis);
             return res.json({ analysis: mock });
         }
 
-        //--------------------------------------------------
-        // MODE IA OPENAI
-        //--------------------------------------------------
+        console.log("🟢 ClinIA: MODE IA RÉEL (OpenAI) (forceReal=true ou CLINIA_MOCK_AI!=true)");
+
+        // --- ton code OpenAI ICI (inchangé) ---
         const prompt = `
 Tu es ClinIA, assistant clinique.
 Répond STRICTEMENT en JSON — aucun texte hors JSON.
 
 Diagnostic : ${diagnosis}
 Patient : ${JSON.stringify(patient, null, 2)}
-        `;
+    `;
 
         const aiResponse = await openai.chat.completions.create({
             model: process.env.OPENAI_MODEL,
             response_format: { type: "json_object" },
             messages: [
                 { role: "system", content: "ClinIA assistant clinique." },
-                { role: "user", content: prompt }
+                { role: "user", content: prompt },
             ],
-            temperature: 0.1
+            temperature: 0.1,
         });
 
         const structured = safeParseMedicalAI(aiResponse.choices[0].message.content);
-        res.json({ analysis: structured });
-
+        return res.json({ analysis: structured });
     } catch (err) {
         console.error("OpenAI error:", err);
-        res.status(500).json({ error: "Erreur IA", details: err.message });
+        return res.status(500).json({ error: "Erreur IA", details: err.message });
     }
 });
+
 
 //-----------------------------------------------------
 // 10. MONGO CONNEXION
