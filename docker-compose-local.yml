@@ -1,0 +1,74 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: "321eRRe!p"
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  mongo-express:
+    image: mongo-express:1
+    restart: unless-stopped
+    environment:
+      ME_CONFIG_BASICAUTH_USERNAME: plasante
+      ME_CONFIG_BASICAUTH_PASSWORD: "321eRRe!p"
+
+      # Forcer une URL explicite (évite les surprises d'authSource)
+      ME_CONFIG_MONGODB_URL: "mongodb://root:321eRRe!p@mongo:27017/?authSource=admin"
+
+      # Optionnel mais utile
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongo
+
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile-local
+    restart: unless-stopped
+    environment:
+      MONGO_URI: "mongodb://root:321eRRe!p@mongo:27017/clinia?authSource=admin"
+      JWT_SECRET: ${JWT_SECRET:-dev_secret_change_me}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      CLINIA_MOCK_AI: ${CLINIA_MOCK_AI:-true}
+      NODE_ENV: development
+      # Utile si tu fais du file watching dans Docker sur Linux/WSL :
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+    depends_on:
+      - mongo
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile-local
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      # Important si ton front appelle /api en relatif (proxy), sinon configure VITE_API_BASE_URL
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:4000}
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
+  backend_node_modules:
+  frontend_node_modules:
