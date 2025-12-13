@@ -28,7 +28,7 @@
       "glyc",
       "type 2"
     ],
-    "patient_summary": "Votre glycémie est élevée, ce qui indique un diabète de type 2.",
+    "patient_summary": "Votre glycémie est élevée, ce qui indique un diabète de type 2. Hourra.",
     "treatments": [
       {
         "name": "Metformine",
