@@ -2,10 +2,21 @@
 FROM node:20-alpine AS build
 
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+
+# Copie explicite du package.json + lockfile pour un cache Docker stable
+COPY package.json package-lock.json ./
+
+# Install déterministe (utilise strictement package-lock.json)
+RUN npm ci
+
+# Copie du reste du code
 COPY . .
-RUN npm run build
+
+# Build
+# Si tu as ajouté vite.config.build.mts pour blinder Coolify:
+RUN npx vite build --config vite.config.build.mts
+# Sinon, utilise plutôt:
+# RUN npm run build
 
 # Prod stage
 FROM nginx:1.27-alpine
@@ -14,5 +25,4 @@ COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
-
 CMD ["nginx", "-g", "daemon off;"]
