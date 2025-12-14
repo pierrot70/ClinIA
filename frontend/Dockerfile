@@ -12,11 +12,8 @@ RUN npm ci
 # Copie du reste du code
 COPY . .
 
-# Build
-# Si tu as ajouté vite.config.build.mts pour blinder Coolify:
-RUN npx vite build --config vite.config.build.mts
-# Sinon, utilise plutôt:
-# RUN npm run build
+# Build (prod) - utilise la config standard du projet
+RUN npm run build
 
 # Prod stage
 FROM nginx:1.27-alpine
@@ -26,3 +23,4 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
+q
