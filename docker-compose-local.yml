@@ -33,14 +33,11 @@ services:
       context: ./backend
       dockerfile: Dockerfile-local
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       MONGO_URI: "mongodb://root:321eRRe!p@mongo:27017/clinia?authSource=admin"
-      JWT_SECRET: ${JWT_SECRET:-dev_secret_change_me}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
-      CLINIA_MOCK_AI: ${CLINIA_MOCK_AI:-true}
       NODE_ENV: development
-      # Utile si tu fais du file watching dans Docker sur Linux/WSL :
       CHOKIDAR_USEPOLLING: "true"
     ports:
       - "4000:4000"
@@ -49,6 +46,7 @@ services:
       - backend_node_modules:/app/node_modules
     depends_on:
       - mongo
+
 
   frontend:
     build:
