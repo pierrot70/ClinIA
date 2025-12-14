@@ -7,7 +7,7 @@ export default defineConfig({
     host: true,
     proxy: {
       "/api": {
-        target: "http://clinia-backend-1:4000",
+        target: "http://backend:4000",
         changeOrigin: true,
       },
     },
