@@ -230,29 +230,45 @@ app.post("/api/ai/analyze", async (req, res) => {
         async function persistDiagnosis({ analysis, mode }) {
             const fingerprint = makeFingerprint({ diagnosis, patient });
 
-            // 🔍 Vérifie si déjà existant
-            const existing = await DiagnosisResult.findOne({ fingerprint });
-            if (existing) {
-                console.log("🟦 Diagnostic déjà existant, pas de duplication");
-                return existing;
-            }
-
             try {
-                return await DiagnosisResult.create({
-                    fingerprint,
-                    input: { diagnosis, patient: patient ?? {}, forceReal: forceReal === true },
-                    output: { analysis },
-                    mode,
-                    model: mode === "real" ? process.env.OPENAI_MODEL : "mock",
-                });
+                const existing = await DiagnosisResult.findOne({ fingerprint });
+
+                // 🟦 Cas 1 — aucune entrée → création
+                if (!existing) {
+                    console.log("🟢 Création nouveau diagnostic:", mode);
+                    return await DiagnosisResult.create({
+                        fingerprint,
+                        input: { diagnosis, patient: patient ?? {}, forceReal: forceReal === true },
+                        output: { analysis },
+                        mode,
+                        model: mode === "real" ? process.env.OPENAI_MODEL : "mock",
+                    });
+                }
+
+                // 🟨 Cas 2 — mock existant + réponse IA réelle → remplacement
+                if (existing.mode === "mock" && mode === "real") {
+                    console.log("🔁 Remplacement mock → IA réelle");
+
+                    existing.output = { analysis };
+                    existing.mode = "real";
+                    existing.model = process.env.OPENAI_MODEL;
+                    existing.updatedAt = new Date();
+
+                    return await existing.save();
+                }
+
+                // 🔒 Cas 3 — IA existante ou mock → mock
+                console.log("🟦 Diagnostic existant conservé (mode:", existing.mode, ")");
+                return existing;
             } catch (e) {
-                // 🛡️ Sécurité en cas de race condition
+                // 🛡️ Sécurité ultime en cas de race condition
                 if (e.code === 11000) {
                     return DiagnosisResult.findOne({ fingerprint });
                 }
                 throw e;
             }
         }
+
 
 
         if (useMock) {
