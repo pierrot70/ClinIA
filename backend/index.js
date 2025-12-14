@@ -13,6 +13,8 @@ import { safeParseMedicalAI } from "./utils/aiParser.js";
 import { getMockForDiagnosis, getAllMocks, saveAllMocks } from "./utils/mockLoader.js";
 
 import { AdminUser } from "./models/AdminUser.js";
+import { DiagnosisResult } from "./models/DiagnosisResult.js";
+
 
 dotenv.config();
 
@@ -196,6 +198,9 @@ function normalizeAnalysis(raw) {
 //-----------------------------------------------------
 // 9. ROUTE IA PRINCIPALE
 //-----------------------------------------------------
+//-----------------------------------------------------
+// 9. ROUTE IA PRINCIPALE
+//-----------------------------------------------------
 app.post("/api/ai/analyze", async (req, res) => {
     try {
         const { diagnosis, patient, forceReal } = req.body;
@@ -204,14 +209,31 @@ app.post("/api/ai/analyze", async (req, res) => {
             return res.status(400).json({ error: "Diagnosis is required." });
         }
 
-        // ✅ Toggle par requête:
-        // - si CLINIA_MOCK_AI=true -> on MOCK, SAUF si forceReal=true
         const useMock = process.env.CLINIA_MOCK_AI === "true" && forceReal !== true;
+
+        // Helper de persistance (ne casse jamais la réponse)
+        async function persistDiagnosis({ analysis, mode }) {
+            try {
+                await DiagnosisResult.create({
+                    input: { diagnosis, patient: patient ?? {}, forceReal: forceReal === true },
+                    output: { analysis },
+                    mode, // "mock" | "real"
+                    model: mode === "real" ? process.env.OPENAI_MODEL : "mock",
+                });
+            } catch (e) {
+                console.error("Persist diagnosis failed:", e.message);
+            }
+        }
 
         if (useMock) {
             console.log("🟡 ClinIA: MODE MOCK IA");
             const mock = getMockForDiagnosis(diagnosis);
-            return res.json({ analysis: normalizeAnalysis(mock) });
+            const analysis = normalizeAnalysis(mock);
+
+            // ✅ sauvegarde
+            await persistDiagnosis({ analysis, mode: "mock" });
+
+            return res.json({ analysis });
         }
 
         // ✅ GLOBAL rate limit configurable via ENV (seulement pour l'IA réelle)
@@ -260,8 +282,12 @@ Patient: ${JSON.stringify(patient ?? {}, null, 2)}
                 });
 
                 const raw = safeParseMedicalAI(aiResponse.choices[0].message.content);
-                const structured = normalizeAnalysis(raw);
-                return res.json({ analysis: structured });
+                const analysis = normalizeAnalysis(raw);
+
+                // ✅ sauvegarde
+                await persistDiagnosis({ analysis, mode: "real" });
+
+                return res.json({ analysis });
             } catch (err) {
                 console.error("OpenAI error:", err);
                 return res.status(500).json({ error: "Erreur IA", details: err.message });
@@ -272,6 +298,7 @@ Patient: ${JSON.stringify(patient ?? {}, null, 2)}
         return res.status(500).json({ error: "Erreur IA", details: err.message });
     }
 });
+
 
 //-----------------------------------------------------
 // 10. MONGO CONNEXION
