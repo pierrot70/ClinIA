@@ -2,14 +2,21 @@ import mongoose from "mongoose";
 
 const DiagnosisResultSchema = new mongoose.Schema(
     {
+        fingerprint: {
+            type: String,
+            required: true,
+            unique: true, // 🔒 clé anti-doublon
+            index: true,
+        },
+
         input: {
             type: Object,
-            required: true, // symptômes, contexte, etc.
+            required: true,
         },
 
         output: {
             type: Object,
-            required: true, // réponse structurée IA
+            required: true,
         },
 
         mode: {
@@ -19,12 +26,10 @@ const DiagnosisResultSchema = new mongoose.Schema(
         },
 
         model: {
-            type: String, // ex: gpt-4.1-mini
+            type: String,
         },
     },
-    {
-        timestamps: true, // createdAt / updatedAt
-    }
+    { timestamps: true }
 );
 
 export const DiagnosisResult = mongoose.model(

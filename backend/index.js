@@ -14,6 +14,8 @@ import { getMockForDiagnosis, getAllMocks, saveAllMocks } from "./utils/mockLoad
 
 import { AdminUser } from "./models/AdminUser.js";
 import { DiagnosisResult } from "./models/DiagnosisResult.js";
+import crypto from "crypto";
+
 
 
 dotenv.config();
@@ -75,6 +77,19 @@ function rateLimitGlobalAI(req, res, next) {
 
     next();
 }
+
+function makeFingerprint({ diagnosis, patient }) {
+    const normalized = {
+        diagnosis: diagnosis.trim().toLowerCase(),
+        patient: patient ?? {},
+    };
+
+    return crypto
+        .createHash("sha256")
+        .update(JSON.stringify(normalized))
+        .digest("hex");
+}
+
 
 //-----------------------------------------------------
 // 3. MIDDLEWARE EVALUEUR DE TOKEN ADMIN
@@ -213,17 +228,32 @@ app.post("/api/ai/analyze", async (req, res) => {
 
         // Helper de persistance (ne casse jamais la réponse)
         async function persistDiagnosis({ analysis, mode }) {
+            const fingerprint = makeFingerprint({ diagnosis, patient });
+
+            // 🔍 Vérifie si déjà existant
+            const existing = await DiagnosisResult.findOne({ fingerprint });
+            if (existing) {
+                console.log("🟦 Diagnostic déjà existant, pas de duplication");
+                return existing;
+            }
+
             try {
-                await DiagnosisResult.create({
+                return await DiagnosisResult.create({
+                    fingerprint,
                     input: { diagnosis, patient: patient ?? {}, forceReal: forceReal === true },
                     output: { analysis },
-                    mode, // "mock" | "real"
+                    mode,
                     model: mode === "real" ? process.env.OPENAI_MODEL : "mock",
                 });
             } catch (e) {
-                console.error("Persist diagnosis failed:", e.message);
+                // 🛡️ Sécurité en cas de race condition
+                if (e.code === 11000) {
+                    return DiagnosisResult.findOne({ fingerprint });
+                }
+                throw e;
             }
         }
+
 
         if (useMock) {
             console.log("🟡 ClinIA: MODE MOCK IA");
