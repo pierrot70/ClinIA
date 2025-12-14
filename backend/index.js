@@ -272,15 +272,18 @@ app.post("/api/ai/analyze", async (req, res) => {
 
 
         if (useMock) {
-            console.log("🟡 ClinIA: MODE MOCK IA");
-            const mock = getMockForDiagnosis(diagnosis);
-            const analysis = normalizeAnalysis(mock);
+            return rateLimitGlobalMock(req, res, async () => {
+                console.log("🟡 ClinIA: MODE MOCK IA");
 
-            // ✅ sauvegarde
-            await persistDiagnosis({ analysis, mode: "mock" });
+                const mock = getMockForDiagnosis(diagnosis);
+                const analysis = normalizeAnalysis(mock);
 
-            return res.json({ analysis });
+                await persistDiagnosis({ analysis, mode: "mock" });
+
+                return res.json({ analysis });
+            });
         }
+
 
         // ✅ GLOBAL rate limit configurable via ENV (seulement pour l'IA réelle)
         return rateLimitGlobalAI(req, res, async () => {
@@ -344,6 +347,56 @@ Patient: ${JSON.stringify(patient ?? {}, null, 2)}
         return res.status(500).json({ error: "Erreur IA", details: err.message });
     }
 });
+//-----------------------------------------------------
+// 🧪 GLOBAL Rate limit MOCK (anti-spam Mongo)
+//-----------------------------------------------------
+const MOCK_GLOBAL_WINDOW_MS =
+    (Number(process.env.CLINIA_MOCK_WINDOW_SECONDS) || 60) * 1000;
+
+const MOCK_GLOBAL_MAX = Number(process.env.CLINIA_MOCK_MAX) || 1;
+
+let mockGlobal = { windowStart: 0, count: 0 };
+
+function rateLimitGlobalMock(req, res, next) {
+    const now = Date.now();
+
+    // reset fenêtre si expirée
+    if (!mockGlobal.windowStart || now - mockGlobal.windowStart >= MOCK_GLOBAL_WINDOW_MS) {
+        mockGlobal = { windowStart: now, count: 0 };
+    }
+
+    // 🚫 LIMITE ATTEINTE
+    if (mockGlobal.count >= MOCK_GLOBAL_MAX) {
+        const resetAt = mockGlobal.windowStart + MOCK_GLOBAL_WINDOW_MS;
+        const retryAfterSec = Math.ceil((resetAt - now) / 1000);
+
+        res.setHeader("Retry-After", String(retryAfterSec));
+        res.setHeader("X-ClinIA-Blocked", "mock-rate-limit");
+        res.setHeader("X-RateLimit-Limit", String(MOCK_GLOBAL_MAX));
+        res.setHeader("X-RateLimit-Remaining", "0");
+        res.setHeader("X-RateLimit-Reset", String(Math.ceil(resetAt / 1000)));
+
+        return res.status(429).json({
+            error: "MOCK_RATE_LIMIT_EXCEEDED",
+            message: "Requête mock bloquée : limite de 1 requête par minute atteinte.",
+            mode: "mock",
+            retry_after_seconds: retryAfterSec,
+        });
+    }
+
+    mockGlobal.count += 1;
+
+    const resetAt = mockGlobal.windowStart + MOCK_GLOBAL_WINDOW_MS;
+    res.setHeader("X-RateLimit-Limit", String(MOCK_GLOBAL_MAX));
+    res.setHeader(
+        "X-RateLimit-Remaining",
+        String(Math.max(0, MOCK_GLOBAL_MAX - mockGlobal.count))
+    );
+    res.setHeader("X-RateLimit-Reset", String(Math.ceil(resetAt / 1000)));
+
+    next();
+}
+
 
 
 //-----------------------------------------------------
