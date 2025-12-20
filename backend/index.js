@@ -7,6 +7,7 @@ import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
+import crypto from "crypto";
 
 import OpenAI from "openai";
 import { safeParseMedicalAI } from "./utils/aiParser.js";
@@ -14,9 +15,6 @@ import { getMockForDiagnosis, getAllMocks, saveAllMocks } from "./utils/mockLoad
 
 import { AdminUser } from "./models/AdminUser.js";
 import { DiagnosisResult } from "./models/DiagnosisResult.js";
-import crypto from "crypto";
-
-
 
 dotenv.config();
 
@@ -28,109 +26,72 @@ app.use(cors());
 app.use(express.json());
 
 //-----------------------------------------------------
-// 🔒 GLOBAL Rate limit OpenAI (tous clients confondus)
-// Configurable via ENV:
-// - CLINIA_REAL_AI_WINDOW_SECONDS (default 300 = 5 min)
-// - CLINIA_REAL_AI_MAX (default 1)
-// Appliqué seulement si on va appeler OpenAI (pas en mock)
+// 3. GLOBAL RATE LIMIT IA (NON BLOQUANT UI)
 //-----------------------------------------------------
 const AI_GLOBAL_WINDOW_MS =
     (Number(process.env.CLINIA_REAL_AI_WINDOW_SECONDS) || 300) * 1000;
-
 const AI_GLOBAL_MAX = Number(process.env.CLINIA_REAL_AI_MAX) || 1;
 
-// État global en mémoire (OK pour 1 droplet / 1 instance)
-let aiGlobal = { windowStart: 0, count: 0 };
+let aiGlobal = { start: 0, count: 0 };
 
 function rateLimitGlobalAI(req, res, next) {
     const now = Date.now();
-
-    // reset fenêtre si expirée
-    if (!aiGlobal.windowStart || now - aiGlobal.windowStart >= AI_GLOBAL_WINDOW_MS) {
-        aiGlobal = { windowStart: now, count: 0 };
+    if (!aiGlobal.start || now - aiGlobal.start >= AI_GLOBAL_WINDOW_MS) {
+        aiGlobal = { start: now, count: 0 };
     }
-
-    if (aiGlobal.count >= AI_GLOBAL_MAX) {
-        const resetAt = aiGlobal.windowStart + AI_GLOBAL_WINDOW_MS;
-        const retryAfterSec = Math.ceil((resetAt - now) / 1000);
-
-        res.setHeader("Retry-After", String(retryAfterSec));
-        res.setHeader("X-RateLimit-Limit", String(AI_GLOBAL_MAX));
-        res.setHeader("X-RateLimit-Remaining", "0");
-        res.setHeader("X-RateLimit-Reset", String(Math.ceil(resetAt / 1000)));
-
-        return res.status(429).json({
-            error: "Too many requests",
-            details: `Global rate limit: ${AI_GLOBAL_MAX} real AI request(s) per ${Math.round(
-                AI_GLOBAL_WINDOW_MS / 1000
-            )} seconds`,
-            retry_after_seconds: retryAfterSec,
-        });
+    if (aiGlobal.count < AI_GLOBAL_MAX) {
+        aiGlobal.count += 1;
     }
+    next(); // ⚠️ ne bloque JAMAIS l’UI
+}
 
-    aiGlobal.count += 1;
-
-    const resetAt = aiGlobal.windowStart + AI_GLOBAL_WINDOW_MS;
-    res.setHeader("X-RateLimit-Limit", String(AI_GLOBAL_MAX));
-    res.setHeader("X-RateLimit-Remaining", String(Math.max(0, AI_GLOBAL_MAX - aiGlobal.count)));
-    res.setHeader("X-RateLimit-Reset", String(Math.ceil(resetAt / 1000)));
-
-    next();
+//-----------------------------------------------------
+// 4. SAFE MONGO PERSIST (NE BLOQUE JAMAIS)
+//-----------------------------------------------------
+async function safePersist(payload) {
+    try {
+        await DiagnosisResult.create(payload);
+    } catch (err) {
+        console.warn("⚠️ Mongo persist ignoré:", err.message);
+    }
 }
 
 function makeFingerprint({ diagnosis, patient }) {
-    const normalized = {
-        diagnosis: diagnosis.trim().toLowerCase(),
-        patient: patient ?? {},
-    };
-
     return crypto
         .createHash("sha256")
-        .update(JSON.stringify(normalized))
+        .update(JSON.stringify({ diagnosis, patient }))
         .digest("hex");
 }
 
-
 //-----------------------------------------------------
-// 3. MIDDLEWARE EVALUEUR DE TOKEN ADMIN
+// 5. ADMIN AUTH
 //-----------------------------------------------------
 function requireAdmin(req, res, next) {
-    const auth = req.headers.authorization || "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-
-    if (!token) {
-        return res.status(401).json({ error: "Admin token missing" });
-    }
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token) return res.status(401).json({ error: "Admin token missing" });
 
     try {
         const payload = jwt.verify(token, process.env.JWT_SECRET);
-        if (payload.role !== "admin") {
-            return res.status(403).json({ error: "Forbidden" });
-        }
+        if (payload.role !== "admin") return res.status(403).json({ error: "Forbidden" });
         next();
-    } catch (err) {
-        console.error("JWT error:", err.message);
-        return res.status(401).json({ error: "Invalid or expired token" });
+    } catch {
+        return res.status(401).json({ error: "Invalid token" });
     }
 }
 
 //-----------------------------------------------------
-// 5. LOGIN ADMIN (bcrypt + JWT)
+// 6. ADMIN LOGIN
 //-----------------------------------------------------
 app.post("/api/admin/login", async (req, res) => {
     const { username, password } = req.body;
 
     const user = await AdminUser.findOne({ username });
-    if (!user) {
-        return res.status(401).json({ error: "Utilisateur admin inconnu" });
-    }
+    if (!user) return res.status(401).json({ error: "Unknown admin" });
 
     const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) {
-        return res.status(401).json({ error: "Mot de passe invalide" });
-    }
+    if (!valid) return res.status(401).json({ error: "Invalid password" });
 
-    const token = jwt.sign({ role: "admin", id: user._id }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET, {
         expiresIn: "8h",
     });
 
@@ -138,269 +99,194 @@ app.post("/api/admin/login", async (req, res) => {
 });
 
 //-----------------------------------------------------
-// 6. ROUTES MOCK STUDIO (protégées)
+// 7. MOCK STUDIO
 //-----------------------------------------------------
-app.get("/api/mocks", requireAdmin, (req, res) => {
-    try {
-        res.json(getAllMocks());
-    } catch (err) {
-        console.error("Error reading mocks:", err);
-        res.status(500).json({ error: "Cannot read mocks" });
-    }
-});
-
+app.get("/api/mocks", requireAdmin, (req, res) => res.json(getAllMocks()));
 app.put("/api/mocks", requireAdmin, (req, res) => {
-    try {
-        saveAllMocks(req.body);
-        res.json({ ok: true });
-    } catch (err) {
-        console.error("Error saving mocks:", err);
-        res.status(400).json({ error: "Cannot save mocks", details: err.message });
-    }
+    saveAllMocks(req.body);
+    res.json({ ok: true });
 });
 
 //-----------------------------------------------------
-// 7. ROUTES STANDARD
+// 8. HEALTH
 //-----------------------------------------------------
-app.get("/api/treatments", (req, res) => {
-    res.json({
-        diagnosis: "Hypertension essentielle (mock)",
-        treatments: [
-            { name: "Indapamide", efficacy: 94 },
-            { name: "Amlodipine", efficacy: 89 },
-            { name: "Candesartan", efficacy: 85 },
-        ],
-    });
-});
-
-app.get("/health", (req, res) => {
-    res.json({ status: "ok" });
-});
+app.get("/health", (req, res) => res.json({ status: "ok" }));
 
 //-----------------------------------------------------
-// 8. OPENAI CLIENT
+// 9. OPENAI CLIENT
 //-----------------------------------------------------
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
 //-----------------------------------------------------
-// 8.1 NORMALISATION IA (garantit patient_summary + treatments)
+// 10. NORMALISATION CLINIQUE (ALIGNÉ FRONTEND)
 //-----------------------------------------------------
 function normalizeAnalysis(raw) {
     const obj = raw && typeof raw === "object" ? raw : {};
 
-    const patient_summary =
-        obj.patient_summary ??
-        obj.patientSummary ??
-        obj.summary ??
-        obj.summary_patient ??
-        obj.patient?.summary ??
-        "";
+    return {
+        diagnosis: {
+            suspected:
+                obj.diagnosis?.suspected ??
+                obj.diagnosis ??
+                "Indéterminé",
+            certainty_level:
+                obj.diagnosis?.certainty_level ??
+                obj.certainty_level ??
+                "low",
+            justification:
+                obj.diagnosis?.justification ??
+                obj.justification ??
+                "Données cliniques insuffisantes pour conclure.",
+        },
 
-    const treatmentsRaw =
-        obj.treatments ??
-        obj.treatment_plan ??
-        obj.recommended_treatments ??
-        obj.recommendations ??
-        [];
+        treatments: Array.isArray(obj.treatments) ? obj.treatments : [],
+        alternatives: Array.isArray(obj.alternatives) ? obj.alternatives : [],
+        red_flags: Array.isArray(obj.red_flags) ? obj.red_flags : [],
 
-    const treatments = Array.isArray(treatmentsRaw) ? treatmentsRaw : [];
+        patient_summary: {
+            plain_language:
+                obj.patient_summary?.plain_language ??
+                obj.patient_summary ??
+                "Analyse clinique en cours.",
+            clinical_language:
+                obj.patient_summary?.clinical_language ??
+                "Analyse clinique assistée par ClinIA.",
+        },
 
-    return { patient_summary, treatments };
+        meta: {
+            model: obj.meta?.model ?? "clinia",
+            confidence_score: obj.meta?.confidence_score ?? 0,
+        },
+    };
 }
 
 //-----------------------------------------------------
-// 9. ROUTE IA PRINCIPALE
-//-----------------------------------------------------
-//-----------------------------------------------------
-// 9. ROUTE IA PRINCIPALE
+// 11. ROUTE IA PRINCIPALE (CLINIA — JAMAIS DE 500)
 //-----------------------------------------------------
 app.post("/api/ai/analyze", async (req, res) => {
     try {
-        const { diagnosis, patient, forceReal } = req.body;
+        const {
+            age,
+            sex,
+            symptoms,
+            medical_history,
+            current_medications,
+            forceReal,
+        } = req.body;
 
-        if (!diagnosis) {
-            return res.status(400).json({ error: "Diagnosis is required." });
-        }
-
-        const useMock = process.env.CLINIA_MOCK_AI === "true" && forceReal !== true;
-
-        // Helper de persistance (ne casse jamais la réponse)
-        async function persistDiagnosis({ analysis, mode }) {
-            const fingerprint = makeFingerprint({ diagnosis, patient });
-
-            try {
-                const existing = await DiagnosisResult.findOne({ fingerprint });
-
-                // 🟦 Cas 1 — aucune entrée → création
-                if (!existing) {
-                    console.log("🟢 Création nouveau diagnostic:", mode);
-                    return await DiagnosisResult.create({
-                        fingerprint,
-                        input: { diagnosis, patient: patient ?? {}, forceReal: forceReal === true },
-                        output: { analysis },
-                        mode,
-                        model: mode === "real" ? process.env.OPENAI_MODEL : "mock",
-                    });
-                }
-
-                // 🟨 Cas 2 — mock existant + réponse IA réelle → remplacement
-                if (existing.mode === "mock" && mode === "real") {
-                    console.log("🔁 Remplacement mock → IA réelle");
-
-                    existing.output = { analysis };
-                    existing.mode = "real";
-                    existing.model = process.env.OPENAI_MODEL;
-                    existing.updatedAt = new Date();
-
-                    return await existing.save();
-                }
-
-                // 🔒 Cas 3 — IA existante ou mock → mock
-                console.log("🟦 Diagnostic existant conservé (mode:", existing.mode, ")");
-                return existing;
-            } catch (e) {
-                // 🛡️ Sécurité ultime en cas de race condition
-                if (e.code === 11000) {
-                    return DiagnosisResult.findOne({ fingerprint });
-                }
-                throw e;
-            }
-        }
-
-
-
-        if (useMock) {
-            return rateLimitGlobalMock(req, res, async () => {
-                console.log("🟡 ClinIA: MODE MOCK IA");
-
-                const mock = getMockForDiagnosis(diagnosis);
-                const analysis = normalizeAnalysis(mock);
-
-                await persistDiagnosis({ analysis, mode: "mock" });
-
-                return res.json({ analysis });
+        // Validation clinique minimale (NON BLOQUANTE UI)
+        if (!age || !sex || !Array.isArray(symptoms) || symptoms.length === 0) {
+            return res.status(200).json({
+                diagnosis: {
+                    suspected: "Indéterminé",
+                    certainty_level: "low",
+                    justification:
+                        "Informations cliniques insuffisantes pour analyse.",
+                },
+                treatments: [],
+                alternatives: [],
+                red_flags: ["Données cliniques incomplètes"],
+                patient_summary: {
+                    plain_language:
+                        "Nous avons besoin de plus d’informations pour analyser votre situation.",
+                    clinical_language:
+                        "Données cliniques insuffisantes pour analyse.",
+                },
+                meta: { model: "fallback", confidence_score: 0 },
             });
         }
 
+        const patient = {
+            age,
+            sex,
+            symptoms,
+            medical_history: medical_history ?? [],
+            current_medications: current_medications ?? [],
+        };
 
-        // ✅ GLOBAL rate limit configurable via ENV (seulement pour l'IA réelle)
+        const diagnosis = "To be determined by ClinIA";
+        const useMock = process.env.CLINIA_MOCK_AI === "true" && forceReal !== true;
+
+        // ---------- MOCK ----------
+        if (useMock) {
+            const mock = getMockForDiagnosis(diagnosis);
+            const analysis = normalizeAnalysis(mock);
+
+            safePersist({
+                fingerprint: makeFingerprint({ diagnosis, patient }),
+                input: patient,
+                output: analysis,
+                mode: "mock",
+            });
+
+            return res.status(200).json(analysis);
+        }
+
+        // ---------- IA RÉELLE ----------
         return rateLimitGlobalAI(req, res, async () => {
+            let raw = {};
+
             try {
-                console.log(
-                    `🟢 ClinIA: MODE IA RÉEL (OpenAI) [global rate limit: ${AI_GLOBAL_MAX}/${Math.round(
-                        AI_GLOBAL_WINDOW_MS / 1000
-                    )}s]`
-                );
-
                 const prompt = `
-Tu es ClinIA, assistant clinique.
-Répond STRICTEMENT en JSON (un seul objet), sans texte hors JSON.
+You are ClinIA, a clinical decision support system.
+Return ONLY valid JSON.
 
-Tu dois produire EXACTEMENT cette forme:
-{
-  "patient_summary": "string",
-  "treatments": [
-    {
-      "name": "string",
-      "justification": "string",
-      "contraindications": ["string"],
-      "efficacy": 0
-    }
-  ]
-}
-
-Règles:
-- patient_summary: 1-3 phrases max.
-- efficacy: nombre entre 0 et 100.
-- contraindications: tableau (vide si aucune).
-
-Diagnostic: ${diagnosis}
-Patient: ${JSON.stringify(patient ?? {}, null, 2)}
+Patient:
+${JSON.stringify(patient, null, 2)}
 `;
 
-                const aiResponse = await openai.chat.completions.create({
+                const ai = await openai.chat.completions.create({
                     model: process.env.OPENAI_MODEL,
                     response_format: { type: "json_object" },
-                    messages: [
-                        { role: "system", content: "ClinIA assistant clinique." },
-                        { role: "user", content: prompt },
-                    ],
+                    messages: [{ role: "user", content: prompt }],
                     temperature: 0.1,
                 });
 
-                const raw = safeParseMedicalAI(aiResponse.choices[0].message.content);
-                const analysis = normalizeAnalysis(raw);
-
-                // ✅ sauvegarde
-                await persistDiagnosis({ analysis, mode: "real" });
-
-                return res.json({ analysis });
+                raw = safeParseMedicalAI(ai.choices[0].message.content);
             } catch (err) {
-                console.error("OpenAI error:", err);
-                return res.status(500).json({ error: "Erreur IA", details: err.message });
+                console.warn("⚠️ OpenAI / parsing error → fallback utilisé");
             }
+
+            const analysis = normalizeAnalysis(raw);
+
+            safePersist({
+                fingerprint: makeFingerprint({ diagnosis, patient }),
+                input: patient,
+                output: analysis,
+                mode: "real",
+                model: process.env.OPENAI_MODEL,
+            });
+
+            return res.status(200).json(analysis);
         });
     } catch (err) {
-        console.error("Route error:", err);
-        return res.status(500).json({ error: "Erreur IA", details: err.message });
-    }
-});
-//-----------------------------------------------------
-// 🧪 GLOBAL Rate limit MOCK (anti-spam Mongo)
-//-----------------------------------------------------
-const MOCK_GLOBAL_WINDOW_MS =
-    (Number(process.env.CLINIA_MOCK_WINDOW_SECONDS) || 60) * 1000;
+        console.error("❌ ClinIA fatal error:", err);
 
-const MOCK_GLOBAL_MAX = Number(process.env.CLINIA_MOCK_MAX) || 1;
-
-let mockGlobal = { windowStart: 0, count: 0 };
-
-function rateLimitGlobalMock(req, res, next) {
-    const now = Date.now();
-
-    // reset fenêtre si expirée
-    if (!mockGlobal.windowStart || now - mockGlobal.windowStart >= MOCK_GLOBAL_WINDOW_MS) {
-        mockGlobal = { windowStart: now, count: 0 };
-    }
-
-    // 🚫 LIMITE ATTEINTE
-    if (mockGlobal.count >= MOCK_GLOBAL_MAX) {
-        const resetAt = mockGlobal.windowStart + MOCK_GLOBAL_WINDOW_MS;
-        const retryAfterSec = Math.ceil((resetAt - now) / 1000);
-
-        res.setHeader("Retry-After", String(retryAfterSec));
-        res.setHeader("X-ClinIA-Blocked", "mock-rate-limit");
-        res.setHeader("X-RateLimit-Limit", String(MOCK_GLOBAL_MAX));
-        res.setHeader("X-RateLimit-Remaining", "0");
-        res.setHeader("X-RateLimit-Reset", String(Math.ceil(resetAt / 1000)));
-
-        return res.status(429).json({
-            error: "MOCK_RATE_LIMIT_EXCEEDED",
-            message: "Requête mock bloquée : limite de 1 requête par minute atteinte.",
-            mode: "mock",
-            retry_after_seconds: retryAfterSec,
+        return res.status(200).json({
+            diagnosis: {
+                suspected: "Indéterminé",
+                certainty_level: "low",
+                justification:
+                    "Erreur technique interne. Analyse interrompue.",
+            },
+            treatments: [],
+            alternatives: [],
+            red_flags: ["Erreur système"],
+            patient_summary: {
+                plain_language:
+                    "Une erreur technique empêche l’analyse pour le moment.",
+                clinical_language:
+                    "Analyse interrompue suite à une erreur système.",
+            },
+            meta: { model: "fallback", confidence_score: 0 },
         });
     }
-
-    mockGlobal.count += 1;
-
-    const resetAt = mockGlobal.windowStart + MOCK_GLOBAL_WINDOW_MS;
-    res.setHeader("X-RateLimit-Limit", String(MOCK_GLOBAL_MAX));
-    res.setHeader(
-        "X-RateLimit-Remaining",
-        String(Math.max(0, MOCK_GLOBAL_MAX - mockGlobal.count))
-    );
-    res.setHeader("X-RateLimit-Reset", String(Math.ceil(resetAt / 1000)));
-
-    next();
-}
-
-
+});
 
 //-----------------------------------------------------
-// 10. MONGO CONNEXION
+// 12. MONGO
 //-----------------------------------------------------
 mongoose
     .connect(process.env.MONGO_URI)
@@ -408,6 +294,8 @@ mongoose
     .catch((err) => console.error("Erreur MongoDB:", err));
 
 //-----------------------------------------------------
-// 11. LANCEMENT SERVEUR
+// 13. SERVER
 //-----------------------------------------------------
-app.listen(4000, () => console.log("Backend ClinIA sur http://localhost:4000 🚀"));
+app.listen(4000, () =>
+    console.log("Backend ClinIA sur http://localhost:4000 🚀")
+);

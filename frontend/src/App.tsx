@@ -12,6 +12,7 @@ import Footer from "./components/Footer";
 import MockStudio from "./pages/MockStudio";
 // 🆕 Import obligatoire pour que le bouton Admin fonctionne
 import AdminLogin from "./pages/AdminLogin";
+import {ClinicalAnalyzePage} from "./pages/ClinicalAnalyzePage";
 
 const App: React.FC = () => {
     return (
@@ -24,6 +25,9 @@ const App: React.FC = () => {
                     <Route path="/treatment/:id" element={<TreatmentDetails />} />
                     <Route path="/quick" element={<QuickMode />} />
                     <Route path="/patient-summary" element={<PatientSummary />} />
+
+                    {/* 🧠 ClinIA – Analyse clinique */}
+                    <Route path="/clinical" element={<ClinicalAnalyzePage />} />
 
                     {/* 🆕 Admin */}
                     <Route path="/admin/login" element={<AdminLogin />} />
