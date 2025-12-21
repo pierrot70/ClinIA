@@ -5,12 +5,24 @@ type ClinicalPayload = {
     sex: "male" | "female" | "other";
     weight?: number;
     height?: number;
+    blood_pressure?: {
+        systolic?: number;
+        diastolic?: number;
+    };
     symptoms: string[];
     medical_history: string[];
     current_medications: string[];
 };
 
 const CACHE_KEY = "clinia_last_clinical_payload";
+
+const EMPTY_FORM: ClinicalPayload = {
+    age: 55,
+    sex: "male",
+    symptoms: [],
+    medical_history: [],
+    current_medications: [],
+};
 
 function loadCachedForm(): ClinicalPayload | null {
     try {
@@ -23,6 +35,10 @@ function loadCachedForm(): ClinicalPayload | null {
 
 function saveCachedForm(data: ClinicalPayload) {
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+}
+
+function clearCachedForm() {
+    localStorage.removeItem(CACHE_KEY);
 }
 
 function Field({
@@ -57,13 +73,7 @@ export function ClinicalForm({
     highlightFields?: string[];
 }) {
     const [form, setForm] = useState<ClinicalPayload>(
-        loadCachedForm() ?? {
-            age: 55,
-            sex: "male",
-            symptoms: [],
-            medical_history: [],
-            current_medications: [],
-        }
+        loadCachedForm() ?? EMPTY_FORM
     );
 
     useEffect(() => {
@@ -71,27 +81,29 @@ export function ClinicalForm({
     }, [form]);
 
     function update<K extends keyof ClinicalPayload>(key: K, value: any) {
-        setForm((p) => ({ ...p, [key]: value }));
+        setForm((prev) => ({ ...prev, [key]: value }));
     }
 
-    function parseList(value: string): string[] {
-        return value
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
+    function parseList(v: string): string[] {
+        return v.split(",").map((s) => s.trim()).filter(Boolean);
     }
 
-    const isHighlighted = (field: string) =>
-        highlightFields.includes(field);
+    const isHighlighted = (field: string) => highlightFields.includes(field);
+
+    function resetPatient() {
+        clearCachedForm();
+        setForm(EMPTY_FORM);
+    }
 
     return (
         <div className="bg-white p-6 rounded border space-y-6">
             {warningMessage && (
                 <div className="border border-orange-300 bg-orange-50 p-4 rounded text-orange-800">
-                    <p className="font-medium">Données cliniques incomplètes</p>
-                    <p className="text-sm mt-1">{warningMessage}</p>
+                    {warningMessage}
                 </div>
             )}
+
+            <h2 className="text-lg font-semibold">Données cliniques</h2>
 
             <Field highlight={isHighlighted("weight")}>
                 <input
@@ -101,9 +113,7 @@ export function ClinicalForm({
                     onChange={(e) =>
                         update(
                             "weight",
-                            e.target.value
-                                ? Number(e.target.value)
-                                : undefined
+                            e.target.value ? Number(e.target.value) : undefined
                         )
                     }
                 />
@@ -117,9 +127,7 @@ export function ClinicalForm({
                     onChange={(e) =>
                         update(
                             "height",
-                            e.target.value
-                                ? Number(e.target.value)
-                                : undefined
+                            e.target.value ? Number(e.target.value) : undefined
                         )
                     }
                 />
@@ -128,7 +136,7 @@ export function ClinicalForm({
             <Field highlight={isHighlighted("symptoms")}>
                 <input
                     className="input w-full"
-                    placeholder="Symptômes (ex: fatigue, soif)"
+                    placeholder="Symptômes"
                     value={form.symptoms.join(", ")}
                     onChange={(e) =>
                         update("symptoms", parseList(e.target.value))
@@ -164,13 +172,23 @@ export function ClinicalForm({
                 />
             </Field>
 
-            <button
-                disabled={loading}
-                onClick={() => onSubmit(form)}
-                className="w-full bg-blue-600 text-white py-2 rounded disabled:opacity-50"
-            >
-                {loading ? "Analyse en cours…" : "Analyser"}
-            </button>
+            <div className="flex gap-3">
+                <button
+                    disabled={loading}
+                    onClick={() => onSubmit(form)}
+                    className="flex-1 bg-blue-600 text-white py-2 rounded disabled:opacity-50"
+                >
+                    {loading ? "Analyse…" : "Analyser"}
+                </button>
+
+                <button
+                    type="button"
+                    onClick={resetPatient}
+                    className="flex-1 bg-gray-100 text-gray-800 py-2 rounded border hover:bg-gray-200"
+                >
+                    Effacer les données patient
+                </button>
+            </div>
         </div>
     );
 }
