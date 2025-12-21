@@ -42,11 +42,11 @@ function rateLimitGlobalAI(req, res, next) {
     if (aiGlobal.count < AI_GLOBAL_MAX) {
         aiGlobal.count += 1;
     }
-    next(); // ⚠️ ne bloque JAMAIS l’UI
+    next(); // ne bloque jamais l’UI
 }
 
 //-----------------------------------------------------
-// 4. SAFE MONGO PERSIST (NE BLOQUE JAMAIS)
+// 4. SAFE MONGO PERSIST
 //-----------------------------------------------------
 async function safePersist(payload) {
     try {
@@ -120,7 +120,7 @@ const openai = new OpenAI({
 });
 
 //-----------------------------------------------------
-// 10. NORMALISATION CLINIQUE (ALIGNÉ FRONTEND)
+// 10. NORMALISATION CLINIQUE
 //-----------------------------------------------------
 function normalizeAnalysis(raw) {
     const obj = raw && typeof raw === "object" ? raw : {};
@@ -163,8 +163,9 @@ function normalizeAnalysis(raw) {
 }
 
 //-----------------------------------------------------
-// 11. ROUTE IA PRINCIPALE (CLINIA — JAMAIS DE 500)
+// 11. ROUTE IA PRINCIPALE — OPTION 3 ACTIVE
 //-----------------------------------------------------
+console.log("CLINIA_MOCK_AI =", process.env.CLINIA_MOCK_AI);
 app.post("/api/ai/analyze", async (req, res) => {
     try {
         const {
@@ -173,10 +174,13 @@ app.post("/api/ai/analyze", async (req, res) => {
             symptoms,
             medical_history,
             current_medications,
+            weight,
+            height,
+            blood_pressure,
+            lifestyle,
             forceReal,
         } = req.body;
 
-        // Validation clinique minimale (NON BLOQUANTE UI)
         if (!age || !sex || !Array.isArray(symptoms) || symptoms.length === 0) {
             return res.status(200).json({
                 diagnosis: {
@@ -204,6 +208,10 @@ app.post("/api/ai/analyze", async (req, res) => {
             symptoms,
             medical_history: medical_history ?? [],
             current_medications: current_medications ?? [],
+            weight,
+            height,
+            blood_pressure,
+            lifestyle,
         };
 
         const diagnosis = "To be determined by ClinIA";
@@ -224,14 +232,49 @@ app.post("/api/ai/analyze", async (req, res) => {
             return res.status(200).json(analysis);
         }
 
-        // ---------- IA RÉELLE ----------
+        // ---------- IA RÉELLE (PROMPT STRUCTURÉ) ----------
         return rateLimitGlobalAI(req, res, async () => {
             let raw = {};
 
             try {
                 const prompt = `
-You are ClinIA, a clinical decision support system.
-Return ONLY valid JSON.
+You are ClinIA, a clinical decision support system (CDSS).
+
+Return ONLY valid JSON with EXACTLY this structure:
+
+{
+  "diagnosis": {
+    "suspected": "string",
+    "certainty_level": "low | moderate | high",
+    "justification": "string"
+  },
+  "treatments": [
+    {
+      "name": "string",
+      "indication": "string",
+      "dosage": "string",
+      "duration": "string",
+      "contraindications": ["string"],
+      "monitoring": ["string"],
+      "evidence_level": "A | B | C"
+    }
+  ],
+  "alternatives": [],
+  "red_flags": [],
+  "patient_summary": {
+    "plain_language": "string",
+    "clinical_language": "string"
+  },
+  "meta": {
+    "confidence_score": number
+  }
+}
+
+Rules:
+- Be conservative.
+- Do NOT invent lab values.
+- If data is insufficient, still return the structure.
+- Treatments must be first-line and guideline-based.
 
 Patient:
 ${JSON.stringify(patient, null, 2)}
