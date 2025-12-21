@@ -24,6 +24,9 @@ const EMPTY_FORM: ClinicalPayload = {
     current_medications: [],
 };
 
+// --------------------
+// Cache helpers
+// --------------------
 function loadCachedForm(): ClinicalPayload | null {
     try {
         const raw = localStorage.getItem(CACHE_KEY);
@@ -41,6 +44,9 @@ function clearCachedForm() {
     localStorage.removeItem(CACHE_KEY);
 }
 
+// --------------------
+// UI helper
+// --------------------
 function Field({
                    highlight,
                    children,
@@ -61,21 +67,34 @@ function Field({
     );
 }
 
+// --------------------
+// Component
+// --------------------
 export function ClinicalForm({
                                  onSubmit,
                                  loading,
                                  warningMessage,
                                  highlightFields = [],
+                                 initialData,
                              }: {
     onSubmit: (payload: ClinicalPayload) => void;
     loading: boolean;
     warningMessage?: string;
     highlightFields?: string[];
+    initialData?: ClinicalPayload | null;
 }) {
     const [form, setForm] = useState<ClinicalPayload>(
-        loadCachedForm() ?? EMPTY_FORM
+        initialData ?? loadCachedForm() ?? EMPTY_FORM
     );
 
+    // 🔁 Recharger le formulaire quand un patient est sélectionné
+    useEffect(() => {
+        if (initialData) {
+            setForm(initialData);
+        }
+    }, [initialData]);
+
+    // 💾 Cache local automatique
     useEffect(() => {
         saveCachedForm(form);
     }, [form]);
@@ -99,7 +118,8 @@ export function ClinicalForm({
         <div className="bg-white p-6 rounded border space-y-6">
             {warningMessage && (
                 <div className="border border-orange-300 bg-orange-50 p-4 rounded text-orange-800">
-                    {warningMessage}
+                    <p className="font-medium">Données cliniques incomplètes</p>
+                    <p className="text-sm mt-1">{warningMessage}</p>
                 </div>
             )}
 
@@ -150,10 +170,7 @@ export function ClinicalForm({
                     placeholder="Antécédents médicaux"
                     value={form.medical_history.join(", ")}
                     onChange={(e) =>
-                        update(
-                            "medical_history",
-                            parseList(e.target.value)
-                        )
+                        update("medical_history", parseList(e.target.value))
                     }
                 />
             </Field>
