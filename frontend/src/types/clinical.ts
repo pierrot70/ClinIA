@@ -1,3 +1,5 @@
+// src/types/clinical.ts
+
 export type CertaintyLevel = "low" | "moderate" | "high";
 export type EvidenceLevel = "A" | "B" | "C";
 

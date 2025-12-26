@@ -1,37 +1,33 @@
-import React from "react";
-
-interface AICardProps {
+type Props = {
     loading: boolean;
     error: boolean;
-    text: string | null | undefined;
-}
+    text?: string;
+};
 
-export default function AICard({ loading, error, text }: AICardProps) {
+export default function AICard({ loading, error, text }: Props) {
     if (loading) {
         return (
-            <div className="p-6 bg-white border rounded-xl shadow-sm">
-                <p className="text-gray-500 text-sm">Analyse IA en cours…</p>
+            <div className="bg-gray-50 border rounded-lg p-4 text-sm text-gray-600">
+                Analyse en cours…
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="p-6 bg-white border rounded-xl shadow-sm">
-                <p className="text-red-600 font-semibold">Erreur lors de l&apos;analyse IA</p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+                {text || "Une erreur est survenue lors de l’analyse."}
             </div>
         );
     }
 
-    const hasText = typeof text === "string" && text.trim().length > 0;
+    if (!text) {
+        return null;
+    }
 
     return (
-        <div className="p-6 bg-white border rounded-xl shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">🧍 Résumé pour le patient</h3>
-
-            <p className="text-gray-700 leading-relaxed text-sm">
-                {hasText ? text : "Aucun résumé reçu (réponse IA vide ou non conforme)."}
-            </p>
+        <div className="bg-white border border-gray-200 rounded-lg p-4 text-sm text-gray-800">
+            {text}
         </div>
     );
 }
