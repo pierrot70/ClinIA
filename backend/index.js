@@ -9,6 +9,12 @@ import { safeParseMedicalAI } from "./utils/aiParser.js";
 import { getMockForDiagnosis } from "./utils/mockLoader.js";
 import { DiagnosisResult } from "./models/DiagnosisResult.js";
 
+import {
+    canCallOpenAI,
+    recordOpenAISuccess,
+    recordOpenAIFailure,
+} from "./utils/openaiCircuitBreaker.js";
+
 dotenv.config();
 
 /* ------------------------------------------------------------------ */
@@ -36,15 +42,17 @@ function makeFingerprint({ diagnosis, patient }) {
 
 /**
  * 🔑 NORMALISATION — CONTRAT FRONT GARANTI
+ * Le frontend reçoit TOUJOURS cette structure
  */
 function normalizeClinicalAnalysis(raw) {
     const pa = raw?.patient_analysis ?? raw ?? {};
 
     return {
         diagnosis: {
-            suspected: pa.blood_pressure_status
-                ? "Diabète de type 2 avec hypertension"
-                : "Analyse clinique en cours",
+            suspected:
+                pa.blood_pressure_status
+                    ? "Diabète de type 2 avec hypertension"
+                    : "Analyse clinique en cours",
             certainty_level: "moderate",
             justification:
                 "Analyse basée sur symptômes, antécédents et paramètres cliniques disponibles.",
@@ -55,16 +63,18 @@ function normalizeClinicalAnalysis(raw) {
         red_flags: [],
 
         patient_summary: {
-            plain_language: Array.isArray(pa.clinical_recommendations)
-                ? pa.clinical_recommendations.join(" ")
-                : "Analyse clinique générée par ClinIA.",
-            clinical_language: Array.isArray(pa.symptoms_analysis)
-                ? pa.symptoms_analysis.join(" ")
-                : "Analyse clinique structurée.",
+            plain_language:
+                Array.isArray(pa.clinical_recommendations)
+                    ? pa.clinical_recommendations.join(" ")
+                    : "Analyse clinique générée par ClinIA.",
+            clinical_language:
+                Array.isArray(pa.symptoms_analysis)
+                    ? pa.symptoms_analysis.join(" ")
+                    : "Analyse clinique structurée.",
         },
 
         meta: {
-            model: process.env.OPENAI_MODEL ?? "unknown",
+            model: process.env.OPENAI_MODEL ?? "fallback",
             confidence_score: 0.6,
         },
     };
@@ -72,15 +82,14 @@ function normalizeClinicalAnalysis(raw) {
 
 /**
  * 🧠 PERSISTENCE INTELLIGENTE
- * - create si possible
- * - si duplicate key → on relit et on retourne
+ * - insert si nouveau
+ * - duplicate → relit (cache)
  */
 async function persistOrReuseDiagnosis(payload) {
     try {
         const created = await DiagnosisResult.create(payload);
         return { ok: true, doc: created };
     } catch (err) {
-        // 🔁 DUPLICATE KEY = CACHE HIT
         if (err.code === 11000) {
             const existing = await DiagnosisResult.findOne({
                 fingerprint: payload.fingerprint,
@@ -97,7 +106,7 @@ async function persistOrReuseDiagnosis(payload) {
             error: {
                 source: "mongo",
                 message:
-                    "Erreur technique lors de la persistance de l’analyse.",
+                    "L’analyse a été générée, mais n’a pas pu être sauvegardée.",
             },
         };
     }
@@ -109,8 +118,6 @@ async function persistOrReuseDiagnosis(payload) {
 
 app.post("/api/ai/analyze", async (req, res) => {
     const { symptoms = [], forceReal } = req.body;
-
-    console.log("🔥 PAYLOAD REÇU:\n", JSON.stringify(req.body, null, 2));
 
     if (!Array.isArray(symptoms) || symptoms.length === 0) {
         return res.json({
@@ -150,7 +157,20 @@ app.post("/api/ai/analyze", async (req, res) => {
         });
     }
 
-    /* ---------------- OPENAI ---------------- */
+    /* ---------------- OPENAI PROTÉGÉ ---------------- */
+
+    // 🛑 Circuit breaker ouvert → fallback immédiat
+    if (!canCallOpenAI()) {
+        console.warn("⚠️ OpenAI circuit OPEN → mode dégradé");
+
+        const degraded = normalizeClinicalAnalysis({});
+
+        return res.json({
+            data: degraded,
+            meta: { source: "degraded", model: "fallback" },
+        });
+    }
+
     let normalized;
 
     try {
@@ -161,7 +181,7 @@ app.post("/api/ai/analyze", async (req, res) => {
                 {
                     role: "system",
                     content:
-                        "You are ClinIA, a clinical decision support system. Respond ONLY in valid JSON.",
+                        "You are ClinIA. Respond ONLY in valid JSON. If unsure, return {}.",
                 },
                 {
                     role: "user",
@@ -169,6 +189,7 @@ app.post("/api/ai/analyze", async (req, res) => {
                 },
             ],
             temperature: 0.1,
+            timeout: 15_000,
         });
 
         const parsed = safeParseMedicalAI(
@@ -176,14 +197,17 @@ app.post("/api/ai/analyze", async (req, res) => {
         );
 
         normalized = normalizeClinicalAnalysis(parsed);
+
+        recordOpenAISuccess();
     } catch (err) {
-        console.error("❌ OpenAI analyze error:", err.message);
+        console.error("❌ OpenAI error:", err.message);
+        recordOpenAIFailure();
+
+        const degraded = normalizeClinicalAnalysis({});
+
         return res.json({
-            error: {
-                source: "openai",
-                message:
-                    "Le service d’analyse clinique (IA) est temporairement indisponible.",
-            },
+            data: degraded,
+            meta: { source: "degraded", model: "fallback" },
         });
     }
 

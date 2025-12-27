@@ -1,23 +1,49 @@
 // src/services/clinicalApi.ts
 
 import type { ClinicalAnalysis } from "../types/clinical";
-import type { ApiResponse } from "../types/api";
-
+import type { ApiResponse, ApiSuccess, ApiFailure } from "../types/api";
 
 const API_URL = import.meta.env.VITE_API_URL || "";
+
+/* ------------------------------------------------------------------ */
+/* Type guards                                                         */
+/* ------------------------------------------------------------------ */
+
+function isApiFailure(obj: any): obj is ApiFailure {
+    return (
+        typeof obj === "object" &&
+        obj !== null &&
+        "error" in obj &&
+        typeof obj.error?.code === "string"
+    );
+}
+
+function isApiSuccess<T>(obj: any): obj is ApiSuccess<T> {
+    return (
+        typeof obj === "object" &&
+        obj !== null &&
+        "data" in obj &&
+        "meta" in obj
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/* API call                                                           */
+/* ------------------------------------------------------------------ */
 
 /**
  * Appelle l’API ClinIA.
  *
- * ⚠️ Ne throw jamais pour les erreurs métier (OpenAI / Mongo).
- * ⚠️ Retourne TOUJOURS un ApiResponse<ClinicalAnalysis>.
+ * ⚠️ Ne throw jamais pour les erreurs métier
+ * ⚠️ Retourne TOUJOURS un ApiResponse<ClinicalAnalysis>
  */
 export async function analyzeClinicalCase(
     payload: Record<string, any>
 ): Promise<ApiResponse<ClinicalAnalysis>> {
+
     let response: Response;
 
-    // 🌐 Erreurs réseau (serveur down, CORS, offline)
+    /* ---------------- Réseau / fetch ---------------- */
     try {
         response = await fetch(`${API_URL}/api/ai/analyze`, {
             method: "POST",
@@ -26,42 +52,47 @@ export async function analyzeClinicalCase(
             },
             body: JSON.stringify(payload),
         });
-    } catch (err) {
+    } catch {
         return {
             error: {
-                source: "internal",
+                code: "INTERNAL_ERROR",
                 message: "Impossible de contacter le serveur ClinIA.",
-                technical: String(err),
+                retryable: true,
             },
         };
     }
 
+    /* ---------------- JSON parsing ---------------- */
     let json: unknown;
 
-    // 🧩 JSON invalide
     try {
         json = await response.json();
-    } catch (err) {
+    } catch {
         return {
             error: {
-                source: "internal",
-                message: "Réponse serveur invalide (JSON non lisible).",
-                technical: String(err),
+                code: "INTERNAL_ERROR",
+                message: "Réponse serveur invalide.",
+                retryable: true,
             },
         };
     }
 
-    // ❌ Erreur métier retournée par le backend
-    if (
-        typeof json === "object" &&
-        json !== null &&
-        "error" in json
-    ) {
-        return json as ApiResponse<ClinicalAnalysis>;
+    /* ---------------- Erreur métier backend ---------------- */
+    if (isApiFailure(json)) {
+        return json;
     }
 
-    // ✅ Succès
+    /* ---------------- Succès ---------------- */
+    if (isApiSuccess<ClinicalAnalysis>(json)) {
+        return json;
+    }
+
+    /* ---------------- Cas impossible mais sécurisé ---------------- */
     return {
-        data: json as ClinicalAnalysis,
+        error: {
+            code: "INTERNAL_ERROR",
+            message: "Format de réponse inconnu.",
+            retryable: false,
+        },
     };
 }

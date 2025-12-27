@@ -5,6 +5,8 @@
 /* ------------------------------------------------------------------ */
 
 export type Sex = "male" | "female" | "other";
+export type AIServiceSource = "real" | "mock" | "degraded";
+
 
 export interface ClinicalPayload {
     age: number;
@@ -62,5 +64,7 @@ export interface ClinicalAnalysis {
     meta: {
         model: string;
         confidence_score: number;
+        source?: AIServiceSource; // 👈 AJOUT
     };
+
 }
