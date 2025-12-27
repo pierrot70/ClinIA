@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { ClinicalForm } from "../components/clinical/ClinicalForm";
 import { ClinicalResultPage } from "./ClinicalResultPage";
+import { ServiceStatusBanner } from "../components/system/ServiceStatusBanner";
 import { analyzeClinicalCase } from "../services/clinicalApi";
 
 import type { ClinicalPayload, ClinicalAnalysis } from "../types/clinical";
-import type { ApiResponse, ApiFailure } from "../types/api";
+import type { ApiResponse, ApiError } from "../types/api";
 
 /* ------------------------------------------------------------------ */
-/* Preset clinique par défaut (sécurisé)                               */
+/* Preset clinique par défaut (sécurisé, jamais invalide)              */
 /* ------------------------------------------------------------------ */
 
 const DEFAULT_CLINICAL_PAYLOAD: ClinicalPayload = {
@@ -19,18 +20,10 @@ const DEFAULT_CLINICAL_PAYLOAD: ClinicalPayload = {
         systolic: 145,
         diastolic: 92,
     },
-    symptoms: ["Polyurie", "Polydipsie", "Fatigue"], // 🔒 jamais vide
+    symptoms: ["Polyurie", "Polydipsie", "Fatigue"],
     medical_history: ["Diabète de type 2"],
     current_medications: ["Metformine"],
 };
-
-/* ------------------------------------------------------------------ */
-/* Type guard                                                          */
-/* ------------------------------------------------------------------ */
-
-function isApiError<T>(response: ApiResponse<T>): response is ApiFailure {
-    return "error" in response;
-}
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -40,7 +33,13 @@ export function ClinicalAnalyzePage() {
     const [activeTab, setActiveTab] = useState<"patient" | "clinical">("patient");
     const [result, setResult] = useState<ClinicalAnalysis | null>(null);
     const [loading, setLoading] = useState(false);
-    const [warning, setWarning] = useState<string>();
+
+    /** Dernière erreur API normalisée */
+    const [apiError, setApiError] = useState<ApiError | null>(null);
+
+    /** Dernier payload valide (pour retry intelligent) */
+    const [lastPayload, setLastPayload] =
+        useState<ClinicalPayload | null>(null);
 
     /**
      * 🧹 Nettoyage cache UNE SEULE FOIS à l’arrivée sur /clinical
@@ -53,51 +52,19 @@ export function ClinicalAnalyzePage() {
     }, []);
 
     /* ------------------------------------------------------------------ */
-    /* Soumission                                                        */
+    /* Analyse (appel réel + retry)                                       */
     /* ------------------------------------------------------------------ */
 
-    async function handleSubmit(payload: ClinicalPayload) {
+    async function runAnalysis(payload: ClinicalPayload) {
         setLoading(true);
-        setWarning(undefined);
+        setApiError(null);
 
-        // 🛡️ Sécurité ultime : on n’envoie JAMAIS un payload invalide
-        const safePayload: ClinicalPayload = {
-            ...payload,
-            symptoms:
-                payload.symptoms && payload.symptoms.length > 0
-                    ? payload.symptoms
-                    : DEFAULT_CLINICAL_PAYLOAD.symptoms,
-        };
+        const response: ApiResponse<ClinicalAnalysis> =
+            await analyzeClinicalCase(payload);
 
-        let response: ApiResponse<ClinicalAnalysis>;
-
-        try {
-            response = await analyzeClinicalCase(safePayload);
-        } catch (err) {
-            console.error("Erreur réseau:", err);
-            setWarning("Erreur réseau. Impossible de contacter ClinIA.");
-            setLoading(false);
-            return;
-        }
-
-        if (isApiError(response)) {
-            switch (response.error.source) {
-                case "openai":
-                    setWarning(
-                        "Le service d’analyse médicale (IA) est temporairement indisponible."
-                    );
-                    break;
-
-                case "mongo":
-                    // 🧠 Cache Mongo : PAS une erreur utilisateur
-                    console.warn("Analyse récupérée depuis le cache Mongo");
-                    break;
-
-                case "internal":
-                default:
-                    setWarning(response.error.message);
-            }
-
+        // ❌ ERREUR NORMALISÉE
+        if ("error" in response) {
+            setApiError(response.error);
             setResult(null);
             setActiveTab("patient");
             setLoading(false);
@@ -111,20 +78,57 @@ export function ClinicalAnalyzePage() {
     }
 
     /* ------------------------------------------------------------------ */
+    /* Soumission initiale                                                */
+    /* ------------------------------------------------------------------ */
+
+    async function handleSubmit(payload: ClinicalPayload) {
+        // 🛡️ Sécurité ultime : jamais de payload invalide
+        const safePayload: ClinicalPayload = {
+            ...payload,
+            symptoms:
+                payload.symptoms && payload.symptoms.length > 0
+                    ? payload.symptoms
+                    : DEFAULT_CLINICAL_PAYLOAD.symptoms,
+        };
+
+        setLastPayload(safePayload);
+        await runAnalysis(safePayload);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Retry intelligent                                                  */
+    /* ------------------------------------------------------------------ */
+
+    function retry() {
+        if (lastPayload) {
+            runAnalysis(lastPayload);
+        }
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Render                                                             */
     /* ------------------------------------------------------------------ */
 
     return (
         <div className="max-w-5xl mx-auto p-6 space-y-6">
+            {/* 🔔 Bannière système (résilience visible) */}
+            {apiError && (
+                <ServiceStatusBanner
+                    error={apiError}
+                    onRetry={apiError.retryable ? retry : undefined}
+                />
+            )}
+
+            {/* 🧑‍⚕️ Formulaire clinique */}
             {activeTab === "patient" && !result && (
                 <ClinicalForm
                     onSubmit={handleSubmit}
                     loading={loading}
-                    warningMessage={warning}
                     initialData={DEFAULT_CLINICAL_PAYLOAD}
                 />
             )}
 
+            {/* 📊 Résultat clinique */}
             {activeTab === "clinical" && result && (
                 <ClinicalResultPage data={result} />
             )}
