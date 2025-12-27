@@ -3,6 +3,7 @@
 import type { ClinicalAnalysis } from "../types/clinical";
 import type { ApiResponse } from "../types/api";
 
+
 const API_URL = import.meta.env.VITE_API_URL || "";
 
 /**

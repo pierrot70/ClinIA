@@ -1,18 +1,5 @@
 import { useEffect, useState } from "react";
-
-type ClinicalPayload = {
-    age: number;
-    sex: "male" | "female" | "other";
-    weight?: number;
-    height?: number;
-    blood_pressure?: {
-        systolic?: number;
-        diastolic?: number;
-    };
-    symptoms: string[];
-    medical_history: string[];
-    current_medications: string[];
-};
+import type { ClinicalPayload } from "../../types/clinical";
 
 const CACHE_KEY = "clinia_last_clinical_payload";
 

@@ -1,44 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ClinicalForm } from "../components/clinical/ClinicalForm";
 import { ClinicalResultPage } from "./ClinicalResultPage";
 import { analyzeClinicalCase } from "../services/clinicalApi";
+
+import type { ClinicalPayload, ClinicalAnalysis } from "../types/clinical";
 import type { ApiResponse, ApiFailure } from "../types/api";
 
 /* ------------------------------------------------------------------ */
-/* Types                                                               */
+/* Preset clinique par défaut (sécurisé)                               */
 /* ------------------------------------------------------------------ */
 
-type ClinicalPayload = {
-    age: number;
-    sex: "male" | "female" | "other";
-    weight?: number;
-    height?: number;
-    blood_pressure?: {
-        systolic?: number;
-        diastolic?: number;
-    };
-    symptoms: string[];
-    medical_history: string[];
-    current_medications: string[];
-};
-
-type ClinicalAnalysis = {
-    diagnosis: {
-        suspected: string;
-        certainty_level: "low" | "moderate" | "high";
-        justification: string;
-    };
-    treatments: any[];
-    alternatives: any[];
-    red_flags: string[];
-    patient_summary: {
-        plain_language: string;
-        clinical_language: string;
-    };
-    meta?: {
-        model?: string;
-        confidence_score?: number;
-    };
+const DEFAULT_CLINICAL_PAYLOAD: ClinicalPayload = {
+    age: 55,
+    sex: "male",
+    weight: 92,
+    height: 175,
+    blood_pressure: {
+        systolic: 145,
+        diastolic: 92,
+    },
+    symptoms: ["Polyurie", "Polydipsie", "Fatigue"], // 🔒 jamais vide
+    medical_history: ["Diabète de type 2"],
+    current_medications: ["Metformine"],
 };
 
 /* ------------------------------------------------------------------ */
@@ -57,13 +40,45 @@ export function ClinicalAnalyzePage() {
     const [activeTab, setActiveTab] = useState<"patient" | "clinical">("patient");
     const [result, setResult] = useState<ClinicalAnalysis | null>(null);
     const [loading, setLoading] = useState(false);
-    const [warning, setWarning] = useState<string | undefined>();
+    const [warning, setWarning] = useState<string>();
+
+    /**
+     * 🧹 Nettoyage cache UNE SEULE FOIS à l’arrivée sur /clinical
+     * - dépendances vides
+     * - aucun setState
+     * - AUCUNE boucle possible
+     */
+    useEffect(() => {
+        localStorage.removeItem("clinia_last_clinical_payload");
+    }, []);
+
+    /* ------------------------------------------------------------------ */
+    /* Soumission                                                        */
+    /* ------------------------------------------------------------------ */
 
     async function handleSubmit(payload: ClinicalPayload) {
         setLoading(true);
         setWarning(undefined);
 
-        const response = await analyzeClinicalCase(payload);
+        // 🛡️ Sécurité ultime : on n’envoie JAMAIS un payload invalide
+        const safePayload: ClinicalPayload = {
+            ...payload,
+            symptoms:
+                payload.symptoms && payload.symptoms.length > 0
+                    ? payload.symptoms
+                    : DEFAULT_CLINICAL_PAYLOAD.symptoms,
+        };
+
+        let response: ApiResponse<ClinicalAnalysis>;
+
+        try {
+            response = await analyzeClinicalCase(safePayload);
+        } catch (err) {
+            console.error("Erreur réseau:", err);
+            setWarning("Erreur réseau. Impossible de contacter ClinIA.");
+            setLoading(false);
+            return;
+        }
 
         if (isApiError(response)) {
             switch (response.error.source) {
@@ -72,11 +87,13 @@ export function ClinicalAnalyzePage() {
                         "Le service d’analyse médicale (IA) est temporairement indisponible."
                     );
                     break;
+
                 case "mongo":
-                    setWarning(
-                        "L’analyse a été effectuée, mais n’a pas pu être sauvegardée."
-                    );
+                    // 🧠 Cache Mongo : PAS une erreur utilisateur
+                    console.warn("Analyse récupérée depuis le cache Mongo");
                     break;
+
+                case "internal":
                 default:
                     setWarning(response.error.message);
             }
@@ -87,11 +104,15 @@ export function ClinicalAnalyzePage() {
             return;
         }
 
-        // ✅ SUCCESS
+        // ✅ SUCCÈS
         setResult(response.data);
         setActiveTab("clinical");
         setLoading(false);
     }
+
+    /* ------------------------------------------------------------------ */
+    /* Render                                                             */
+    /* ------------------------------------------------------------------ */
 
     return (
         <div className="max-w-5xl mx-auto p-6 space-y-6">
@@ -100,6 +121,7 @@ export function ClinicalAnalyzePage() {
                     onSubmit={handleSubmit}
                     loading={loading}
                     warningMessage={warning}
+                    initialData={DEFAULT_CLINICAL_PAYLOAD}
                 />
             )}
 

@@ -1,5 +1,32 @@
 // src/types/clinical.ts
 
+/* ------------------------------------------------------------------ */
+/* Payload envoyé au backend                                           */
+/* ------------------------------------------------------------------ */
+
+export type Sex = "male" | "female" | "other";
+
+export interface ClinicalPayload {
+    age: number;
+    sex: Sex;
+
+    weight?: number;
+    height?: number;
+
+    blood_pressure?: {
+        systolic?: number;
+        diastolic?: number;
+    };
+
+    symptoms: string[];
+    medical_history: string[];
+    current_medications: string[];
+}
+
+/* ------------------------------------------------------------------ */
+/* Analyse retournée par ClinIA                                        */
+/* ------------------------------------------------------------------ */
+
 export type CertaintyLevel = "low" | "moderate" | "high";
 export type EvidenceLevel = "A" | "B" | "C";
 
