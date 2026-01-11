@@ -63,12 +63,16 @@ const AppointmentSchema = new mongoose.Schema(
 );
 
 /* ------------------------------------------------------------------ */
-/* Index unique — anti double booking                                  */
+/* Index unique pour empêcher le double booking                        */
+/* Uniquement pour les rendez-vous "scheduled"                         */
 /* ------------------------------------------------------------------ */
 
 AppointmentSchema.index(
     { specialist: 1, date: 1, time: 1 },
-    { unique: true }
+    {
+        unique: true,
+        partialFilterExpression: { status: "scheduled" },
+    }
 );
 
 export const Appointment =

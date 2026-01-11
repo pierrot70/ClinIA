@@ -2,6 +2,7 @@ import express from "express";
 import {
     createAppointment,
     listAppointments,
+    getAvailableSlots,
     getAppointmentById,
     cancelAppointment,
     updateAppointmentStatus,
@@ -13,6 +14,51 @@ const router = express.Router();
 /* ------------------------------------------------------------------ */
 /* POST /api/appointments                                              */
 /* ------------------------------------------------------------------ */
+
+
+/* ------------------------------------------------------------------ */
+/* GET /api/appointments/slots                                         */
+/* ------------------------------------------------------------------ */
+
+router.get("/slots", async (req, res) => {
+    const { specialist, date } = req.query;
+
+    try {
+        const slots = await getAvailableSlots(
+            specialist,
+            date
+        );
+
+        return res.status(200).json({
+            data: slots,
+            meta: {
+                source: "real",
+                model: "computed",
+            },
+        });
+    } catch (err) {
+        if (err.code === "INVALID_INPUT") {
+            return res.status(400).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        console.error("❌ Slot fetch error:", err);
+
+        return res.status(500).json({
+            error: {
+                code: "PERSISTENCE_FAILED",
+                message:
+                    "Impossible de récupérer les créneaux.",
+                retryable: true,
+            },
+        });
+    }
+});
 
 router.post("/", async (req, res) => {
     /* ---------------- Mapping DTO ---------------- */

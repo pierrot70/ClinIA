@@ -176,6 +176,80 @@ export async function updateAppointmentStatus(id, newStatus) {
 
     return appointment;
 }
+
+/* ------------------------------------------------------------------ */
+/* Available slots                                                     */
+/* ------------------------------------------------------------------ */
+
+const WORK_START_HOUR = 8;
+const WORK_END_HOUR = 17;
+const SLOT_STEP_MINUTES = 15;
+
+function generateDailySlots() {
+    const slots = [];
+
+    for (let h = WORK_START_HOUR; h < WORK_END_HOUR; h++) {
+        for (let m = 0; m < 60; m += SLOT_STEP_MINUTES) {
+            slots.push(
+                `${h.toString().padStart(2, "0")}:${m
+                    .toString()
+                    .padStart(2, "0")}`
+            );
+        }
+    }
+
+    return slots;
+}
+
+export async function getAvailableSlots(
+    specialist,
+    date
+) {
+    if (!specialist || !date) {
+        throw {
+            code: "INVALID_INPUT",
+            message:
+                "Spécialiste et date sont requis pour les créneaux.",
+        };
+    }
+
+    const allSlots = generateDailySlots();
+
+    const booked = await Appointment.find(
+        {
+            specialist,
+            date,
+            status: "scheduled",
+        },
+        { time: 1, _id: 0 }
+    ).lean();
+
+    const bookedTimes = new Set(
+        booked.map((a) => a.time)
+    );
+
+    // Date passée → aucun créneau
+    const today = new Date();
+    const targetDate = new Date(`${date}T00:00`);
+
+    if (targetDate < new Date(today.toDateString())) {
+        return [];
+    }
+
+    // Aujourd’hui → exclure heures passées
+    const now = new Date();
+
+    return allSlots.filter((slot) => {
+        if (bookedTimes.has(slot)) return false;
+
+        if (targetDate.toDateString() === now.toDateString()) {
+            const slotDate = new Date(`${date}T${slot}`);
+            if (slotDate <= now) return false;
+        }
+
+        return true;
+    });
+}
 /* ------------------------------------------------------------------ */
 /* GET appointment by par numero de RAMQ                              */
 /*   Validation: Un individu peut avoir qu'un seul appointment par    */
