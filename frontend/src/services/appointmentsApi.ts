@@ -19,7 +19,7 @@ export interface CreateAppointmentPayload {
 }
 
 /* ------------------------------------------------------------------ */
-/* API call                                                            */
+/* Create appointment                                                   */
 /* ------------------------------------------------------------------ */
 
 export async function createAppointment(
@@ -61,4 +61,54 @@ export async function createAppointment(
     }
 
     return json as ApiResponse<any>;
+}
+
+/* ------------------------------------------------------------------ */
+/* Fetch available slots                                                */
+/* ------------------------------------------------------------------ */
+
+export async function fetchAvailableSlots(
+    specialist: string,
+    date: string
+): Promise<ApiResponse<string[]>> {
+
+    let response: Response;
+
+    try {
+        response = await fetch(
+            `${API_URL}/api/appointments/slots?specialist=${encodeURIComponent(
+                specialist
+            )}&date=${encodeURIComponent(date)}`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+    } catch {
+        return {
+            error: {
+                code: "INTERNAL_ERROR",
+                message: "Impossible de récupérer les créneaux.",
+                retryable: true,
+            },
+        };
+    }
+
+    let json: unknown;
+
+    try {
+        json = await response.json();
+    } catch {
+        return {
+            error: {
+                code: "INTERNAL_ERROR",
+                message: "Réponse serveur invalide.",
+                retryable: true,
+            },
+        };
+    }
+
+    return json as ApiResponse<string[]>;
 }
