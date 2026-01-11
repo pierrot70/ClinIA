@@ -87,6 +87,40 @@ export async function getAppointmentById(id) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Cancel appointment (soft delete)                                   */
+/* ------------------------------------------------------------------ */
+
+export async function cancelAppointment(id) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw {
+            code: "INVALID_ID",
+            message: "Identifiant de rendez-vous invalide.",
+        };
+    }
+
+    const appointment = await Appointment.findById(id);
+
+    if (!appointment) {
+        throw {
+            code: "NOT_FOUND",
+            message: "Rendez-vous introuvable.",
+        };
+    }
+
+    if (appointment.status === "cancelled") {
+        throw {
+            code: "ALREADY_CANCELLED",
+            message: "Ce rendez-vous est déjà annulé.",
+        };
+    }
+
+    appointment.status = "cancelled";
+    await appointment.save();
+
+    return appointment;
+}
+
+/* ------------------------------------------------------------------ */
 /* GET appointment by par numero de RAMQ                              */
 /*   Validation: Un individu peut avoir qu'un seul appointment par    */
 /*               categorie.                                           */
