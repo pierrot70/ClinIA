@@ -4,6 +4,7 @@ import {
     listAppointments,
     getAppointmentById,
     cancelAppointment,
+    updateAppointmentStatus,
 } from "../services/appointments.js";
 import { toCreateAppointmentDTO } from "../dto/appointment.dto.js";
 
@@ -218,6 +219,76 @@ router.delete("/:id", async (req, res) => {
                 code: "PERSISTENCE_FAILED",
                 message:
                     "Impossible d’annuler le rendez-vous.",
+                retryable: true,
+            },
+        });
+    }
+});
+
+/* ------------------------------------------------------------------ */
+/* PATCH /api/appointments/:id/status                                  */
+/* ------------------------------------------------------------------ */
+
+router.patch("/:id/status", async (req, res) => {
+    const { status } = req.body;
+
+    if (!status) {
+        return res.status(400).json({
+            error: {
+                code: "INVALID_INPUT",
+                message: "Le champ 'status' est requis.",
+                retryable: false,
+            },
+        });
+    }
+
+    try {
+        const appointment =
+            await updateAppointmentStatus(req.params.id, status);
+
+        return res.status(200).json({
+            data: appointment,
+            meta: {
+                source: "real",
+                model: "mongo",
+            },
+        });
+    } catch (err) {
+        if (
+            [
+                "INVALID_ID",
+                "INVALID_STATUS",
+                "STATUS_IMMUTABLE",
+            ].includes(err.code)
+        ) {
+            return res.status(400).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+        if (err.code === "NOT_FOUND") {
+            return res.status(404).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        console.error(
+            "❌ Appointment status update error:",
+            err
+        );
+
+        return res.status(500).json({
+            error: {
+                code: "PERSISTENCE_FAILED",
+                message:
+                    "Impossible de mettre à jour le statut du rendez-vous.",
                 retryable: true,
             },
         });

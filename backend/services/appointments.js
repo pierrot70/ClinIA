@@ -121,6 +121,62 @@ export async function cancelAppointment(id) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Update appointment status                                           */
+/* ------------------------------------------------------------------ */
+
+const ALLOWED_STATUSES = ["scheduled", "cancelled", "completed"];
+
+export async function updateAppointmentStatus(id, newStatus) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw {
+            code: "INVALID_ID",
+            message: "Identifiant de rendez-vous invalide.",
+        };
+    }
+
+    if (!ALLOWED_STATUSES.includes(newStatus)) {
+        throw {
+            code: "INVALID_STATUS",
+            message:
+                "Statut invalide. Valeurs autorisées : scheduled, cancelled, completed.",
+        };
+    }
+    const appointment = await Appointment.findById(id);
+
+    if (!appointment) {
+        throw {
+            code: "NOT_FOUND",
+            message: "Rendez-vous introuvable.",
+        };
+    }
+
+    /* ---------------- Règles métier ---------------- */
+
+    if (appointment.status === "cancelled") {
+        throw {
+            code: "STATUS_IMMUTABLE",
+            message:
+                "Un rendez-vous annulé ne peut pas être modifié.",
+        };
+    }
+
+    if (
+        appointment.status === "completed" &&
+        newStatus !== "completed"
+    ) {
+        throw {
+            code: "STATUS_IMMUTABLE",
+            message:
+                "Un rendez-vous complété ne peut pas être modifié.",
+        };
+    }
+
+    appointment.status = newStatus;
+    await appointment.save();
+
+    return appointment;
+}
+/* ------------------------------------------------------------------ */
 /* GET appointment by par numero de RAMQ                              */
 /*   Validation: Un individu peut avoir qu'un seul appointment par    */
 /*               categorie.                                           */
