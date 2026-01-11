@@ -1,0 +1,84 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: "321eRRe!p"
+    volumes:
+      - mongo_data:/data/db
+
+  mongo-express:
+    image: mongo-express:1
+    restart: always
+    environment:
+      ME_CONFIG_BASICAUTH_USERNAME: plasante
+      ME_CONFIG_BASICAUTH_PASSWORD: "321eRRe!p"
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: "321eRRe!p"
+      ME_CONFIG_MONGODB_SERVER: mongo
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongo
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      MONGO_URI: "mongodb://root:321eRRe!p@mongo:27017/clinia?authSource=admin"
+      JWT_SECRET: ${JWT_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: gpt-4.1-mini
+      CLINIA_MOCK_AI: "true"
+    ports:
+      - "4000:4000"
+    labels:
+      - "traefik.enable=true"
+
+      # API sur le même domaine, seulement pour /api
+      - "traefik.http.routers.clinia-api-https.rule=(Host(`clinique-ai.ca`) || Host(`www.clinique-ai.ca`)) && PathPrefix(`/api`)"
+      - "traefik.http.routers.clinia-api-https.entrypoints=https"
+      - "traefik.http.routers.clinia-api-https.tls=true"
+      - "traefik.http.routers.clinia-api-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.clinia-api-https.priority=100"
+
+      - "traefik.http.services.clinia-api.loadbalancer.server.port=4000"
+      - "traefik.http.routers.clinia-api-https.service=clinia-api"
+    depends_on:
+      - mongo
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "8082:80" # debug direct (http://clinique-ai.ca:8082)
+    labels:
+      - "traefik.enable=true"
+
+      # --- HTTP -> HTTPS redirect
+      - "traefik.http.routers.clinia-frontend-http.rule=Host(`clinique-ai.ca`) || Host(`www.clinique-ai.ca`)"
+      - "traefik.http.routers.clinia-frontend-http.entrypoints=http"
+      - "traefik.http.routers.clinia-frontend-http.middlewares=clinia-redirect-to-https"
+      - "traefik.http.middlewares.clinia-redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.clinia-redirect-to-https.redirectscheme.permanent=true"
+
+      # --- HTTPS (443) with Let's Encrypt via Coolify's Traefik
+      - "traefik.http.routers.clinia-frontend-https.rule=Host(`clinique-ai.ca`) || Host(`www.clinique-ai.ca`)"
+      - "traefik.http.routers.clinia-frontend-https.entrypoints=https"
+      - "traefik.http.routers.clinia-frontend-https.tls=true"
+      - "traefik.http.routers.clinia-frontend-https.tls.certresolver=letsencrypt"
+
+      # --- service port inside container
+      - "traefik.http.services.clinia-frontend.loadbalancer.server.port=80"
+      - "traefik.http.routers.clinia-frontend-http.service=clinia-frontend"
+      - "traefik.http.routers.clinia-frontend-https.service=clinia-frontend"
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:

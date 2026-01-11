@@ -1,0 +1,16 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Installe deps (incluant dev deps)
+COPY package*.json ./
+RUN npm install
+
+# Code (sera ensuite écrasé/complété par le volume en compose)
+COPY . .
+
+EXPOSE 4000
+
+# DEV: on suppose que tu as un script "dev" (nodemon/tsx/etc.)
+# Si tu n'as pas "dev", dis-moi ton package.json backend et je l'ajuste.
+CMD ["npm", "run", "dev"]
