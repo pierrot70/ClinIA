@@ -8,6 +8,15 @@ import mongoose from "mongoose";
 export async function createAppointment(dto) {
     /* ---------------- Validation métier ---------------- */
 
+    const ALLOWED_PRIORITIES = ["normal", "urgent"];
+
+    if (!ALLOWED_PRIORITIES.includes(dto.priority)) {
+        throw {
+            code: "INVALID_PRIORITY",
+            message: "Priorité invalide (normal ou urgent).",
+        };
+    }
+
     // Heures ouvrables
     const [hour] = dto.time.split(":").map(Number);
     if (hour < 8 || hour >= 17) {

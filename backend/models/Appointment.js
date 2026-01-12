@@ -49,6 +49,13 @@ const AppointmentSchema = new mongoose.Schema(
             index: true,
         },
 
+        priority: {
+            type: String,
+            enum: ["normal", "urgent"],
+            default: "normal",
+            index: true,
+        },
+
         /** Métadonnées */
         meta: {
             createdBy: {

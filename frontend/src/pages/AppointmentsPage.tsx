@@ -30,6 +30,9 @@ export function AppointmentsPage() {
     const [time, setTime] = useState("");
     const [reason, setReason] = useState("");
 
+    // 🔴 NOUVEAU — priorité
+    const [priority, setPriority] = useState<"normal" | "urgent">("normal");
+
     const [loading, setLoading] = useState(false);
     const [slotsLoading, setSlotsLoading] = useState(false);
     const [availableSlots, setAvailableSlots] = useState<string[]>([]);
@@ -38,7 +41,7 @@ export function AppointmentsPage() {
     const [success, setSuccess] = useState(false);
 
     /* ------------------------------------------------------------------ */
-    /* Initialisation date (indicatif)                                    */
+    /* Initialisation date                                                */
     /* ------------------------------------------------------------------ */
 
     useEffect(() => {
@@ -47,7 +50,7 @@ export function AppointmentsPage() {
     }, []);
 
     /* ------------------------------------------------------------------ */
-    /* Rafraîchissement des créneaux (SOURCE DE VÉRITÉ)                   */
+    /* Rafraîchissement des créneaux                                      */
     /* ------------------------------------------------------------------ */
 
     async function refreshSlots() {
@@ -67,7 +70,6 @@ export function AppointmentsPage() {
         setSlotsLoading(false);
     }
 
-    /* 🔁 Recharge auto quand spécialiste ou date change */
     useEffect(() => {
         refreshSlots();
     }, [specialist, date]);
@@ -83,7 +85,7 @@ export function AppointmentsPage() {
         time.trim() !== "";
 
     /* ------------------------------------------------------------------ */
-    /* Création rendez-vous (API)                                         */
+    /* Création rendez-vous                                               */
     /* ------------------------------------------------------------------ */
 
     async function handleCreateAppointment() {
@@ -99,6 +101,7 @@ export function AppointmentsPage() {
             date,
             time,
             reason,
+            priority, // ✅ NOUVEAU
         });
 
         if ("error" in response) {
@@ -109,10 +112,8 @@ export function AppointmentsPage() {
 
         setSuccess(true);
 
-        // 🔄 RAFRAÎCHISSEMENT DES CRÉNEAUX APRÈS CRÉATION
         await refreshSlots();
 
-        // ❌ Heure devenue invalide → reset
         if (!availableSlots.includes(time)) {
             setTime("");
         }
@@ -133,7 +134,7 @@ export function AppointmentsPage() {
             {/* ---------------- Formulaire ---------------- */}
             <div className="grid grid-cols-1 gap-4">
 
-                {/* Numéro d’assurance maladie — CRITIQUE */}
+                {/* Numéro RAMQ */}
                 <input
                     className="border-2 border-red-500 rounded p-2 focus:outline-none focus:ring-2 focus:ring-red-300"
                     placeholder="Numéro d’assurance maladie *"
@@ -155,6 +156,33 @@ export function AppointmentsPage() {
                     ))}
                 </select>
 
+                {/* Priorité */}
+                <div className="flex items-center gap-6">
+                    <span className="text-sm font-medium">
+                        Priorité du rendez-vous
+                    </span>
+
+                    <label className="flex items-center gap-2 text-sm">
+                        <input
+                            type="radio"
+                            name="priority"
+                            checked={priority === "normal"}
+                            onChange={() => setPriority("normal")}
+                        />
+                        Normal
+                    </label>
+
+                    <label className="flex items-center gap-2 text-sm text-red-600">
+                        <input
+                            type="radio"
+                            name="priority"
+                            checked={priority === "urgent"}
+                            onChange={() => setPriority("urgent")}
+                        />
+                        Urgent
+                    </label>
+                </div>
+
                 {/* Date */}
                 <input
                     type="date"
@@ -163,7 +191,7 @@ export function AppointmentsPage() {
                     onChange={(e) => setDate(e.target.value)}
                 />
 
-                {/* Heure — CRITIQUE */}
+                {/* Heure */}
                 <input
                     type="time"
                     className="border-2 border-red-500 rounded p-2 focus:outline-none focus:ring-2 focus:ring-red-300"
@@ -171,7 +199,7 @@ export function AppointmentsPage() {
                     onChange={(e) => setTime(e.target.value)}
                 />
 
-                {/* Créneaux disponibles (BACKEND) */}
+                {/* Créneaux */}
                 <div>
                     <div className="text-xs text-gray-500 mb-1">
                         Créneaux disponibles
@@ -183,11 +211,14 @@ export function AppointmentsPage() {
                         </div>
                     )}
 
-                    {!slotsLoading && availableSlots.length === 0 && specialist && date && (
-                        <div className="text-xs text-gray-400">
-                            Aucun créneau disponible pour cette date.
-                        </div>
-                    )}
+                    {!slotsLoading &&
+                        availableSlots.length === 0 &&
+                        specialist &&
+                        date && (
+                            <div className="text-xs text-gray-400">
+                                Aucun créneau disponible pour cette date.
+                            </div>
+                        )}
 
                     <div className="flex flex-wrap gap-2">
                         {availableSlots.map((slot) => (
@@ -216,21 +247,32 @@ export function AppointmentsPage() {
                 />
             </div>
 
-            {/* ---------------- Résumé + Action ---------------- */}
+            {/* ---------------- Résumé ---------------- */}
             <div className="border rounded p-4 bg-gray-50 space-y-3">
                 <h2 className="font-medium">Résumé du rendez-vous</h2>
 
                 {isComplete ? (
                     <>
                         <p>
-                            <strong>Numéro d’assurance maladie :</strong>{" "}
-                            {insuranceNumber}
+                            <strong>Patient :</strong> {insuranceNumber}
                         </p>
                         <p>
                             <strong>Spécialiste :</strong> {specialist}
                         </p>
                         <p>
                             <strong>Date :</strong> {date} à {time}
+                        </p>
+                        <p>
+                            <strong>Priorité :</strong>{" "}
+                            <span
+                                className={
+                                    priority === "urgent"
+                                        ? "text-red-600 font-semibold"
+                                        : ""
+                                }
+                            >
+                                {priority}
+                            </span>
                         </p>
                         {reason && (
                             <p>
@@ -240,8 +282,7 @@ export function AppointmentsPage() {
                     </>
                 ) : (
                     <p className="text-sm text-gray-500">
-                        Veuillez compléter tous les champs requis pour créer le
-                        rendez-vous.
+                        Veuillez compléter tous les champs requis.
                     </p>
                 )}
 

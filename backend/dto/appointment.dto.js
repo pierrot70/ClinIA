@@ -10,10 +10,11 @@
  */
 export function toCreateAppointmentDTO(body) {
     return {
-        patientInsuranceNumber: body.patientInsuranceNumber,
-        specialist: body.specialist,
+        patientInsuranceNumber: body.patientInsuranceNumber?.trim(),
+        specialist: body.specialist?.trim(),
         date: body.date,
         time: body.time,
-        reason: typeof body.reason === "string" ? body.reason : "",
+        reason: body.reason ?? "",
+        priority: body.priority === "urgent" ? "urgent" : "normal",
     };
 }

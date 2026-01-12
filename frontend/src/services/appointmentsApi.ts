@@ -16,6 +16,9 @@ export interface CreateAppointmentPayload {
     date: string; // YYYY-MM-DD
     time: string; // HH:mm
     reason?: string;
+
+    // ✅ NOUVEAU
+    priority: "normal" | "urgent";
 }
 
 /* ------------------------------------------------------------------ */
