@@ -71,7 +71,9 @@ AppointmentSchema.index(
     { specialist: 1, date: 1, time: 1 },
     {
         unique: true,
-        partialFilterExpression: { status: "scheduled" },
+        partialFilterExpression: {
+            status: "scheduled",
+        },
     }
 );
 
