@@ -8,9 +8,8 @@ import mongoose from "mongoose";
 export async function createAppointment(dto) {
     /* ---------------- Validation métier ---------------- */
 
-    // Exemple 1 : heures ouvrables
-    const [hour, minute] = dto.time.split(":").map(Number);
-
+    // Heures ouvrables
+    const [hour] = dto.time.split(":").map(Number);
     if (hour < 8 || hour >= 17) {
         throw {
             code: "INVALID_TIME",
@@ -18,41 +17,50 @@ export async function createAppointment(dto) {
         };
     }
 
-    // Exemple 2 : date passée
-    const today = new Date();
+    // Date passée
     const appointmentDate = new Date(`${dto.date}T${dto.time}`);
-
-    if (appointmentDate < today) {
+    if (appointmentDate < new Date()) {
         throw {
             code: "INVALID_DATE",
             message: "Impossible de créer un rendez-vous dans le passé.",
         };
     }
 
+    /* -------------------------------------------------- */
+    /* RÈGLE MÉTIER MAJEURE                               */
+    /* Un patient = un seul rendez-vous par spécialité   */
+    /* -------------------------------------------------- */
+
+    const existing = await Appointment.findOne({
+        patientInsuranceNumber: dto.patientInsuranceNumber,
+        specialist: dto.specialist,
+        status: "scheduled",
+    }).lean();
+
+    if (existing) {
+        throw {
+            code: "SPECIALIST_ALREADY_BOOKED",
+            message:
+                "Ce patient a déjà un rendez-vous avec ce spécialiste.",
+        };
+    }
+
     /* ---------------- Persistance ---------------- */
 
-    // 👉 C’est ICI que l’Entity est utilisée
     return Appointment.create(dto);
 }
 
 /* ------------------------------------------------------------------ */
-/* GET appointments (service)                                         */
+/* GET appointments                                                    */
 /* ------------------------------------------------------------------ */
 
 export async function listAppointments(filters = {}) {
     const query = {};
 
-    if (filters.specialist) {
-        query.specialist = filters.specialist;
-    }
-
-    if (filters.date) {
-        query.date = filters.date;
-    }
-
+    if (filters.specialist) query.specialist = filters.specialist;
+    if (filters.date) query.date = filters.date;
     if (filters.patientInsuranceNumber) {
-        query.patientInsuranceNumber =
-            filters.patientInsuranceNumber;
+        query.patientInsuranceNumber = filters.patientInsuranceNumber;
     }
 
     return Appointment.find(query)
@@ -60,13 +68,11 @@ export async function listAppointments(filters = {}) {
         .lean();
 }
 
-
 /* ------------------------------------------------------------------ */
-/* GET appointment by id (service)                                     */
+/* GET appointment by id                                               */
 /* ------------------------------------------------------------------ */
 
 export async function getAppointmentById(id) {
-    // Validation métier minimale
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
             code: "INVALID_ID",
@@ -141,6 +147,7 @@ export async function updateAppointmentStatus(id, newStatus) {
                 "Statut invalide. Valeurs autorisées : scheduled, cancelled, completed.",
         };
     }
+
     const appointment = await Appointment.findById(id);
 
     if (!appointment) {
@@ -149,8 +156,6 @@ export async function updateAppointmentStatus(id, newStatus) {
             message: "Rendez-vous introuvable.",
         };
     }
-
-    /* ---------------- Règles métier ---------------- */
 
     if (appointment.status === "cancelled") {
         throw {
@@ -187,7 +192,6 @@ const SLOT_STEP_MINUTES = 15;
 
 function generateDailySlots() {
     const slots = [];
-
     for (let h = WORK_START_HOUR; h < WORK_END_HOUR; h++) {
         for (let m = 0; m < 60; m += SLOT_STEP_MINUTES) {
             slots.push(
@@ -197,14 +201,10 @@ function generateDailySlots() {
             );
         }
     }
-
     return slots;
 }
 
-export async function getAvailableSlots(
-    specialist,
-    date
-) {
+export async function getAvailableSlots(specialist, date) {
     if (!specialist || !date) {
         throw {
             code: "INVALID_INPUT",
@@ -216,27 +216,17 @@ export async function getAvailableSlots(
     const allSlots = generateDailySlots();
 
     const booked = await Appointment.find(
-        {
-            specialist,
-            date,
-            status: "scheduled",
-        },
+        { specialist, date, status: "scheduled" },
         { time: 1, _id: 0 }
     ).lean();
 
-    const bookedTimes = new Set(
-        booked.map((a) => a.time)
-    );
+    const bookedTimes = new Set(booked.map((a) => a.time));
 
-    // Date passée → aucun créneau
     const today = new Date();
     const targetDate = new Date(`${date}T00:00`);
 
-    if (targetDate < new Date(today.toDateString())) {
-        return [];
-    }
+    if (targetDate < new Date(today.toDateString())) return [];
 
-    // Aujourd’hui → exclure heures passées
     const now = new Date();
 
     return allSlots.filter((slot) => {
@@ -250,8 +240,3 @@ export async function getAvailableSlots(
         return true;
     });
 }
-/* ------------------------------------------------------------------ */
-/* GET appointment by par numero de RAMQ                              */
-/*   Validation: Un individu peut avoir qu'un seul appointment par    */
-/*               categorie.                                           */
-/* ------------------------------------------------------------------ */

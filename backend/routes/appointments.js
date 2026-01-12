@@ -108,6 +108,16 @@ router.post("/", async (req, res) => {
             });
         }
 
+        if (err.code === "SPECIALIST_ALREADY_BOOKED") {
+            return res.status(409).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
         /* ---------------- Conflit créneau (Mongo) ---------------- */
 
         if (err.code === 11000) {
