@@ -6,6 +6,60 @@ if (!API_URL) {
     throw new Error("VITE_API_URL is not defined");
 }
 
+export interface Appointment {
+    _id: string;
+    patientInsuranceNumber: string;
+    specialist: string;
+    date: string;
+    time: string;
+    reason?: string;
+    priority?: "normal" | "urgent";
+    status: "scheduled" | "cancelled" | "completed";
+    createdAt: string;
+}
+
+/* ------------------------------------------------------------------ */
+/* GET all appointments                                                */
+/* ------------------------------------------------------------------ */
+export async function fetchAppointments(
+    filters?: {
+        specialist?: string;
+        status?: string;
+        patientInsuranceNumber?: string;
+    }
+): Promise<ApiResponse<Appointment[]>> {
+    const params = new URLSearchParams();
+
+    if (filters?.specialist) {
+        params.append("specialist", filters.specialist);
+    }
+    if (filters?.status) {
+        params.append("status", filters.status);
+    }
+    if (filters?.patientInsuranceNumber) {
+        params.append(
+            "patientInsuranceNumber",
+            filters.patientInsuranceNumber
+        );
+    }
+    try {
+        const response = await fetch(
+            `${API_URL}/api/appointments?${params.toString()}`
+        );
+
+        const json = await response.json();
+        return json;
+    } catch {
+        return {
+            error: {
+                code: "INTERNAL_ERROR",
+                message:
+                    "Impossible de récupérer les rendez-vous.",
+                retryable: true,
+            },
+        };
+    }
+}
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
 /* ------------------------------------------------------------------ */

@@ -14,6 +14,7 @@ import MockStudio from "./pages/MockStudio";
 import AdminLogin from "./pages/AdminLogin";
 import {ClinicalAnalyzePage} from "./pages/ClinicalAnalyzePage";
 import { AppointmentsPage } from "./pages/AppointmentsPage";
+import { AppointmentsListPage } from "./pages/AppointmentsList";
 
 const App: React.FC = () => {
     return (
@@ -30,6 +31,7 @@ const App: React.FC = () => {
                     {/* 🧠 ClinIA – Analyse clinique et appointments */}
                     <Route path="/clinical" element={<ClinicalAnalyzePage />} />
                     <Route path="/appointments" element={<AppointmentsPage />} />
+                    <Route path="/appointments/list" element={<AppointmentsListPage />} />
 
                     {/* 🆕 Admin */}
                     <Route path="/admin/login" element={<AdminLogin />} />
