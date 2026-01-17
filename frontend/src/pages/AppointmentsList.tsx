@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { fetchAppointments } from "../services/appointmentsApi";
 import type { ApiError } from "../types/api";
 
@@ -44,6 +45,15 @@ export function AppointmentsListPage() {
                 Tous les rendez-vous
             </h1>
 
+            <div className="flex gap-4">
+                <Link
+                    to="/appointments"
+                    className="px-3 py-1 border rounded hover:bg-gray-100"
+                >
+                    Créer un rendez-vous
+                </Link>
+            </div>
+
             {loading && (
                 <div className="text-gray-500">
                     Chargement des rendez-vous…
@@ -65,7 +75,7 @@ export function AppointmentsListPage() {
             {!loading && appointments.length > 0 && (
                 <div className="overflow-x-auto border rounded">
                     <table className="w-full text-sm">
-                        <thead className="bg-gray-100 text-left">
+                        <thead className="bg-gray-100">
                         <tr>
                             <th className="p-2">Patient</th>
                             <th className="p-2">Spécialiste</th>
@@ -84,15 +94,9 @@ export function AppointmentsListPage() {
                                 <td className="p-2 font-mono">
                                     {a.patientInsuranceNumber}
                                 </td>
-                                <td className="p-2">
-                                    {a.specialist}
-                                </td>
-                                <td className="p-2">
-                                    {a.date}
-                                </td>
-                                <td className="p-2">
-                                    {a.time}
-                                </td>
+                                <td className="p-2">{a.specialist}</td>
+                                <td className="p-2">{a.date}</td>
+                                <td className="p-2">{a.time}</td>
                                 <td className="p-2">
                                     {a.priority === "urgent" ? (
                                         <span className="text-red-600 font-semibold">
