@@ -6,6 +6,10 @@ if (!API_URL) {
     throw new Error("VITE_API_URL is not defined");
 }
 
+/* ------------------------------------------------------------------ */
+/* Types                                                               */
+/* ------------------------------------------------------------------ */
+
 export interface Appointment {
     _id: string;
     patientInsuranceNumber: string;
@@ -18,17 +22,72 @@ export interface Appointment {
     createdAt: string;
 }
 
+export type AppointmentStatus =
+    | "scheduled"
+    | "cancelled"
+    | "completed";
+
+export interface CreateAppointmentPayload {
+    patientInsuranceNumber: string;
+    specialist: string;
+    date: string;
+    time: string;
+    reason?: string;
+    priority: "normal" | "urgent";
+}
+
 /* ------------------------------------------------------------------ */
-/* GET all appointments                                                */
+/* Cache simple en mémoire (FRONTEND UNIQUEMENT)                       */
 /* ------------------------------------------------------------------ */
+
+const appointmentsCache = new Map<string, Appointment[]>();
+
+export function clearAppointmentsCache() {
+    appointmentsCache.clear();
+}
+
+/* ------------------------------------------------------------------ */
+/* Helpers                                                             */
+/* ------------------------------------------------------------------ */
+
+async function safeJson(response: Response): Promise<any> {
+    try {
+        return await response.json();
+    } catch {
+        return {
+            error: {
+                code: "INTERNAL_ERROR",
+                message: "Réponse serveur invalide.",
+                retryable: true,
+            },
+        };
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* GET appointments (avec cache frontend)                              */
+/* ------------------------------------------------------------------ */
+
 export async function fetchAppointments(
     filters?: {
         specialist?: string;
-        status?: string;
+        status?: AppointmentStatus;
         patientInsuranceNumber?: string;
     }
 ): Promise<ApiResponse<Appointment[]>> {
     const params = new URLSearchParams();
+    const cacheKey = JSON.stringify(filters || {});
+
+    /* ---------- Cache HIT ---------- */
+    if (appointmentsCache.has(cacheKey)) {
+        return {
+            data: appointmentsCache.get(cacheKey)!,
+            meta: {
+                source: "real", // ⚠️ OBLIGATOIRE (contrat ApiResponse)
+                model: "mongo", // ⚠️ PAS "cache" (voir explication)
+            },
+        };
+    }
 
     if (filters?.specialist) {
         params.append("specialist", filters.specialist);
@@ -42,57 +101,46 @@ export async function fetchAppointments(
             filters.patientInsuranceNumber
         );
     }
+
     try {
         const response = await fetch(
             `${API_URL}/api/appointments?${params.toString()}`
         );
 
-        const json = await response.json();
+        const json = await safeJson(response);
+
+        if ("data" in json) {
+            appointmentsCache.set(cacheKey, json.data);
+        }
+
         return json;
     } catch {
         return {
             error: {
                 code: "INTERNAL_ERROR",
-                message:
-                    "Impossible de récupérer les rendez-vous.",
+                message: "Impossible de récupérer les rendez-vous.",
                 retryable: true,
             },
         };
     }
 }
-/* ------------------------------------------------------------------ */
-/* Types                                                               */
-/* ------------------------------------------------------------------ */
-
-export interface CreateAppointmentPayload {
-    patientInsuranceNumber: string;
-    specialist: string;
-    date: string; // YYYY-MM-DD
-    time: string; // HH:mm
-    reason?: string;
-
-    // ✅ NOUVEAU
-    priority: "normal" | "urgent";
-}
 
 /* ------------------------------------------------------------------ */
-/* Create appointment                                                   */
+/* Create appointment                                                  */
 /* ------------------------------------------------------------------ */
 
 export async function createAppointment(
     payload: CreateAppointmentPayload
-): Promise<ApiResponse<any>> {
-
-    let response: Response;
-
+): Promise<ApiResponse<Appointment>> {
     try {
-        response = await fetch(`${API_URL}/api/appointments`, {
+        const response = await fetch(`${API_URL}/api/appointments`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         });
+
+        clearAppointmentsCache(); // 🔥 invalide le cache
+        return (await safeJson(response)) as ApiResponse<Appointment>;
     } catch {
         return {
             error: {
@@ -102,47 +150,24 @@ export async function createAppointment(
             },
         };
     }
-
-    let json: unknown;
-
-    try {
-        json = await response.json();
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Réponse serveur invalide.",
-                retryable: true,
-            },
-        };
-    }
-
-    return json as ApiResponse<any>;
 }
 
 /* ------------------------------------------------------------------ */
-/* Fetch available slots                                                */
+/* Fetch available slots                                               */
 /* ------------------------------------------------------------------ */
 
 export async function fetchAvailableSlots(
     specialist: string,
     date: string
 ): Promise<ApiResponse<string[]>> {
-
-    let response: Response;
-
     try {
-        response = await fetch(
+        const response = await fetch(
             `${API_URL}/api/appointments/slots?specialist=${encodeURIComponent(
                 specialist
-            )}&date=${encodeURIComponent(date)}`,
-            {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            }
+            )}&date=${encodeURIComponent(date)}`
         );
+
+        return (await safeJson(response)) as ApiResponse<string[]>;
     } catch {
         return {
             error: {
@@ -152,20 +177,61 @@ export async function fetchAvailableSlots(
             },
         };
     }
+}
 
-    let json: unknown;
+/* ------------------------------------------------------------------ */
+/* Cancel appointment                                                  */
+/* ------------------------------------------------------------------ */
 
+export async function cancelAppointment(
+    id: string
+): Promise<ApiResponse<Appointment>> {
     try {
-        json = await response.json();
+        const response = await fetch(
+            `${API_URL}/api/appointments/${id}`,
+            { method: "DELETE" }
+        );
+
+        clearAppointmentsCache();
+        return (await safeJson(response)) as ApiResponse<Appointment>;
     } catch {
         return {
             error: {
                 code: "INTERNAL_ERROR",
-                message: "Réponse serveur invalide.",
+                message: "Impossible d’annuler le rendez-vous.",
                 retryable: true,
             },
         };
     }
+}
 
-    return json as ApiResponse<string[]>;
+/* ------------------------------------------------------------------ */
+/* Update appointment status                                           */
+/* ------------------------------------------------------------------ */
+
+export async function updateAppointmentStatus(
+    id: string,
+    status: AppointmentStatus
+): Promise<ApiResponse<Appointment>> {
+    try {
+        const response = await fetch(
+            `${API_URL}/api/appointments/${id}/status`,
+            {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status }),
+            }
+        );
+
+        clearAppointmentsCache();
+        return (await safeJson(response)) as ApiResponse<Appointment>;
+    } catch {
+        return {
+            error: {
+                code: "INTERNAL_ERROR",
+                message: "Impossible de mettre à jour le statut.",
+                retryable: true,
+            },
+        };
+    }
 }
