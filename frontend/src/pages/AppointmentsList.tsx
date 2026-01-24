@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import {
     fetchAppointmentsPaginated,
     cancelAppointment,
+    fetchAvailableSlots,
+    updateAppointmentSchedule,
     updateAppointmentStatus,
     type Appointment,
     type AppointmentStatus,
@@ -34,6 +36,15 @@ export function AppointmentsListPage() {
     const [error, setError] = useState<ApiError | null>(null);
     const [busyIds, setBusyIds] = useState<Record<string, boolean>>({});
 
+    /* ---------------- Edition horaire ---------------- */
+
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editDate, setEditDate] = useState("");
+    const [editTime, setEditTime] = useState("");
+    const [editSpecialist, setEditSpecialist] = useState("");
+    const [editSlots, setEditSlots] = useState<string[]>([]);
+    const [editSlotsLoading, setEditSlotsLoading] = useState(false);
+
     /* ---------------- Pagination ---------------- */
 
     const [page, setPage] = useState(1);
@@ -59,6 +70,38 @@ export function AppointmentsListPage() {
         loadAppointments();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters, page]);
+
+    useEffect(() => {
+        if (!editingId || !editSpecialist || !editDate) {
+            setEditSlots([]);
+            return;
+        }
+
+        let cancelled = false;
+
+        async function loadEditSlots() {
+            setEditSlotsLoading(true);
+
+            const response = await fetchAvailableSlots(
+                editSpecialist,
+                editDate
+            );
+
+            if (!cancelled && "data" in response) {
+                setEditSlots(response.data);
+            }
+
+            if (!cancelled) {
+                setEditSlotsLoading(false);
+            }
+        }
+
+        loadEditSlots();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [editingId, editSpecialist, editDate]);
 
     async function loadAppointments() {
         setLoading(true);
@@ -100,7 +143,7 @@ export function AppointmentsListPage() {
     async function handleAction(
         id: string,
         action: () => Promise<any>
-    ) {
+    ): Promise<boolean> {
         setBusyIds((p) => ({ ...p, [id]: true }));
         setError(null);
 
@@ -109,11 +152,43 @@ export function AppointmentsListPage() {
         if ("error" in response) {
             setError(response.error);
             setBusyIds((p) => ({ ...p, [id]: false }));
-            return;
+            return false;
         }
 
         await loadAppointments();
         setBusyIds((p) => ({ ...p, [id]: false }));
+        return true;
+    }
+
+    function startEditing(appointment: Appointment) {
+        setEditingId(appointment._id);
+        setEditDate(appointment.date);
+        setEditTime(appointment.time);
+        setEditSpecialist(appointment.specialist);
+        setEditSlots([]);
+    }
+
+    function stopEditing() {
+        setEditingId(null);
+        setEditDate("");
+        setEditTime("");
+        setEditSpecialist("");
+        setEditSlots([]);
+    }
+
+    async function handleSaveSchedule(id: string) {
+        if (!editDate || !editTime) return;
+
+        const ok = await handleAction(id, () =>
+            updateAppointmentSchedule(id, {
+                date: editDate,
+                time: editTime,
+            })
+        );
+
+        if (ok) {
+            stopEditing();
+        }
     }
 
     /* ------------------------------------------------------------------ */
@@ -207,40 +282,144 @@ export function AppointmentsListPage() {
                                     {a.patientInsuranceNumber}
                                 </td>
                                 <td className="p-2">{a.specialist}</td>
-                                <td className="p-2">{a.date}</td>
-                                <td className="p-2">{a.time}</td>
+                                <td className="p-2">
+                                    {editingId === a._id ? (
+                                        <input
+                                            type="date"
+                                            className="border rounded p-1"
+                                            value={editDate}
+                                            onChange={(e) =>
+                                                setEditDate(
+                                                    e.target.value
+                                                )
+                                            }
+                                        />
+                                    ) : (
+                                        a.date
+                                    )}
+                                </td>
+                                <td className="p-2">
+                                    {editingId === a._id ? (
+                                        <div className="space-y-2">
+                                            <input
+                                                type="time"
+                                                className="border rounded p-1 w-full"
+                                                value={editTime}
+                                                onChange={(e) =>
+                                                    setEditTime(
+                                                        e.target.value
+                                                    )
+                                                }
+                                            />
+                                            <div className="text-xs text-gray-500">
+                                                Créneaux disponibles
+                                            </div>
+                                            {editSlotsLoading && (
+                                                <div className="text-xs text-gray-400">
+                                                    Chargement…
+                                                </div>
+                                            )}
+                                            <div className="flex flex-wrap gap-2">
+                                                {editSlots.map((slot) => (
+                                                    <button
+                                                        key={slot}
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setEditTime(
+                                                                slot
+                                                            )
+                                                        }
+                                                        className={`px-2 py-1 text-xs border rounded ${
+                                                            slot ===
+                                                            editTime
+                                                                ? "bg-primary text-white"
+                                                                : ""
+                                                        }`}
+                                                    >
+                                                        {slot}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        a.time
+                                    )}
+                                </td>
                                 <td className="p-2">{a.status}</td>
                                 <td className="p-2 flex gap-2">
-                                    <button
-                                        disabled={
-                                            busyIds[a._id] ||
-                                            a.status !== "scheduled"
-                                        }
-                                        onClick={() =>
-                                            handleAction(a._id, () =>
-                                                cancelAppointment(a._id)
-                                            )
-                                        }
-                                    >
-                                        Annuler
-                                    </button>
+                                    {editingId === a._id ? (
+                                        <>
+                                            <button
+                                                disabled={
+                                                    busyIds[a._id] ||
+                                                    a.status !== "scheduled"
+                                                }
+                                                onClick={() =>
+                                                    handleSaveSchedule(
+                                                        a._id
+                                                    )
+                                                }
+                                            >
+                                                Enregistrer
+                                            </button>
+                                            <button
+                                                onClick={stopEditing}
+                                            >
+                                                Annuler
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button
+                                                disabled={
+                                                    busyIds[a._id] ||
+                                                    a.status !== "scheduled"
+                                                }
+                                                onClick={() =>
+                                                    handleAction(
+                                                        a._id,
+                                                        () =>
+                                                            cancelAppointment(
+                                                                a._id
+                                                            )
+                                                    )
+                                                }
+                                            >
+                                                Annuler
+                                            </button>
 
-                                    <button
-                                        disabled={
-                                            busyIds[a._id] ||
-                                            a.status !== "scheduled"
-                                        }
-                                        onClick={() =>
-                                            handleAction(a._id, () =>
-                                                updateAppointmentStatus(
-                                                    a._id,
-                                                    "completed"
-                                                )
-                                            )
-                                        }
-                                    >
-                                        Compléter
-                                    </button>
+                                            <button
+                                                disabled={
+                                                    busyIds[a._id] ||
+                                                    a.status !== "scheduled"
+                                                }
+                                                onClick={() =>
+                                                    handleAction(
+                                                        a._id,
+                                                        () =>
+                                                            updateAppointmentStatus(
+                                                                a._id,
+                                                                "completed"
+                                                            )
+                                                    )
+                                                }
+                                            >
+                                                Compléter
+                                            </button>
+
+                                            <button
+                                                disabled={
+                                                    busyIds[a._id] ||
+                                                    a.status !== "scheduled"
+                                                }
+                                                onClick={() =>
+                                                    startEditing(a)
+                                                }
+                                            >
+                                                Modifier l’heure
+                                            </button>
+                                        </>
+                                    )}
                                 </td>
                             </tr>
                         ))}

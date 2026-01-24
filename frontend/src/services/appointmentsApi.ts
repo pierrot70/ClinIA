@@ -221,3 +221,34 @@ export async function updateAppointmentStatus(
         };
     }
 }
+
+/* ------------------------------------------------------------------ */
+/* Update appointment schedule                                         */
+/* ------------------------------------------------------------------ */
+
+export async function updateAppointmentSchedule(
+    id: string,
+    payload: { date: string; time: string }
+): Promise<ApiResponse<Appointment>> {
+    try {
+        const response = await fetch(
+            `${API_URL}/api/appointments/${id}/schedule`,
+            {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            }
+        );
+
+        return (await safeJson(response)) as ApiResponse<Appointment>;
+    } catch {
+        return {
+            error: {
+                code: "INTERNAL_ERROR",
+                message:
+                    "Impossible de modifier l’horaire du rendez-vous.",
+                retryable: true,
+            },
+        };
+    }
+}

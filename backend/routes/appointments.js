@@ -5,6 +5,7 @@ import {
     getAppointmentById,
     cancelAppointment,
     updateAppointmentStatus,
+    updateAppointmentSchedule,
 } from "../services/appointments.js";
 import { toCreateAppointmentDTO } from "../dto/appointment.dto.js";
 import { Appointment } from "../models/Appointment.js"; // ✅ IMPORT MANQUANT
@@ -361,6 +362,93 @@ router.patch("/:id/status", async (req, res) => {
                 code: "PERSISTENCE_FAILED",
                 message:
                     "Impossible de mettre à jour le statut du rendez-vous.",
+                retryable: true,
+            },
+        });
+    }
+});
+
+/* ------------------------------------------------------------------ */
+/* PATCH /api/appointments/:id/schedule                                */
+/* ------------------------------------------------------------------ */
+
+router.patch("/:id/schedule", async (req, res) => {
+    const { date, time } = req.body;
+
+    if (!date || !time) {
+        return res.status(400).json({
+            error: {
+                code: "INVALID_INPUT",
+                message: "Les champs 'date' et 'time' sont requis.",
+                retryable: false,
+            },
+        });
+    }
+
+    try {
+        const appointment = await updateAppointmentSchedule(
+            req.params.id,
+            { date, time }
+        );
+
+        return res.status(200).json({
+            data: appointment,
+            meta: {
+                source: "real",
+                model: "mongo",
+            },
+        });
+    } catch (err) {
+        if (
+            [
+                "INVALID_ID",
+                "INVALID_INPUT",
+                "INVALID_TIME",
+                "INVALID_DATE",
+                "STATUS_IMMUTABLE",
+                "SPECIALIST_ALREADY_BOOKED",
+            ].includes(err.code)
+        ) {
+            return res.status(400).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        if (err.code === "NOT_FOUND") {
+            return res.status(404).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        if (err.code === 11000) {
+            return res.status(409).json({
+                error: {
+                    code: "APPOINTMENT_CONFLICT",
+                    message:
+                        "Ce créneau est déjà réservé pour ce spécialiste.",
+                    retryable: false,
+                },
+            });
+        }
+
+        console.error(
+            "❌ Appointment schedule update error:",
+            err
+        );
+
+        return res.status(500).json({
+            error: {
+                code: "PERSISTENCE_FAILED",
+                message:
+                    "Impossible de modifier l’horaire du rendez-vous.",
                 retryable: true,
             },
         });

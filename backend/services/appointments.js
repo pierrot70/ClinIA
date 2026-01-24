@@ -192,6 +192,81 @@ export async function updateAppointmentStatus(id, newStatus) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Update appointment schedule (date/time)                             */
+/* ------------------------------------------------------------------ */
+
+export async function updateAppointmentSchedule(id, { date, time }) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw {
+            code: "INVALID_ID",
+            message: "Identifiant de rendez-vous invalide.",
+        };
+    }
+
+    if (!date || !time) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Les champs 'date' et 'time' sont requis.",
+        };
+    }
+
+    const [hour] = time.split(":").map(Number);
+    if (Number.isNaN(hour) || hour < 8 || hour >= 17) {
+        throw {
+            code: "INVALID_TIME",
+            message: "Le rendez-vous doit être entre 08:00 et 17:00.",
+        };
+    }
+
+    const appointmentDate = new Date(`${date}T${time}`);
+    if (appointmentDate < new Date()) {
+        throw {
+            code: "INVALID_DATE",
+            message: "Impossible de déplacer un rendez-vous dans le passé.",
+        };
+    }
+
+    const appointment = await Appointment.findById(id);
+
+    if (!appointment) {
+        throw {
+            code: "NOT_FOUND",
+            message: "Rendez-vous introuvable.",
+        };
+    }
+
+    if (appointment.status !== "scheduled") {
+        throw {
+            code: "STATUS_IMMUTABLE",
+            message:
+                "Un rendez-vous annulé ou complété ne peut pas être modifié.",
+        };
+    }
+
+    const conflict = await Appointment.findOne({
+        _id: { $ne: appointment._id },
+        specialist: appointment.specialist,
+        date,
+        time,
+        status: "scheduled",
+    }).lean();
+
+    if (conflict) {
+        throw {
+            code: "SPECIALIST_ALREADY_BOOKED",
+            message:
+                "Ce créneau est déjà réservé pour ce spécialiste.",
+        };
+    }
+
+    appointment.date = date;
+    appointment.time = time;
+    await appointment.save();
+
+    return appointment;
+}
+
+/* ------------------------------------------------------------------ */
 /* Available slots                                                     */
 /* ------------------------------------------------------------------ */
 
