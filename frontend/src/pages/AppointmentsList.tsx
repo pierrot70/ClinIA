@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
     fetchAppointmentsPaginated,
@@ -42,8 +42,18 @@ export function AppointmentsListPage() {
     const [editDate, setEditDate] = useState("");
     const [editTime, setEditTime] = useState("");
     const [editSpecialist, setEditSpecialist] = useState("");
+    const [editOriginalDate, setEditOriginalDate] = useState("");
+    const [editOriginalTime, setEditOriginalTime] = useState("");
     const [editSlots, setEditSlots] = useState<string[]>([]);
     const [editSlotsLoading, setEditSlotsLoading] = useState(false);
+
+    /* ---------------- Toasts ---------------- */
+
+    const [toast, setToast] = useState<{
+        type: "success" | "error" | "info";
+        message: string;
+    } | null>(null);
+    const toastTimerRef = useRef<number | null>(null);
 
     /* ---------------- Pagination ---------------- */
 
@@ -70,6 +80,14 @@ export function AppointmentsListPage() {
         loadAppointments();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters, page]);
+
+    useEffect(() => {
+        return () => {
+            if (toastTimerRef.current) {
+                window.clearTimeout(toastTimerRef.current);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (!editingId || !editSpecialist || !editDate) {
@@ -140,10 +158,34 @@ export function AppointmentsListPage() {
         setLoading(false);
     }
 
+    function showToast(
+        type: "success" | "error" | "info",
+        message: string
+    ) {
+        setToast({ type, message });
+        if (toastTimerRef.current) {
+            window.clearTimeout(toastTimerRef.current);
+        }
+        toastTimerRef.current = window.setTimeout(() => {
+            setToast(null);
+        }, 3000);
+    }
+
     async function handleAction(
         id: string,
-        action: () => Promise<any>
+        action: () => Promise<any>,
+        options?: {
+            confirmMessage?: string;
+            successMessage?: string;
+        }
     ): Promise<boolean> {
+        if (options?.confirmMessage) {
+            const confirmed = window.confirm(options.confirmMessage);
+            if (!confirmed) {
+                return false;
+            }
+        }
+
         setBusyIds((p) => ({ ...p, [id]: true }));
         setError(null);
 
@@ -151,12 +193,16 @@ export function AppointmentsListPage() {
 
         if ("error" in response) {
             setError(response.error);
+            showToast("error", response.error.message);
             setBusyIds((p) => ({ ...p, [id]: false }));
             return false;
         }
 
         await loadAppointments();
         setBusyIds((p) => ({ ...p, [id]: false }));
+        if (options?.successMessage) {
+            showToast("success", options.successMessage);
+        }
         return true;
     }
 
@@ -165,6 +211,8 @@ export function AppointmentsListPage() {
         setEditDate(appointment.date);
         setEditTime(appointment.time);
         setEditSpecialist(appointment.specialist);
+        setEditOriginalDate(appointment.date);
+        setEditOriginalTime(appointment.time);
         setEditSlots([]);
     }
 
@@ -173,17 +221,37 @@ export function AppointmentsListPage() {
         setEditDate("");
         setEditTime("");
         setEditSpecialist("");
+        setEditOriginalDate("");
+        setEditOriginalTime("");
         setEditSlots([]);
     }
 
     async function handleSaveSchedule(id: string) {
         if (!editDate || !editTime) return;
 
-        const ok = await handleAction(id, () =>
-            updateAppointmentSchedule(id, {
-                date: editDate,
-                time: editTime,
-            })
+        if (
+            editDate === editOriginalDate &&
+            editTime === editOriginalTime
+        ) {
+            showToast(
+                "info",
+                "Aucune modification à enregistrer."
+            );
+            return;
+        }
+
+        const ok = await handleAction(
+            id,
+            () =>
+                updateAppointmentSchedule(id, {
+                    date: editDate,
+                    time: editTime,
+                }),
+            {
+                confirmMessage: `Confirmer le déplacement du rendez-vous au ${editDate} à ${editTime} ?`,
+                successMessage:
+                    "Horaire du rendez-vous mis à jour.",
+            }
         );
 
         if (ok) {
@@ -195,8 +263,29 @@ export function AppointmentsListPage() {
     /* Render                                                             */
     /* ------------------------------------------------------------------ */
 
+    const isEditFormComplete = Boolean(editDate && editTime);
+    const isEditTimeSameAsOriginal =
+        editDate === editOriginalDate && editTime === editOriginalTime;
+    const isEditTimeAllowed =
+        isEditTimeSameAsOriginal || editSlots.includes(editTime);
+
     return (
         <div className="max-w-6xl mx-auto p-6 space-y-6">
+            {toast && (
+                <div
+                    className={`fixed top-4 right-4 z-50 px-4 py-2 rounded shadow text-sm ${
+                        toast.type === "success"
+                            ? "bg-green-600 text-white"
+                            : toast.type === "error"
+                            ? "bg-red-600 text-white"
+                            : "bg-gray-900 text-white"
+                    }`}
+                    role="status"
+                >
+                    {toast.message}
+                </div>
+            )}
+
             <div className="flex justify-between">
                 <h1 className="text-2xl font-semibold">
                     Tous les rendez-vous
@@ -340,6 +429,25 @@ export function AppointmentsListPage() {
                                                     </button>
                                                 ))}
                                             </div>
+                                            {!editSlotsLoading &&
+                                                editSlots.length === 0 && (
+                                                    <div className="text-xs text-gray-400">
+                                                        Aucun créneau disponible
+                                                        pour cette date.
+                                                    </div>
+                                                )}
+                                            {!isEditFormComplete && (
+                                                <div className="text-xs text-amber-700">
+                                                    Date et heure requises.
+                                                </div>
+                                            )}
+                                            {isEditFormComplete &&
+                                                !isEditTimeAllowed && (
+                                                    <div className="text-xs text-red-600">
+                                                        Ce créneau n&apos;est pas
+                                                        disponible.
+                                                    </div>
+                                                )}
                                         </div>
                                     ) : (
                                         a.time
@@ -352,7 +460,10 @@ export function AppointmentsListPage() {
                                             <button
                                                 disabled={
                                                     busyIds[a._id] ||
-                                                    a.status !== "scheduled"
+                                                    a.status !== "scheduled" ||
+                                                    editSlotsLoading ||
+                                                    !isEditFormComplete ||
+                                                    !isEditTimeAllowed
                                                 }
                                                 onClick={() =>
                                                     handleSaveSchedule(
@@ -381,7 +492,13 @@ export function AppointmentsListPage() {
                                                         () =>
                                                             cancelAppointment(
                                                                 a._id
-                                                            )
+                                                            ),
+                                                        {
+                                                            confirmMessage:
+                                                                "Confirmer l’annulation de ce rendez-vous ?",
+                                                            successMessage:
+                                                                "Rendez-vous annulé.",
+                                                        }
                                                     )
                                                 }
                                             >
@@ -400,7 +517,13 @@ export function AppointmentsListPage() {
                                                             updateAppointmentStatus(
                                                                 a._id,
                                                                 "completed"
-                                                            )
+                                                            ),
+                                                        {
+                                                            confirmMessage:
+                                                                "Confirmer le passage à “Complété” ?",
+                                                            successMessage:
+                                                                "Rendez-vous complété.",
+                                                        }
                                                     )
                                                 }
                                             >
