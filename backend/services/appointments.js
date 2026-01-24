@@ -243,13 +243,17 @@ export async function updateAppointmentSchedule(id, { date, time }) {
         };
     }
 
-    const conflict = await Appointment.findOne({
+    const conflictQuery = Appointment.findOne({
         _id: { $ne: appointment._id },
         specialist: appointment.specialist,
         date,
         time,
         status: "scheduled",
-    }).lean();
+    });
+    const conflict =
+        typeof conflictQuery?.lean === "function"
+            ? await conflictQuery.lean()
+            : await conflictQuery;
 
     if (conflict) {
         throw {
