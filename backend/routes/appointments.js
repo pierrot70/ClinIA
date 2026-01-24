@@ -1,20 +1,15 @@
 import express from "express";
 import {
     createAppointment,
-    listAppointments,
     getAvailableSlots,
     getAppointmentById,
     cancelAppointment,
     updateAppointmentStatus,
 } from "../services/appointments.js";
 import { toCreateAppointmentDTO } from "../dto/appointment.dto.js";
+import { Appointment } from "../models/Appointment.js"; // ✅ IMPORT MANQUANT
 
 const router = express.Router();
-
-/* ------------------------------------------------------------------ */
-/* POST /api/appointments                                              */
-/* ------------------------------------------------------------------ */
-
 
 /* ------------------------------------------------------------------ */
 /* GET /api/appointments/slots                                         */
@@ -24,10 +19,7 @@ router.get("/slots", async (req, res) => {
     const { specialist, date } = req.query;
 
     try {
-        const slots = await getAvailableSlots(
-            specialist,
-            date
-        );
+        const slots = await getAvailableSlots(specialist, date);
 
         return res.status(200).json({
             data: slots,
@@ -52,20 +44,19 @@ router.get("/slots", async (req, res) => {
         return res.status(500).json({
             error: {
                 code: "PERSISTENCE_FAILED",
-                message:
-                    "Impossible de récupérer les créneaux.",
+                message: "Impossible de récupérer les créneaux.",
                 retryable: true,
             },
         });
     }
 });
 
+/* ------------------------------------------------------------------ */
+/* POST /api/appointments                                              */
+/* ------------------------------------------------------------------ */
+
 router.post("/", async (req, res) => {
-    /* ---------------- Mapping DTO ---------------- */
-
     const dto = toCreateAppointmentDTO(req.body);
-
-    /* ---------------- Validation API (structure) ---------------- */
 
     if (
         !dto.patientInsuranceNumber ||
@@ -83,8 +74,6 @@ router.post("/", async (req, res) => {
         });
     }
 
-    /* ---------------- Appel service ---------------- */
-
     try {
         const appointment = await createAppointment(dto);
 
@@ -96,9 +85,10 @@ router.post("/", async (req, res) => {
             },
         });
     } catch (err) {
-        /* ---------------- Erreurs métier ---------------- */
-
-        if (err.code === "INVALID_TIME" || err.code === "INVALID_DATE") {
+        if (
+            err.code === "INVALID_TIME" ||
+            err.code === "INVALID_DATE"
+        ) {
             return res.status(400).json({
                 error: {
                     code: err.code,
@@ -118,8 +108,6 @@ router.post("/", async (req, res) => {
             });
         }
 
-        /* ---------------- Conflit créneau (Mongo) ---------------- */
-
         if (err.code === 11000) {
             return res.status(409).json({
                 error: {
@@ -130,8 +118,6 @@ router.post("/", async (req, res) => {
                 },
             });
         }
-
-        /* ---------------- Erreur inconnue ---------------- */
 
         console.error("❌ Appointment create error:", err);
 
@@ -147,19 +133,49 @@ router.post("/", async (req, res) => {
 });
 
 /* ------------------------------------------------------------------ */
-/* GET /api/appointments                                               */
+/* GET /api/appointments (PAGINATION BACKEND)                          */
 /* ------------------------------------------------------------------ */
+
 router.get("/", async (req, res) => {
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    const skip = (page - 1) * limit;
+
+    const filters = {};
+
+    if (req.query.specialist) {
+        filters.specialist = req.query.specialist;
+    }
+    if (req.query.status) {
+        filters.status = req.query.status;
+    }
+    if (req.query.patientInsuranceNumber) {
+        filters.patientInsuranceNumber =
+            req.query.patientInsuranceNumber;
+    }
+
     try {
-        const appointments = await listAppointments({
-            specialist: req.query.specialist,
-            date: req.query.date,
-            patientInsuranceNumber:
-            req.query.patientInsuranceNumber,
-        });
+        const [data, total] = await Promise.all([
+            Appointment.find(filters)
+                .sort({ date: 1, time: 1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            Appointment.countDocuments(filters),
+        ]);
 
         return res.status(200).json({
-            data: appointments,
+            data: {
+                data,
+                meta: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.ceil(total / limit),
+                    source: "real",
+                    model: "mongo",
+                },
+            },
             meta: {
                 source: "real",
                 model: "mongo",
@@ -182,6 +198,7 @@ router.get("/", async (req, res) => {
 /* ------------------------------------------------------------------ */
 /* GET /api/appointments/:id                                           */
 /* ------------------------------------------------------------------ */
+
 router.get("/:id", async (req, res) => {
     try {
         const appointment = await getAppointmentById(req.params.id);
@@ -228,7 +245,7 @@ router.get("/:id", async (req, res) => {
 });
 
 /* ------------------------------------------------------------------ */
-/* DELETE /api/appointments/:id (annulation)                           */
+/* DELETE /api/appointments/:id                                        */
 /* ------------------------------------------------------------------ */
 
 router.delete("/:id", async (req, res) => {
@@ -255,8 +272,6 @@ router.delete("/:id", async (req, res) => {
                 },
             });
         }
-
-
 
         if (err.code === "NOT_FOUND") {
             return res.status(404).json({
@@ -325,6 +340,7 @@ router.patch("/:id/status", async (req, res) => {
                 },
             });
         }
+
         if (err.code === "NOT_FOUND") {
             return res.status(404).json({
                 error: {

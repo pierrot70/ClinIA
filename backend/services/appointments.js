@@ -249,3 +249,39 @@ export async function getAvailableSlots(specialist, date) {
         return true;
     });
 }
+
+export async function listAppointmentsPaginated({
+                                                    page = 1,
+                                                    limit = 20,
+                                                    specialist,
+                                                    status,
+                                                    patientInsuranceNumber,
+                                                }) {
+    const query = {};
+
+    if (specialist) query.specialist = specialist;
+    if (status) query.status = status;
+    if (patientInsuranceNumber)
+        query.patientInsuranceNumber = patientInsuranceNumber;
+
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+        Appointment.find(query)
+            .sort({ date: 1, time: 1 })
+            .skip(skip)
+            .limit(limit)
+            .lean(),
+        Appointment.countDocuments(query),
+    ]);
+
+    return {
+        data,
+        meta: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+        },
+    };
+}

@@ -27,23 +27,25 @@ export type AppointmentStatus =
     | "cancelled"
     | "completed";
 
+export interface PaginatedAppointments {
+    data: Appointment[];
+    meta: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+        source: "real" | "mock" | "degraded";
+        model: string;
+    };
+}
+
 export interface CreateAppointmentPayload {
     patientInsuranceNumber: string;
     specialist: string;
-    date: string;
-    time: string;
+    date: string; // YYYY-MM-DD
+    time: string; // HH:mm
     reason?: string;
     priority: "normal" | "urgent";
-}
-
-/* ------------------------------------------------------------------ */
-/* Cache simple en mémoire (FRONTEND UNIQUEMENT)                       */
-/* ------------------------------------------------------------------ */
-
-const appointmentsCache = new Map<string, Appointment[]>();
-
-export function clearAppointmentsCache() {
-    appointmentsCache.clear();
 }
 
 /* ------------------------------------------------------------------ */
@@ -65,55 +67,42 @@ async function safeJson(response: Response): Promise<any> {
 }
 
 /* ------------------------------------------------------------------ */
-/* GET appointments (avec cache frontend)                              */
+/* GET appointments (pagination backend)                               */
 /* ------------------------------------------------------------------ */
 
-export async function fetchAppointments(
-    filters?: {
+export async function fetchAppointmentsPaginated(
+    params: {
+        page: number;
+        limit: number;
         specialist?: string;
         status?: AppointmentStatus;
         patientInsuranceNumber?: string;
     }
-): Promise<ApiResponse<Appointment[]>> {
-    const params = new URLSearchParams();
-    const cacheKey = JSON.stringify(filters || {});
+): Promise<ApiResponse<PaginatedAppointments>> {
+    const query = new URLSearchParams();
 
-    /* ---------- Cache HIT ---------- */
-    if (appointmentsCache.has(cacheKey)) {
-        return {
-            data: appointmentsCache.get(cacheKey)!,
-            meta: {
-                source: "real", // ⚠️ OBLIGATOIRE (contrat ApiResponse)
-                model: "mongo", // ⚠️ PAS "cache" (voir explication)
-            },
-        };
-    }
+    query.set("page", String(params.page));
+    query.set("limit", String(params.limit));
 
-    if (filters?.specialist) {
-        params.append("specialist", filters.specialist);
+    if (params.specialist) {
+        query.set("specialist", params.specialist);
     }
-    if (filters?.status) {
-        params.append("status", filters.status);
+    if (params.status) {
+        query.set("status", params.status);
     }
-    if (filters?.patientInsuranceNumber) {
-        params.append(
+    if (params.patientInsuranceNumber) {
+        query.set(
             "patientInsuranceNumber",
-            filters.patientInsuranceNumber
+            params.patientInsuranceNumber
         );
     }
 
     try {
         const response = await fetch(
-            `${API_URL}/api/appointments?${params.toString()}`
+            `${API_URL}/api/appointments?${query.toString()}`
         );
 
-        const json = await safeJson(response);
-
-        if ("data" in json) {
-            appointmentsCache.set(cacheKey, json.data);
-        }
-
-        return json;
+        return (await safeJson(response)) as ApiResponse<PaginatedAppointments>;
     } catch {
         return {
             error: {
@@ -126,7 +115,7 @@ export async function fetchAppointments(
 }
 
 /* ------------------------------------------------------------------ */
-/* Create appointment                                                  */
+/* CREATE appointment                                                  */
 /* ------------------------------------------------------------------ */
 
 export async function createAppointment(
@@ -139,13 +128,12 @@ export async function createAppointment(
             body: JSON.stringify(payload),
         });
 
-        clearAppointmentsCache(); // 🔥 invalide le cache
         return (await safeJson(response)) as ApiResponse<Appointment>;
     } catch {
         return {
             error: {
                 code: "INTERNAL_ERROR",
-                message: "Impossible de contacter ClinIA.",
+                message: "Impossible de créer le rendez-vous.",
                 retryable: true,
             },
         };
@@ -153,7 +141,7 @@ export async function createAppointment(
 }
 
 /* ------------------------------------------------------------------ */
-/* Fetch available slots                                               */
+/* FETCH available slots                                               */
 /* ------------------------------------------------------------------ */
 
 export async function fetchAvailableSlots(
@@ -192,7 +180,6 @@ export async function cancelAppointment(
             { method: "DELETE" }
         );
 
-        clearAppointmentsCache();
         return (await safeJson(response)) as ApiResponse<Appointment>;
     } catch {
         return {
@@ -223,7 +210,6 @@ export async function updateAppointmentStatus(
             }
         );
 
-        clearAppointmentsCache();
         return (await safeJson(response)) as ApiResponse<Appointment>;
     } catch {
         return {
