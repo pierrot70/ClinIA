@@ -1,9 +1,33 @@
 import mongoose from "mongoose";
 import { Clinique } from "../models/Clinique.js";
+import { geocodeAddress } from "../utils/geocode.js";
 
 /* ------------------------------------------------------------------ */
 /* Clinique Service                                                   */
 /* ------------------------------------------------------------------ */
+
+async function maybePopulateCoordinates(target, address) {
+    if (
+        target.lat !== undefined &&
+        target.long !== undefined
+    ) {
+        return;
+    }
+
+    const coords = await geocodeAddress(address);
+
+    if (!coords) {
+        return;
+    }
+
+    if (target.lat === undefined) {
+        target.lat = coords.lat;
+    }
+
+    if (target.long === undefined) {
+        target.long = coords.long;
+    }
+}
 
 export async function createClinique(dto) {
     if (!dto.nom || !dto.num_civique || !dto.rue || !dto.code_postal) {
@@ -14,7 +38,10 @@ export async function createClinique(dto) {
         };
     }
 
-    return Clinique.create(dto);
+    const payload = { ...dto };
+    await maybePopulateCoordinates(payload, payload);
+
+    return Clinique.create(payload);
 }
 
 export async function listCliniques(filters = {}, opts = {}) {
@@ -86,6 +113,14 @@ export async function updateClinique(id, updates) {
         };
     }
 
+    const existing = await Clinique.findById(id).lean();
+    if (!existing) {
+        throw {
+            code: "NOT_FOUND",
+            message: "Clinique introuvable.",
+        };
+    }
+
     if (
         updates.nom === "" ||
         updates.num_civique === "" ||
@@ -99,9 +134,18 @@ export async function updateClinique(id, updates) {
         };
     }
 
+    const addressForGeocoding = {
+        num_civique: updates.num_civique ?? existing.num_civique,
+        rue: updates.rue ?? existing.rue,
+        code_postal: updates.code_postal ?? existing.code_postal,
+    };
+
+    const hydratedUpdates = { ...updates };
+    await maybePopulateCoordinates(hydratedUpdates, addressForGeocoding);
+
     const clinique = await Clinique.findByIdAndUpdate(
         id,
-        { $set: updates },
+        { $set: hydratedUpdates },
         { new: true, runValidators: true }
     );
 
