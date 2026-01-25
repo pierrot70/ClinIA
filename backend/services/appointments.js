@@ -1,5 +1,6 @@
 import { Appointment } from "../models/Appointment.js";
 import mongoose from "mongoose";
+import { isValidRamq } from "../utils/validators.js";
 
 /* ------------------------------------------------------------------ */
 /* Service Appointment                                                 */
@@ -9,6 +10,14 @@ export async function createAppointment(dto) {
     /* ---------------- Validation métier ---------------- */
 
     const ALLOWED_PRIORITIES = ["normal", "urgent"];
+
+    if (!isValidRamq(dto.patientInsuranceNumber)) {
+        throw {
+            code: "INVALID_INPUT",
+            message:
+                "Numéro RAMQ invalide. Format requis : RAMQXXXXXXXXXX.",
+        };
+    }
 
     if (!ALLOWED_PRIORITIES.includes(dto.priority)) {
         throw {

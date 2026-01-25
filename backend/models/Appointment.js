@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { RAMQ_REGEX } from "../utils/validators.js";
 
 /* ------------------------------------------------------------------ */
 /* Appointment Schema                                                  */
@@ -12,6 +13,7 @@ const AppointmentSchema = new mongoose.Schema(
             required: true,
             index: true,
             trim: true,
+            match: RAMQ_REGEX,
         },
 
         /** Spécialité médicale */

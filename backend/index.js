@@ -16,6 +16,7 @@ import {
 } from "./utils/openaiCircuitBreaker.js";
 
 import appointmentsRouter from "./routes/appointments.js";
+import patientsRouter from "./routes/patients.js";
 
 dotenv.config();
 
@@ -323,6 +324,7 @@ mongoose
     Dans ce block j'ajoute mes API endpoints
  */
 app.use("/api/appointments", appointmentsRouter);
+app.use("/api/patients", patientsRouter);
 
 app.listen(4000, () =>
     console.log(

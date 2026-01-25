@@ -9,6 +9,7 @@ import {
 } from "../services/appointments.js";
 import { toCreateAppointmentDTO } from "../dto/appointment.dto.js";
 import { Appointment } from "../models/Appointment.js"; // ✅ IMPORT MANQUANT
+import { isValidRamq } from "../utils/validators.js";
 
 const router = express.Router();
 
@@ -75,6 +76,17 @@ router.post("/", async (req, res) => {
         });
     }
 
+    if (!isValidRamq(dto.patientInsuranceNumber)) {
+        return res.status(400).json({
+            error: {
+                code: "INVALID_INPUT",
+                message:
+                    "Numéro RAMQ invalide. Format requis : RAMQXXXXXXXXXX.",
+                retryable: false,
+            },
+        });
+    }
+
     try {
         const appointment = await createAppointment(dto);
 
@@ -87,6 +99,7 @@ router.post("/", async (req, res) => {
         });
     } catch (err) {
         if (
+            err.code === "INVALID_INPUT" ||
             err.code === "INVALID_TIME" ||
             err.code === "INVALID_DATE"
         ) {
@@ -150,7 +163,17 @@ router.get("/", async (req, res) => {
     if (req.query.status) {
         filters.status = req.query.status;
     }
-    if (req.query.patientInsuranceNumber) {
+    if (req.query.patientInsuranceNumber !== undefined) {
+        if (!isValidRamq(req.query.patientInsuranceNumber)) {
+            return res.status(400).json({
+                error: {
+                    code: "INVALID_INPUT",
+                    message:
+                        "Numéro RAMQ invalide. Format requis : RAMQXXXXXXXXXX.",
+                    retryable: false,
+                },
+            });
+        }
         filters.patientInsuranceNumber =
             req.query.patientInsuranceNumber;
     }
