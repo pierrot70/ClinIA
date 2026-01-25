@@ -4,6 +4,10 @@ import {
     createAppointment,
     fetchAvailableSlots,
 } from "../services/appointmentsApi";
+import {
+    fetchPatientsPaginated,
+    type Patient,
+} from "../services/patientsApi";
 import type { ApiError } from "../types/api";
 
 /* ------------------------------------------------------------------ */
@@ -39,6 +43,18 @@ export function AppointmentsPage() {
     const [apiError, setApiError] = useState<ApiError | null>(null);
     const [success, setSuccess] = useState(false);
 
+    const [searchNom, setSearchNom] = useState("");
+    const [searchPrenom, setSearchPrenom] = useState("");
+    const [searchTelephone, setSearchTelephone] = useState("");
+    const [patientsLoading, setPatientsLoading] = useState(false);
+    const [patientsError, setPatientsError] =
+        useState<ApiError | null>(null);
+    const [patients, setPatients] = useState<Patient[]>([]);
+    const [hasSearchedPatients, setHasSearchedPatients] =
+        useState(false);
+    const [searchTimer, setSearchTimer] =
+        useState<number | null>(null);
+
     /* ------------------------------------------------------------------ */
     /* Initialisation date                                                */
     /* ------------------------------------------------------------------ */
@@ -64,6 +80,80 @@ export function AppointmentsPage() {
             setInsuranceNumber(generateRamqNumber());
         }
     }, [insuranceNumber]);
+
+    /* ------------------------------------------------------------------ */
+    /* Recherche patients                                                 */
+    /* ------------------------------------------------------------------ */
+
+    async function handleSearchPatients() {
+        const nomTrim = searchNom.trim();
+        const prenomTrim = searchPrenom.trim();
+        const telTrim = searchTelephone.trim();
+
+        if (!nomTrim && !prenomTrim && !telTrim) {
+            setPatients([]);
+            setHasSearchedPatients(false);
+            return;
+        }
+
+        setPatientsLoading(true);
+        setPatientsError(null);
+        setHasSearchedPatients(true);
+
+        const response = await fetchPatientsPaginated({
+            page: 1,
+            limit: 10,
+            nom: nomTrim || undefined,
+            prenom: prenomTrim || undefined,
+            telephone: telTrim || undefined,
+        });
+
+        if ("error" in response) {
+            setPatientsError(response.error);
+            setPatients([]);
+            setPatientsLoading(false);
+            return;
+        }
+
+        setPatients(response.data.data);
+        setPatientsLoading(false);
+    }
+
+    useEffect(() => {
+        if (searchTimer) {
+            window.clearTimeout(searchTimer);
+        }
+
+        const nomTrim = searchNom.trim();
+        const prenomTrim = searchPrenom.trim();
+        const telTrim = searchTelephone.trim();
+        const hasMinInput =
+            nomTrim.length >= 2 ||
+            prenomTrim.length >= 2 ||
+            telTrim.length >= 2;
+
+        if (!nomTrim && !prenomTrim && !telTrim) {
+            setPatients([]);
+            setHasSearchedPatients(false);
+            return;
+        }
+
+        if (!hasMinInput) {
+            setPatients([]);
+            setHasSearchedPatients(false);
+            return;
+        }
+
+        const timer = window.setTimeout(() => {
+            handleSearchPatients();
+        }, 300);
+
+        setSearchTimer(timer);
+
+        return () => {
+            window.clearTimeout(timer);
+        };
+    }, [searchNom, searchPrenom, searchTelephone]);
 
     /* ------------------------------------------------------------------ */
     /* Chargement des créneaux                                            */
@@ -171,6 +261,92 @@ export function AppointmentsPage() {
                     value={insuranceNumber}
                     onChange={(e) => setInsuranceNumber(e.target.value)}
                 />
+
+                <div className="border rounded p-3 bg-gray-50 space-y-2">
+                    <div className="text-sm font-medium">
+                        Rechercher un patient existant
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                        <input
+                            className="border rounded p-2"
+                            placeholder="Nom"
+                            value={searchNom}
+                            onChange={(e) =>
+                                setSearchNom(e.target.value)
+                            }
+                        />
+                        <input
+                            className="border rounded p-2"
+                            placeholder="Prénom"
+                            value={searchPrenom}
+                            onChange={(e) =>
+                                setSearchPrenom(e.target.value)
+                            }
+                        />
+                        <input
+                            className="border rounded p-2"
+                            placeholder="Téléphone"
+                            value={searchTelephone}
+                            onChange={(e) =>
+                                setSearchTelephone(e.target.value)
+                            }
+                        />
+                        <button
+                            type="button"
+                            onClick={handleSearchPatients}
+                            disabled={patientsLoading}
+                            className="px-3 py-2 border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
+                        >
+                            {patientsLoading
+                                ? "Recherche…"
+                                : "Rechercher"}
+                        </button>
+                    </div>
+
+                    {patientsError && (
+                        <div className="text-xs text-red-600">
+                            {patientsError.message}
+                        </div>
+                    )}
+
+                    {hasSearchedPatients &&
+                        !patientsLoading &&
+                        patients.length === 0 && (
+                        <div className="text-xs text-gray-500">
+                            Aucun patient trouvé.
+                        </div>
+                    )}
+
+                    {patients.length > 0 && (
+                        <div className="flex flex-col gap-2">
+                            {patients.map((p) => (
+                                <button
+                                    key={p._id}
+                                    type="button"
+                                    onClick={() =>
+                                        setInsuranceNumber(
+                                            p.num_assurance_maladie
+                                        )
+                                    }
+                                    className="text-left border rounded p-2 hover:bg-gray-100"
+                                >
+                                    <div className="text-sm font-medium">
+                                        {p.prenom} {p.nom}
+                                    </div>
+                                    {p.telephone && (
+                                        <div className="text-xs text-gray-600">
+                                            {p.telephone}
+                                        </div>
+                                    )}
+                                    <div className="text-xs text-gray-600">
+                                        {p.num_assurance_maladie}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
 
                 <select
                     className="border rounded p-2"

@@ -15,7 +15,8 @@ random_item() {
 }
 
 random_phone() {
-  printf "514%07d" "$((RANDOM % 10000000))"
+  local idx=$1
+  printf "514%07d" "$idx"
 }
 
 random_address() {
@@ -35,7 +36,7 @@ for i in $(seq 1 "$COUNT"); do
   "nom": "${nom}",
   "prenom": "${prenom}",
   "addresse": "$(random_address)",
-  "telephone": "$(random_phone)",
+  "telephone": "$(random_phone "$i")",
   "courriel": "${email}",
   "texto": $([ $((RANDOM % 2)) -eq 0 ] && echo true || echo false)
 }

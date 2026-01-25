@@ -88,6 +88,7 @@ router.get("/", async (req, res) => {
                 prenom: req.query.prenom,
                 num_assurance_maladie:
                     req.query.num_assurance_maladie,
+                telephone: req.query.telephone,
             },
             {
                 page: req.query.page,

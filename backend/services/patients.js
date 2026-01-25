@@ -52,11 +52,23 @@ export async function createPatient(dto) {
 export async function listPatients(filters = {}, opts = {}) {
     const query = {};
 
-    if (filters.nom) query.nom = filters.nom;
-    if (filters.prenom) query.prenom = filters.prenom;
+    if (filters.nom) {
+        query.nom = { $regex: filters.nom, $options: "i" };
+    }
+    if (filters.prenom) {
+        query.prenom = { $regex: filters.prenom, $options: "i" };
+    }
     if (filters.num_assurance_maladie) {
-        query.num_assurance_maladie =
-            filters.num_assurance_maladie;
+        query.num_assurance_maladie = {
+            $regex: filters.num_assurance_maladie,
+            $options: "i",
+        };
+    }
+    if (filters.telephone) {
+        query.telephone = {
+            $regex: filters.telephone,
+            $options: "i",
+        };
     }
 
     const page = Math.max(parseInt(opts.page) || 1, 1);

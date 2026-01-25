@@ -30,8 +30,10 @@ const PatientSchema = new mongoose.Schema(
         },
         telephone: {
             type: String,
-            default: "",
+            default: undefined,
             trim: true,
+            unique: true,
+            sparse: true,
         },
         courriel: {
             type: String,

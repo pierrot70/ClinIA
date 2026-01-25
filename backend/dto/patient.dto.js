@@ -19,13 +19,17 @@ function normalizeBoolean(value) {
  * - garantit une forme stable pour la couche service
  */
 export function toCreatePatientDTO(body) {
+    const telephoneRaw = body.telephone?.trim();
     return {
         nom: body.nom?.trim(),
         prenom: body.prenom?.trim(),
         num_assurance_maladie:
             body.num_assurance_maladie?.trim(),
         addresse: body.addresse?.trim() ?? "",
-        telephone: body.telephone?.trim() ?? "",
+        telephone:
+            telephoneRaw && telephoneRaw.length > 0
+                ? telephoneRaw
+                : undefined,
         courriel: body.courriel?.trim() ?? "",
         texto: normalizeBoolean(body.texto),
         lat: typeof body.lat === "number" ? body.lat : undefined,
@@ -44,8 +48,12 @@ export function toUpdatePatientDTO(body) {
             body.num_assurance_maladie?.trim();
     if (body.addresse !== undefined)
         dto.addresse = body.addresse?.trim() ?? "";
-    if (body.telephone !== undefined)
-        dto.telephone = body.telephone?.trim() ?? "";
+    if (body.telephone !== undefined) {
+        const tel = body.telephone?.trim();
+        if (tel && tel.length > 0) {
+            dto.telephone = tel;
+        }
+    }
     if (body.courriel !== undefined)
         dto.courriel = body.courriel?.trim() ?? "";
     if (body.texto !== undefined)
