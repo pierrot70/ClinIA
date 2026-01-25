@@ -73,6 +73,13 @@ const Header: React.FC = () => {
                         Rendez-vous
                     </Link>
 
+                    <Link
+                        to="/patients"
+                        className={linkClass("/patients")}
+                    >
+                        Patients
+                    </Link>
+
                     <Link to="/quick" className={linkClass("/quick")}>
                         Mode rapide
                     </Link>

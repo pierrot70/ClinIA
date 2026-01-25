@@ -33,6 +33,16 @@ export interface PaginatedPatients {
     };
 }
 
+export interface PatientPayload {
+    nom: string;
+    prenom: string;
+    num_assurance_maladie?: string;
+    addresse?: string;
+    telephone?: string;
+    courriel?: string;
+    texto?: boolean;
+}
+
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
@@ -90,6 +100,83 @@ export async function fetchPatientsPaginated(
             error: {
                 code: "INTERNAL_ERROR",
                 message: "Impossible de récupérer les patients.",
+                retryable: true,
+            },
+        };
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* CREATE patient                                                      */
+/* ------------------------------------------------------------------ */
+
+export async function createPatient(
+    payload: PatientPayload
+): Promise<ApiResponse<Patient>> {
+    try {
+        const response = await fetch(`${API_URL}/api/patients`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+
+        return (await safeJson(response)) as ApiResponse<Patient>;
+    } catch {
+        return {
+            error: {
+                code: "INTERNAL_ERROR",
+                message: "Impossible de créer le patient.",
+                retryable: true,
+            },
+        };
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* UPDATE patient                                                      */
+/* ------------------------------------------------------------------ */
+
+export async function updatePatient(
+    id: string,
+    payload: PatientPayload
+): Promise<ApiResponse<Patient>> {
+    try {
+        const response = await fetch(`${API_URL}/api/patients/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+
+        return (await safeJson(response)) as ApiResponse<Patient>;
+    } catch {
+        return {
+            error: {
+                code: "INTERNAL_ERROR",
+                message: "Impossible de mettre à jour le patient.",
+                retryable: true,
+            },
+        };
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* DELETE patient                                                      */
+/* ------------------------------------------------------------------ */
+
+export async function deletePatient(
+    id: string
+): Promise<ApiResponse<Patient>> {
+    try {
+        const response = await fetch(`${API_URL}/api/patients/${id}`, {
+            method: "DELETE",
+        });
+
+        return (await safeJson(response)) as ApiResponse<Patient>;
+    } catch {
+        return {
+            error: {
+                code: "INTERNAL_ERROR",
+                message: "Impossible de supprimer le patient.",
                 retryable: true,
             },
         };
