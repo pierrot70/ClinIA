@@ -20,12 +20,12 @@ const router = express.Router();
 router.post("/", async (req, res) => {
     const dto = toCreateCliniqueDTO(req.body);
 
-    if (!dto.num_civique || !dto.rue || !dto.code_postal) {
+    if (!dto.nom || !dto.num_civique || !dto.rue || !dto.code_postal) {
         return res.status(400).json({
             error: {
                 code: "INVALID_INPUT",
                 message:
-                    "Champs requis manquants (num_civique, rue, code_postal).",
+                    "Champs requis manquants (nom, num_civique, rue, code_postal).",
                 retryable: false,
             },
         });
@@ -73,6 +73,7 @@ router.get("/", async (req, res) => {
     try {
         const { data, meta } = await listCliniques(
             {
+                nom: req.query.nom,
                 rue: req.query.rue,
                 code_postal: req.query.code_postal,
             },

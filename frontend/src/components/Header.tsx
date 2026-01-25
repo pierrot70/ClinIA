@@ -20,6 +20,16 @@ const Header: React.FC = () => {
             ? "text-primary font-medium"
             : "text-gray-600");
 
+    const clinicNavPaths = [
+        "/appointments",
+        "/patients",
+        "/cliniques",
+    ];
+
+    const isClinicGroupActive = clinicNavPaths.some((path) =>
+        location.pathname.startsWith(path)
+    );
+
     return (
         <header className="bg-white border-b border-gray-200">
             <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
@@ -66,19 +76,49 @@ const Header: React.FC = () => {
                         Analyse clinique
                     </Link>
 
-                    <Link
-                        to="/appointments"
-                        className={linkClass("/appointments")}
-                    >
-                        Rendez-vous
-                    </Link>
-
-                    <Link
-                        to="/patients"
-                        className={linkClass("/patients")}
-                    >
-                        Patients
-                    </Link>
+                    <div className="relative group">
+                        <button
+                            type="button"
+                            className={
+                                "flex items-center gap-1 rounded px-3 py-1 text-sm transition " +
+                                (isClinicGroupActive
+                                    ? "text-primary font-medium"
+                                    : "text-gray-600 hover:text-primary")
+                            }
+                        >
+                            Clinique
+                            <span className="text-xs">▾</span>
+                        </button>
+                        <div className="absolute right-0 top-full z-10 mt-2 hidden min-w-[160px] rounded-lg border border-gray-200 bg-white shadow-lg transition group-hover:block group-focus-within:block">
+                            {[
+                                {
+                                    label: "Rendez-vous",
+                                    path: "/appointments",
+                                },
+                                {
+                                    label: "Patients",
+                                    path: "/patients",
+                                },
+                                {
+                                    label: "Cliniques",
+                                    path: "/cliniques",
+                                },
+                            ].map((item) => (
+                                <Link
+                                    key={item.path}
+                                    to={item.path}
+                                    className={
+                                        "block px-4 py-2 text-sm transition hover:bg-gray-50 " +
+                                        (location.pathname === item.path
+                                            ? "text-primary font-medium"
+                                            : "text-gray-700")
+                                    }
+                                >
+                                    {item.label}
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
 
                     <Link to="/quick" className={linkClass("/quick")}>
                         Mode rapide

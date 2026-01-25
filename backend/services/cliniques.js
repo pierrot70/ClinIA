@@ -6,11 +6,11 @@ import { Clinique } from "../models/Clinique.js";
 /* ------------------------------------------------------------------ */
 
 export async function createClinique(dto) {
-    if (!dto.num_civique || !dto.rue || !dto.code_postal) {
+    if (!dto.nom || !dto.num_civique || !dto.rue || !dto.code_postal) {
         throw {
             code: "INVALID_INPUT",
             message:
-                "Les champs 'num_civique', 'rue' et 'code_postal' sont requis.",
+                "Les champs 'nom', 'num_civique', 'rue' et 'code_postal' sont requis.",
         };
     }
 
@@ -19,6 +19,10 @@ export async function createClinique(dto) {
 
 export async function listCliniques(filters = {}, opts = {}) {
     const query = {};
+
+    if (filters.nom) {
+        query.nom = { $regex: filters.nom, $options: "i" };
+    }
 
     if (filters.rue) {
         query.rue = { $regex: filters.rue, $options: "i" };
@@ -36,7 +40,7 @@ export async function listCliniques(filters = {}, opts = {}) {
 
     const [data, total] = await Promise.all([
         Clinique.find(query)
-            .sort({ rue: 1, num_civique: 1 })
+            .sort({ nom: 1, rue: 1, num_civique: 1 })
             .skip(skip)
             .limit(limit)
             .lean(),
@@ -83,6 +87,7 @@ export async function updateClinique(id, updates) {
     }
 
     if (
+        updates.nom === "" ||
         updates.num_civique === "" ||
         updates.rue === "" ||
         updates.code_postal === ""
@@ -90,7 +95,7 @@ export async function updateClinique(id, updates) {
         throw {
             code: "INVALID_INPUT",
             message:
-                "Les champs 'num_civique', 'rue' et 'code_postal' ne peuvent pas être vides.",
+                "Les champs 'nom', 'num_civique', 'rue' et 'code_postal' ne peuvent pas être vides.",
         };
     }
 

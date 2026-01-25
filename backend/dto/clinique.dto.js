@@ -30,6 +30,7 @@ function normalizePostalCode(value) {
 
 export function toCreateCliniqueDTO(body) {
     return {
+        nom: body.nom?.trim(),
         num_civique: body.num_civique?.trim(),
         rue: body.rue?.trim(),
         code_postal: normalizePostalCode(body.code_postal),
@@ -49,6 +50,9 @@ export function toUpdateCliniqueDTO(body) {
     }
     if (body.code_postal !== undefined) {
         dto.code_postal = normalizePostalCode(body.code_postal);
+    }
+    if (body.nom !== undefined) {
+        dto.nom = body.nom?.trim();
     }
     if (body.lat !== undefined) {
         dto.lat = parseCoordinate(body.lat);

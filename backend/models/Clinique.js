@@ -6,6 +6,11 @@ import mongoose from "mongoose";
 
 const CliniqueSchema = new mongoose.Schema(
     {
+        nom: {
+            type: String,
+            required: true,
+            trim: true,
+        },
         num_civique: {
             type: String,
             required: true,
