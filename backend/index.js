@@ -17,6 +17,7 @@ import {
 
 import appointmentsRouter from "./routes/appointments.js";
 import patientsRouter from "./routes/patients.js";
+import cliniquesRouter from "./routes/cliniques.js";
 
 dotenv.config();
 
@@ -325,6 +326,7 @@ mongoose
  */
 app.use("/api/appointments", appointmentsRouter);
 app.use("/api/patients", patientsRouter);
+app.use("/api/cliniques", cliniquesRouter);
 
 app.listen(4000, () =>
     console.log(
