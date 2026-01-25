@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
     createAppointment,
     fetchAvailableSlots,
@@ -29,6 +29,7 @@ const SPECIALISTS = [
 /* ------------------------------------------------------------------ */
 
 export function AppointmentsPage() {
+    const [searchParams] = useSearchParams();
     const [insuranceNumber, setInsuranceNumber] = useState("");
     const [specialist, setSpecialist] = useState("");
     const [date, setDate] = useState("");
@@ -54,6 +55,7 @@ export function AppointmentsPage() {
         useState(false);
     const [searchTimer, setSearchTimer] =
         useState<number | null>(null);
+    const [ramqInitialized, setRamqInitialized] = useState(false);
 
     /* ------------------------------------------------------------------ */
     /* Initialisation date                                                */
@@ -76,10 +78,18 @@ export function AppointmentsPage() {
     }
 
     useEffect(() => {
-        if (!insuranceNumber) {
-            setInsuranceNumber(generateRamqNumber());
+        const ramq = searchParams.get("ramq");
+        if (ramq) {
+            setInsuranceNumber(ramq);
+            setRamqInitialized(true);
+            return;
         }
-    }, [insuranceNumber]);
+
+        if (!ramqInitialized) {
+            setInsuranceNumber(generateRamqNumber());
+            setRamqInitialized(true);
+        }
+    }, [searchParams, ramqInitialized]);
 
     /* ------------------------------------------------------------------ */
     /* Recherche patients                                                 */

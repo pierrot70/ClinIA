@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
     createPatient,
     deletePatient,
@@ -455,6 +456,14 @@ export function PatientsPage() {
                                         {p.num_assurance_maladie}
                                     </td>
                                     <td className="p-2 flex gap-2">
+                                        <Link
+                                            className="px-2 py-1 border rounded"
+                                            to={`/appointments?ramq=${encodeURIComponent(
+                                                p.num_assurance_maladie
+                                            )}`}
+                                        >
+                                            Créer rendez-vous
+                                        </Link>
                                         <button
                                             className="px-2 py-1 border rounded"
                                             onClick={() => handleEdit(p)}
