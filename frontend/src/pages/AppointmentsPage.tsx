@@ -49,6 +49,23 @@ export function AppointmentsPage() {
     }, []);
 
     /* ------------------------------------------------------------------ */
+    /* Numéro RAMQ factice                                                */
+    /* ------------------------------------------------------------------ */
+
+    function generateRamqNumber() {
+        const digits = Array.from({ length: 10 }, () =>
+            Math.floor(Math.random() * 10).toString()
+        ).join("");
+        return `RAMQ${digits}`;
+    }
+
+    useEffect(() => {
+        if (!insuranceNumber) {
+            setInsuranceNumber(generateRamqNumber());
+        }
+    }, [insuranceNumber]);
+
+    /* ------------------------------------------------------------------ */
     /* Chargement des créneaux                                            */
     /* ------------------------------------------------------------------ */
 
