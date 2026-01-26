@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
     createSpecialist,
     deleteSpecialist,
@@ -9,6 +9,10 @@ import {
 } from "../services/specialistsApi";
 import type { ApiError } from "../types/api";
 import { useDebounce } from "../hooks/useDebounce";
+import {
+    Clinique,
+    fetchCliniquesPaginated,
+} from "../services/cliniqueApi";
 
 export function SpecialistsPage() {
     const [specialists, setSpecialists] = useState<Specialist[]>([]);
@@ -19,6 +23,15 @@ export function SpecialistsPage() {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const limit = 10;
+
+
+    const [cliniqueOptions, setCliniqueOptions] = useState<Clinique[]>(
+        []
+    );
+    const [highlightedId, setHighlightedId] = useState<string | null>(null);
+    const highlightTimeoutRef = useRef<
+        ReturnType<typeof setTimeout> | null
+    >(null);
 
     const [filterNom, setFilterNom] = useState("");
     const [filterPrenom, setFilterPrenom] = useState("");
@@ -60,9 +73,13 @@ export function SpecialistsPage() {
     });
 
     useEffect(() => {
-        loadSpecialists();
+        void loadSpecialists();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters, page]);
+
+    useEffect(() => {
+        void loadCliniqueOptions();
+    }, []);
 
     async function loadSpecialists() {
         setLoading(true);
@@ -101,6 +118,42 @@ export function SpecialistsPage() {
         setTotalPages(response.data.meta.totalPages);
         setLoading(false);
     }
+
+    async function loadCliniqueOptions() {
+        const response = await fetchCliniquesPaginated({
+            page: 1,
+            limit: 100,
+        });
+
+        if ("error" in response) {
+            return;
+        }
+
+        setCliniqueOptions(response.data.data);
+    }
+
+    function highlightRow(id: string | null) {
+        if (highlightTimeoutRef.current) {
+            clearTimeout(highlightTimeoutRef.current);
+        }
+
+        setHighlightedId(id);
+
+        if (id) {
+            highlightTimeoutRef.current = window.setTimeout(() => {
+                setHighlightedId(null);
+                highlightTimeoutRef.current = null;
+            }, 4000);
+        }
+    }
+
+    useEffect(() => {
+        return () => {
+            if (highlightTimeoutRef.current) {
+                clearTimeout(highlightTimeoutRef.current);
+            }
+        };
+    }, []);
 
     function resetForm() {
         setEditingId(null);
@@ -164,12 +217,17 @@ export function SpecialistsPage() {
                 setError(response.error);
                 return;
             }
+            const savedId =
+                response.data?._id ?? editingId;
+            highlightRow(savedId);
         } else {
             const response = await createSpecialist(toPayload(form));
             if ("error" in response) {
                 setError(response.error);
                 return;
             }
+            const savedId = response.data?._id ?? null;
+            highlightRow(savedId);
         }
 
         resetForm();
@@ -185,7 +243,10 @@ export function SpecialistsPage() {
             telephone: specialist.telephone ?? "",
             email: specialist.email ?? "",
             texto: Boolean(specialist.texto),
-            clinique_associer: specialist.clinique_associer ?? "",
+            clinique_associer:
+                typeof specialist.clinique_associer === "string"
+                    ? specialist.clinique_associer
+                    : specialist.clinique_associer?.toString() ?? "",
         });
     }
 
@@ -213,7 +274,13 @@ export function SpecialistsPage() {
         <div className="max-w-6xl mx-auto p-6 space-y-6">
             <h1 className="text-2xl font-semibold">Spécialistes</h1>
 
-            <div className="grid grid-cols-1 gap-4 bg-gray-50 border rounded p-4">
+            <div
+                className={`grid grid-cols-1 gap-4 border rounded p-4 transition duration-150 ${
+                    editingId
+                        ? "bg-gradient-to-r from-yellow-50 via-white to-white border-yellow-300 shadow-sm"
+                        : "bg-gray-50 border-gray-200"
+                }`}
+            >
                 <div className="text-sm font-medium">
                     {editingId
                         ? "Modifier un spécialiste"
@@ -276,17 +343,29 @@ export function SpecialistsPage() {
                             }))
                         }
                     />
-                    <input
+                    <select
                         className="border rounded p-2"
-                        placeholder="Clinique associée (ID)"
                         value={form.clinique_associer}
-                        onChange={(e) =>
+                        onChange={(event) =>
                             setForm((p) => ({
                                 ...p,
-                                clinique_associer: e.target.value,
+                                clinique_associer:
+                                    event.target.value,
                             }))
                         }
-                    />
+                    >
+                        <option value="">Aucune clinique</option>
+                        {cliniqueOptions.map((clinique) => (
+                            <option
+                                key={clinique._id}
+                                value={clinique._id}
+                            >
+                                {clinique.nom}{" "}
+                                {clinique.rue &&
+                                    `(${clinique.rue})`}
+                            </option>
+                        ))}
+                    </select>
                 </div>
 
                 <label className="flex items-center gap-2 text-sm">
@@ -426,41 +505,59 @@ export function SpecialistsPage() {
                             </tr>
                         )}
                         {!loading &&
-                            specialists.map((sp) => (
-                                <tr key={sp._id} className="border-t">
-                                    <td className="p-2">
-                                        {sp.prenom}
-                                    </td>
-                                    <td className="p-2">{sp.nom}</td>
-                                    <td className="p-2">
-                                        {sp.numero_medecin}
-                                    </td>
-                                    <td className="p-2">
-                                        {sp.telephone || "—"}
-                                    </td>
-                                    <td className="p-2">
-                                        {sp.email || "—"}
-                                    </td>
-                                    <td className="p-2">
-                                        {sp.clinique_associer || "—"}
-                                    </td>
-                                    <td className="p-2 flex gap-2">
-                                        <button
-                                            className="px-2 py-1 border rounded"
-                                            onClick={() => handleEdit(sp)}
-                                        >
-                                            Éditer
-                                        </button>
-                                        <button
-                                            className="px-2 py-1 border rounded text-red-600"
-                                            disabled={busyIds[sp._id]}
-                                            onClick={() => handleDelete(sp._id)}
-                                        >
-                                            Supprimer
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
+                            specialists.map((sp) => {
+                                const isRowHighlighted =
+                                    highlightedId === sp._id;
+
+                                return (
+                                    <tr
+                                        key={sp._id}
+                                        className={`border-t ${
+                                            isRowHighlighted
+                                                ? "bg-gradient-to-r from-emerald-50 via-white to-white border border-emerald-200 shadow-inner"
+                                                : ""
+                                        }`}
+                                    >
+                                        <td className="p-2">
+                                            {sp.prenom}
+                                        </td>
+                                        <td className="p-2">{sp.nom}</td>
+                                        <td className="p-2">
+                                            {sp.numero_medecin}
+                                        </td>
+                                        <td className="p-2">
+                                            {sp.telephone || "—"}
+                                        </td>
+                                        <td className="p-2">
+                                            {sp.email || "—"}
+                                        </td>
+                                        <td className="p-2">
+                                            {sp.clinique_associer || "—"}
+                                        </td>
+                                        <td className="p-2 flex gap-2">
+                                            <button
+                                                className="px-2 py-1 border rounded"
+                                                type="button"
+                                                onClick={() =>
+                                                    handleEdit(sp)
+                                                }
+                                            >
+                                                Éditer
+                                            </button>
+                                            <button
+                                                className="px-2 py-1 border rounded text-red-600"
+                                                type="button"
+                                                disabled={busyIds[sp._id]}
+                                                onClick={() =>
+                                                    handleDelete(sp._id)
+                                                }
+                                            >
+                                                Supprimer
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                     </tbody>
                 </table>
             </div>
