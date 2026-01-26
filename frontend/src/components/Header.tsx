@@ -24,6 +24,7 @@ const Header: React.FC = () => {
         "/appointments",
         "/patients",
         "/cliniques",
+        "/specialists",
     ];
 
     const isClinicGroupActive = clinicNavPaths.some((path) =>
@@ -90,20 +91,24 @@ const Header: React.FC = () => {
                             <span className="text-xs">▾</span>
                         </button>
                         <div className="absolute right-0 top-full z-10 mt-2 hidden min-w-[160px] rounded-lg border border-gray-200 bg-white shadow-lg transition group-hover:block group-focus-within:block">
-                            {[
-                                {
-                                    label: "Rendez-vous",
-                                    path: "/appointments",
-                                },
-                                {
-                                    label: "Patients",
-                                    path: "/patients",
-                                },
-                                {
-                                    label: "Cliniques",
-                                    path: "/cliniques",
-                                },
-                            ].map((item) => (
+                                {[
+                                    {
+                                        label: "Rendez-vous",
+                                        path: "/appointments",
+                                    },
+                                    {
+                                        label: "Patients",
+                                        path: "/patients",
+                                    },
+                                    {
+                                        label: "Cliniques",
+                                        path: "/cliniques",
+                                    },
+                                    {
+                                        label: "Spécialistes",
+                                        path: "/specialists",
+                                    },
+                                ].map((item) => (
                                 <Link
                                     key={item.path}
                                     to={item.path}

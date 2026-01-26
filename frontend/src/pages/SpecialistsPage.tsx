@@ -1,22 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import {
-    createPatient,
-    deletePatient,
-    fetchPatientsPaginated,
-    updatePatient,
-    type Patient,
-    type PatientPayload,
-} from "../services/patientsApi";
+    createSpecialist,
+    deleteSpecialist,
+    fetchSpecialistsPaginated,
+    updateSpecialist,
+    type Specialist,
+    type SpecialistPayload,
+} from "../services/specialistsApi";
 import type { ApiError } from "../types/api";
 import { useDebounce } from "../hooks/useDebounce";
 
-/* ------------------------------------------------------------------ */
-/* Page                                                                */
-/* ------------------------------------------------------------------ */
-
-export function PatientsPage() {
-    const [patients, setPatients] = useState<Patient[]>([]);
+export function SpecialistsPage() {
+    const [specialists, setSpecialists] = useState<Specialist[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const [busyIds, setBusyIds] = useState<Record<string, boolean>>({});
@@ -27,17 +22,28 @@ export function PatientsPage() {
 
     const [filterNom, setFilterNom] = useState("");
     const [filterPrenom, setFilterPrenom] = useState("");
+    const [filterNumero, setFilterNumero] = useState("");
     const [filterTelephone, setFilterTelephone] = useState("");
-    const [filterRamq, setFilterRamq] = useState("");
+    const [filterEmail, setFilterEmail] = useState("");
+    const [filterClinique, setFilterClinique] = useState("");
 
     const rawFilters = useMemo(
         () => ({
             nom: filterNom,
             prenom: filterPrenom,
+            numero_medecin: filterNumero,
             telephone: filterTelephone,
-            ramq: filterRamq,
+            email: filterEmail,
+            clinique_associer: filterClinique,
         }),
-        [filterNom, filterPrenom, filterTelephone, filterRamq]
+        [
+            filterNom,
+            filterPrenom,
+            filterNumero,
+            filterTelephone,
+            filterEmail,
+            filterClinique,
+        ]
     );
 
     const filters = useDebounce(rawFilters, 300);
@@ -46,42 +52,33 @@ export function PatientsPage() {
     const [form, setForm] = useState({
         nom: "",
         prenom: "",
-        num_assurance_maladie: "",
-        addresse: "",
+        numero_medecin: "",
         telephone: "",
-        courriel: "",
+        email: "",
         texto: false,
+        clinique_associer: "",
     });
 
     useEffect(() => {
-        loadPatients();
+        loadSpecialists();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters, page]);
 
-    async function loadPatients() {
+    async function loadSpecialists() {
         setLoading(true);
         setError(null);
 
-        const nomFilter = filters.prenom || undefined;
-        const prenomFilter = filters.nom || undefined;
-        const telFilter = filters.telephone || undefined;
-
-        const baseQuery = {
+        const response = await fetchSpecialistsPaginated({
             page,
             limit,
-            nom: nomFilter,
-            prenom: prenomFilter,
-            num_assurance_maladie: filters.ramq || undefined,
-        };
-
-        const shouldUsePhoneOnly =
-            !nomFilter && !prenomFilter && telFilter;
-
-        const response = await fetchPatientsPaginated(
-            shouldUsePhoneOnly
-                ? { ...baseQuery, telephone: telFilter }
-                : baseQuery
-        );
+            nom: filters.nom || undefined,
+            prenom: filters.prenom || undefined,
+            numero_medecin: filters.numero_medecin || undefined,
+            telephone: filters.telephone || undefined,
+            email: filters.email || undefined,
+            clinique_associer:
+                filters.clinique_associer || undefined,
+        });
 
         if ("error" in response) {
             setError(response.error);
@@ -100,31 +97,8 @@ export function PatientsPage() {
             return;
         }
 
-        let data = response.data.data;
-        let totalPages = response.data.meta.totalPages;
-
-        if (
-            telFilter &&
-            !shouldUsePhoneOnly &&
-            response.data.meta.total > 1
-        ) {
-            const refined = await fetchPatientsPaginated({
-                ...baseQuery,
-                telephone: telFilter,
-            });
-
-            if ("error" in refined) {
-                setError(refined.error);
-                setLoading(false);
-                return;
-            }
-
-            data = refined.data.data;
-            totalPages = refined.data.meta.totalPages;
-        }
-
-        setPatients(data);
-        setTotalPages(totalPages);
+        setSpecialists(response.data.data);
+        setTotalPages(response.data.meta.totalPages);
         setLoading(false);
     }
 
@@ -133,43 +107,47 @@ export function PatientsPage() {
         setForm({
             nom: "",
             prenom: "",
-            num_assurance_maladie: "",
-            addresse: "",
+            numero_medecin: "",
             telephone: "",
-            courriel: "",
+            email: "",
             texto: false,
+            clinique_associer: "",
         });
     }
 
-    function toPayload(values: typeof form): PatientPayload {
-        const payload: PatientPayload = {
+    function toPayload(values: typeof form): SpecialistPayload {
+        const payload: SpecialistPayload = {
             nom: values.nom.trim(),
             prenom: values.prenom.trim(),
+            numero_medecin: values.numero_medecin.trim(),
             texto: values.texto,
         };
 
-        if (values.num_assurance_maladie.trim()) {
-            payload.num_assurance_maladie =
-                values.num_assurance_maladie.trim();
-        }
-        if (values.addresse.trim()) {
-            payload.addresse = values.addresse.trim();
-        }
         if (values.telephone.trim()) {
             payload.telephone = values.telephone.trim();
         }
-        if (values.courriel.trim()) {
-            payload.courriel = values.courriel.trim();
+        if (values.email.trim()) {
+            payload.email = values.email.trim();
+        }
+        if (values.clinique_associer.trim()) {
+            payload.clinique_associer = values.clinique_associer.trim();
+        } else if (values.clinique_associer === "") {
+            payload.clinique_associer = undefined;
         }
 
         return payload;
     }
 
     async function handleSubmit() {
-        if (!form.nom.trim() || !form.prenom.trim()) {
+        if (
+            !form.nom.trim() ||
+            !form.prenom.trim() ||
+            !form.numero_medecin.trim()
+        ) {
             setError({
                 code: "INVALID_INPUT",
-                message: "Nom et prénom sont requis.",
+                message:
+                    "Nom, prénom et numéro de médecin sont requis.",
                 retryable: false,
             });
             return;
@@ -178,7 +156,7 @@ export function PatientsPage() {
         setError(null);
 
         if (editingId) {
-            const response = await updatePatient(
+            const response = await updateSpecialist(
                 editingId,
                 toPayload(form)
             );
@@ -187,7 +165,7 @@ export function PatientsPage() {
                 return;
             }
         } else {
-            const response = await createPatient(toPayload(form));
+            const response = await createSpecialist(toPayload(form));
             if ("error" in response) {
                 setError(response.error);
                 return;
@@ -195,32 +173,32 @@ export function PatientsPage() {
         }
 
         resetForm();
-        await loadPatients();
+        await loadSpecialists();
     }
 
-    async function handleEdit(patient: Patient) {
-        setEditingId(patient._id);
+    async function handleEdit(specialist: Specialist) {
+        setEditingId(specialist._id);
         setForm({
-            nom: patient.nom ?? "",
-            prenom: patient.prenom ?? "",
-            num_assurance_maladie: patient.num_assurance_maladie ?? "",
-            addresse: patient.addresse ?? "",
-            telephone: patient.telephone ?? "",
-            courriel: patient.courriel ?? "",
-            texto: Boolean(patient.texto),
+            nom: specialist.nom ?? "",
+            prenom: specialist.prenom ?? "",
+            numero_medecin: specialist.numero_medecin ?? "",
+            telephone: specialist.telephone ?? "",
+            email: specialist.email ?? "",
+            texto: Boolean(specialist.texto),
+            clinique_associer: specialist.clinique_associer ?? "",
         });
     }
 
     async function handleDelete(id: string) {
         const confirmed = window.confirm(
-            "Supprimer ce patient définitivement ?"
+            "Supprimer ce spécialiste définitivement ?"
         );
         if (!confirmed) return;
 
         setBusyIds((p) => ({ ...p, [id]: true }));
         setError(null);
 
-        const response = await deletePatient(id);
+        const response = await deleteSpecialist(id);
         if ("error" in response) {
             setError(response.error);
             setBusyIds((p) => ({ ...p, [id]: false }));
@@ -228,18 +206,18 @@ export function PatientsPage() {
         }
 
         setBusyIds((p) => ({ ...p, [id]: false }));
-        await loadPatients();
+        await loadSpecialists();
     }
 
     return (
         <div className="max-w-6xl mx-auto p-6 space-y-6">
-            <h1 className="text-2xl font-semibold">Patients</h1>
+            <h1 className="text-2xl font-semibold">Spécialistes</h1>
 
             <div className="grid grid-cols-1 gap-4 bg-gray-50 border rounded p-4">
                 <div className="text-sm font-medium">
                     {editingId
-                        ? "Modifier un patient"
-                        : "Créer un patient"}
+                        ? "Modifier un spécialiste"
+                        : "Créer un spécialiste"}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -267,18 +245,18 @@ export function PatientsPage() {
                     />
                     <input
                         className="border rounded p-2"
-                        placeholder="Numéro RAMQ (optionnel)"
-                        value={form.num_assurance_maladie}
+                        placeholder="Numéro de médecin *"
+                        value={form.numero_medecin}
                         onChange={(e) =>
                             setForm((p) => ({
                                 ...p,
-                                num_assurance_maladie: e.target.value,
+                                numero_medecin: e.target.value,
                             }))
                         }
                     />
                     <input
                         className="border rounded p-2"
-                        placeholder="Téléphone (optionnel)"
+                        placeholder="Téléphone"
                         value={form.telephone}
                         onChange={(e) =>
                             setForm((p) => ({
@@ -289,23 +267,23 @@ export function PatientsPage() {
                     />
                     <input
                         className="border rounded p-2"
-                        placeholder="Courriel (optionnel)"
-                        value={form.courriel}
+                        placeholder="Courriel"
+                        value={form.email}
                         onChange={(e) =>
                             setForm((p) => ({
                                 ...p,
-                                courriel: e.target.value,
+                                email: e.target.value,
                             }))
                         }
                     />
                     <input
                         className="border rounded p-2"
-                        placeholder="Adresse (optionnel)"
-                        value={form.addresse}
+                        placeholder="Clinique associée (ID)"
+                        value={form.clinique_associer}
                         onChange={(e) =>
                             setForm((p) => ({
                                 ...p,
-                                addresse: e.target.value,
+                                clinique_associer: e.target.value,
                             }))
                         }
                     />
@@ -350,10 +328,8 @@ export function PatientsPage() {
             )}
 
             <div className="border rounded p-4 space-y-3">
-                <div className="text-sm font-medium">
-                    Recherche
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                <div className="text-sm font-medium">Recherche</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <input
                         className="border rounded p-2"
                         placeholder="Nom"
@@ -374,6 +350,15 @@ export function PatientsPage() {
                     />
                     <input
                         className="border rounded p-2"
+                        placeholder="Numéro de médecin"
+                        value={filterNumero}
+                        onChange={(e) => {
+                            setPage(1);
+                            setFilterNumero(e.target.value);
+                        }}
+                    />
+                    <input
+                        className="border rounded p-2"
                         placeholder="Téléphone"
                         value={filterTelephone}
                         onChange={(e) => {
@@ -383,11 +368,20 @@ export function PatientsPage() {
                     />
                     <input
                         className="border rounded p-2"
-                        placeholder="RAMQ"
-                        value={filterRamq}
+                        placeholder="Courriel"
+                        value={filterEmail}
                         onChange={(e) => {
                             setPage(1);
-                            setFilterRamq(e.target.value);
+                            setFilterEmail(e.target.value);
+                        }}
+                    />
+                    <input
+                        className="border rounded p-2"
+                        placeholder="Clinique associée (ID)"
+                        value={filterClinique}
+                        onChange={(e) => {
+                            setPage(1);
+                            setFilterClinique(e.target.value);
                         }}
                     />
                 </div>
@@ -399,8 +393,14 @@ export function PatientsPage() {
                         <tr>
                             <th className="text-left p-2">Prénom</th>
                             <th className="text-left p-2">Nom</th>
+                            <th className="text-left p-2">
+                                Numéro médecin
+                            </th>
                             <th className="text-left p-2">Téléphone</th>
-                            <th className="text-left p-2">RAMQ</th>
+                            <th className="text-left p-2">Courriel</th>
+                            <th className="text-left p-2">
+                                Clinique
+                            </th>
                             <th className="text-left p-2">Actions</th>
                         </tr>
                     </thead>
@@ -409,61 +409,52 @@ export function PatientsPage() {
                             <tr>
                                 <td
                                     className="p-2 text-gray-500"
-                                    colSpan={5}
+                                    colSpan={7}
                                 >
                                     Chargement…
                                 </td>
                             </tr>
                         )}
-                        {!loading && patients.length === 0 && (
+                        {!loading && specialists.length === 0 && (
                             <tr>
                                 <td
                                     className="p-2 text-gray-500"
-                                    colSpan={5}
+                                    colSpan={7}
                                 >
-                                    Aucun patient trouvé.
+                                    Aucun spécialiste trouvé.
                                 </td>
                             </tr>
                         )}
                         {!loading &&
-                            patients.map((p) => (
-                                <tr
-                                    key={p._id}
-                                    className="border-t"
-                                >
+                            specialists.map((sp) => (
+                                <tr key={sp._id} className="border-t">
                                     <td className="p-2">
-                                        {p.prenom}
+                                        {sp.prenom}
                                     </td>
-                                    <td className="p-2">{p.nom}</td>
+                                    <td className="p-2">{sp.nom}</td>
                                     <td className="p-2">
-                                        {p.telephone || "—"}
+                                        {sp.numero_medecin}
                                     </td>
                                     <td className="p-2">
-                                        {p.num_assurance_maladie}
+                                        {sp.telephone || "—"}
+                                    </td>
+                                    <td className="p-2">
+                                        {sp.email || "—"}
+                                    </td>
+                                    <td className="p-2">
+                                        {sp.clinique_associer || "—"}
                                     </td>
                                     <td className="p-2 flex gap-2">
-                                        <Link
-                                            className="px-2 py-1 border rounded"
-                                            to={`/appointments?ramq=${encodeURIComponent(
-                                                p.num_assurance_maladie
-                                            )}`}
-                                        >
-                                            Créer rendez-vous
-                                        </Link>
                                         <button
                                             className="px-2 py-1 border rounded"
-                                            onClick={() => handleEdit(p)}
+                                            onClick={() => handleEdit(sp)}
                                         >
                                             Éditer
                                         </button>
                                         <button
                                             className="px-2 py-1 border rounded text-red-600"
-                                            disabled={
-                                                busyIds[p._id]
-                                            }
-                                            onClick={() =>
-                                                handleDelete(p._id)
-                                            }
+                                            disabled={busyIds[sp._id]}
+                                            onClick={() => handleDelete(sp._id)}
                                         >
                                             Supprimer
                                         </button>
