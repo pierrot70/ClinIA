@@ -87,7 +87,7 @@ const Header: React.FC = () => {
                                     : "text-gray-600 hover:text-primary")
                             }
                         >
-                            Clinique
+                        Gestion clinique
                             <span className="text-xs">▾</span>
                         </button>
                         <div className="absolute right-0 top-full z-10 mt-2 hidden min-w-[160px] rounded-lg border border-gray-200 bg-white shadow-lg transition group-hover:block group-focus-within:block">

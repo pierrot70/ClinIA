@@ -270,7 +270,7 @@ export function CliniquesPage() {
         <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
             <header className="space-y-2">
                 <h1 className="text-2xl font-semibold text-gray-900">
-                    Gestion des cliniques
+                    Gestion des établissements
                 </h1>
                 <p className="text-sm text-gray-600">
                     Créez, modifiez ou supprimez les établissements suivis par
