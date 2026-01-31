@@ -52,6 +52,7 @@ export function PatientsPage() {
         courriel: "",
         texto: false,
     });
+    const [viewMode, setViewMode] = useState<"create" | "list">("list");
 
     useEffect(() => {
         loadPatients();
@@ -200,6 +201,7 @@ export function PatientsPage() {
 
     async function handleEdit(patient: Patient) {
         setEditingId(patient._id);
+        setViewMode("create");
         setForm({
             nom: patient.nom ?? "",
             prenom: patient.prenom ?? "",
@@ -235,112 +237,29 @@ export function PatientsPage() {
         <div className="max-w-6xl mx-auto p-6 space-y-6">
             <h1 className="text-2xl font-semibold">Patients</h1>
 
-            <div className="grid grid-cols-1 gap-4 bg-gray-50 border rounded p-4">
-                <div className="text-sm font-medium">
-                    {editingId
-                        ? "Modifier un patient"
-                        : "Créer un patient"}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Prénom *"
-                        value={form.prenom}
-                        onChange={(e) =>
-                            setForm((p) => ({
-                                ...p,
-                                prenom: e.target.value,
-                            }))
-                        }
-                    />
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Nom *"
-                        value={form.nom}
-                        onChange={(e) =>
-                            setForm((p) => ({
-                                ...p,
-                                nom: e.target.value,
-                            }))
-                        }
-                    />
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Numéro RAMQ (optionnel)"
-                        value={form.num_assurance_maladie}
-                        onChange={(e) =>
-                            setForm((p) => ({
-                                ...p,
-                                num_assurance_maladie: e.target.value,
-                            }))
-                        }
-                    />
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Téléphone (optionnel)"
-                        value={form.telephone}
-                        onChange={(e) =>
-                            setForm((p) => ({
-                                ...p,
-                                telephone: e.target.value,
-                            }))
-                        }
-                    />
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Courriel (optionnel)"
-                        value={form.courriel}
-                        onChange={(e) =>
-                            setForm((p) => ({
-                                ...p,
-                                courriel: e.target.value,
-                            }))
-                        }
-                    />
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Adresse (optionnel)"
-                        value={form.addresse}
-                        onChange={(e) =>
-                            setForm((p) => ({
-                                ...p,
-                                addresse: e.target.value,
-                            }))
-                        }
-                    />
-                </div>
-
-                <label className="flex items-center gap-2 text-sm">
-                    <input
-                        type="checkbox"
-                        checked={form.texto}
-                        onChange={(e) =>
-                            setForm((p) => ({
-                                ...p,
-                                texto: e.target.checked,
-                            }))
-                        }
-                    />
-                    SMS activé
-                </label>
-
-                <div className="flex gap-2">
-                    <button
-                        onClick={handleSubmit}
-                        className="px-4 py-2 bg-primary text-white rounded"
-                    >
-                        {editingId ? "Enregistrer" : "Créer"}
-                    </button>
-                    {editingId && (
-                        <button
-                            onClick={resetForm}
-                            className="px-4 py-2 border rounded"
-                        >
-                            Annuler
-                        </button>
-                    )}
-                </div>
+            <div className="flex flex-wrap gap-2">
+                <button
+                    type="button"
+                    className={`px-4 py-2 rounded border font-semibold transition ${
+                        viewMode === "create"
+                            ? "bg-primary text-white border-primary"
+                            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                    }`}
+                    onClick={() => setViewMode("create")}
+                >
+                    Créer un patient
+                </button>
+                <button
+                    type="button"
+                    className={`px-4 py-2 rounded border font-semibold transition ${
+                        viewMode === "list"
+                            ? "bg-primary text-white border-primary"
+                            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                    }`}
+                    onClick={() => setViewMode("list")}
+                >
+                    Rechercher les patients
+                </button>
             </div>
 
             {error && (
@@ -349,154 +268,274 @@ export function PatientsPage() {
                 </div>
             )}
 
-            <div className="border rounded p-4 space-y-3">
-                <div className="text-sm font-medium">
-                    Recherche
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Nom"
-                        value={filterNom}
-                        onChange={(e) => {
-                            setPage(1);
-                            setFilterNom(e.target.value);
-                        }}
-                    />
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Prénom"
-                        value={filterPrenom}
-                        onChange={(e) => {
-                            setPage(1);
-                            setFilterPrenom(e.target.value);
-                        }}
-                    />
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Téléphone"
-                        value={filterTelephone}
-                        onChange={(e) => {
-                            setPage(1);
-                            setFilterTelephone(e.target.value);
-                        }}
-                    />
-                    <input
-                        className="border rounded p-2"
-                        placeholder="RAMQ"
-                        value={filterRamq}
-                        onChange={(e) => {
-                            setPage(1);
-                            setFilterRamq(e.target.value);
-                        }}
-                    />
-                </div>
-            </div>
+            {viewMode === "create" && (
+                <div className="grid grid-cols-1 gap-4 bg-gray-50 border rounded p-4">
+                    <div className="text-sm font-medium">
+                        {editingId
+                            ? "Modifier un patient"
+                            : "Créer un patient"}
+                    </div>
 
-            <div className="border rounded overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-gray-100 text-gray-700">
-                        <tr>
-                            <th className="text-left p-2">Prénom</th>
-                            <th className="text-left p-2">Nom</th>
-                            <th className="text-left p-2">Téléphone</th>
-                            <th className="text-left p-2">RAMQ</th>
-                            <th className="text-left p-2">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading && (
-                            <tr>
-                                <td
-                                    className="p-2 text-gray-500"
-                                    colSpan={5}
-                                >
-                                    Chargement…
-                                </td>
-                            </tr>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <input
+                            className="border rounded p-2"
+                            placeholder="Prénom *"
+                            value={form.prenom}
+                            onChange={(e) =>
+                                setForm((p) => ({
+                                    ...p,
+                                    prenom: e.target.value,
+                                }))
+                            }
+                        />
+                        <input
+                            className="border rounded p-2"
+                            placeholder="Nom *"
+                            value={form.nom}
+                            onChange={(e) =>
+                                setForm((p) => ({
+                                    ...p,
+                                    nom: e.target.value,
+                                }))
+                            }
+                        />
+                        <input
+                            className="border rounded p-2"
+                            placeholder="Numéro RAMQ (optionnel)"
+                            value={form.num_assurance_maladie}
+                            onChange={(e) =>
+                                setForm((p) => ({
+                                    ...p,
+                                    num_assurance_maladie: e.target.value,
+                                }))
+                            }
+                        />
+                        <input
+                            className="border rounded p-2"
+                            placeholder="Téléphone (optionnel)"
+                            value={form.telephone}
+                            onChange={(e) =>
+                                setForm((p) => ({
+                                    ...p,
+                                    telephone: e.target.value,
+                                }))
+                            }
+                        />
+                        <input
+                            className="border rounded p-2"
+                            placeholder="Courriel (optionnel)"
+                            value={form.courriel}
+                            onChange={(e) =>
+                                setForm((p) => ({
+                                    ...p,
+                                    courriel: e.target.value,
+                                }))
+                            }
+                        />
+                        <input
+                            className="border rounded p-2"
+                            placeholder="Adresse (optionnel)"
+                            value={form.addresse}
+                            onChange={(e) =>
+                                setForm((p) => ({
+                                    ...p,
+                                    addresse: e.target.value,
+                                }))
+                            }
+                        />
+                    </div>
+
+                    <label className="flex items-center gap-2 text-sm">
+                        <input
+                            type="checkbox"
+                            checked={form.texto}
+                            onChange={(e) =>
+                                setForm((p) => ({
+                                    ...p,
+                                    texto: e.target.checked,
+                                }))
+                            }
+                        />
+                        SMS activé
+                    </label>
+
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleSubmit}
+                            className="px-4 py-2 bg-primary text-white rounded"
+                        >
+                            {editingId ? "Enregistrer" : "Créer"}
+                        </button>
+                        {editingId && (
+                            <button
+                                onClick={resetForm}
+                                className="px-4 py-2 border rounded"
+                            >
+                                Annuler
+                            </button>
                         )}
-                        {!loading && patients.length === 0 && (
-                            <tr>
-                                <td
-                                    className="p-2 text-gray-500"
-                                    colSpan={5}
-                                >
-                                    Aucun patient trouvé.
-                                </td>
-                            </tr>
-                        )}
-                        {!loading &&
-                            patients.map((p) => (
-                                <tr
-                                    key={p._id}
-                                    className="border-t"
-                                >
-                                    <td className="p-2">
-                                        {p.prenom}
-                                    </td>
-                                    <td className="p-2">{p.nom}</td>
-                                    <td className="p-2">
-                                        {p.telephone || "—"}
-                                    </td>
-                                    <td className="p-2">
-                                        {p.num_assurance_maladie}
-                                    </td>
-                                    <td className="p-2 flex gap-2">
-                                        <Link
-                                            className="px-2 py-1 border rounded"
-                                            to={`/appointments?ramq=${encodeURIComponent(
-                                                p.num_assurance_maladie
-                                            )}`}
-                                        >
-                                            Créer rendez-vous
-                                        </Link>
-                                        <button
-                                            className="px-2 py-1 border rounded"
-                                            onClick={() => handleEdit(p)}
-                                        >
-                                            Éditer
-                                        </button>
-                                        <button
-                                            className="px-2 py-1 border rounded text-red-600"
-                                            disabled={
-                                                busyIds[p._id]
-                                            }
-                                            onClick={() =>
-                                                handleDelete(p._id)
-                                            }
-                                        >
-                                            Supprimer
-                                        </button>
-                                    </td>
+                    </div>
+                </div>
+            )}
+
+            {viewMode === "list" && (
+                <>
+                    <div className="border rounded p-4 space-y-3">
+                        <div className="text-sm font-medium">
+                            Recherche
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                            <input
+                                className="border rounded p-2"
+                                placeholder="Nom"
+                                value={filterNom}
+                                onChange={(e) => {
+                                    setPage(1);
+                                    setFilterNom(e.target.value);
+                                }}
+                            />
+                            <input
+                                className="border rounded p-2"
+                                placeholder="Prénom"
+                                value={filterPrenom}
+                                onChange={(e) => {
+                                    setPage(1);
+                                    setFilterPrenom(e.target.value);
+                                }}
+                            />
+                            <input
+                                className="border rounded p-2"
+                                placeholder="Téléphone"
+                                value={filterTelephone}
+                                onChange={(e) => {
+                                    setPage(1);
+                                    setFilterTelephone(e.target.value);
+                                }}
+                            />
+                            <input
+                                className="border rounded p-2"
+                                placeholder="RAMQ"
+                                value={filterRamq}
+                                onChange={(e) => {
+                                    setPage(1);
+                                    setFilterRamq(e.target.value);
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="border rounded overflow-hidden">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-100 text-gray-700">
+                                <tr>
+                                    <th className="text-left p-2">Prénom</th>
+                                    <th className="text-left p-2">Nom</th>
+                                    <th className="text-left p-2">Téléphone</th>
+                                    <th className="text-left p-2">RAMQ</th>
+                                    <th className="text-left p-2">Actions</th>
                                 </tr>
-                            ))}
-                    </tbody>
-                </table>
-            </div>
+                            </thead>
+                            <tbody>
+                                {loading && (
+                                    <tr>
+                                        <td
+                                            className="p-2 text-gray-500"
+                                            colSpan={5}
+                                        >
+                                            Chargement…
+                                        </td>
+                                    </tr>
+                                )}
+                                {!loading && patients.length === 0 && (
+                                    <tr>
+                                        <td
+                                            className="p-2 text-gray-500"
+                                            colSpan={5}
+                                        >
+                                            Aucun patient trouvé.
+                                        </td>
+                                    </tr>
+                                )}
+                                {!loading &&
+                                    patients.map((p) => (
+                                        <tr
+                                            key={p._id}
+                                            className="border-t"
+                                        >
+                                            <td className="p-2">
+                                                {p.prenom}
+                                            </td>
+                                            <td className="p-2">
+                                                {p.nom}
+                                            </td>
+                                            <td className="p-2">
+                                                {p.telephone || "—"}
+                                            </td>
+                                            <td className="p-2">
+                                                {p.num_assurance_maladie}
+                                            </td>
+                                            <td className="p-2 flex gap-2">
+                                                <Link
+                                                    className="px-2 py-1 border rounded"
+                                                    to={`/appointments?ramq=${encodeURIComponent(
+                                                        p.num_assurance_maladie
+                                                    )}`}
+                                                >
+                                                    Créer rendez-vous
+                                                </Link>
+                                                <button
+                                                    className="px-2 py-1 border rounded"
+                                                    onClick={() =>
+                                                        handleEdit(p)
+                                                    }
+                                                >
+                                                    Éditer
+                                                </button>
+                                                <button
+                                                    className="px-2 py-1 border rounded text-red-600"
+                                                    disabled={
+                                                        busyIds[p._id]
+                                                    }
+                                                    onClick={() =>
+                                                        handleDelete(p._id)
+                                                    }
+                                                >
+                                                    Supprimer
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                            </tbody>
+                        </table>
+                    </div>
 
-            <div className="flex items-center gap-3">
-                <button
-                    className="px-3 py-1 border rounded"
-                    disabled={page <= 1}
-                    onClick={() =>
-                        setPage((p) => Math.max(p - 1, 1))
-                    }
-                >
-                    Précédent
-                </button>
-                <span className="text-sm text-gray-600">
-                    Page {page} / {totalPages}
-                </span>
-                <button
-                    className="px-3 py-1 border rounded"
-                    disabled={page >= totalPages}
-                    onClick={() =>
-                        setPage((p) => Math.min(p + 1, totalPages))
-                    }
-                >
-                    Suivant
-                </button>
-            </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            className="px-3 py-1 border rounded"
+                            disabled={page <= 1}
+                            onClick={() =>
+                                setPage((p) => Math.max(p - 1, 1))
+                            }
+                        >
+                            Précédent
+                        </button>
+                        <span className="text-sm text-gray-600">
+                            Page {page} / {totalPages}
+                        </span>
+                        <button
+                            className="px-3 py-1 border rounded"
+                            disabled={page >= totalPages}
+                            onClick={() =>
+                                setPage((p) =>
+                                    Math.min(p + 1, totalPages)
+                                )
+                            }
+                        >
+                            Suivant
+                        </button>
+                    </div>
+                </>
+            )}
         </div>
     );
 }
