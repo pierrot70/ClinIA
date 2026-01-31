@@ -42,8 +42,6 @@ export function SpecialistsPage() {
     const [filterNom, setFilterNom] = useState("");
     const [filterPrenom, setFilterPrenom] = useState("");
     const [filterNumero, setFilterNumero] = useState("");
-    const [filterTelephone, setFilterTelephone] = useState("");
-    const [filterEmail, setFilterEmail] = useState("");
     const [filterClinique, setFilterClinique] = useState("");
 
     const rawFilters = useMemo(
@@ -51,16 +49,12 @@ export function SpecialistsPage() {
             nom: filterNom,
             prenom: filterPrenom,
             numero_medecin: filterNumero,
-            telephone: filterTelephone,
-            email: filterEmail,
             clinique_associer: filterClinique,
         }),
         [
             filterNom,
             filterPrenom,
             filterNumero,
-            filterTelephone,
-            filterEmail,
             filterClinique,
         ]
     );
@@ -107,8 +101,6 @@ export function SpecialistsPage() {
             nom: filters.nom || undefined,
             prenom: filters.prenom || undefined,
             numero_medecin: filters.numero_medecin || undefined,
-            telephone: filters.telephone || undefined,
-            email: filters.email || undefined,
             clinique_associer:
                 filters.clinique_associer || undefined,
         });
@@ -520,68 +512,67 @@ export function SpecialistsPage() {
                                     setFilterNumero(e.target.value);
                                 }}
                             />
-                            <input
+                            <select
                                 className="border rounded p-2"
-                                placeholder="Téléphone"
-                                value={filterTelephone}
-                                onChange={(e) => {
-                                    setPage(1);
-                                    setFilterTelephone(
-                                        e.target.value
-                                    );
-                                }}
-                            />
-                            <input
-                                className="border rounded p-2"
-                                placeholder="Courriel"
-                                value={filterEmail}
-                                onChange={(e) => {
-                                    setPage(1);
-                                    setFilterEmail(e.target.value);
-                                }}
-                            />
-                            <input
-                                className="border rounded p-2"
-                                placeholder="Clinique associée (ID)"
                                 value={filterClinique}
                                 onChange={(e) => {
                                     setPage(1);
                                     setFilterClinique(e.target.value);
                                 }}
-                            />
+                            >
+                                <option value="">
+                                    Toutes les cliniques
+                                </option>
+                                {cliniqueOptions.map((clinique) => (
+                                    <option
+                                        key={clinique._id}
+                                        value={clinique._id}
+                                    >
+                                        {clinique.nom}
+                                        {clinique.rue &&
+                                            ` (${clinique.rue})`}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 
                     <div className="border rounded overflow-hidden">
                         <table className="w-full text-sm">
                             <thead className="bg-gray-100 text-gray-700">
-                                <tr>
-                                    <th className="text-left p-2">
-                                        Prénom
-                                    </th>
-                                    <th className="text-left p-2">
-                                        Nom
-                                    </th>
-                                    <th className="text-left p-2">
-                                        Numéro médecin
-                                    </th>
-                                    <th className="text-left p-2">
-                                        Spécialité
-                                    </th>
-                                    <th className="text-left p-2">
-                                        Clinique
-                                    </th>
-                                    <th className="text-left p-2">
-                                        Actions
-                                    </th>
-                                </tr>
+                        <tr>
+                            <th className="text-left p-2">
+                                Prénom
+                            </th>
+                            <th className="text-left p-2">
+                                Nom
+                            </th>
+                            <th className="text-left p-2">
+                                Numéro médecin
+                            </th>
+                            <th className="text-left p-2">
+                                Spécialité
+                            </th>
+                            <th className="text-left p-2">
+                                Clinique
+                            </th>
+                            <th className="text-left p-2">
+                                Téléphone
+                            </th>
+                            <th className="text-left p-2">
+                                Courriel
+                            </th>
+                            <th className="text-left p-2">
+                                Actions
+                            </th>
+                        </tr>
                             </thead>
                             <tbody>
                                 {loading && (
                                     <tr>
                                         <td
                                             className="p-2 text-gray-500"
-                                            colSpan={6}
+                                            colSpan={8}
                                         >
                                             Chargement…
                                         </td>
@@ -592,7 +583,7 @@ export function SpecialistsPage() {
                                         <tr>
                                             <td
                                                 className="p-2 text-gray-500"
-                                                colSpan={6}
+                                                colSpan={8}
                                             >
                                                 Aucun spécialiste
                                                 trouvé.
@@ -612,6 +603,12 @@ export function SpecialistsPage() {
                                             sp.specialite?.trim() || "—";
                                         const clinicLabel =
                                             associatedClinique?.nom ||
+                                            "—";
+                                        const clinicTelephone =
+                                            associatedClinique?.telephone ||
+                                            "—";
+                                        const clinicCourriel =
+                                            associatedClinique?.courriel ||
                                             "—";
 
                                         return (
@@ -637,6 +634,12 @@ export function SpecialistsPage() {
                                                 </td>
                                                 <td className="p-2">
                                                     {clinicLabel}
+                                                </td>
+                                                <td className="p-2">
+                                                    {clinicTelephone}
+                                                </td>
+                                                <td className="p-2">
+                                                    {clinicCourriel}
                                                 </td>
                                                 <td className="p-2 flex gap-2">
                                                     <button
