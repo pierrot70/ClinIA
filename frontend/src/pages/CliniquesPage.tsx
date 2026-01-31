@@ -65,6 +65,7 @@ export function CliniquesPage() {
         telephone: "",
         courriel: "",
     });
+    const [viewMode, setViewMode] = useState<"create" | "list">("list");
 
     useEffect(() => {
         loadCliniques();
@@ -226,6 +227,7 @@ export function CliniquesPage() {
     }
 
     function handleEdit(clinique: Clinique) {
+        setViewMode("create");
         setEditingId(clinique._id);
         setForm({
             nom: clinique.nom,
@@ -276,13 +278,39 @@ export function CliniquesPage() {
                 </p>
             </header>
 
+            <div className="flex flex-wrap gap-2">
+                <button
+                    type="button"
+                    className={`px-4 py-2 rounded border font-semibold transition ${
+                        viewMode === "create"
+                            ? "bg-primary text-white border-primary"
+                            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                    }`}
+                    onClick={() => setViewMode("create")}
+                >
+                    Créer une clinique
+                </button>
+                <button
+                    type="button"
+                    className={`px-4 py-2 rounded border font-semibold transition ${
+                        viewMode === "list"
+                            ? "bg-primary text-white border-primary"
+                            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                    }`}
+                    onClick={() => setViewMode("list")}
+                >
+                    Rechercher les cliniques
+                </button>
+            </div>
+
             {error && (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {error.message}
                 </div>
             )}
 
-            <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            {viewMode === "list" && (
+                <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                     <div>
                         <p className="text-xs uppercase tracking-wide text-gray-500">
@@ -443,9 +471,11 @@ export function CliniquesPage() {
                         </button>
                     </div>
                 </div>
-            </section>
+                </section>
+            )}
 
-            <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            {viewMode === "create" && (
+                <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <h2 className="text-lg font-semibold text-gray-900">
                     {editingId ? "Modifier une clinique" : "Nouvelle clinique"}
                 </h2>
@@ -584,7 +614,8 @@ export function CliniquesPage() {
                         </button>
                     )}
                 </div>
-            </section>
+                </section>
+            )}
         </div>
     );
 }
