@@ -18,6 +18,8 @@ export interface Clinique {
     code_postal: string;
     lat?: number;
     long?: number;
+    telephone?: string;
+    courriel?: string;
 }
 
 export interface PaginatedCliniques {
@@ -39,6 +41,8 @@ export interface CliniquePayload {
     code_postal: string;
     lat?: number;
     long?: number;
+    telephone?: string;
+    courriel?: string;
 }
 
 /* ------------------------------------------------------------------ */

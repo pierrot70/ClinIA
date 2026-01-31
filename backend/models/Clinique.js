@@ -33,6 +33,17 @@ const CliniqueSchema = new mongoose.Schema(
         long: {
             type: Number,
         },
+        telephone: {
+            type: String,
+            trim: true,
+            default: undefined,
+        },
+        courriel: {
+            type: String,
+            trim: true,
+            lowercase: true,
+            default: undefined,
+        },
     },
     {
         timestamps: true,

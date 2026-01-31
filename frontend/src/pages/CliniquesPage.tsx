@@ -62,6 +62,8 @@ export function CliniquesPage() {
         code_postal: "",
         lat: "",
         long: "",
+        telephone: "",
+        courriel: "",
     });
 
     useEffect(() => {
@@ -116,6 +118,8 @@ export function CliniquesPage() {
             code_postal: "",
             lat: "",
             long: "",
+            telephone: "",
+            courriel: "",
         });
     }
 
@@ -180,6 +184,14 @@ export function CliniquesPage() {
             payload.long = longValue;
         }
 
+        if (form.telephone.trim()) {
+            payload.telephone = form.telephone.trim();
+        }
+
+        if (form.courriel.trim()) {
+            payload.courriel = form.courriel.trim().toLowerCase();
+        }
+
         return payload;
     }
 
@@ -222,6 +234,8 @@ export function CliniquesPage() {
             code_postal: clinique.code_postal,
             lat: clinique.lat?.toString() ?? "",
             long: clinique.long?.toString() ?? "",
+            telephone: clinique.telephone ?? "",
+            courriel: clinique.courriel ?? "",
         });
     }
 
@@ -325,6 +339,8 @@ export function CliniquesPage() {
                                 <th className="px-3 py-2">Nom</th>
                                 <th className="px-3 py-2">Adresse</th>
                                 <th className="px-3 py-2">Code postal</th>
+                                <th className="px-3 py-2">Téléphone</th>
+                                <th className="px-3 py-2">Courriel</th>
                                 <th className="px-3 py-2">Latitude</th>
                                 <th className="px-3 py-2">Longitude</th>
                                 <th className="px-3 py-2">Actions</th>
@@ -334,7 +350,7 @@ export function CliniquesPage() {
                             {cliniques.length === 0 && !loading ? (
                                 <tr>
                                     <td
-                                        colSpan={6}
+                                        colSpan={8}
                                         className="px-3 py-6 text-center text-sm text-gray-500"
                                     >
                                         Aucune clinique trouvée.
@@ -352,6 +368,12 @@ export function CliniquesPage() {
                                     </td>
                                     <td className="px-3 py-3">
                                         {clinique.code_postal}
+                                    </td>
+                                    <td className="px-3 py-3">
+                                        {clinique.telephone ?? "-"}
+                                    </td>
+                                    <td className="px-3 py-3">
+                                        {clinique.courriel ?? "-"}
                                     </td>
                                     <td className="px-3 py-3">
                                         {clinique.lat ?? "-"}
@@ -480,6 +502,34 @@ export function CliniquesPage() {
                                 setForm((prev) => ({
                                     ...prev,
                                     code_postal: event.target.value,
+                                }))
+                            }
+                            className="mt-1 w-full rounded border border-gray-200 px-3 py-2 text-sm"
+                        />
+                    </label>
+                    <label className="text-sm text-gray-700">
+                        Téléphone
+                        <input
+                            type="text"
+                            value={form.telephone}
+                            onChange={(event) =>
+                                setForm((prev) => ({
+                                    ...prev,
+                                    telephone: event.target.value,
+                                }))
+                            }
+                            className="mt-1 w-full rounded border border-gray-200 px-3 py-2 text-sm"
+                        />
+                    </label>
+                    <label className="text-sm text-gray-700">
+                        Courriel
+                        <input
+                            type="email"
+                            value={form.courriel}
+                            onChange={(event) =>
+                                setForm((prev) => ({
+                                    ...prev,
+                                    courriel: event.target.value,
                                 }))
                             }
                             className="mt-1 w-full rounded border border-gray-200 px-3 py-2 text-sm"

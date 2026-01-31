@@ -28,6 +28,20 @@ function normalizePostalCode(value) {
     return value?.trim().toUpperCase() || undefined;
 }
 
+function normalizeOptionalString(value) {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === "string") {
+        const trimmed = value.trim();
+        return trimmed === "" ? undefined : trimmed;
+    }
+    return undefined;
+}
+
+function normalizeEmail(value) {
+    const normalized = normalizeOptionalString(value);
+    return normalized ? normalized.toLowerCase() : undefined;
+}
+
 export function toCreateCliniqueDTO(body) {
     return {
         nom: body.nom?.trim(),
@@ -36,6 +50,8 @@ export function toCreateCliniqueDTO(body) {
         code_postal: normalizePostalCode(body.code_postal),
         lat: parseCoordinate(body.lat),
         long: parseCoordinate(body.long),
+        telephone: normalizeOptionalString(body.telephone),
+        courriel: normalizeEmail(body.courriel),
     };
 }
 
@@ -59,6 +75,12 @@ export function toUpdateCliniqueDTO(body) {
     }
     if (body.long !== undefined) {
         dto.long = parseCoordinate(body.long);
+    }
+    if (body.telephone !== undefined) {
+        dto.telephone = normalizeOptionalString(body.telephone);
+    }
+    if (body.courriel !== undefined) {
+        dto.courriel = normalizeEmail(body.courriel);
     }
 
     return dto;

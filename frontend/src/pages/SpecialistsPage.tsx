@@ -519,6 +519,12 @@ export function SpecialistsPage() {
                             <th className="text-left p-2">
                                 Clinique
                             </th>
+                            <th className="text-left p-2">
+                                Téléphone clinique
+                            </th>
+                            <th className="text-left p-2">
+                                Courriel clinique
+                            </th>
                             <th className="text-left p-2">Actions</th>
                         </tr>
                     </thead>
@@ -527,7 +533,7 @@ export function SpecialistsPage() {
                             <tr>
                                 <td
                                     className="p-2 text-gray-500"
-                                    colSpan={8}
+                                    colSpan={10}
                                 >
                                     Chargement…
                                 </td>
@@ -537,7 +543,7 @@ export function SpecialistsPage() {
                             <tr>
                                 <td
                                     className="p-2 text-gray-500"
-                                    colSpan={8}
+                                    colSpan={10}
                                 >
                                     Aucun spécialiste trouvé.
                                 </td>
@@ -554,6 +560,10 @@ export function SpecialistsPage() {
                                 sp.specialite?.trim() || "—";
                             const clinicLabel =
                                 associatedClinique?.nom || "—";
+                            const clinicTelephone =
+                                associatedClinique?.telephone || "—";
+                            const clinicCourriel =
+                                associatedClinique?.courriel || "—";
 
                             return (
                                 <tr
@@ -582,6 +592,12 @@ export function SpecialistsPage() {
                                     </td>
                                     <td className="p-2">
                                         {clinicLabel}
+                                    </td>
+                                    <td className="p-2">
+                                        {clinicTelephone}
+                                    </td>
+                                    <td className="p-2">
+                                        {clinicCourriel}
                                     </td>
                                     <td className="p-2 flex gap-2">
                                         <button
