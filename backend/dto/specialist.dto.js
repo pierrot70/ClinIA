@@ -22,6 +22,15 @@ function normalizeCliniqueAssocier(value) {
     return value;
 }
 
+function normalizeSpecialite(value) {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === "string") {
+        const trimmed = value.trim();
+        return trimmed === "" ? undefined : trimmed;
+    }
+    return undefined;
+}
+
 export function toCreateSpecialistDTO(body) {
     const telephoneRaw = body.telephone?.trim();
 
@@ -38,6 +47,7 @@ export function toCreateSpecialistDTO(body) {
         clinique_associer: normalizeCliniqueAssocier(
             body.clinique_associer
         ),
+        specialite: normalizeSpecialite(body.specialite),
     };
 }
 
@@ -62,6 +72,8 @@ export function toUpdateSpecialistDTO(body) {
         dto.clinique_associer = normalizeCliniqueAssocier(
             body.clinique_associer
         );
+    if (body.specialite !== undefined)
+        dto.specialite = normalizeSpecialite(body.specialite);
 
     return dto;
 }

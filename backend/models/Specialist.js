@@ -23,6 +23,11 @@ const SpecialistSchema = new mongoose.Schema(
             index: true,
             trim: true,
         },
+        specialite: {
+            type: String,
+            trim: true,
+            default: undefined,
+        },
         telephone: {
             type: String,
             trim: true,

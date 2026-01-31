@@ -9,20 +9,7 @@ import {
     type Patient,
 } from "../services/patientsApi";
 import type { ApiError } from "../types/api";
-
-/* ------------------------------------------------------------------ */
-/* Constantes                                                          */
-/* ------------------------------------------------------------------ */
-
-const SPECIALISTS = [
-    "Ophtalmologue",
-    "Cardiologue",
-    "Pneumologue",
-    "Neurologue",
-    "Endocrinologue",
-    "Néphrologue",
-    "Rhumatologue",
-];
+import { SPECIALTIES } from "../data/specialties";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -364,9 +351,9 @@ export function AppointmentsPage() {
                     onChange={(e) => setSpecialist(e.target.value)}
                 >
                     <option value="">Choisir un spécialiste *</option>
-                    {SPECIALISTS.map((s) => (
-                        <option key={s} value={s}>
-                            {s}
+                    {SPECIALTIES.map((specialite) => (
+                        <option key={specialite} value={specialite}>
+                            {specialite}
                         </option>
                     ))}
                 </select>

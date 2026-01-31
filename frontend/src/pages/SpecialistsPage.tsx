@@ -13,6 +13,7 @@ import {
     Clinique,
     fetchCliniquesPaginated,
 } from "../services/cliniqueApi";
+import { SPECIALTIES } from "../data/specialties";
 
 export function SpecialistsPage() {
     const [specialists, setSpecialists] = useState<Specialist[]>([]);
@@ -28,6 +29,13 @@ export function SpecialistsPage() {
     const [cliniqueOptions, setCliniqueOptions] = useState<Clinique[]>(
         []
     );
+    const cliniqueMap = useMemo(() => {
+        const map: Record<string, Clinique> = {};
+        cliniqueOptions.forEach((clinique) => {
+            map[clinique._id] = clinique;
+        });
+        return map;
+    }, [cliniqueOptions]);
     const [highlightedId, setHighlightedId] = useState<string | null>(null);
     const highlightTimeoutRef = useRef<
         ReturnType<typeof setTimeout> | null
@@ -70,6 +78,7 @@ export function SpecialistsPage() {
         email: "",
         texto: false,
         clinique_associer: "",
+        specialite: "",
     });
 
     useEffect(() => {
@@ -165,6 +174,7 @@ export function SpecialistsPage() {
             email: "",
             texto: false,
             clinique_associer: "",
+            specialite: "",
         });
     }
 
@@ -186,6 +196,11 @@ export function SpecialistsPage() {
             payload.clinique_associer = values.clinique_associer.trim();
         } else if (values.clinique_associer === "") {
             payload.clinique_associer = undefined;
+        }
+        if (values.specialite.trim()) {
+            payload.specialite = values.specialite.trim();
+        } else if (values.specialite === "") {
+            payload.specialite = undefined;
         }
 
         return payload;
@@ -247,6 +262,7 @@ export function SpecialistsPage() {
                 typeof specialist.clinique_associer === "string"
                     ? specialist.clinique_associer
                     : specialist.clinique_associer?.toString() ?? "",
+            specialite: specialist.specialite ?? "",
         });
     }
 
@@ -366,6 +382,26 @@ export function SpecialistsPage() {
                             </option>
                         ))}
                     </select>
+                    <select
+                        className="border rounded p-2"
+                        value={form.specialite}
+                        onChange={(event) =>
+                            setForm((p) => ({
+                                ...p,
+                                specialite: event.target.value,
+                            }))
+                        }
+                    >
+                        <option value="">Aucune spécialité</option>
+                        {SPECIALTIES.map((specialite) => (
+                            <option
+                                key={specialite}
+                                value={specialite}
+                            >
+                                {specialite}
+                            </option>
+                        ))}
+                    </select>
                 </div>
 
                 <label className="flex items-center gap-2 text-sm">
@@ -475,6 +511,9 @@ export function SpecialistsPage() {
                             <th className="text-left p-2">
                                 Numéro médecin
                             </th>
+                            <th className="text-left p-2">
+                                Spécialité
+                            </th>
                             <th className="text-left p-2">Téléphone</th>
                             <th className="text-left p-2">Courriel</th>
                             <th className="text-left p-2">
@@ -488,7 +527,7 @@ export function SpecialistsPage() {
                             <tr>
                                 <td
                                     className="p-2 text-gray-500"
-                                    colSpan={7}
+                                    colSpan={8}
                                 >
                                     Chargement…
                                 </td>
@@ -498,66 +537,76 @@ export function SpecialistsPage() {
                             <tr>
                                 <td
                                     className="p-2 text-gray-500"
-                                    colSpan={7}
+                                    colSpan={8}
                                 >
                                     Aucun spécialiste trouvé.
                                 </td>
                             </tr>
                         )}
-                        {!loading &&
-                            specialists.map((sp) => {
-                                const isRowHighlighted =
-                                    highlightedId === sp._id;
+                    {!loading &&
+                        specialists.map((sp) => {
+                            const isRowHighlighted =
+                                highlightedId === sp._id;
+                            const associatedClinique = sp.clinique_associer
+                                ? cliniqueMap[sp.clinique_associer]
+                                : undefined;
+                            const specialtyLabel =
+                                sp.specialite?.trim() || "—";
+                            const clinicLabel =
+                                associatedClinique?.nom || "—";
 
-                                return (
-                                    <tr
-                                        key={sp._id}
-                                        className={`border-t ${
-                                            isRowHighlighted
-                                                ? "bg-gradient-to-r from-emerald-50 via-white to-white border border-emerald-200 shadow-inner"
-                                                : ""
-                                        }`}
-                                    >
-                                        <td className="p-2">
-                                            {sp.prenom}
-                                        </td>
-                                        <td className="p-2">{sp.nom}</td>
-                                        <td className="p-2">
-                                            {sp.numero_medecin}
-                                        </td>
-                                        <td className="p-2">
-                                            {sp.telephone || "—"}
-                                        </td>
-                                        <td className="p-2">
-                                            {sp.email || "—"}
-                                        </td>
-                                        <td className="p-2">
-                                            {sp.clinique_associer || "—"}
-                                        </td>
-                                        <td className="p-2 flex gap-2">
-                                            <button
-                                                className="px-2 py-1 border rounded"
-                                                type="button"
-                                                onClick={() =>
-                                                    handleEdit(sp)
-                                                }
-                                            >
-                                                Éditer
-                                            </button>
-                                            <button
-                                                className="px-2 py-1 border rounded text-red-600"
-                                                type="button"
-                                                disabled={busyIds[sp._id]}
-                                                onClick={() =>
-                                                    handleDelete(sp._id)
-                                                }
-                                            >
-                                                Supprimer
-                                            </button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
+                            return (
+                                <tr
+                                    key={sp._id}
+                                    className={`border-t ${
+                                        isRowHighlighted
+                                            ? "bg-gradient-to-r from-emerald-50 via-white to-white border border-emerald-200 shadow-inner"
+                                            : ""
+                                    }`}
+                                >
+                                    <td className="p-2">
+                                        {sp.prenom}
+                                    </td>
+                                    <td className="p-2">{sp.nom}</td>
+                                    <td className="p-2">
+                                        {sp.numero_medecin}
+                                    </td>
+                                    <td className="p-2">
+                                        {specialtyLabel}
+                                    </td>
+                                    <td className="p-2">
+                                        {sp.telephone || "—"}
+                                    </td>
+                                    <td className="p-2">
+                                        {sp.email || "—"}
+                                    </td>
+                                    <td className="p-2">
+                                        {clinicLabel}
+                                    </td>
+                                    <td className="p-2 flex gap-2">
+                                        <button
+                                            className="px-2 py-1 border rounded"
+                                            type="button"
+                                            onClick={() =>
+                                                handleEdit(sp)
+                                            }
+                                        >
+                                            Éditer
+                                        </button>
+                                        <button
+                                            className="px-2 py-1 border rounded text-red-600"
+                                            type="button"
+                                            disabled={busyIds[sp._id]}
+                                            onClick={() =>
+                                                handleDelete(sp._id)
+                                            }
+                                        >
+                                            Supprimer
+                                        </button>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
