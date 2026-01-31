@@ -78,6 +78,7 @@ export function SpecialistsPage() {
         clinique_associer: "",
         specialite: "",
     });
+    const [viewMode, setViewMode] = useState<"create" | "list">("list");
 
     useEffect(() => {
         void loadSpecialists();
@@ -269,6 +270,7 @@ export function SpecialistsPage() {
     }
 
     async function handleEdit(specialist: Specialist) {
+        setViewMode("create");
         setEditingId(specialist._id);
         const clinicId =
             typeof specialist.clinique_associer === "string"
@@ -317,136 +319,29 @@ export function SpecialistsPage() {
         <div className="max-w-6xl mx-auto p-6 space-y-6">
             <h1 className="text-2xl font-semibold">Spécialistes</h1>
 
-            <div
-                className={`grid grid-cols-1 gap-4 border rounded p-4 transition duration-150 ${
-                    editingId
-                        ? "bg-gradient-to-r from-yellow-50 via-white to-white border-yellow-300 shadow-sm"
-                        : "bg-gray-50 border-gray-200"
-                }`}
-            >
-                <div className="text-sm font-medium">
-                    {editingId
-                        ? "Modifier un spécialiste"
-                        : "Créer un spécialiste"}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Prénom *"
-                        value={form.prenom}
-                        onChange={(e) =>
-                            setForm((p) => ({
-                                ...p,
-                                prenom: e.target.value,
-                            }))
-                        }
-                    />
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Nom *"
-                        value={form.nom}
-                        onChange={(e) =>
-                            setForm((p) => ({
-                                ...p,
-                                nom: e.target.value,
-                            }))
-                        }
-                    />
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Numéro de médecin *"
-                        value={form.numero_medecin}
-                        onChange={(e) =>
-                            setForm((p) => ({
-                                ...p,
-                                numero_medecin: e.target.value,
-                            }))
-                        }
-                    />
-                    <input
-                        className="border rounded p-2 bg-gray-50"
-                        placeholder="Téléphone (automatique)"
-                        value={form.telephone}
-                        readOnly
-                    />
-                    <input
-                        className="border rounded p-2 bg-gray-50"
-                        placeholder="Courriel (automatique)"
-                        value={form.email}
-                        readOnly
-                    />
-                    <select
-                        className="border rounded p-2"
-                        value={form.clinique_associer}
-                        onChange={(event) =>
-                            handleCliniqueSelection(event.target.value)
-                        }
-                    >
-                        <option value="">Aucune clinique</option>
-                        {cliniqueOptions.map((clinique) => (
-                            <option
-                                key={clinique._id}
-                                value={clinique._id}
-                            >
-                                {clinique.nom}{" "}
-                                {clinique.rue &&
-                                    `(${clinique.rue})`}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        className="border rounded p-2"
-                        value={form.specialite}
-                        onChange={(event) =>
-                            setForm((p) => ({
-                                ...p,
-                                specialite: event.target.value,
-                            }))
-                        }
-                    >
-                        <option value="">Aucune spécialité</option>
-                        {SPECIALTIES.map((specialite) => (
-                            <option
-                                key={specialite}
-                                value={specialite}
-                            >
-                                {specialite}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                <label className="flex items-center gap-2 text-sm">
-                    <input
-                        type="checkbox"
-                        checked={form.texto}
-                        onChange={(e) =>
-                            setForm((p) => ({
-                                ...p,
-                                texto: e.target.checked,
-                            }))
-                        }
-                    />
-                    SMS activé
-                </label>
-
-                <div className="flex gap-2">
-                    <button
-                        onClick={handleSubmit}
-                        className="px-4 py-2 bg-primary text-white rounded"
-                    >
-                        {editingId ? "Enregistrer" : "Créer"}
-                    </button>
-                    {editingId && (
-                        <button
-                            onClick={resetForm}
-                            className="px-4 py-2 border rounded"
-                        >
-                            Annuler
-                        </button>
-                    )}
-                </div>
+            <div className="flex flex-wrap gap-2">
+                <button
+                    type="button"
+                    className={`px-4 py-2 rounded border font-semibold transition ${
+                        viewMode === "create"
+                            ? "bg-primary text-white border-primary"
+                            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                    }`}
+                    onClick={() => setViewMode("create")}
+                >
+                    Créer un spécialiste
+                </button>
+                <button
+                    type="button"
+                    className={`px-4 py-2 rounded border font-semibold transition ${
+                        viewMode === "list"
+                            ? "bg-primary text-white border-primary"
+                            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                    }`}
+                    onClick={() => setViewMode("list")}
+                >
+                    Rechercher les spécialistes
+                </button>
             </div>
 
             {error && (
@@ -455,206 +350,355 @@ export function SpecialistsPage() {
                 </div>
             )}
 
-            <div className="border rounded p-4 space-y-3">
-                <div className="text-sm font-medium">Recherche</div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Nom"
-                        value={filterNom}
-                        onChange={(e) => {
-                            setPage(1);
-                            setFilterNom(e.target.value);
-                        }}
-                    />
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Prénom"
-                        value={filterPrenom}
-                        onChange={(e) => {
-                            setPage(1);
-                            setFilterPrenom(e.target.value);
-                        }}
-                    />
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Numéro de médecin"
-                        value={filterNumero}
-                        onChange={(e) => {
-                            setPage(1);
-                            setFilterNumero(e.target.value);
-                        }}
-                    />
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Téléphone"
-                        value={filterTelephone}
-                        onChange={(e) => {
-                            setPage(1);
-                            setFilterTelephone(e.target.value);
-                        }}
-                    />
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Courriel"
-                        value={filterEmail}
-                        onChange={(e) => {
-                            setPage(1);
-                            setFilterEmail(e.target.value);
-                        }}
-                    />
-                    <input
-                        className="border rounded p-2"
-                        placeholder="Clinique associée (ID)"
-                        value={filterClinique}
-                        onChange={(e) => {
-                            setPage(1);
-                            setFilterClinique(e.target.value);
-                        }}
-                    />
-                </div>
-            </div>
+            {viewMode === "create" && (
+                <div
+                    className={`grid grid-cols-1 gap-4 border rounded p-4 transition duration-150 ${
+                        editingId
+                            ? "bg-gradient-to-r from-yellow-50 via-white to-white border-yellow-300 shadow-sm"
+                            : "bg-gray-50 border-gray-200"
+                    }`}
+                >
+                    <div className="text-sm font-medium">
+                        {editingId
+                            ? "Modifier un spécialiste"
+                            : "Créer un spécialiste"}
+                    </div>
 
-            <div className="border rounded overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-gray-100 text-gray-700">
-                        <tr>
-                            <th className="text-left p-2">Prénom</th>
-                            <th className="text-left p-2">Nom</th>
-                            <th className="text-left p-2">
-                                Numéro médecin
-                            </th>
-                            <th className="text-left p-2">
-                                Spécialité
-                            </th>
-                            <th className="text-left p-2">
-                                Clinique
-                            </th>
-                            <th className="text-left p-2">
-                                Téléphone clinique
-                            </th>
-                            <th className="text-left p-2">
-                                Courriel clinique
-                            </th>
-                            <th className="text-left p-2">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading && (
-                            <tr>
-                                    <td
-                                        className="p-2 text-gray-500"
-                                        colSpan={8}
-                                    >
-                                        Chargement…
-                                    </td>
-                                </tr>
-                            )}
-                            {!loading && specialists.length === 0 && (
-                                <tr>
-                                    <td
-                                        className="p-2 text-gray-500"
-                                        colSpan={8}
-                                    >
-                                        Aucun spécialiste trouvé.
-                                    </td>
-                                </tr>
-                            )}
-                    {!loading &&
-                        specialists.map((sp) => {
-                            const isRowHighlighted =
-                                highlightedId === sp._id;
-                            const associatedClinique = sp.clinique_associer
-                                ? cliniqueMap[sp.clinique_associer]
-                                : undefined;
-                            const specialtyLabel =
-                                sp.specialite?.trim() || "—";
-                            const clinicLabel =
-                                associatedClinique?.nom || "—";
-                            const clinicTelephone =
-                                associatedClinique?.telephone || "—";
-                            const clinicCourriel =
-                                associatedClinique?.courriel || "—";
-
-                            return (
-                                <tr
-                                    key={sp._id}
-                                    className={`border-t ${
-                                        isRowHighlighted
-                                            ? "bg-gradient-to-r from-emerald-50 via-white to-white border border-emerald-200 shadow-inner"
-                                            : ""
-                                    }`}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <input
+                            className="border rounded p-2"
+                            placeholder="Prénom *"
+                            value={form.prenom}
+                            onChange={(e) =>
+                                setForm((p) => ({
+                                    ...p,
+                                    prenom: e.target.value,
+                                }))
+                            }
+                        />
+                        <input
+                            className="border rounded p-2"
+                            placeholder="Nom *"
+                            value={form.nom}
+                            onChange={(e) =>
+                                setForm((p) => ({
+                                    ...p,
+                                    nom: e.target.value,
+                                }))
+                            }
+                        />
+                        <input
+                            className="border rounded p-2"
+                            placeholder="Numéro de médecin *"
+                            value={form.numero_medecin}
+                            onChange={(e) =>
+                                setForm((p) => ({
+                                    ...p,
+                                    numero_medecin: e.target.value,
+                                }))
+                            }
+                        />
+                        <input
+                            className="border rounded p-2 bg-gray-50"
+                            placeholder="Téléphone (automatique)"
+                            value={form.telephone}
+                            readOnly
+                        />
+                        <input
+                            className="border rounded p-2 bg-gray-50"
+                            placeholder="Courriel (automatique)"
+                            value={form.email}
+                            readOnly
+                        />
+                        <select
+                            className="border rounded p-2"
+                            value={form.clinique_associer}
+                            onChange={(event) =>
+                                handleCliniqueSelection(
+                                    event.target.value
+                                )
+                            }
+                        >
+                            <option value="">Aucune clinique</option>
+                            {cliniqueOptions.map((clinique) => (
+                                <option
+                                    key={clinique._id}
+                                    value={clinique._id}
                                 >
-                                    <td className="p-2">
-                                        {sp.prenom}
-                                    </td>
-                                    <td className="p-2">{sp.nom}</td>
-                                    <td className="p-2">
-                                        {sp.numero_medecin}
-                                    </td>
-                                    <td className="p-2">
-                                        {specialtyLabel}
-                                    </td>
-                                    <td className="p-2">
-                                        {clinicLabel}
-                                    </td>
-                                    <td className="p-2">
-                                        {clinicTelephone}
-                                    </td>
-                                    <td className="p-2">
-                                        {clinicCourriel}
-                                    </td>
-                                    <td className="p-2 flex gap-2">
-                                        <button
-                                            className="px-2 py-1 border rounded"
-                                            type="button"
-                                            onClick={() =>
-                                                handleEdit(sp)
-                                            }
-                                        >
-                                            Éditer
-                                        </button>
-                                        <button
-                                            className="px-2 py-1 border rounded text-red-600"
-                                            type="button"
-                                            disabled={busyIds[sp._id]}
-                                            onClick={() =>
-                                                handleDelete(sp._id)
-                                            }
-                                        >
-                                            Supprimer
-                                        </button>
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
+                                    {clinique.nom}{" "}
+                                    {clinique.rue &&
+                                        `(${clinique.rue})`}
+                                </option>
+                            ))}
+                        </select>
+                        <select
+                            className="border rounded p-2"
+                            value={form.specialite}
+                            onChange={(event) =>
+                                setForm((p) => ({
+                                    ...p,
+                                    specialite: event.target.value,
+                                }))
+                            }
+                        >
+                            <option value="">Aucune spécialité</option>
+                            {SPECIALTIES.map((specialite) => (
+                                <option
+                                    key={specialite}
+                                    value={specialite}
+                                >
+                                    {specialite}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
-            <div className="flex items-center gap-3">
-                <button
-                    className="px-3 py-1 border rounded"
-                    disabled={page <= 1}
-                    onClick={() =>
-                        setPage((p) => Math.max(p - 1, 1))
-                    }
-                >
-                    Précédent
-                </button>
-                <span className="text-sm text-gray-600">
-                    Page {page} / {totalPages}
-                </span>
-                <button
-                    className="px-3 py-1 border rounded"
-                    disabled={page >= totalPages}
-                    onClick={() =>
-                        setPage((p) => Math.min(p + 1, totalPages))
-                    }
-                >
-                    Suivant
-                </button>
-            </div>
+                    <label className="flex items-center gap-2 text-sm">
+                        <input
+                            type="checkbox"
+                            checked={form.texto}
+                            onChange={(e) =>
+                                setForm((p) => ({
+                                    ...p,
+                                    texto: e.target.checked,
+                                }))
+                            }
+                        />
+                        SMS activé
+                    </label>
+
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleSubmit}
+                            className="px-4 py-2 bg-primary text-white rounded"
+                        >
+                            {editingId ? "Enregistrer" : "Créer"}
+                        </button>
+                        {editingId && (
+                            <button
+                                onClick={resetForm}
+                                className="px-4 py-2 border rounded"
+                            >
+                                Annuler
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {viewMode === "list" && (
+                <div className="space-y-4">
+                    <div className="border rounded p-4 space-y-3">
+                        <div className="text-sm font-medium">
+                            Recherche
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                            <input
+                                className="border rounded p-2"
+                                placeholder="Nom"
+                                value={filterNom}
+                                onChange={(e) => {
+                                    setPage(1);
+                                    setFilterNom(e.target.value);
+                                }}
+                            />
+                            <input
+                                className="border rounded p-2"
+                                placeholder="Prénom"
+                                value={filterPrenom}
+                                onChange={(e) => {
+                                    setPage(1);
+                                    setFilterPrenom(e.target.value);
+                                }}
+                            />
+                            <input
+                                className="border rounded p-2"
+                                placeholder="Numéro de médecin"
+                                value={filterNumero}
+                                onChange={(e) => {
+                                    setPage(1);
+                                    setFilterNumero(e.target.value);
+                                }}
+                            />
+                            <input
+                                className="border rounded p-2"
+                                placeholder="Téléphone"
+                                value={filterTelephone}
+                                onChange={(e) => {
+                                    setPage(1);
+                                    setFilterTelephone(
+                                        e.target.value
+                                    );
+                                }}
+                            />
+                            <input
+                                className="border rounded p-2"
+                                placeholder="Courriel"
+                                value={filterEmail}
+                                onChange={(e) => {
+                                    setPage(1);
+                                    setFilterEmail(e.target.value);
+                                }}
+                            />
+                            <input
+                                className="border rounded p-2"
+                                placeholder="Clinique associée (ID)"
+                                value={filterClinique}
+                                onChange={(e) => {
+                                    setPage(1);
+                                    setFilterClinique(e.target.value);
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="border rounded overflow-hidden">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-100 text-gray-700">
+                                <tr>
+                                    <th className="text-left p-2">
+                                        Prénom
+                                    </th>
+                                    <th className="text-left p-2">
+                                        Nom
+                                    </th>
+                                    <th className="text-left p-2">
+                                        Numéro médecin
+                                    </th>
+                                    <th className="text-left p-2">
+                                        Spécialité
+                                    </th>
+                                    <th className="text-left p-2">
+                                        Clinique
+                                    </th>
+                                    <th className="text-left p-2">
+                                        Actions
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {loading && (
+                                    <tr>
+                                        <td
+                                            className="p-2 text-gray-500"
+                                            colSpan={6}
+                                        >
+                                            Chargement…
+                                        </td>
+                                    </tr>
+                                )}
+                                {!loading &&
+                                    specialists.length === 0 && (
+                                        <tr>
+                                            <td
+                                                className="p-2 text-gray-500"
+                                                colSpan={6}
+                                            >
+                                                Aucun spécialiste
+                                                trouvé.
+                                            </td>
+                                        </tr>
+                                    )}
+                                {!loading &&
+                                    specialists.map((sp) => {
+                                        const isRowHighlighted =
+                                            highlightedId === sp._id;
+                                        const associatedClinique = sp.clinique_associer
+                                            ? cliniqueMap[
+                                                  sp.clinique_associer
+                                              ]
+                                            : undefined;
+                                        const specialtyLabel =
+                                            sp.specialite?.trim() || "—";
+                                        const clinicLabel =
+                                            associatedClinique?.nom ||
+                                            "—";
+
+                                        return (
+                                            <tr
+                                                key={sp._id}
+                                                className={`border-t ${
+                                                    isRowHighlighted
+                                                        ? "bg-gradient-to-r from-emerald-50 via-white to-white border border-emerald-200 shadow-inner"
+                                                        : ""
+                                                }`}
+                                            >
+                                                <td className="p-2">
+                                                    {sp.prenom}
+                                                </td>
+                                                <td className="p-2">
+                                                    {sp.nom}
+                                                </td>
+                                                <td className="p-2">
+                                                    {sp.numero_medecin}
+                                                </td>
+                                                <td className="p-2">
+                                                    {specialtyLabel}
+                                                </td>
+                                                <td className="p-2">
+                                                    {clinicLabel}
+                                                </td>
+                                                <td className="p-2 flex gap-2">
+                                                    <button
+                                                        className="px-2 py-1 border rounded"
+                                                        type="button"
+                                                        onClick={() =>
+                                                            handleEdit(sp)
+                                                        }
+                                                    >
+                                                        Éditer
+                                                    </button>
+                                                    <button
+                                                        className="px-2 py-1 border rounded text-red-600"
+                                                        type="button"
+                                                        disabled={
+                                                            busyIds[
+                                                                sp._id
+                                                            ]
+                                                        }
+                                                        onClick={() =>
+                                                            handleDelete(
+                                                                sp._id
+                                                            )
+                                                        }
+                                                    >
+                                                        Supprimer
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <button
+                            className="px-3 py-1 border rounded"
+                            disabled={page <= 1}
+                            onClick={() =>
+                                setPage((p) => Math.max(p - 1, 1))
+                            }
+                        >
+                            Précédent
+                        </button>
+                        <span className="text-sm text-gray-600">
+                            Page {page} / {totalPages}
+                        </span>
+                        <button
+                            className="px-3 py-1 border rounded"
+                            disabled={page >= totalPages}
+                            onClick={() =>
+                                setPage((p) =>
+                                    Math.min(p + 1, totalPages)
+                                )
+                            }
+                        >
+                            Suivant
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -1,5 +1,5 @@
 export const SPECIALTIES = [
-    "Médecin de famille",
+    "Medecin de famille",
     "Ophtalmologue",
     "Cardiologue",
     "Pneumologue",
