@@ -26,9 +26,7 @@ export function SpecialistsPage() {
     const limit = 10;
 
 
-    const [cliniqueOptions, setCliniqueOptions] = useState<Clinique[]>(
-        []
-    );
+    const [cliniqueOptions, setCliniqueOptions] = useState<Clinique[]>([]);
     const cliniqueMap = useMemo(() => {
         const map: Record<string, Clinique> = {};
         cliniqueOptions.forEach((clinique) => {
@@ -89,6 +87,14 @@ export function SpecialistsPage() {
     useEffect(() => {
         void loadCliniqueOptions();
     }, []);
+
+    function getClinicContacts(clinicId?: string) {
+        const clinic = clinicId ? cliniqueMap[clinicId] : undefined;
+        return {
+            telephone: clinic?.telephone ?? "",
+            email: clinic?.courriel ?? "",
+        };
+    }
 
     async function loadSpecialists() {
         setLoading(true);
@@ -178,6 +184,19 @@ export function SpecialistsPage() {
         });
     }
 
+    function handleCliniqueSelection(value: string) {
+        const { telephone, email } = getClinicContacts(
+            value || undefined
+        );
+
+        setForm((prev) => ({
+            ...prev,
+            clinique_associer: value,
+            telephone,
+            email,
+        }));
+    }
+
     function toPayload(values: typeof form): SpecialistPayload {
         const payload: SpecialistPayload = {
             nom: values.nom.trim(),
@@ -251,12 +270,20 @@ export function SpecialistsPage() {
 
     async function handleEdit(specialist: Specialist) {
         setEditingId(specialist._id);
+        const clinicId =
+            typeof specialist.clinique_associer === "string"
+                ? specialist.clinique_associer
+                : specialist.clinique_associer?.toString() ?? "";
+        const clinicContacts = getClinicContacts(clinicId || undefined);
+        const telephoneValue =
+            clinicContacts.telephone || specialist.telephone || "";
+        const emailValue = clinicContacts.email || specialist.email || "";
         setForm({
             nom: specialist.nom ?? "",
             prenom: specialist.prenom ?? "",
             numero_medecin: specialist.numero_medecin ?? "",
-            telephone: specialist.telephone ?? "",
-            email: specialist.email ?? "",
+            telephone: telephoneValue,
+            email: emailValue,
             texto: Boolean(specialist.texto),
             clinique_associer:
                 typeof specialist.clinique_associer === "string"
@@ -338,36 +365,22 @@ export function SpecialistsPage() {
                         }
                     />
                     <input
-                        className="border rounded p-2"
-                        placeholder="Téléphone"
+                        className="border rounded p-2 bg-gray-50"
+                        placeholder="Téléphone (automatique)"
                         value={form.telephone}
-                        onChange={(e) =>
-                            setForm((p) => ({
-                                ...p,
-                                telephone: e.target.value,
-                            }))
-                        }
+                        readOnly
                     />
                     <input
-                        className="border rounded p-2"
-                        placeholder="Courriel"
+                        className="border rounded p-2 bg-gray-50"
+                        placeholder="Courriel (automatique)"
                         value={form.email}
-                        onChange={(e) =>
-                            setForm((p) => ({
-                                ...p,
-                                email: e.target.value,
-                            }))
-                        }
+                        readOnly
                     />
                     <select
                         className="border rounded p-2"
                         value={form.clinique_associer}
                         onChange={(event) =>
-                            setForm((p) => ({
-                                ...p,
-                                clinique_associer:
-                                    event.target.value,
-                            }))
+                            handleCliniqueSelection(event.target.value)
                         }
                     >
                         <option value="">Aucune clinique</option>
@@ -514,8 +527,6 @@ export function SpecialistsPage() {
                             <th className="text-left p-2">
                                 Spécialité
                             </th>
-                            <th className="text-left p-2">Téléphone</th>
-                            <th className="text-left p-2">Courriel</th>
                             <th className="text-left p-2">
                                 Clinique
                             </th>
@@ -531,24 +542,24 @@ export function SpecialistsPage() {
                     <tbody>
                         {loading && (
                             <tr>
-                                <td
-                                    className="p-2 text-gray-500"
-                                    colSpan={10}
-                                >
-                                    Chargement…
-                                </td>
-                            </tr>
-                        )}
-                        {!loading && specialists.length === 0 && (
-                            <tr>
-                                <td
-                                    className="p-2 text-gray-500"
-                                    colSpan={10}
-                                >
-                                    Aucun spécialiste trouvé.
-                                </td>
-                            </tr>
-                        )}
+                                    <td
+                                        className="p-2 text-gray-500"
+                                        colSpan={8}
+                                    >
+                                        Chargement…
+                                    </td>
+                                </tr>
+                            )}
+                            {!loading && specialists.length === 0 && (
+                                <tr>
+                                    <td
+                                        className="p-2 text-gray-500"
+                                        colSpan={8}
+                                    >
+                                        Aucun spécialiste trouvé.
+                                    </td>
+                                </tr>
+                            )}
                     {!loading &&
                         specialists.map((sp) => {
                             const isRowHighlighted =
@@ -583,12 +594,6 @@ export function SpecialistsPage() {
                                     </td>
                                     <td className="p-2">
                                         {specialtyLabel}
-                                    </td>
-                                    <td className="p-2">
-                                        {sp.telephone || "—"}
-                                    </td>
-                                    <td className="p-2">
-                                        {sp.email || "—"}
                                     </td>
                                     <td className="p-2">
                                         {clinicLabel}
