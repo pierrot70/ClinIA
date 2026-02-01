@@ -47,6 +47,11 @@ const SpecialistSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: "Clinique",
         },
+        disponibilites: [
+            {
+                type: Date,
+            },
+        ],
     },
     {
         timestamps: true,

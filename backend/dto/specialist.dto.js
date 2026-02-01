@@ -31,6 +31,28 @@ function normalizeSpecialite(value) {
     return undefined;
 }
 
+function normalizeDisponibilites(value) {
+    if (value === null) return [];
+    if (value === undefined) return undefined;
+    if (!Array.isArray(value)) return "__invalid__";
+
+    const parsed = value.map((item) => {
+        if (!item) return null;
+        if (typeof item === "string" || item instanceof Date) {
+            const date = new Date(item);
+            if (Number.isNaN(date.getTime())) return null;
+            return date;
+        }
+        return null;
+    });
+
+    if (parsed.some((item) => item === null)) {
+        return "__invalid__";
+    }
+
+    return parsed;
+}
+
 export function toCreateSpecialistDTO(body) {
     const telephoneRaw = body.telephone?.trim();
 
@@ -48,6 +70,7 @@ export function toCreateSpecialistDTO(body) {
             body.clinique_associer
         ),
         specialite: normalizeSpecialite(body.specialite),
+        disponibilites: normalizeDisponibilites(body.disponibilites),
     };
 }
 
@@ -74,6 +97,10 @@ export function toUpdateSpecialistDTO(body) {
         );
     if (body.specialite !== undefined)
         dto.specialite = normalizeSpecialite(body.specialite);
+    if (body.disponibilites !== undefined)
+        dto.disponibilites = normalizeDisponibilites(
+            body.disponibilites
+        );
 
     return dto;
 }

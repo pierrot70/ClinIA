@@ -5,6 +5,79 @@ import { Specialist } from "../models/Specialist.js";
 /* Specialist Service                                                  */
 /* ------------------------------------------------------------------ */
 
+function validateDisponibilites(disponibilites) {
+    if (disponibilites === undefined) return;
+    if (disponibilites === "__invalid__") {
+        throw {
+            code: "INVALID_INPUT",
+            message:
+                "Les disponibilités fournies sont invalides.",
+        };
+    }
+    if (!Array.isArray(disponibilites)) {
+        throw {
+            code: "INVALID_INPUT",
+            message:
+                "Les disponibilités doivent être un tableau.",
+        };
+    }
+
+    const normalized = disponibilites.map((slot) => {
+        const date = slot instanceof Date ? slot : new Date(slot);
+        if (Number.isNaN(date.getTime())) {
+            throw {
+                code: "INVALID_INPUT",
+                message:
+                    "Chaque disponibilité doit être une date ISO valide.",
+            };
+        }
+        if (
+            date.getUTCSeconds() !== 0 ||
+            date.getUTCMilliseconds() !== 0 ||
+            date.getUTCMinutes() % 15 !== 0
+        ) {
+            throw {
+                code: "INVALID_INPUT",
+                message:
+                    "Chaque disponibilité doit être alignée sur 15 minutes.",
+            };
+        }
+        return date;
+    });
+
+    const sorted = [...normalized].sort(
+        (a, b) => a.getTime() - b.getTime()
+    );
+
+    const monthKey = sorted.length
+        ? `${sorted[0].getUTCFullYear()}-${sorted[0].getUTCMonth()}`
+        : null;
+
+    for (let i = 0; i < sorted.length; i += 1) {
+        const current = sorted[i];
+        if (i > 0) {
+            const prev = sorted[i - 1];
+            if (current.getTime() === prev.getTime()) {
+                throw {
+                    code: "INVALID_INPUT",
+                    message:
+                        "Les disponibilités ne doivent pas se chevaucher.",
+                };
+            }
+        }
+        if (monthKey) {
+            const key = `${current.getUTCFullYear()}-${current.getUTCMonth()}`;
+            if (key !== monthKey) {
+                throw {
+                    code: "INVALID_INPUT",
+                    message:
+                        "Les disponibilités doivent appartenir au même mois.",
+                };
+            }
+        }
+    }
+}
+
 export async function createSpecialist(dto) {
     if (!dto.nom || !dto.prenom || !dto.numero_medecin) {
         throw {
@@ -13,6 +86,8 @@ export async function createSpecialist(dto) {
                 "Les champs 'nom', 'prenom' et 'numero_medecin' sont requis.",
         };
     }
+
+    validateDisponibilites(dto.disponibilites);
 
     return Specialist.create(dto);
 }
@@ -113,6 +188,8 @@ export async function updateSpecialist(id, updates) {
                 "Les champs 'nom', 'prenom' et 'numero_medecin' ne peuvent pas être vides.",
         };
     }
+
+    validateDisponibilites(updates.disponibilites);
 
     const specialist = await Specialist.findByIdAndUpdate(
         id,

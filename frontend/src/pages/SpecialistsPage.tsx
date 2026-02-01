@@ -15,6 +15,56 @@ import {
 } from "../services/cliniqueApi";
 import { SPECIALTIES } from "../data/specialties";
 
+type DisponibiliteForm = {
+    date: string; // YYYY-MM-DD
+    start: string;
+    end: string;
+};
+
+function padTime(value: number) {
+    return String(value).padStart(2, "0");
+}
+
+function formatDisponibilites(disponibilites?: string[]) {
+    if (!disponibilites || disponibilites.length === 0) {
+        return "—";
+    }
+    const parsed = disponibilites
+        .map((slot) => new Date(slot))
+        .filter((date) => !Number.isNaN(date.getTime()));
+
+    if (parsed.length === 0) return "—";
+
+    const grouped: Record<string, Date[]> = {};
+    parsed.forEach((date) => {
+        const key = `${date.getFullYear()}-${padTime(
+            date.getMonth() + 1
+        )}-${padTime(date.getDate())}`;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(date);
+    });
+
+    const dayLabels = Object.keys(grouped).sort();
+    const formatted = dayLabels.map((day) => {
+        const slots = grouped[day]
+            .slice()
+            .sort((a, b) => a.getTime() - b.getTime());
+        if (slots.length === 0) return null;
+        const first = slots[0];
+        const last = slots[slots.length - 1];
+        const end = new Date(last.getTime() + 15 * 60 * 1000);
+        const startLabel = `${padTime(first.getHours())}:${padTime(
+            first.getMinutes()
+        )}`;
+        const endLabel = `${padTime(end.getHours())}:${padTime(
+            end.getMinutes()
+        )}`;
+        return `${day} ${startLabel}-${endLabel} (${slots.length})`;
+    });
+
+    return formatted.filter(Boolean).join(" · ");
+}
+
 export function SpecialistsPage() {
     const [specialists, setSpecialists] = useState<Specialist[]>([]);
     const [loading, setLoading] = useState(false);
@@ -71,6 +121,13 @@ export function SpecialistsPage() {
         texto: false,
         clinique_associer: "",
         specialite: "",
+        disponibilites: [] as DisponibiliteForm[],
+    });
+    const [monthKey, setMonthKey] = useState(() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(
+            now.getMonth() + 1
+        ).padStart(2, "0")}`;
     });
     const [viewMode, setViewMode] = useState<"create" | "list">("list");
 
@@ -174,7 +231,14 @@ export function SpecialistsPage() {
             texto: false,
             clinique_associer: "",
             specialite: "",
+            disponibilites: [],
         });
+        const now = new Date();
+        setMonthKey(
+            `${now.getFullYear()}-${String(
+                now.getMonth() + 1
+            ).padStart(2, "0")}`
+        );
     }
 
     function handleCliniqueSelection(value: string) {
@@ -190,12 +254,118 @@ export function SpecialistsPage() {
         }));
     }
 
-    function toPayload(values: typeof form): SpecialistPayload {
+    function toPayload(
+        values: typeof form
+    ): { payload?: SpecialistPayload; error?: string } {
+        const slots: string[] = [];
+        const seen = new Set<string>();
+
+        for (const slot of values.disponibilites) {
+            if (!slot.date || !slot.start || !slot.end) {
+                return {
+                    error:
+                        "Chaque disponibilité doit contenir une date, un début et une fin.",
+                };
+            }
+            const [year, month, day] = slot.date
+                .split("-")
+                .map((value) => Number(value));
+            if (
+                Number.isNaN(year) ||
+                Number.isNaN(month) ||
+                Number.isNaN(day)
+            ) {
+                return {
+                    error:
+                        "Les dates de disponibilité doivent être valides.",
+                };
+            }
+            const [startH, startM] = slot.start
+                .split(":")
+                .map((value) => Number(value));
+            const [endH, endM] = slot.end
+                .split(":")
+                .map((value) => Number(value));
+            if (
+                Number.isNaN(startH) ||
+                Number.isNaN(startM) ||
+                Number.isNaN(endH) ||
+                Number.isNaN(endM)
+            ) {
+                return {
+                    error:
+                        "Les heures de disponibilité doivent être valides.",
+                };
+            }
+            if (startM % 15 !== 0 || endM % 15 !== 0) {
+                return {
+                    error:
+                        "Les heures doivent être alignées sur 15 minutes.",
+                };
+            }
+            const start = new Date(
+                year,
+                month - 1,
+                day,
+                startH,
+                startM,
+                0,
+                0
+            );
+            const end = new Date(
+                year,
+                month - 1,
+                day,
+                endH,
+                endM,
+                0,
+                0
+            );
+            if (Number.isNaN(start.getTime())) {
+                return {
+                    error:
+                        "Les dates de disponibilité doivent être valides.",
+                };
+            }
+            if (start.getTime() >= end.getTime()) {
+                return {
+                    error:
+                        "Chaque disponibilité doit avoir une fin après le début.",
+                };
+            }
+
+            let cursor = new Date(start);
+            while (cursor.getTime() < end.getTime()) {
+                const iso = cursor.toISOString();
+                if (seen.has(iso)) {
+                    return {
+                        error:
+                            "Les disponibilités ne doivent pas se chevaucher.",
+                    };
+                }
+                seen.add(iso);
+                slots.push(iso);
+                cursor = new Date(
+                    cursor.getTime() + 15 * 60 * 1000
+                );
+            }
+        }
+
+        if (slots.length === 0 && values.disponibilites.length > 0) {
+            return {
+                error:
+                    "Chaque disponibilité doit contenir au moins un créneau.",
+            };
+        }
+
+        const ordered = slots.slice().sort();
+
         const payload: SpecialistPayload = {
             nom: values.nom.trim(),
             prenom: values.prenom.trim(),
             numero_medecin: values.numero_medecin.trim(),
             texto: values.texto,
+            disponibilites: ordered,
         };
 
         if (values.telephone.trim()) {
@@ -215,7 +385,7 @@ export function SpecialistsPage() {
             payload.specialite = undefined;
         }
 
-        return payload;
+        return { payload };
     }
 
     async function handleSubmit() {
@@ -235,10 +405,24 @@ export function SpecialistsPage() {
 
         setError(null);
 
+        const { payload, error: disponibiliteError } = toPayload(
+            form
+        );
+        if (!payload) {
+            setError({
+                code: "INVALID_INPUT",
+                message:
+                    disponibiliteError ??
+                    "Disponibilités invalides.",
+                retryable: false,
+            });
+            return;
+        }
+
         if (editingId) {
             const response = await updateSpecialist(
                 editingId,
-                toPayload(form)
+                payload
             );
             if ("error" in response) {
                 setError(response.error);
@@ -248,7 +432,7 @@ export function SpecialistsPage() {
                 response.data?._id ?? editingId;
             highlightRow(savedId);
         } else {
-            const response = await createSpecialist(toPayload(form));
+            const response = await createSpecialist(payload);
             if ("error" in response) {
                 setError(response.error);
                 return;
@@ -272,6 +456,50 @@ export function SpecialistsPage() {
         const telephoneValue =
             clinicContacts.telephone || specialist.telephone || "";
         const emailValue = clinicContacts.email || specialist.email || "";
+        const slots = (specialist.disponibilites ?? [])
+            .map((slot) => new Date(slot))
+            .filter((date) => !Number.isNaN(date.getTime()))
+            .sort((a, b) => a.getTime() - b.getTime());
+        const baseMonthKey =
+            slots.length > 0
+                ? `${slots[0].getFullYear()}-${String(
+                      slots[0].getMonth() + 1
+                  ).padStart(2, "0")}`
+                : monthKey;
+        const grouped: Record<string, Date[]> = {};
+        slots.forEach((date) => {
+            const key = `${date.getFullYear()}-${String(
+                date.getMonth() + 1
+            ).padStart(2, "0")}-${String(date.getDate()).padStart(
+                2,
+                "0"
+            )}`;
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(date);
+        });
+        const disponibilites = Object.keys(grouped)
+            .filter((key) => key.startsWith(baseMonthKey))
+            .sort()
+            .map((key) => {
+                const daySlots = grouped[key].sort(
+                    (a, b) => a.getTime() - b.getTime()
+                );
+                const start = daySlots[0];
+                const end = new Date(
+                    daySlots[daySlots.length - 1].getTime() +
+                        15 * 60 * 1000
+                );
+                return {
+                    date: key,
+                    start: `${padTime(
+                        start.getHours()
+                    )}:${padTime(start.getMinutes())}`,
+                    end: `${padTime(end.getHours())}:${padTime(
+                        end.getMinutes()
+                    )}`,
+                };
+            });
+        setMonthKey(baseMonthKey);
         setForm({
             nom: specialist.nom ?? "",
             prenom: specialist.prenom ?? "",
@@ -284,6 +512,7 @@ export function SpecialistsPage() {
                     ? specialist.clinique_associer
                     : specialist.clinique_associer?.toString() ?? "",
             specialite: specialist.specialite ?? "",
+            disponibilites,
         });
     }
 
@@ -459,6 +688,214 @@ export function SpecialistsPage() {
                         SMS activé
                     </label>
 
+                    <div className="space-y-2">
+                        <div className="text-sm font-medium">
+                            Disponibilités (jours du mois)
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-[200px_1fr] items-start">
+                            <div className="space-y-2">
+                                <label className="text-xs text-gray-600">
+                                    Mois ciblé
+                                </label>
+                                <input
+                                    type="month"
+                                    className="border rounded p-2 w-full"
+                                    value={monthKey}
+                                    onChange={(event) => {
+                                        const next = event.target.value;
+                                        if (!next) return;
+                                        setMonthKey(next);
+                                        setForm((p) => ({
+                                            ...p,
+                                            disponibilites: [],
+                                        }));
+                                    }}
+                                />
+                                <div className="text-xs text-gray-500">
+                                    Sélectionnez les jours à activer.
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-7 gap-2">
+                                {(() => {
+                                    const [yearStr, monthStr] =
+                                        monthKey.split("-");
+                                    const year = Number(yearStr);
+                                    const month = Number(monthStr);
+                                    if (
+                                        Number.isNaN(year) ||
+                                        Number.isNaN(month)
+                                    ) {
+                                        return null;
+                                    }
+                                    const firstDay = new Date(
+                                        year,
+                                        month - 1,
+                                        1
+                                    );
+                                    const startOffset =
+                                        (firstDay.getDay() + 6) % 7;
+                                    const daysInMonth = new Date(
+                                        year,
+                                        month,
+                                        0
+                                    ).getDate();
+                                    const blanks = Array.from(
+                                        { length: startOffset },
+                                        (_, i) => (
+                                            <div key={`b-${i}`} />
+                                        )
+                                    );
+                                    const days = Array.from(
+                                        { length: daysInMonth },
+                                        (_, i) => {
+                                            const day = i + 1;
+                                            const dateKey = `${year}-${String(
+                                                month
+                                            ).padStart(2, "0")}-${String(
+                                                day
+                                            ).padStart(2, "0")}`;
+                                            const selected =
+                                                form.disponibilites.some(
+                                                    (d) =>
+                                                        d.date === dateKey
+                                                );
+                                            return (
+                                                <button
+                                                    key={dateKey}
+                                                    type="button"
+                                                    className={`rounded border px-2 py-1 text-sm ${
+                                                        selected
+                                                            ? "bg-primary text-white border-primary"
+                                                            : "bg-white text-gray-700 border-gray-200"
+                                                    }`}
+                                                    onClick={() => {
+                                                        setForm((p) => {
+                                                            const exists =
+                                                                p.disponibilites.some(
+                                                                    (d) =>
+                                                                        d.date ===
+                                                                        dateKey
+                                                                );
+                                                            return {
+                                                                ...p,
+                                                                disponibilites: exists
+                                                                    ? p.disponibilites.filter(
+                                                                          (
+                                                                              d
+                                                                          ) =>
+                                                                              d.date !==
+                                                                              dateKey
+                                                                      )
+                                                                    : [
+                                                                          ...p.disponibilites,
+                                                                          {
+                                                                              date: dateKey,
+                                                                              start: "10:00",
+                                                                              end: "12:00",
+                                                                          },
+                                                                      ],
+                                                            };
+                                                        });
+                                                    }}
+                                                >
+                                                    {day}
+                                                </button>
+                                            );
+                                        }
+                                    );
+                                    return [...blanks, ...days];
+                                })()}
+                            </div>
+                        </div>
+                        {form.disponibilites.length === 0 && (
+                            <div className="text-xs text-gray-500">
+                                Aucun jour sélectionné.
+                            </div>
+                        )}
+                        {form.disponibilites
+                            .slice()
+                            .sort((a, b) =>
+                                a.date.localeCompare(b.date)
+                            )
+                            .map((slot) => (
+                                <div
+                                    key={slot.date}
+                                    className="grid grid-cols-1 md:grid-cols-[1fr_140px_140px_auto] gap-2 items-center"
+                                >
+                                    <div className="text-sm font-medium">
+                                        {slot.date}
+                                    </div>
+                                    <input
+                                        className="border rounded p-2"
+                                        type="time"
+                                        step={900}
+                                        value={slot.start}
+                                        onChange={(event) => {
+                                            const start = event.target.value;
+                                            setForm((p) => ({
+                                                ...p,
+                                                disponibilites:
+                                                    p.disponibilites.map(
+                                                        (current) =>
+                                                            current.date ===
+                                                            slot.date
+                                                                ? {
+                                                                      ...current,
+                                                                      start,
+                                                                  }
+                                                                : current
+                                                    ),
+                                            }));
+                                        }}
+                                    />
+                                    <input
+                                        className="border rounded p-2"
+                                        type="time"
+                                        step={900}
+                                        value={slot.end}
+                                        onChange={(event) => {
+                                            const end = event.target.value;
+                                            setForm((p) => ({
+                                                ...p,
+                                                disponibilites:
+                                                    p.disponibilites.map(
+                                                        (current) =>
+                                                            current.date ===
+                                                            slot.date
+                                                                ? {
+                                                                      ...current,
+                                                                      end,
+                                                                  }
+                                                                : current
+                                                    ),
+                                            }));
+                                        }}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="px-3 py-2 border rounded text-red-600"
+                                        onClick={() =>
+                                            setForm((p) => ({
+                                                ...p,
+                                                disponibilites:
+                                                    p.disponibilites.filter(
+                                                        (current) =>
+                                                            current.date !==
+                                                            slot.date
+                                                    ),
+                                            }))
+                                        }
+                                    >
+                                        Retirer
+                                    </button>
+                                </div>
+                            ))}
+                        <div className="text-xs text-gray-500">
+                            Les créneaux sont générés par pas de 15
+                            minutes et sauvegardés en ISO.
+                        </div>
+                    </div>
+
                     <div className="flex gap-2">
                         <button
                             onClick={handleSubmit}
@@ -563,6 +1000,9 @@ export function SpecialistsPage() {
                                 Courriel
                             </th>
                             <th className="text-left p-2">
+                                Disponibilités
+                            </th>
+                            <th className="text-left p-2">
                                 Actions
                             </th>
                         </tr>
@@ -572,7 +1012,7 @@ export function SpecialistsPage() {
                                     <tr>
                                         <td
                                             className="p-2 text-gray-500"
-                                            colSpan={8}
+                                            colSpan={9}
                                         >
                                             Chargement…
                                         </td>
@@ -583,7 +1023,7 @@ export function SpecialistsPage() {
                                         <tr>
                                             <td
                                                 className="p-2 text-gray-500"
-                                                colSpan={8}
+                                                colSpan={9}
                                             >
                                                 Aucun spécialiste
                                                 trouvé.
@@ -610,6 +1050,10 @@ export function SpecialistsPage() {
                                         const clinicCourriel =
                                             associatedClinique?.courriel ||
                                             "—";
+                                        const disponibilitesLabel =
+                                            formatDisponibilites(
+                                                sp.disponibilites
+                                            );
 
                                         return (
                                             <tr
@@ -640,6 +1084,9 @@ export function SpecialistsPage() {
                                                 </td>
                                                 <td className="p-2">
                                                     {clinicCourriel}
+                                                </td>
+                                                <td className="p-2">
+                                                    {disponibilitesLabel}
                                                 </td>
                                                 <td className="p-2 flex gap-2">
                                                     <button

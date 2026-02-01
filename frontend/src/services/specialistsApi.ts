@@ -16,6 +16,7 @@ export interface Specialist {
     texto?: boolean;
     clinique_associer?: string | null;
     specialite?: string;
+    disponibilites?: string[];
 }
 
 export interface PaginatedSpecialists {
@@ -39,6 +40,7 @@ export interface SpecialistPayload {
     texto?: boolean;
     clinique_associer?: string | null;
     specialite?: string;
+    disponibilites?: string[];
 }
 
 async function safeJson(response: Response): Promise<any> {
