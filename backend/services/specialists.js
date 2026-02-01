@@ -52,9 +52,17 @@ function validateDisponibilites(disponibilites) {
     const monthKey = sorted.length
         ? `${sorted[0].getUTCFullYear()}-${sorted[0].getUTCMonth()}`
         : null;
+    const now = Date.now();
 
     for (let i = 0; i < sorted.length; i += 1) {
         const current = sorted[i];
+        if (current.getTime() < now) {
+            throw {
+                code: "INVALID_INPUT",
+                message:
+                    "Les disponibilités ne peuvent pas être dans le passé.",
+            };
+        }
         if (i > 0) {
             const prev = sorted[i - 1];
             if (current.getTime() === prev.getTime()) {

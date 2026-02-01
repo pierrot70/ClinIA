@@ -17,13 +17,27 @@ import { SPECIALTIES } from "../data/specialties";
 
 type DisponibiliteForm = {
     date: string; // YYYY-MM-DD
-    start: string;
-    end: string;
+    slots: string[];
 };
 
 function padTime(value: number) {
     return String(value).padStart(2, "0");
 }
+
+const MONTH_OPTIONS = [
+    { value: "01", label: "Janvier" },
+    { value: "02", label: "Février" },
+    { value: "03", label: "Mars" },
+    { value: "04", label: "Avril" },
+    { value: "05", label: "Mai" },
+    { value: "06", label: "Juin" },
+    { value: "07", label: "Juillet" },
+    { value: "08", label: "Août" },
+    { value: "09", label: "Septembre" },
+    { value: "10", label: "Octobre" },
+    { value: "11", label: "Novembre" },
+    { value: "12", label: "Décembre" },
+];
 
 function formatDisponibilites(disponibilites?: string[]) {
     if (!disponibilites || disponibilites.length === 0) {
@@ -64,6 +78,40 @@ function formatDisponibilites(disponibilites?: string[]) {
 
     return formatted.filter(Boolean).join(" · ");
 }
+
+function toLocalDateKey(date: Date) {
+    return `${date.getFullYear()}-${padTime(date.getMonth() + 1)}-${padTime(
+        date.getDate()
+    )}`;
+}
+
+function nextQuarterHour(time: Date) {
+    const rounded = new Date(time);
+    const minutes = rounded.getMinutes();
+    const next = Math.ceil((minutes + 1) / 15) * 15;
+    rounded.setSeconds(0, 0);
+    if (next >= 60) {
+        rounded.setMinutes(0);
+        rounded.setHours(rounded.getHours() + 1);
+    } else {
+        rounded.setMinutes(next);
+    }
+    return `${padTime(rounded.getHours())}:${padTime(
+        rounded.getMinutes()
+    )}`;
+}
+
+function buildTimeSlots() {
+    const slots: string[] = [];
+    for (let hour = 8; hour <= 18; hour += 1) {
+        for (let minutes = 0; minutes < 60; minutes += 15) {
+            slots.push(`${padTime(hour)}:${padTime(minutes)}`);
+        }
+    }
+    return slots;
+}
+
+const TIME_SLOTS = buildTimeSlots();
 
 export function SpecialistsPage() {
     const [specialists, setSpecialists] = useState<Specialist[]>([]);
@@ -129,6 +177,7 @@ export function SpecialistsPage() {
             now.getMonth() + 1
         ).padStart(2, "0")}`;
     });
+    const [activeDay, setActiveDay] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<"create" | "list">("list");
 
     useEffect(() => {
@@ -239,6 +288,7 @@ export function SpecialistsPage() {
                 now.getMonth() + 1
             ).padStart(2, "0")}`
         );
+        setActiveDay(null);
     }
 
     function handleCliniqueSelection(value: string) {
@@ -257,14 +307,15 @@ export function SpecialistsPage() {
     function toPayload(
         values: typeof form
     ): { payload?: SpecialistPayload; error?: string } {
+        const now = new Date();
         const slots: string[] = [];
         const seen = new Set<string>();
 
         for (const slot of values.disponibilites) {
-            if (!slot.date || !slot.start || !slot.end) {
+            if (!slot.date || !slot.slots || slot.slots.length === 0) {
                 return {
                     error:
-                        "Chaque disponibilité doit contenir une date, un début et une fin.",
+                        "Chaque disponibilité doit contenir une date et au moins un créneau.",
                 };
             }
             const [year, month, day] = slot.date
@@ -280,63 +331,44 @@ export function SpecialistsPage() {
                         "Les dates de disponibilité doivent être valides.",
                 };
             }
-            const [startH, startM] = slot.start
-                .split(":")
-                .map((value) => Number(value));
-            const [endH, endM] = slot.end
-                .split(":")
-                .map((value) => Number(value));
-            if (
-                Number.isNaN(startH) ||
-                Number.isNaN(startM) ||
-                Number.isNaN(endH) ||
-                Number.isNaN(endM)
-            ) {
-                return {
-                    error:
-                        "Les heures de disponibilité doivent être valides.",
-                };
-            }
-            if (startM % 15 !== 0 || endM % 15 !== 0) {
-                return {
-                    error:
-                        "Les heures doivent être alignées sur 15 minutes.",
-                };
-            }
-            const start = new Date(
-                year,
-                month - 1,
-                day,
-                startH,
-                startM,
-                0,
-                0
-            );
-            const end = new Date(
-                year,
-                month - 1,
-                day,
-                endH,
-                endM,
-                0,
-                0
-            );
-            if (Number.isNaN(start.getTime())) {
-                return {
-                    error:
-                        "Les dates de disponibilité doivent être valides.",
-                };
-            }
-            if (start.getTime() >= end.getTime()) {
-                return {
-                    error:
-                        "Chaque disponibilité doit avoir une fin après le début.",
-                };
-            }
-
-            let cursor = new Date(start);
-            while (cursor.getTime() < end.getTime()) {
-                const iso = cursor.toISOString();
+            for (const time of slot.slots) {
+                const [hours, minutes] = time
+                    .split(":")
+                    .map((value) => Number(value));
+                if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+                    return {
+                        error:
+                            "Les heures de disponibilité doivent être valides.",
+                    };
+                }
+                if (minutes % 15 !== 0) {
+                    return {
+                        error:
+                            "Les heures doivent être alignées sur 15 minutes.",
+                    };
+                }
+                const start = new Date(
+                    year,
+                    month - 1,
+                    day,
+                    hours,
+                    minutes,
+                    0,
+                    0
+                );
+                if (Number.isNaN(start.getTime())) {
+                    return {
+                        error:
+                            "Les dates de disponibilité doivent être valides.",
+                    };
+                }
+                if (start.getTime() < now.getTime()) {
+                    return {
+                        error:
+                            "Les disponibilités ne peuvent pas être dans le passé.",
+                    };
+                }
+                const iso = start.toISOString();
                 if (seen.has(iso)) {
                     return {
                         error:
@@ -345,9 +377,6 @@ export function SpecialistsPage() {
                 }
                 seen.add(iso);
                 slots.push(iso);
-                cursor = new Date(
-                    cursor.getTime() + 15 * 60 * 1000
-                );
             }
         }
 
@@ -484,19 +513,14 @@ export function SpecialistsPage() {
                 const daySlots = grouped[key].sort(
                     (a, b) => a.getTime() - b.getTime()
                 );
-                const start = daySlots[0];
-                const end = new Date(
-                    daySlots[daySlots.length - 1].getTime() +
-                        15 * 60 * 1000
-                );
                 return {
                     date: key,
-                    start: `${padTime(
-                        start.getHours()
-                    )}:${padTime(start.getMinutes())}`,
-                    end: `${padTime(end.getHours())}:${padTime(
-                        end.getMinutes()
-                    )}`,
+                    slots: daySlots.map(
+                        (slot) =>
+                            `${padTime(slot.getHours())}:${padTime(
+                                slot.getMinutes()
+                            )}`
+                    ),
                 };
             });
         setMonthKey(baseMonthKey);
@@ -697,20 +721,68 @@ export function SpecialistsPage() {
                                 <label className="text-xs text-gray-600">
                                     Mois ciblé
                                 </label>
-                                <input
-                                    type="month"
-                                    className="border rounded p-2 w-full"
-                                    value={monthKey}
-                                    onChange={(event) => {
-                                        const next = event.target.value;
-                                        if (!next) return;
-                                        setMonthKey(next);
-                                        setForm((p) => ({
-                                            ...p,
-                                            disponibilites: [],
-                                        }));
-                                    }}
-                                />
+                                <div className="grid grid-cols-2 gap-2">
+                                    <select
+                                        className="border rounded p-2 w-full"
+                                        value={monthKey.split("-")[1]}
+                                        onChange={(event) => {
+                                            const nextMonth =
+                                                event.target.value;
+                                            const year =
+                                                monthKey.split("-")[0];
+                                            setMonthKey(
+                                                `${year}-${nextMonth}`
+                                            );
+                                            setForm((p) => ({
+                                                ...p,
+                                                disponibilites: [],
+                                            }));
+                                        }}
+                                    >
+                                        {MONTH_OPTIONS.map((option) => (
+                                            <option
+                                                key={option.value}
+                                                value={option.value}
+                                            >
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        className="border rounded p-2 w-full"
+                                        value={monthKey.split("-")[0]}
+                                        onChange={(event) => {
+                                            const nextYear =
+                                                event.target.value;
+                                            const month =
+                                                monthKey.split("-")[1];
+                                            setMonthKey(
+                                                `${nextYear}-${month}`
+                                            );
+                                            setForm((p) => ({
+                                                ...p,
+                                                disponibilites: [],
+                                            }));
+                                        }}
+                                    >
+                                        {Array.from(
+                                            { length: 6 },
+                                            (_, i) =>
+                                                String(
+                                                    new Date().getFullYear() -
+                                                        1 +
+                                                        i
+                                                )
+                                        ).map((year) => (
+                                            <option
+                                                key={year}
+                                                value={year}
+                                            >
+                                                {year}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                                 <div className="text-xs text-gray-500">
                                     Sélectionnez les jours à activer.
                                 </div>
@@ -721,6 +793,8 @@ export function SpecialistsPage() {
                                         monthKey.split("-");
                                     const year = Number(yearStr);
                                     const month = Number(monthStr);
+                                    const now = new Date();
+                                    const todayKey = toLocalDateKey(now);
                                     if (
                                         Number.isNaN(year) ||
                                         Number.isNaN(month)
@@ -754,6 +828,8 @@ export function SpecialistsPage() {
                                             ).padStart(2, "0")}-${String(
                                                 day
                                             ).padStart(2, "0")}`;
+                                            const isPastDay =
+                                                dateKey < todayKey;
                                             const selected =
                                                 form.disponibilites.some(
                                                     (d) =>
@@ -767,7 +843,12 @@ export function SpecialistsPage() {
                                                         selected
                                                             ? "bg-primary text-white border-primary"
                                                             : "bg-white text-gray-700 border-gray-200"
+                                                    } ${
+                                                        isPastDay
+                                                            ? "opacity-40 cursor-not-allowed"
+                                                            : ""
                                                     }`}
+                                                    disabled={isPastDay}
                                                     onClick={() => {
                                                         setForm((p) => {
                                                             const exists =
@@ -776,6 +857,9 @@ export function SpecialistsPage() {
                                                                         d.date ===
                                                                         dateKey
                                                                 );
+                                                            setActiveDay(
+                                                                dateKey
+                                                            );
                                                             return {
                                                                 ...p,
                                                                 disponibilites: exists
@@ -790,8 +874,7 @@ export function SpecialistsPage() {
                                                                           ...p.disponibilites,
                                                                           {
                                                                               date: dateKey,
-                                                                              start: "10:00",
-                                                                              end: "12:00",
+                                                                              slots: [],
                                                                           },
                                                                       ],
                                                             };
@@ -812,6 +895,96 @@ export function SpecialistsPage() {
                                 Aucun jour sélectionné.
                             </div>
                         )}
+                        {activeDay &&
+                            form.disponibilites.some(
+                                (d) => d.date === activeDay
+                            ) && (
+                                <div className="border rounded p-3 bg-white space-y-2">
+                                    <div className="text-sm font-medium">
+                                        Choisir une plage pour{" "}
+                                        {activeDay}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                        Cliquez pour activer/désactiver les
+                                        créneaux de 15 minutes.
+                                    </div>
+                                    <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+                                        {TIME_SLOTS.map((slot) => {
+                                            const now = new Date();
+                                            const minToday =
+                                                nextQuarterHour(now);
+                                            const isToday =
+                                                activeDay ===
+                                                toLocalDateKey(now);
+                                            const isPastSlot =
+                                                isToday &&
+                                                slot < minToday;
+                                            const isSelected =
+                                                form.disponibilites
+                                                    .find(
+                                                        (d) =>
+                                                            d.date ===
+                                                            activeDay
+                                                    )
+                                                    ?.slots.includes(slot) ??
+                                                false;
+                                            return (
+                                                <button
+                                                    key={slot}
+                                                    type="button"
+                                                    disabled={isPastSlot}
+                                                    className={`border rounded px-2 py-1 text-xs ${
+                                                        isSelected
+                                                            ? "bg-primary text-white border-primary"
+                                                            : "bg-white text-gray-700 border-gray-200"
+                                                    } ${
+                                                        isPastSlot
+                                                            ? "opacity-40 cursor-not-allowed"
+                                                            : ""
+                                                    }`}
+                                                    onClick={() => {
+                                                        setForm((p) => ({
+                                                            ...p,
+                                                            disponibilites:
+                                                                p.disponibilites.map(
+                                                                    (
+                                                                        current
+                                                                    ) =>
+                                                                        current.date ===
+                                                                        activeDay
+                                                                            ? {
+                                                                                  ...current,
+                                                                                  slots: current.slots.includes(
+                                                                                      slot
+                                                                                  )
+                                                                                      ? current.slots.filter(
+                                                                                            (
+                                                                                                item
+                                                                                            ) =>
+                                                                                                item !==
+                                                                                                slot
+                                                                                        )
+                                                                                      : [
+                                                                                            ...current.slots,
+                                                                                            slot,
+                                                                                        ],
+                                                                              }
+                                                                            : current
+                                                                ),
+                                                        }));
+                                                    }}
+                                                >
+                                                    {slot}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                        Cliquez plusieurs créneaux pour créer
+                                        une liste (ex: 14:45, 16:15).
+                                    </div>
+                                </div>
+                            )}
                         {form.disponibilites
                             .slice()
                             .sort((a, b) =>
@@ -820,57 +993,28 @@ export function SpecialistsPage() {
                             .map((slot) => (
                                 <div
                                     key={slot.date}
-                                    className="grid grid-cols-1 md:grid-cols-[1fr_140px_140px_auto] gap-2 items-center"
+                                    className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2 items-center"
                                 >
                                     <div className="text-sm font-medium">
                                         {slot.date}
                                     </div>
-                                    <input
-                                        className="border rounded p-2"
-                                        type="time"
-                                        step={900}
-                                        value={slot.start}
-                                        onChange={(event) => {
-                                            const start = event.target.value;
-                                            setForm((p) => ({
-                                                ...p,
-                                                disponibilites:
-                                                    p.disponibilites.map(
-                                                        (current) =>
-                                                            current.date ===
-                                                            slot.date
-                                                                ? {
-                                                                      ...current,
-                                                                      start,
-                                                                  }
-                                                                : current
-                                                    ),
-                                            }));
-                                        }}
-                                    />
-                                    <input
-                                        className="border rounded p-2"
-                                        type="time"
-                                        step={900}
-                                        value={slot.end}
-                                        onChange={(event) => {
-                                            const end = event.target.value;
-                                            setForm((p) => ({
-                                                ...p,
-                                                disponibilites:
-                                                    p.disponibilites.map(
-                                                        (current) =>
-                                                            current.date ===
-                                                            slot.date
-                                                                ? {
-                                                                      ...current,
-                                                                      end,
-                                                                  }
-                                                                : current
-                                                    ),
-                                            }));
-                                        }}
-                                    />
+                                    <div className="text-sm text-gray-700">
+                                        {slot.slots.length > 0
+                                            ? slot.slots
+                                                  .slice()
+                                                  .sort()
+                                                  .join(", ")
+                                            : "Aucun créneau"}
+                                        <button
+                                            type="button"
+                                            className="ml-2 text-xs text-primary underline"
+                                            onClick={() => {
+                                                setActiveDay(slot.date);
+                                            }}
+                                        >
+                                            Modifier
+                                        </button>
+                                    </div>
                                     <button
                                         type="button"
                                         className="px-3 py-2 border rounded text-red-600"
