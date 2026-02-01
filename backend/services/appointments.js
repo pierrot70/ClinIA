@@ -1,4 +1,5 @@
 import { Appointment } from "../models/Appointment.js";
+import { Specialist } from "../models/Specialist.js";
 import mongoose from "mongoose";
 import { isValidRamq } from "../utils/validators.js";
 
@@ -41,6 +42,18 @@ export async function createAppointment(dto) {
         throw {
             code: "INVALID_DATE",
             message: "Impossible de créer un rendez-vous dans le passé.",
+        };
+    }
+
+    const availableSlots = await getAvailableSlots(
+        dto.specialist,
+        dto.date
+    );
+    if (!availableSlots.includes(dto.time)) {
+        throw {
+            code: "NO_AVAILABILITY",
+            message:
+                "Aucun créneau disponible pour ce spécialiste.",
         };
     }
 
@@ -286,6 +299,15 @@ export async function updateAppointmentSchedule(id, { date, time }) {
 const WORK_START_HOUR = 8;
 const WORK_END_HOUR = 17;
 const SLOT_STEP_MINUTES = 15;
+function formatTime(date) {
+    return `${date
+        .getHours()
+        .toString()
+        .padStart(2, "0")}:${date
+        .getMinutes()
+        .toString()
+        .padStart(2, "0")}`;
+}
 
 function generateDailySlots() {
     const slots = [];
@@ -301,6 +323,38 @@ function generateDailySlots() {
     return slots;
 }
 
+async function getSpecialistAvailableTimes(specialist, date) {
+    const startOfDay = new Date(`${date}T00:00`);
+    const endOfDay = new Date(`${date}T23:59:59.999`);
+
+    const specialists = await Specialist.find(
+        {
+            specialite: specialist,
+            disponibilites: {
+                $elemMatch: { $gte: startOfDay, $lte: endOfDay },
+            },
+        },
+        { disponibilites: 1 }
+    ).lean();
+
+    const availableTimes = new Set();
+
+    specialists.forEach((sp) => {
+        if (!Array.isArray(sp.disponibilites)) return;
+        sp.disponibilites.forEach((slot) => {
+            const slotDate = new Date(slot);
+            if (
+                slotDate >= startOfDay &&
+                slotDate <= endOfDay
+            ) {
+                availableTimes.add(formatTime(slotDate));
+            }
+        });
+    });
+
+    return availableTimes;
+}
+
 export async function getAvailableSlots(specialist, date) {
     if (!specialist || !date) {
         throw {
@@ -311,6 +365,13 @@ export async function getAvailableSlots(specialist, date) {
     }
 
     const allSlots = generateDailySlots();
+    const specialistTimes = await getSpecialistAvailableTimes(
+        specialist,
+        date
+    );
+    if (specialistTimes.size === 0) {
+        return [];
+    }
 
     const booked = await Appointment.find(
         { specialist, date, status: "scheduled" },
@@ -327,6 +388,9 @@ export async function getAvailableSlots(specialist, date) {
     const now = new Date();
 
     return allSlots.filter((slot) => {
+        if (specialistTimes.size > 0 && !specialistTimes.has(slot)) {
+            return false;
+        }
         if (bookedTimes.has(slot)) return false;
 
         if (targetDate.toDateString() === now.toDateString()) {

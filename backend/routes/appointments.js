@@ -101,7 +101,8 @@ router.post("/", async (req, res) => {
         if (
             err.code === "INVALID_INPUT" ||
             err.code === "INVALID_TIME" ||
-            err.code === "INVALID_DATE"
+            err.code === "INVALID_DATE" ||
+            err.code === "NO_AVAILABILITY"
         ) {
             return res.status(400).json({
                 error: {
