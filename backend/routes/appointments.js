@@ -9,6 +9,7 @@ import {
 } from "../services/appointments.js";
 import { toCreateAppointmentDTO } from "../dto/appointment.dto.js";
 import { Appointment } from "../models/Appointment.js"; // ✅ IMPORT MANQUANT
+import mongoose from "mongoose";
 import { isValidRamq } from "../utils/validators.js";
 
 const router = express.Router();
@@ -60,28 +61,12 @@ router.get("/slots", async (req, res) => {
 router.post("/", async (req, res) => {
     const dto = toCreateAppointmentDTO(req.body);
 
-    if (
-        !dto.patientInsuranceNumber ||
-        !dto.specialist ||
-        !dto.date ||
-        !dto.time
-    ) {
+    if (!dto.patient || !dto.specialist || !dto.date || !dto.time) {
         return res.status(400).json({
             error: {
                 code: "INVALID_INPUT",
                 message:
                     "Champs requis manquants (patient, spécialiste, date, heure).",
-                retryable: false,
-            },
-        });
-    }
-
-    if (!isValidRamq(dto.patientInsuranceNumber)) {
-        return res.status(400).json({
-            error: {
-                code: "INVALID_INPUT",
-                message:
-                    "Numéro RAMQ invalide. Format requis : RAMQXXXXXXXXXX.",
                 retryable: false,
             },
         });
@@ -159,6 +144,15 @@ router.get("/", async (req, res) => {
     const filters = {};
 
     if (req.query.specialist) {
+        if (!mongoose.Types.ObjectId.isValid(req.query.specialist)) {
+            return res.status(400).json({
+                error: {
+                    code: "INVALID_INPUT",
+                    message: "Identifiant de spécialiste invalide.",
+                    retryable: false,
+                },
+            });
+        }
         filters.specialist = req.query.specialist;
     }
     if (req.query.status) {

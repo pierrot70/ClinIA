@@ -1,5 +1,6 @@
 import { Appointment } from "../models/Appointment.js";
 import { Specialist } from "../models/Specialist.js";
+import { Patient } from "../models/Patient.js";
 import mongoose from "mongoose";
 import { isValidRamq } from "../utils/validators.js";
 
@@ -12,11 +13,10 @@ export async function createAppointment(dto) {
 
     const ALLOWED_PRIORITIES = ["normal", "urgent"];
 
-    if (!isValidRamq(dto.patientInsuranceNumber)) {
+    if (!mongoose.Types.ObjectId.isValid(dto.patient)) {
         throw {
             code: "INVALID_INPUT",
-            message:
-                "Numéro RAMQ invalide. Format requis : RAMQXXXXXXXXXX.",
+            message: "Identifiant patient invalide.",
         };
     }
 
@@ -45,6 +45,39 @@ export async function createAppointment(dto) {
         };
     }
 
+    if (!mongoose.Types.ObjectId.isValid(dto.specialist)) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Identifiant de spécialiste invalide.",
+        };
+    }
+
+    const patient = await Patient.findById(dto.patient).lean();
+    if (!patient) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Patient introuvable.",
+        };
+    }
+
+    if (!isValidRamq(patient.num_assurance_maladie)) {
+        throw {
+            code: "INVALID_INPUT",
+            message:
+                "Numéro RAMQ invalide. Format requis : RAMQXXXXXXXXXX.",
+        };
+    }
+
+    const specialistExists = await Specialist.exists({
+        _id: dto.specialist,
+    });
+    if (!specialistExists) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Spécialiste introuvable.",
+        };
+    }
+
     const availableSlots = await getAvailableSlots(
         dto.specialist,
         dto.date
@@ -59,11 +92,11 @@ export async function createAppointment(dto) {
 
     /* -------------------------------------------------- */
     /* RÈGLE MÉTIER MAJEURE                               */
-    /* Un patient = un seul rendez-vous par spécialité   */
+    /* Un patient = un seul rendez-vous par spécialiste  */
     /* -------------------------------------------------- */
 
     const existing = await Appointment.findOne({
-        patientInsuranceNumber: dto.patientInsuranceNumber,
+        patient: dto.patient,
         specialist: dto.specialist,
         status: "scheduled",
     }).lean();
@@ -78,7 +111,10 @@ export async function createAppointment(dto) {
 
     /* ---------------- Persistance ---------------- */
 
-    return Appointment.create(dto);
+    return Appointment.create({
+        ...dto,
+        patientInsuranceNumber: patient.num_assurance_maladie,
+    });
 }
 
 /* ------------------------------------------------------------------ */
@@ -327,29 +363,26 @@ async function getSpecialistAvailableTimes(specialist, date) {
     const startOfDay = new Date(`${date}T00:00`);
     const endOfDay = new Date(`${date}T23:59:59.999`);
 
-    const specialists = await Specialist.find(
-        {
-            specialite: specialist,
-            disponibilites: {
-                $elemMatch: { $gte: startOfDay, $lte: endOfDay },
-            },
-        },
+    if (!mongoose.Types.ObjectId.isValid(specialist)) {
+        return new Set();
+    }
+
+    const specialistDoc = await Specialist.findById(
+        specialist,
         { disponibilites: 1 }
     ).lean();
 
     const availableTimes = new Set();
 
-    specialists.forEach((sp) => {
-        if (!Array.isArray(sp.disponibilites)) return;
-        sp.disponibilites.forEach((slot) => {
-            const slotDate = new Date(slot);
-            if (
-                slotDate >= startOfDay &&
-                slotDate <= endOfDay
-            ) {
-                availableTimes.add(formatTime(slotDate));
-            }
-        });
+    if (!specialistDoc || !Array.isArray(specialistDoc.disponibilites)) {
+        return availableTimes;
+    }
+
+    specialistDoc.disponibilites.forEach((slot) => {
+        const slotDate = new Date(slot);
+        if (slotDate >= startOfDay && slotDate <= endOfDay) {
+            availableTimes.add(formatTime(slotDate));
+        }
     });
 
     return availableTimes;
@@ -361,6 +394,13 @@ export async function getAvailableSlots(specialist, date) {
             code: "INVALID_INPUT",
             message:
                 "Spécialiste et date sont requis pour les créneaux.",
+        };
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(specialist)) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Identifiant de spécialiste invalide.",
         };
     }
 

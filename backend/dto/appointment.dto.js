@@ -10,7 +10,7 @@
  */
 export function toCreateAppointmentDTO(body) {
     return {
-        patientInsuranceNumber: body.patientInsuranceNumber?.trim(),
+        patient: body.patient?.trim(),
         specialist: body.specialist?.trim(),
         date: body.date,
         time: body.time,

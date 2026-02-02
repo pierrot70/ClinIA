@@ -9,6 +9,14 @@ import {
     type Appointment,
     type AppointmentStatus,
 } from "../services/appointmentsApi";
+import {
+    fetchPatientsPaginated,
+    type Patient,
+} from "../services/patientsApi";
+import {
+    fetchSpecialistsPaginated,
+    type Specialist,
+} from "../services/specialistsApi";
 import type { ApiError } from "../types/api";
 
 /* ------------------------------------------------------------------ */
@@ -35,6 +43,8 @@ export function AppointmentsListPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const [busyIds, setBusyIds] = useState<Record<string, boolean>>({});
+    const [patients, setPatients] = useState<Patient[]>([]);
+    const [specialists, setSpecialists] = useState<Specialist[]>([]);
 
     /* ---------------- Edition horaire ---------------- */
 
@@ -80,6 +90,90 @@ export function AppointmentsListPage() {
         loadAppointments();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters, page]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadAllPatients() {
+            const pageSize = 50;
+            let currentPage = 1;
+            let totalPages = 1;
+            const all: Patient[] = [];
+
+            while (currentPage <= totalPages) {
+                const response = await fetchPatientsPaginated({
+                    page: currentPage,
+                    limit: pageSize,
+                });
+
+                if ("error" in response) {
+                    break;
+                }
+
+                all.push(...response.data.data);
+                totalPages = Math.max(
+                    response.data.meta.totalPages || 1,
+                    1
+                );
+                currentPage += 1;
+            }
+
+            if (!cancelled) {
+                setPatients(all);
+            }
+        }
+
+        loadAllPatients();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadAllSpecialists() {
+            const pageSize = 50;
+            let currentPage = 1;
+            let totalPages = 1;
+            const all: Specialist[] = [];
+
+            while (currentPage <= totalPages) {
+                const response = await fetchSpecialistsPaginated({
+                    page: currentPage,
+                    limit: pageSize,
+                });
+
+                if ("error" in response) {
+                    break;
+                }
+
+                all.push(...response.data.data);
+                totalPages = Math.max(
+                    response.data.meta.totalPages || 1,
+                    1
+                );
+                currentPage += 1;
+            }
+
+            if (!cancelled) {
+                setSpecialists(
+                    all.sort((a, b) => {
+                        const an = `${a.prenom} ${a.nom}`.trim();
+                        const bn = `${b.prenom} ${b.nom}`.trim();
+                        return an.localeCompare(bn, "fr");
+                    })
+                );
+            }
+        }
+
+        loadAllSpecialists();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
         return () => {
@@ -156,6 +250,108 @@ export function AppointmentsListPage() {
         setTotalPages(response.data.meta.totalPages);
 
         setLoading(false);
+    }
+
+    const specialistLookup = useMemo(() => {
+        const byId = new Map<string, Specialist>();
+        const byNumero = new Map<string, Specialist>();
+        const bySpecialite = new Map<string, Specialist[]>();
+
+        specialists.forEach((sp) => {
+            if (sp._id) {
+                byId.set(sp._id, sp);
+            }
+            if (sp.numero_medecin) {
+                byNumero.set(sp.numero_medecin, sp);
+            }
+            if (sp.specialite) {
+                const key = sp.specialite;
+                const existing = bySpecialite.get(key);
+                if (existing) {
+                    existing.push(sp);
+                } else {
+                    bySpecialite.set(key, [sp]);
+                }
+            }
+        });
+
+        return { byId, byNumero, bySpecialite };
+    }, [specialists]);
+
+    const patientLookup = useMemo(() => {
+        const byId = new Map<string, Patient>();
+        const byRamq = new Map<string, Patient>();
+
+        patients.forEach((p) => {
+            if (p._id) {
+                byId.set(p._id, p);
+            }
+            if (p.num_assurance_maladie) {
+                byRamq.set(p.num_assurance_maladie, p);
+            }
+        });
+
+        return { byId, byRamq };
+    }, [patients]);
+
+    function resolveSpecialist(raw: string) {
+        if (!raw) return null;
+
+        const fromId = specialistLookup.byId.get(raw);
+        if (fromId) return fromId;
+
+        const fromNumero = specialistLookup.byNumero.get(raw);
+        if (fromNumero) return fromNumero;
+
+        const fromSpecialite = specialistLookup.bySpecialite.get(raw);
+        if (fromSpecialite && fromSpecialite.length === 1) {
+            return fromSpecialite[0];
+        }
+
+        return null;
+    }
+
+    function formatSpecialistName(specialist: Specialist | null) {
+        if (!specialist) return "—";
+        const label = `${specialist.prenom} ${specialist.nom}`.trim();
+        return label || "—";
+    }
+
+    function formatPatientName(appointment: Appointment) {
+        const byId = appointment.patient
+            ? patientLookup.byId.get(appointment.patient)
+            : undefined;
+        const byRamq = appointment.patientInsuranceNumber
+            ? patientLookup.byRamq.get(
+                  appointment.patientInsuranceNumber
+              )
+            : undefined;
+        const patient = byId || byRamq;
+        if (!patient) return "—";
+        const label = `${patient.prenom} ${patient.nom}`.trim();
+        return label || "—";
+    }
+
+    function normalizeSpecialties(value: unknown) {
+        if (Array.isArray(value)) {
+            return value.map(String).map((item) => item.trim()).filter(Boolean);
+        }
+        if (typeof value === "string") {
+            return value
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean);
+        }
+        return [];
+    }
+
+    function formatSpecialties(
+        specialist: Specialist | null,
+        fallback: string
+    ) {
+        if (!specialist) return fallback || "—";
+        const list = normalizeSpecialties(specialist.specialite);
+        return list.length > 0 ? list.join(", ") : fallback || "—";
     }
 
     function showToast(
@@ -312,15 +508,25 @@ export function AppointmentsListPage() {
                     }}
                 />
 
-                <input
+                <select
                     className="border rounded p-2"
-                    placeholder="Spécialiste"
                     value={specialist}
                     onChange={(e) => {
                         setPage(1);
                         setSpecialist(e.target.value);
                     }}
-                />
+                >
+                    <option value="">Tous les spécialistes</option>
+                    {specialists.map((sp) => (
+                        <option key={sp._id} value={sp._id}>
+                            {`${sp.prenom} ${sp.nom}${
+                                sp.specialite
+                                    ? ` — ${sp.specialite}`
+                                    : ""
+                            }`}
+                        </option>
+                    ))}
+                </select>
 
                 <select
                     className="border rounded p-2"
@@ -358,6 +564,7 @@ export function AppointmentsListPage() {
                         <tr>
                             <th className="p-2">Patient</th>
                             <th className="p-2">Spécialiste</th>
+                            <th className="p-2">Spécialités</th>
                             <th className="p-2">Date</th>
                             <th className="p-2">Heure</th>
                             <th className="p-2">Statut</th>
@@ -365,12 +572,27 @@ export function AppointmentsListPage() {
                         </tr>
                         </thead>
                         <tbody>
-                        {appointments.map((a) => (
+                        {appointments.map((a) => {
+                            const resolvedSpecialist = resolveSpecialist(
+                                a.specialist
+                            );
+
+                            return (
                             <tr key={a._id} className="border-t">
-                                <td className="p-2 font-mono">
-                                    {a.patientInsuranceNumber}
+                                <td className="p-2">
+                                    {formatPatientName(a)}
                                 </td>
-                                <td className="p-2">{a.specialist}</td>
+                                <td className="p-2">
+                                    {formatSpecialistName(
+                                        resolvedSpecialist
+                                    )}
+                                </td>
+                                <td className="p-2">
+                                    {formatSpecialties(
+                                        resolvedSpecialist,
+                                        ""
+                                    )}
+                                </td>
                                 <td className="p-2">
                                     {editingId === a._id ? (
                                         <input
@@ -545,7 +767,8 @@ export function AppointmentsListPage() {
                                     )}
                                 </td>
                             </tr>
-                        ))}
+                            );
+                        })}
                         </tbody>
                     </table>
 

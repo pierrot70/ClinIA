@@ -8,8 +8,11 @@ import {
     fetchPatientsPaginated,
     type Patient,
 } from "../services/patientsApi";
+import {
+    fetchSpecialistsPaginated,
+    type Specialist,
+} from "../services/specialistsApi";
 import type { ApiError } from "../types/api";
-import { SPECIALTIES } from "../data/specialties";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -18,6 +21,7 @@ import { SPECIALTIES } from "../data/specialties";
 export function AppointmentsPage() {
     const [searchParams] = useSearchParams();
     const [insuranceNumber, setInsuranceNumber] = useState("");
+    const [patientId, setPatientId] = useState("");
     const [specialist, setSpecialist] = useState("");
     const [date, setDate] = useState("");
     const [time, setTime] = useState("");
@@ -42,7 +46,11 @@ export function AppointmentsPage() {
         useState(false);
     const [searchTimer, setSearchTimer] =
         useState<number | null>(null);
-    const [ramqInitialized, setRamqInitialized] = useState(false);
+    const [specialists, setSpecialists] = useState<Specialist[]>([]);
+    const [specialistsLoading, setSpecialistsLoading] =
+        useState(false);
+    const [specialistsError, setSpecialistsError] =
+        useState<ApiError | null>(null);
 
     /* ------------------------------------------------------------------ */
     /* Initialisation date                                                */
@@ -54,29 +62,70 @@ export function AppointmentsPage() {
     }, []);
 
     /* ------------------------------------------------------------------ */
-    /* Numéro RAMQ factice                                                */
+    /* Chargement des spécialistes                                         */
     /* ------------------------------------------------------------------ */
 
-    function generateRamqNumber() {
-        const digits = Array.from({ length: 10 }, () =>
-            Math.floor(Math.random() * 10).toString()
-        ).join("");
-        return `RAMQ${digits}`;
-    }
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadAllSpecialists() {
+            setSpecialistsLoading(true);
+            setSpecialistsError(null);
+            const pageSize = 50;
+            let currentPage = 1;
+            let totalPages = 1;
+            const all: Specialist[] = [];
+
+            while (currentPage <= totalPages) {
+                const response = await fetchSpecialistsPaginated({
+                    page: currentPage,
+                    limit: pageSize,
+                });
+
+                if ("error" in response) {
+                    if (!cancelled) {
+                        setSpecialistsError(response.error);
+                    }
+                    break;
+                }
+
+                all.push(...response.data.data);
+                totalPages = Math.max(
+                    response.data.meta.totalPages || 1,
+                    1
+                );
+                currentPage += 1;
+            }
+
+            if (!cancelled) {
+                setSpecialists(
+                    all.sort((a, b) => {
+                        const an = `${a.prenom} ${a.nom}`.trim();
+                        const bn = `${b.prenom} ${b.nom}`.trim();
+                        return an.localeCompare(bn, "fr");
+                    })
+                );
+                setSpecialistsLoading(false);
+            }
+        }
+
+        loadAllSpecialists();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    /* ------------------------------------------------------------------ */
+    /* Numéro RAMQ factice                                                */
+    /* ------------------------------------------------------------------ */
 
     useEffect(() => {
         const ramq = searchParams.get("ramq");
         if (ramq) {
             setInsuranceNumber(ramq);
-            setRamqInitialized(true);
-            return;
         }
-
-        if (!ramqInitialized) {
-            setInsuranceNumber(generateRamqNumber());
-            setRamqInitialized(true);
-        }
-    }, [searchParams, ramqInitialized]);
+    }, [searchParams]);
 
     /* ------------------------------------------------------------------ */
     /* Recherche patients                                                 */
@@ -182,7 +231,7 @@ export function AppointmentsPage() {
     /* ------------------------------------------------------------------ */
 
     const isComplete =
-        insuranceNumber.trim() &&
+        patientId.trim() &&
         specialist.trim() &&
         date.trim() &&
         time.trim();
@@ -199,7 +248,7 @@ export function AppointmentsPage() {
         setSuccess(false);
 
         const response = await createAppointment({
-            patientInsuranceNumber: insuranceNumber,
+            patient: patientId,
             specialist,
             date,
             time,
@@ -254,9 +303,9 @@ export function AppointmentsPage() {
             <div className="grid grid-cols-1 gap-4">
                 <input
                     className="border-2 border-red-500 rounded p-2"
-                    placeholder="Numéro d’assurance maladie *"
+                    placeholder="Numéro d’assurance maladie (auto)"
                     value={insuranceNumber}
-                    onChange={(e) => setInsuranceNumber(e.target.value)}
+                    readOnly
                 />
 
                 <div className="border rounded p-3 bg-gray-50 space-y-2">
@@ -322,9 +371,12 @@ export function AppointmentsPage() {
                                     key={p._id}
                                     type="button"
                                     onClick={() =>
-                                        setInsuranceNumber(
-                                            p.num_assurance_maladie
-                                        )
+                                        {
+                                            setPatientId(p._id);
+                                            setInsuranceNumber(
+                                                p.num_assurance_maladie
+                                            );
+                                        }
                                     }
                                     className="text-left border rounded p-2 hover:bg-gray-100"
                                 >
@@ -350,13 +402,26 @@ export function AppointmentsPage() {
                     value={specialist}
                     onChange={(e) => setSpecialist(e.target.value)}
                 >
-                    <option value="">Choisir un spécialiste *</option>
-                    {SPECIALTIES.map((specialite) => (
-                        <option key={specialite} value={specialite}>
-                            {specialite}
+                    <option value="">
+                        {specialistsLoading
+                            ? "Chargement des spécialistes…"
+                            : "Choisir un spécialiste *"}
+                    </option>
+                    {specialists.map((sp) => (
+                        <option key={sp._id} value={sp._id}>
+                            {`${sp.prenom} ${sp.nom}${
+                                sp.specialite
+                                    ? ` — ${sp.specialite}`
+                                    : ""
+                            }`}
                         </option>
                     ))}
                 </select>
+                {specialistsError && (
+                    <div className="text-xs text-red-600">
+                        {specialistsError.message}
+                    </div>
+                )}
 
                 {/* Priorité */}
                 <div className="flex items-center gap-6">

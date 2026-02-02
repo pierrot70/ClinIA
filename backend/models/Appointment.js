@@ -7,7 +7,15 @@ import { RAMQ_REGEX } from "../utils/validators.js";
 
 const AppointmentSchema = new mongoose.Schema(
     {
-        /** Identifiant patient (TEMPORAIRE, non sécurisé) */
+        /** Identifiant patient */
+        patient: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Patient",
+            required: true,
+            index: true,
+        },
+
+        /** Numéro RAMQ (dérivé du patient) */
         patientInsuranceNumber: {
             type: String,
             required: true,
@@ -16,12 +24,12 @@ const AppointmentSchema = new mongoose.Schema(
             match: RAMQ_REGEX,
         },
 
-        /** Spécialité médicale */
+        /** Spécialiste médical */
         specialist: {
-            type: String,
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Specialist",
             required: true,
             index: true,
-            trim: true,
         },
 
         /** Date du rendez-vous (YYYY-MM-DD) */

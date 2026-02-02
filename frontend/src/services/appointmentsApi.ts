@@ -12,7 +12,8 @@ if (!API_URL) {
 
 export interface Appointment {
     _id: string;
-    patientInsuranceNumber: string;
+    patient?: string;
+    patientInsuranceNumber?: string;
     specialist: string;
     date: string;
     time: string;
@@ -40,7 +41,7 @@ export interface PaginatedAppointments {
 }
 
 export interface CreateAppointmentPayload {
-    patientInsuranceNumber: string;
+    patient: string;
     specialist: string;
     date: string; // YYYY-MM-DD
     time: string; // HH:mm
