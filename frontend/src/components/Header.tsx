@@ -1,5 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
+import VoiceNavButton from "./VoiceNavButton";
 
 const Header: React.FC = () => {
     const location = useLocation();
@@ -68,6 +69,7 @@ const Header: React.FC = () => {
 
                 {/* ---------- NAVIGATION ---------- */}
                 <nav className="flex items-center gap-4 text-sm">
+                    <VoiceNavButton />
 
                     <Link to="/" className={linkClass("/")}>
                         Accueil
