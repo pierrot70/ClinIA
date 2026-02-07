@@ -178,12 +178,19 @@ export function SpecialistsPage() {
         ).padStart(2, "0")}`;
     });
     const [activeDay, setActiveDay] = useState<string | null>(null);
+    const [lastClickedSlot, setLastClickedSlot] = useState<string | null>(
+        null
+    );
     const [viewMode, setViewMode] = useState<"create" | "list">("list");
 
     useEffect(() => {
         void loadSpecialists();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters, page]);
+
+    useEffect(() => {
+        setLastClickedSlot(null);
+    }, [activeDay]);
 
     useEffect(() => {
         void loadCliniqueOptions();
@@ -906,7 +913,8 @@ export function SpecialistsPage() {
                                     </div>
                                     <div className="text-xs text-gray-500">
                                         Cliquez pour activer/désactiver les
-                                        créneaux de 15 minutes.
+                                        créneaux de 15 minutes (shift pour
+                                        une plage).
                                     </div>
                                     <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
                                         {TIME_SLOTS.map((slot) => {
@@ -942,7 +950,46 @@ export function SpecialistsPage() {
                                                             ? "opacity-40 cursor-not-allowed"
                                                             : ""
                                                     }`}
-                                                    onClick={() => {
+                                                    onClick={(event) => {
+                                                        const range =
+                                                            lastClickedSlot &&
+                                                            event.shiftKey
+                                                                ? (() => {
+                                                                      const startIndex =
+                                                                          TIME_SLOTS.indexOf(
+                                                                              lastClickedSlot
+                                                                          );
+                                                                      const endIndex =
+                                                                          TIME_SLOTS.indexOf(
+                                                                              slot
+                                                                          );
+                                                                      if (
+                                                                          startIndex ===
+                                                                              -1 ||
+                                                                          endIndex ===
+                                                                              -1
+                                                                      ) {
+                                                                          return [
+                                                                              slot,
+                                                                          ];
+                                                                      }
+                                                                      const from =
+                                                                          Math.min(
+                                                                              startIndex,
+                                                                              endIndex
+                                                                          );
+                                                                      const to =
+                                                                          Math.max(
+                                                                              startIndex,
+                                                                              endIndex
+                                                                          );
+                                                                      return TIME_SLOTS.slice(
+                                                                          from,
+                                                                          to +
+                                                                              1
+                                                                      );
+                                                                  })()
+                                                                : null;
                                                         setForm((p) => ({
                                                             ...p,
                                                             disponibilites:
@@ -954,24 +1001,36 @@ export function SpecialistsPage() {
                                                                         activeDay
                                                                             ? {
                                                                                   ...current,
-                                                                                  slots: current.slots.includes(
-                                                                                      slot
-                                                                                  )
-                                                                                      ? current.slots.filter(
-                                                                                            (
-                                                                                                item
-                                                                                            ) =>
-                                                                                                item !==
-                                                                                                slot
+                                                                                  slots: range
+                                                                                      ? Array.from(
+                                                                                            new Set(
+                                                                                                [
+                                                                                                    ...current.slots,
+                                                                                                    ...range,
+                                                                                                ]
+                                                                                            )
                                                                                         )
-                                                                                      : [
-                                                                                            ...current.slots,
-                                                                                            slot,
-                                                                                        ],
+                                                                                      : current.slots.includes(
+                                                                                            slot
+                                                                                        )
+                                                                                          ? current.slots.filter(
+                                                                                                (
+                                                                                                    item
+                                                                                                ) =>
+                                                                                                    item !==
+                                                                                                    slot
+                                                                                            )
+                                                                                          : [
+                                                                                                ...current.slots,
+                                                                                                slot,
+                                                                                            ],
                                                                               }
                                                                             : current
                                                                 ),
                                                         }));
+                                                        setLastClickedSlot(
+                                                            slot
+                                                        );
                                                     }}
                                                 >
                                                     {slot}
@@ -1123,10 +1182,10 @@ export function SpecialistsPage() {
                             <thead className="bg-gray-100 text-gray-700">
                         <tr>
                             <th className="text-left p-2">
-                                Prénom
+                                Nom
                             </th>
                             <th className="text-left p-2">
-                                Nom
+                                Prénom
                             </th>
                             <th className="text-left p-2">
                                 Numéro médecin
@@ -1209,10 +1268,10 @@ export function SpecialistsPage() {
                                                 }`}
                                             >
                                                 <td className="p-2">
-                                                    {sp.prenom}
+                                                    {sp.nom}
                                                 </td>
                                                 <td className="p-2">
-                                                    {sp.nom}
+                                                    {sp.prenom}
                                                 </td>
                                                 <td className="p-2">
                                                     {sp.numero_medecin}
