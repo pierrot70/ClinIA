@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
     createPatient,
@@ -10,6 +10,52 @@ import {
 } from "../services/patientsApi";
 import type { ApiError } from "../types/api";
 import { useDebounce } from "../hooks/useDebounce";
+
+declare global {
+    interface Window {
+        google?: any;
+    }
+}
+
+let mapsScriptPromise: Promise<void> | null = null;
+
+function loadGoogleMapsScript(apiKey: string): Promise<void> {
+    if (window.google?.maps?.places) {
+        return Promise.resolve();
+    }
+
+    if (mapsScriptPromise) {
+        return mapsScriptPromise;
+    }
+
+    mapsScriptPromise = new Promise((resolve, reject) => {
+        const existing = document.getElementById(
+            "google-maps-places"
+        ) as HTMLScriptElement | null;
+
+        if (existing) {
+            existing.addEventListener("load", () => resolve());
+            existing.addEventListener("error", () =>
+                reject(new Error("Google Maps script error."))
+            );
+            return;
+        }
+
+        const script = document.createElement("script");
+        script.id = "google-maps-places";
+        script.async = true;
+        script.defer = true;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
+            apiKey
+        )}&libraries=places`;
+        script.onload = () => resolve();
+        script.onerror = () =>
+            reject(new Error("Google Maps script error."));
+        document.head.appendChild(script);
+    });
+
+    return mapsScriptPromise;
+}
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -55,6 +101,83 @@ export function PatientsPage() {
         texto: false,
     });
     const [viewMode, setViewMode] = useState<"create" | "list">("list");
+    const addressInputRef = useRef<HTMLInputElement | null>(null);
+    const autocompleteRef = useRef<any>(null);
+
+    useEffect(() => {
+        if (viewMode !== "create") return;
+
+        let cancelled = false;
+        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as
+            | string
+            | undefined;
+
+        if (!apiKey) {
+            return;
+        }
+
+        async function initAutocomplete() {
+            if (!addressInputRef.current || !window.google?.maps?.places) {
+                return false;
+            }
+
+            autocompleteRef.current =
+                new window.google.maps.places.Autocomplete(
+                    addressInputRef.current,
+                    {
+                        types: ["address"],
+                        fields: ["formatted_address", "geometry"],
+                        componentRestrictions: { country: "ca" },
+                    }
+                );
+
+            autocompleteRef.current.addListener(
+                "place_changed",
+                () => {
+                    if (cancelled) return;
+                    const place =
+                        autocompleteRef.current.getPlace?.();
+                    const formatted =
+                        place?.formatted_address ?? "";
+                    const lat =
+                        place?.geometry?.location?.lat?.();
+                    const lng =
+                        place?.geometry?.location?.lng?.();
+
+                    setForm((p) => ({
+                        ...p,
+                        addresse: formatted || p.addresse,
+                        lat:
+                            typeof lat === "number"
+                                ? lat.toString()
+                                : p.lat,
+                        long:
+                            typeof lng === "number"
+                                ? lng.toString()
+                                : p.long,
+                    }));
+                }
+            );
+
+            return true;
+        }
+
+        loadGoogleMapsScript(apiKey)
+            .then(() => initAutocomplete())
+            .catch(() => {
+                // Silence: autocomplete will remain disabled.
+            });
+
+        return () => {
+            cancelled = true;
+            if (autocompleteRef.current && window.google?.maps?.event) {
+                window.google.maps.event.clearInstanceListeners(
+                    autocompleteRef.current
+                );
+            }
+            autocompleteRef.current = null;
+        };
+    }, [viewMode]);
 
     useEffect(() => {
         loadPatients();
@@ -381,6 +504,8 @@ export function PatientsPage() {
                             className="border rounded p-2"
                             placeholder="Adresse (optionnel)"
                             value={form.addresse}
+                            ref={addressInputRef}
+                            autoComplete="off"
                             onChange={(e) =>
                                 setForm((p) => ({
                                     ...p,
