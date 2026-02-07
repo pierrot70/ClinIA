@@ -702,7 +702,7 @@ export function AppointmentsListPage() {
                                         <span
                                             className={
                                                 recentlyUpdatedId === a._id
-                                                    ? "time-flash"
+                                                    ? "animate-time-flash inline-block rounded px-1 py-0.5"
                                                     : ""
                                             }
                                         >
