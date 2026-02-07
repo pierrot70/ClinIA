@@ -19,6 +19,25 @@ const SearchBar: React.FC = () => {
   }, [navigate, query]);
 
   useEffect(() => {
+    const consumeBufferedDictation = () => {
+      const buffered = (window as any).__cliniaLastDictation as
+        | string
+        | undefined;
+      if (!buffered) {
+        return;
+      }
+      (window as any).__cliniaLastDictation = "";
+      setQuery((prev) => {
+        const nextText = buffered.trim();
+        if (!nextText) {
+          return prev;
+        }
+        return prev ? `${prev} ${nextText}` : nextText;
+      });
+    };
+
+    consumeBufferedDictation();
+
     const handleDictation = (event: Event) => {
       const detail = (event as CustomEvent<{ text: string }>).detail;
       if (!detail?.text) {

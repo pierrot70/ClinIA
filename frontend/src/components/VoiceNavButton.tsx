@@ -210,6 +210,7 @@ const VoiceNavButton: React.FC = () => {
             }
 
             if (voiceMode === "dictation" || location.pathname === "/") {
+                (window as any).__cliniaLastDictation = transcript;
                 window.dispatchEvent(
                     new CustomEvent("clinia:voice-dictation", {
                         detail: { text: transcript },
