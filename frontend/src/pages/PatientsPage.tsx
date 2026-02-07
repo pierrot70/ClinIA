@@ -65,8 +65,8 @@ export function PatientsPage() {
         setLoading(true);
         setError(null);
 
-        const nomFilter = filters.prenom || undefined;
-        const prenomFilter = filters.nom || undefined;
+        const nomFilter = filters.nom || undefined;
+        const prenomFilter = filters.prenom || undefined;
         const telFilter = filters.telephone || undefined;
 
         const baseQuery = {
