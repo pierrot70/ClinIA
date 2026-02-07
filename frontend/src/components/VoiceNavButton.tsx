@@ -298,6 +298,11 @@ const VoiceNavButton: React.FC = () => {
 
         setIsHandsFree(true);
         isHandsFreeRef.current = true;
+        if (typeof window !== "undefined" && "speechSynthesis" in window) {
+            window.speechSynthesis.getVoices();
+            speak("Mode vocal actif.");
+            return;
+        }
         startListening();
     };
 
