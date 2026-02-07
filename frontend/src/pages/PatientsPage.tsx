@@ -495,8 +495,8 @@ export function PatientsPage() {
                         <table className="w-full text-sm">
                             <thead className="bg-gray-100 text-gray-700">
                                 <tr>
-                                    <th className="text-left p-2">Prénom</th>
                                     <th className="text-left p-2">Nom</th>
+                                    <th className="text-left p-2">Prénom</th>
                                     <th className="text-left p-2">Adresse</th>
                                     <th className="text-left p-2">Téléphone</th>
                                     <th className="text-left p-2">RAMQ</th>
@@ -531,10 +531,10 @@ export function PatientsPage() {
                                             className="border-t"
                                         >
                                             <td className="p-2">
-                                                {p.prenom}
+                                                {p.nom}
                                             </td>
                                             <td className="p-2">
-                                                {p.nom}
+                                                {p.prenom}
                                             </td>
                                             <td className="p-2">
                                                 {p.addresse || "—"}
