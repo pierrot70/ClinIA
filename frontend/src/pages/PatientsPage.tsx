@@ -73,17 +73,33 @@ export function PatientsPage() {
 
     const [filterNom, setFilterNom] = useState("");
     const [filterPrenom, setFilterPrenom] = useState("");
+    const [filterAddresse, setFilterAddresse] = useState("");
     const [filterTelephone, setFilterTelephone] = useState("");
     const [filterRamq, setFilterRamq] = useState("");
+    const [sortBy, setSortBy] = useState<
+        "nom" | "prenom" | "addresse" | "telephone" | "num_assurance_maladie"
+    >("nom");
+    const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
     const rawFilters = useMemo(
         () => ({
             nom: filterNom,
             prenom: filterPrenom,
+            addresse: filterAddresse,
             telephone: filterTelephone,
             ramq: filterRamq,
+            sortBy,
+            sortDir,
         }),
-        [filterNom, filterPrenom, filterTelephone, filterRamq]
+        [
+            filterNom,
+            filterPrenom,
+            filterAddresse,
+            filterTelephone,
+            filterRamq,
+            sortBy,
+            sortDir,
+        ]
     );
 
     const filters = useDebounce(rawFilters, 300);
@@ -191,6 +207,7 @@ export function PatientsPage() {
         const nomFilter = filters.nom || undefined;
         const prenomFilter = filters.prenom || undefined;
         const telFilter = filters.telephone || undefined;
+        const addresseFilter = filters.addresse || undefined;
 
         const baseQuery = {
             page,
@@ -198,6 +215,9 @@ export function PatientsPage() {
             nom: nomFilter,
             prenom: prenomFilter,
             num_assurance_maladie: filters.ramq || undefined,
+            addresse: addresseFilter,
+            sortBy: filters.sortBy,
+            sortDir: filters.sortDir,
         };
 
         const shouldUsePhoneOnly =
@@ -401,6 +421,37 @@ export function PatientsPage() {
         await loadPatients();
     }
 
+    function toggleSort(
+        field:
+            | "nom"
+            | "prenom"
+            | "addresse"
+            | "telephone"
+            | "num_assurance_maladie"
+    ) {
+        setPage(1);
+        setSortBy((current) => {
+            if (current === field) {
+                setSortDir((dir) => (dir === "asc" ? "desc" : "asc"));
+                return current;
+            }
+            setSortDir("asc");
+            return field;
+        });
+    }
+
+    function sortLabel(
+        field:
+            | "nom"
+            | "prenom"
+            | "addresse"
+            | "telephone"
+            | "num_assurance_maladie"
+    ) {
+        if (sortBy !== field) return "";
+        return sortDir === "asc" ? " ▲" : " ▼";
+    }
+
     return (
         <div className="max-w-6xl mx-auto p-6 space-y-6">
             <h1 className="text-2xl font-semibold">Patients</h1>
@@ -597,6 +648,15 @@ export function PatientsPage() {
                             />
                             <input
                                 className="border rounded p-2"
+                                placeholder="Adresse"
+                                value={filterAddresse}
+                                onChange={(e) => {
+                                    setPage(1);
+                                    setFilterAddresse(e.target.value);
+                                }}
+                            />
+                            <input
+                                className="border rounded p-2"
                                 placeholder="Téléphone"
                                 value={filterTelephone}
                                 onChange={(e) => {
@@ -620,11 +680,64 @@ export function PatientsPage() {
                         <table className="w-full text-sm">
                             <thead className="bg-gray-100 text-gray-700">
                                 <tr>
-                                    <th className="text-left p-2">Nom</th>
-                                    <th className="text-left p-2">Prénom</th>
-                                    <th className="text-left p-2">Adresse</th>
-                                    <th className="text-left p-2">Téléphone</th>
-                                    <th className="text-left p-2">RAMQ</th>
+                                    <th className="text-left p-2">
+                                        <button
+                                            type="button"
+                                            className="hover:underline"
+                                            onClick={() => toggleSort("nom")}
+                                        >
+                                            Nom{sortLabel("nom")}
+                                        </button>
+                                    </th>
+                                    <th className="text-left p-2">
+                                        <button
+                                            type="button"
+                                            className="hover:underline"
+                                            onClick={() =>
+                                                toggleSort("prenom")
+                                            }
+                                        >
+                                            Prénom{sortLabel("prenom")}
+                                        </button>
+                                    </th>
+                                    <th className="text-left p-2">
+                                        <button
+                                            type="button"
+                                            className="hover:underline"
+                                            onClick={() =>
+                                                toggleSort("addresse")
+                                            }
+                                        >
+                                            Adresse{sortLabel("addresse")}
+                                        </button>
+                                    </th>
+                                    <th className="text-left p-2">
+                                        <button
+                                            type="button"
+                                            className="hover:underline"
+                                            onClick={() =>
+                                                toggleSort("telephone")
+                                            }
+                                        >
+                                            Téléphone{sortLabel("telephone")}
+                                        </button>
+                                    </th>
+                                    <th className="text-left p-2">
+                                        <button
+                                            type="button"
+                                            className="hover:underline"
+                                            onClick={() =>
+                                                toggleSort(
+                                                    "num_assurance_maladie"
+                                                )
+                                            }
+                                        >
+                                            RAMQ
+                                            {sortLabel(
+                                                "num_assurance_maladie"
+                                            )}
+                                        </button>
+                                    </th>
                                     <th className="text-left p-2">Actions</th>
                                 </tr>
                             </thead>

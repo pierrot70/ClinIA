@@ -82,14 +82,35 @@ export async function listPatients(filters = {}, opts = {}) {
             $options: "i",
         };
     }
+    if (filters.addresse) {
+        query.addresse = {
+            $regex: filters.addresse,
+            $options: "i",
+        };
+    }
 
     const page = Math.max(parseInt(opts.page) || 1, 1);
     const limit = Math.min(parseInt(opts.limit) || 10, 50);
     const skip = (page - 1) * limit;
+    const allowedSorts = new Set([
+        "nom",
+        "prenom",
+        "addresse",
+        "telephone",
+        "num_assurance_maladie",
+    ]);
+    const sortBy = allowedSorts.has(opts.sortBy)
+        ? opts.sortBy
+        : "nom";
+    const sortDir = opts.sortDir === "desc" ? -1 : 1;
+    const sort =
+        sortBy === "prenom"
+            ? { prenom: sortDir, nom: 1 }
+            : { [sortBy]: sortDir, prenom: 1 };
 
     const [data, total] = await Promise.all([
         Patient.find(query)
-            .sort({ nom: 1, prenom: 1 })
+            .sort(sort)
             .skip(skip)
             .limit(limit)
             .lean(),

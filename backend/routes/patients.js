@@ -89,10 +89,13 @@ router.get("/", async (req, res) => {
                 num_assurance_maladie:
                     req.query.num_assurance_maladie,
                 telephone: req.query.telephone,
+                addresse: req.query.addresse,
             },
             {
                 page: req.query.page,
                 limit: req.query.limit,
+                sortBy: req.query.sortBy,
+                sortDir: req.query.sortDir,
             }
         );
 

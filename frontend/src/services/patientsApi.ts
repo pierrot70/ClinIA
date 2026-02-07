@@ -77,6 +77,9 @@ export async function fetchPatientsPaginated(
         prenom?: string;
         num_assurance_maladie?: string;
         telephone?: string;
+        addresse?: string;
+        sortBy?: string;
+        sortDir?: "asc" | "desc";
     }
 ): Promise<ApiResponse<PaginatedPatients>> {
     const query = new URLSearchParams();
@@ -91,6 +94,15 @@ export async function fetchPatientsPaginated(
     }
     if (params.telephone) {
         query.set("telephone", params.telephone);
+    }
+    if (params.addresse) {
+        query.set("addresse", params.addresse);
+    }
+    if (params.sortBy) {
+        query.set("sortBy", params.sortBy);
+    }
+    if (params.sortDir) {
+        query.set("sortDir", params.sortDir);
     }
 
     try {
