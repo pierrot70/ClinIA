@@ -23,6 +23,20 @@ const COMMANDS: Command[] = [
         keywords: ["rendez vous", "rendez-vous", "rdv"],
     },
     {
+        label: "Accueil",
+        path: "/",
+        keywords: [
+            "retourne a la maison",
+            "retour a la maison",
+            "retour a l accueil",
+            "retour a l'accueil",
+            "retour a laccueil",
+            "accueil",
+            "maison",
+            "home",
+        ],
+    },
+    {
         label: "Patients",
         path: "/patients",
         keywords: ["patients", "patient"],
@@ -142,7 +156,7 @@ const VoiceNavButton: React.FC = () => {
                         ? "border-red-200 bg-red-50 text-red-700"
                         : "border-gray-200 text-gray-700 hover:bg-gray-50")
                 }
-                title="Dire: ouvre la page des rendez-vous, patients, cliniques, specialistes"
+                title="Dire: ouvre la page des rendez-vous, patients, cliniques, specialistes; retourne a la maison"
             >
                 {isListening ? "Ecoute..." : "Commande vocale"}
             </button>
