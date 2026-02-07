@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -13,10 +13,44 @@ const SearchBar: React.FC = () => {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
 
-  const handleSearch = () => {
+  const handleSearch = useCallback(() => {
     const q = query.trim() || suggestions[0];
     navigate(`/results?q=${encodeURIComponent(q)}`);
-  };
+  }, [navigate, query]);
+
+  useEffect(() => {
+    const handleDictation = (event: Event) => {
+      const detail = (event as CustomEvent<{ text: string }>).detail;
+      if (!detail?.text) {
+        return;
+      }
+      setQuery((prev) => {
+        const nextText = detail.text.trim();
+        if (!nextText) {
+          return prev;
+        }
+        return prev ? `${prev} ${nextText}` : nextText;
+      });
+    };
+
+    const handleExecute = () => {
+      handleSearch();
+    };
+
+    const handleClear = () => {
+      setQuery("");
+    };
+
+    window.addEventListener("clinia:voice-dictation", handleDictation);
+    window.addEventListener("clinia:voice-execute", handleExecute);
+    window.addEventListener("clinia:voice-clear", handleClear);
+
+    return () => {
+      window.removeEventListener("clinia:voice-dictation", handleDictation);
+      window.removeEventListener("clinia:voice-execute", handleExecute);
+      window.removeEventListener("clinia:voice-clear", handleClear);
+    };
+  }, [handleSearch]);
 
   return (
     <div className="w-full max-w-2xl space-y-3">

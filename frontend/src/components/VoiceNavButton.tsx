@@ -1,10 +1,17 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
-type Command = {
+type NavCommand = {
     label: string;
     path: string;
     keywords: string[];
+};
+
+type ActionCommand = {
+    label: string;
+    action: "dictation" | "execute" | "clear" | "stop";
+    keywords: string[];
+    response: string;
 };
 
 const normalizeText = (value: string) =>
@@ -16,7 +23,7 @@ const normalizeText = (value: string) =>
         .replace(/\s+/g, " ")
         .trim();
 
-const COMMANDS: Command[] = [
+const NAV_COMMANDS: NavCommand[] = [
     {
         label: "Rendez-vous",
         path: "/appointments",
@@ -62,11 +69,51 @@ const COMMANDS: Command[] = [
     },
 ];
 
+const ACTION_COMMANDS: ActionCommand[] = [
+    {
+        label: "Dictee",
+        action: "dictation",
+        keywords: ["dictee", "dicte", "dicter", "diagnostic"],
+        response: "Dites votre diagnostic.",
+    },
+    {
+        label: "Rechercher",
+        action: "execute",
+        keywords: ["execute", "recherche", "rechercher", "lancer"],
+        response: "Recherche lancee.",
+    },
+    {
+        label: "Effacer",
+        action: "clear",
+        keywords: ["efface", "effacer", "annule", "annuler", "vider"],
+        response: "Diagnostic efface.",
+    },
+    {
+        label: "Arret",
+        action: "stop",
+        keywords: ["arrete", "stop", "pause"],
+        response: "Ecoute arretee.",
+    },
+];
+
 const VoiceNavButton: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const [isListening, setIsListening] = useState(false);
+    const [isHandsFree, setIsHandsFree] = useState(false);
     const [status, setStatus] = useState<string | null>(null);
+    const [voiceMode, setVoiceMode] = useState<"navigation" | "dictation">(
+        "navigation"
+    );
     const recognitionRef = useRef<SpeechRecognition | null>(null);
+    const startListeningRef = useRef<() => void>(() => {});
+    const isHandsFreeRef = useRef(false);
+    const isSpeakingRef = useRef(false);
+    const isListeningRef = useRef(false);
+
+    useEffect(() => {
+        isHandsFreeRef.current = isHandsFree;
+    }, [isHandsFree]);
 
     const isSupported = useMemo(() => {
         if (typeof window === "undefined") {
@@ -77,24 +124,106 @@ const VoiceNavButton: React.FC = () => {
         );
     }, []);
 
+    const speak = useCallback((text: string) => {
+        if (typeof window === "undefined") {
+            return;
+        }
+        if (!("speechSynthesis" in window)) {
+            return;
+        }
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "fr-CA";
+        isSpeakingRef.current = true;
+        utterance.onend = () => {
+            isSpeakingRef.current = false;
+            if (isHandsFreeRef.current) {
+                startListeningRef.current();
+            }
+        };
+        utterance.onerror = () => {
+            isSpeakingRef.current = false;
+        };
+        recognitionRef.current?.stop();
+        window.speechSynthesis.speak(utterance);
+    }, []);
+
     const handleTranscript = useCallback(
         (transcript: string) => {
             const normalized = normalizeText(transcript);
-            const matched = COMMANDS.find((command) =>
+            const matchedNav = NAV_COMMANDS.find((command) =>
                 command.keywords.some((keyword) =>
                     normalized.includes(normalizeText(keyword))
                 )
             );
 
-            if (matched) {
-                setStatus(`Navigation: ${matched.label}`);
-                navigate(matched.path);
+            if (matchedNav) {
+                setStatus(`Navigation: ${matchedNav.label}`);
+                navigate(matchedNav.path);
+                if (matchedNav.path === "/") {
+                    setVoiceMode("dictation");
+                    speak("Retour a l'accueil.");
+                } else {
+                    setVoiceMode("navigation");
+                    speak(`Ouverture ${matchedNav.label}.`);
+                }
+                return;
+            }
+
+            const matchedAction = ACTION_COMMANDS.find((command) =>
+                command.keywords.some((keyword) =>
+                    normalized.includes(normalizeText(keyword))
+                )
+            );
+
+            if (matchedAction) {
+                setStatus(`Commande: ${matchedAction.label}`);
+                if (matchedAction.action === "dictation") {
+                    setVoiceMode("dictation");
+                    speak(matchedAction.response);
+                    return;
+                }
+                if (matchedAction.action === "execute") {
+                    window.dispatchEvent(
+                        new CustomEvent("clinia:voice-execute")
+                    );
+                    speak(matchedAction.response);
+                    return;
+                }
+                if (matchedAction.action === "clear") {
+                    window.dispatchEvent(
+                        new CustomEvent("clinia:voice-clear")
+                    );
+                    speak(matchedAction.response);
+                    return;
+                }
+                if (matchedAction.action === "stop") {
+                    recognitionRef.current?.stop();
+                    setIsHandsFree(false);
+                    isHandsFreeRef.current = false;
+                    setIsListening(false);
+                    isListeningRef.current = false;
+                    setStatus(matchedAction.response);
+                    speak(matchedAction.response);
+                    return;
+                }
+            }
+
+            if (voiceMode === "dictation" || location.pathname === "/") {
+                window.dispatchEvent(
+                    new CustomEvent("clinia:voice-dictation", {
+                        detail: { text: transcript },
+                    })
+                );
+                setVoiceMode("dictation");
+                setStatus("Diagnostic capture.");
+                speak("Diagnostic capture.");
                 return;
             }
 
             setStatus(`Commande non reconnue: "${transcript}"`);
         },
-        [navigate]
+        [location.pathname, navigate, speak, voiceMode]
     );
 
     const createRecognition = useCallback(() => {
@@ -107,6 +236,7 @@ const VoiceNavButton: React.FC = () => {
         recognition.lang = "fr-CA";
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
+        recognition.continuous = false;
         recognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript;
             handleTranscript(transcript);
@@ -114,12 +244,40 @@ const VoiceNavButton: React.FC = () => {
         recognition.onerror = (event) => {
             setStatus(`Erreur vocale: ${event.error}`);
             setIsListening(false);
+            isListeningRef.current = false;
         };
         recognition.onend = () => {
             setIsListening(false);
+            isListeningRef.current = false;
+            if (isSpeakingRef.current) {
+                return;
+            }
+            if (isHandsFreeRef.current) {
+                startListeningRef.current();
+            }
         };
         return recognition;
     }, [handleTranscript]);
+
+    const startListening = useCallback(() => {
+        if (isListeningRef.current) {
+            return;
+        }
+        const recognition = createRecognition();
+        if (!recognition) {
+            setStatus("Navigation vocale indisponible.");
+            return;
+        }
+        recognitionRef.current = recognition;
+        setStatus("Ecoute en cours...");
+        setIsListening(true);
+        isListeningRef.current = true;
+        recognition.start();
+    }, [createRecognition]);
+
+    useEffect(() => {
+        startListeningRef.current = startListening;
+    }, [startListening]);
 
     const toggleListening = () => {
         if (!isSupported) {
@@ -127,22 +285,19 @@ const VoiceNavButton: React.FC = () => {
             return;
         }
 
-        if (isListening) {
+        if (isHandsFree) {
             recognitionRef.current?.stop();
+            isListeningRef.current = false;
             setIsListening(false);
+            setIsHandsFree(false);
+            isHandsFreeRef.current = false;
+            setStatus("Ecoute arretee.");
             return;
         }
 
-        const recognition = createRecognition();
-        if (!recognition) {
-            setStatus("Navigation vocale indisponible.");
-            return;
-        }
-
-        recognitionRef.current = recognition;
-        setStatus("Ecoute en cours...");
-        setIsListening(true);
-        recognition.start();
+        setIsHandsFree(true);
+        isHandsFreeRef.current = true;
+        startListening();
     };
 
     return (
@@ -156,9 +311,13 @@ const VoiceNavButton: React.FC = () => {
                         ? "border-red-200 bg-red-50 text-red-700"
                         : "border-gray-200 text-gray-700 hover:bg-gray-50")
                 }
-                title="Dire: ouvre la page des rendez-vous, patients, cliniques, specialistes; retourne a la maison"
+                title="Dire: ouvre la page des rendez-vous, patients, cliniques, specialistes; retourne a la maison; execute; efface; arrete"
             >
-                {isListening ? "Ecoute..." : "Commande vocale"}
+                {isHandsFree
+                    ? isListening
+                        ? "Ecoute..."
+                        : "Vocal actif"
+                    : "Commande vocale"}
             </button>
             {status && (
                 <span className="text-xs text-gray-500" aria-live="polite">
