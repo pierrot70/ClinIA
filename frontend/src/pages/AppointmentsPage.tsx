@@ -1,9 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
     createAppointment,
     fetchAvailableSlots,
 } from "../services/appointmentsApi";
+import {
+    fetchCliniquesPaginated,
+    type Clinique,
+} from "../services/cliniqueApi";
 import {
     fetchPatientsPaginated,
     type Patient,
@@ -22,6 +26,8 @@ export function AppointmentsPage() {
     const [searchParams] = useSearchParams();
     const [insuranceNumber, setInsuranceNumber] = useState("");
     const [patientId, setPatientId] = useState("");
+    const [selectedPatient, setSelectedPatient] =
+        useState<Patient | null>(null);
     const [specialist, setSpecialist] = useState("");
     const [date, setDate] = useState("");
     const [time, setTime] = useState("");
@@ -51,6 +57,32 @@ export function AppointmentsPage() {
         useState(false);
     const [specialistsError, setSpecialistsError] =
         useState<ApiError | null>(null);
+    const [cliniques, setCliniques] = useState<Clinique[]>([]);
+    const [cliniquesLoading, setCliniquesLoading] = useState(false);
+    const [cliniquesError, setCliniquesError] =
+        useState<ApiError | null>(null);
+
+    function toRad(value: number) {
+        return (value * Math.PI) / 180;
+    }
+
+    function distanceKm(
+        lat1: number,
+        lon1: number,
+        lat2: number,
+        lon2: number
+    ) {
+        const r = 6371;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) *
+                Math.cos(toRad(lat2)) *
+                Math.sin(dLon / 2) *
+                Math.sin(dLon / 2);
+        return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
 
     /* ------------------------------------------------------------------ */
     /* Initialisation date                                                */
@@ -110,6 +142,55 @@ export function AppointmentsPage() {
         }
 
         loadAllSpecialists();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    /* ------------------------------------------------------------------ */
+    /* Chargement des cliniques                                            */
+    /* ------------------------------------------------------------------ */
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadAllCliniques() {
+            setCliniquesLoading(true);
+            setCliniquesError(null);
+            const pageSize = 50;
+            let currentPage = 1;
+            let totalPages = 1;
+            const all: Clinique[] = [];
+
+            while (currentPage <= totalPages) {
+                const response = await fetchCliniquesPaginated({
+                    page: currentPage,
+                    limit: pageSize,
+                });
+
+                if ("error" in response) {
+                    if (!cancelled) {
+                        setCliniquesError(response.error);
+                    }
+                    break;
+                }
+
+                all.push(...response.data.data);
+                totalPages = Math.max(
+                    response.data.meta.totalPages || 1,
+                    1
+                );
+                currentPage += 1;
+            }
+
+            if (!cancelled) {
+                setCliniques(all);
+                setCliniquesLoading(false);
+            }
+        }
+
+        loadAllCliniques();
 
         return () => {
             cancelled = true;
@@ -200,6 +281,61 @@ export function AppointmentsPage() {
             window.clearTimeout(timer);
         };
     }, [searchNom, searchPrenom, searchTelephone]);
+
+    const nearestCliniqueId = useMemo(() => {
+        if (
+            !selectedPatient ||
+            typeof selectedPatient.lat !== "number" ||
+            typeof selectedPatient.long !== "number"
+        ) {
+            return null;
+        }
+
+        let nearestId: string | null = null;
+        let nearestDistance = Number.POSITIVE_INFINITY;
+
+        cliniques.forEach((clinique) => {
+            if (
+                typeof clinique.lat !== "number" ||
+                typeof clinique.long !== "number"
+            ) {
+                return;
+            }
+
+            const d = distanceKm(
+                selectedPatient.lat,
+                selectedPatient.long,
+                clinique.lat,
+                clinique.long
+            );
+
+            if (d < nearestDistance) {
+                nearestDistance = d;
+                nearestId = clinique._id;
+            }
+        });
+
+        return nearestId;
+    }, [cliniques, selectedPatient]);
+
+    const filteredSpecialists = useMemo(() => {
+        if (!selectedPatient) return specialists;
+        if (!nearestCliniqueId) return [];
+        return specialists.filter(
+            (sp) => sp.clinique_associer === nearestCliniqueId
+        );
+    }, [nearestCliniqueId, selectedPatient, specialists]);
+
+    useEffect(() => {
+        if (!nearestCliniqueId || !specialist) return;
+        const stillValid = filteredSpecialists.some(
+            (sp) => sp._id === specialist
+        );
+        if (!stillValid) {
+            setSpecialist("");
+            setAvailableSlots([]);
+        }
+    }, [filteredSpecialists, nearestCliniqueId, specialist]);
 
     /* ------------------------------------------------------------------ */
     /* Chargement des créneaux                                            */
@@ -366,20 +502,19 @@ export function AppointmentsPage() {
 
                     {patients.length > 0 && (
                         <div className="flex flex-col gap-2">
-                            {patients.map((p) => (
-                                <button
-                                    key={p._id}
-                                    type="button"
-                                    onClick={() =>
-                                        {
-                                            setPatientId(p._id);
-                                            setInsuranceNumber(
-                                                p.num_assurance_maladie
-                                            );
-                                        }
-                                    }
-                                    className="text-left border rounded p-2 hover:bg-gray-100"
-                                >
+                    {patients.map((p) => (
+                        <button
+                            key={p._id}
+                            type="button"
+                            onClick={() => {
+                                setPatientId(p._id);
+                                setSelectedPatient(p);
+                                setInsuranceNumber(
+                                    p.num_assurance_maladie
+                                );
+                            }}
+                            className="text-left border rounded p-2 hover:bg-gray-100"
+                        >
                                     <div className="text-sm font-medium">
                                         {p.prenom} {p.nom}
                                     </div>
@@ -401,13 +536,22 @@ export function AppointmentsPage() {
                     className="border rounded p-2"
                     value={specialist}
                     onChange={(e) => setSpecialist(e.target.value)}
+                    disabled={
+                        !patientId ||
+                        cliniquesLoading ||
+                        (!!patientId && !nearestCliniqueId)
+                    }
                 >
                     <option value="">
-                        {specialistsLoading
+                        {specialistsLoading || cliniquesLoading
                             ? "Chargement des spécialistes…"
-                            : "Choisir un spécialiste *"}
+                            : patientId && nearestCliniqueId
+                                ? "Choisir un spécialiste *"
+                                : patientId
+                                    ? "Clinique la plus proche introuvable"
+                                    : "Sélectionnez un patient"}
                     </option>
-                    {specialists.map((sp) => (
+                    {filteredSpecialists.map((sp) => (
                         <option key={sp._id} value={sp._id}>
                             {`${sp.prenom} ${sp.nom}${
                                 sp.specialite
@@ -420,6 +564,25 @@ export function AppointmentsPage() {
                 {specialistsError && (
                     <div className="text-xs text-red-600">
                         {specialistsError.message}
+                    </div>
+                )}
+                {cliniquesError && (
+                    <div className="text-xs text-red-600">
+                        {cliniquesError.message}
+                    </div>
+                )}
+                {patientId &&
+                    nearestCliniqueId &&
+                    filteredSpecialists.length === 0 && (
+                    <div className="text-xs text-gray-500">
+                        Aucun spécialiste disponible dans la clinique la plus
+                        proche.
+                    </div>
+                )}
+                {patientId && !nearestCliniqueId && (
+                    <div className="text-xs text-gray-500">
+                        Coordonnées manquantes pour déterminer la clinique la
+                        plus proche.
                     </div>
                 )}
 

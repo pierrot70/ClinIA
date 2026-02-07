@@ -50,6 +50,8 @@ export function PatientsPage() {
         addresse: "",
         telephone: "",
         courriel: "",
+        lat: "",
+        long: "",
         texto: false,
     });
     const [viewMode, setViewMode] = useState<"create" | "list">("list");
@@ -138,6 +140,8 @@ export function PatientsPage() {
             addresse: "",
             telephone: "",
             courriel: "",
+            lat: "",
+            long: "",
             texto: false,
         });
     }
@@ -162,6 +166,20 @@ export function PatientsPage() {
         if (values.courriel.trim()) {
             payload.courriel = values.courriel.trim();
         }
+        if (values.lat.trim()) {
+            const latValue = Number(values.lat.trim());
+            if (!Number.isFinite(latValue)) {
+                throw new Error("Latitude invalide.");
+            }
+            payload.lat = latValue;
+        }
+        if (values.long.trim()) {
+            const longValue = Number(values.long.trim());
+            if (!Number.isFinite(longValue)) {
+                throw new Error("Longitude invalide.");
+            }
+            payload.long = longValue;
+        }
 
         return payload;
     }
@@ -179,16 +197,41 @@ export function PatientsPage() {
         setError(null);
 
         if (editingId) {
-            const response = await updatePatient(
-                editingId,
-                toPayload(form)
-            );
+            let payload: PatientPayload;
+            try {
+                payload = toPayload(form);
+            } catch (err) {
+                setError({
+                    code: "INVALID_INPUT",
+                    message:
+                        err instanceof Error
+                            ? err.message
+                            : "Coordonnées invalides.",
+                    retryable: false,
+                });
+                return;
+            }
+            const response = await updatePatient(editingId, payload);
             if ("error" in response) {
                 setError(response.error);
                 return;
             }
         } else {
-            const response = await createPatient(toPayload(form));
+            let payload: PatientPayload;
+            try {
+                payload = toPayload(form);
+            } catch (err) {
+                setError({
+                    code: "INVALID_INPUT",
+                    message:
+                        err instanceof Error
+                            ? err.message
+                            : "Coordonnées invalides.",
+                    retryable: false,
+                });
+                return;
+            }
+            const response = await createPatient(payload);
             if ("error" in response) {
                 setError(response.error);
                 return;
@@ -202,15 +245,17 @@ export function PatientsPage() {
     async function handleEdit(patient: Patient) {
         setEditingId(patient._id);
         setViewMode("create");
-        setForm({
-            nom: patient.nom ?? "",
-            prenom: patient.prenom ?? "",
-            num_assurance_maladie: patient.num_assurance_maladie ?? "",
-            addresse: patient.addresse ?? "",
-            telephone: patient.telephone ?? "",
-            courriel: patient.courriel ?? "",
-            texto: Boolean(patient.texto),
-        });
+            setForm({
+                nom: patient.nom ?? "",
+                prenom: patient.prenom ?? "",
+                num_assurance_maladie: patient.num_assurance_maladie ?? "",
+                addresse: patient.addresse ?? "",
+                telephone: patient.telephone ?? "",
+                courriel: patient.courriel ?? "",
+                lat: patient.lat?.toString() ?? "",
+                long: patient.long?.toString() ?? "",
+                texto: Boolean(patient.texto),
+            });
     }
 
     async function handleDelete(id: string) {
@@ -343,6 +388,28 @@ export function PatientsPage() {
                                 }))
                             }
                         />
+                        <input
+                            className="border rounded p-2"
+                            placeholder="Latitude (optionnel)"
+                            value={form.lat}
+                            onChange={(e) =>
+                                setForm((p) => ({
+                                    ...p,
+                                    lat: e.target.value,
+                                }))
+                            }
+                        />
+                        <input
+                            className="border rounded p-2"
+                            placeholder="Longitude (optionnel)"
+                            value={form.long}
+                            onChange={(e) =>
+                                setForm((p) => ({
+                                    ...p,
+                                    long: e.target.value,
+                                }))
+                            }
+                        />
                     </div>
 
                     <label className="flex items-center gap-2 text-sm">
@@ -430,6 +497,7 @@ export function PatientsPage() {
                                 <tr>
                                     <th className="text-left p-2">Prénom</th>
                                     <th className="text-left p-2">Nom</th>
+                                    <th className="text-left p-2">Adresse</th>
                                     <th className="text-left p-2">Téléphone</th>
                                     <th className="text-left p-2">RAMQ</th>
                                     <th className="text-left p-2">Actions</th>
@@ -467,6 +535,9 @@ export function PatientsPage() {
                                             </td>
                                             <td className="p-2">
                                                 {p.nom}
+                                            </td>
+                                            <td className="p-2">
+                                                {p.addresse || "—"}
                                             </td>
                                             <td className="p-2">
                                                 {p.telephone || "—"}

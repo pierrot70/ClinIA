@@ -19,6 +19,8 @@ export interface Patient {
     telephone?: string;
     courriel?: string;
     texto?: boolean;
+    lat?: number;
+    long?: number;
 }
 
 export interface PaginatedPatients {
@@ -41,6 +43,8 @@ export interface PatientPayload {
     telephone?: string;
     courriel?: string;
     texto?: boolean;
+    lat?: number;
+    long?: number;
 }
 
 /* ------------------------------------------------------------------ */

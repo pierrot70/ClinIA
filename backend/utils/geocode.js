@@ -55,3 +55,15 @@ export async function geocodeAddress({
         return null;
     }
 }
+
+export async function geocodeFreeAddress(address) {
+    if (!address || !address.trim()) {
+        return null;
+    }
+
+    try {
+        return await fetchGeocode(address.trim());
+    } catch {
+        return null;
+    }
+}

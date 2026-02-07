@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { Patient } from "../models/Patient.js";
+import { geocodeFreeAddress } from "../utils/geocode.js";
 
 /* ------------------------------------------------------------------ */
 /* Service Patient                                                     */
@@ -44,6 +45,17 @@ export async function createPatient(dto) {
     if (!dto.num_assurance_maladie) {
         dto.num_assurance_maladie =
             await ensureUniqueRamqNumber();
+    }
+
+    if (
+        dto.addresse &&
+        (dto.lat === undefined || dto.long === undefined)
+    ) {
+        const coords = await geocodeFreeAddress(dto.addresse);
+        if (coords) {
+            if (dto.lat === undefined) dto.lat = coords.lat;
+            if (dto.long === undefined) dto.long = coords.long;
+        }
     }
 
     return Patient.create(dto);
@@ -123,6 +135,14 @@ export async function updatePatient(id, updates) {
         };
     }
 
+    const existing = await Patient.findById(id).lean();
+    if (!existing) {
+        throw {
+            code: "NOT_FOUND",
+            message: "Patient introuvable.",
+        };
+    }
+
     if (
         updates.num_assurance_maladie === "" ||
         updates.nom === "" ||
@@ -133,6 +153,19 @@ export async function updatePatient(id, updates) {
             message:
                 "Les champs 'nom', 'prenom' et 'num_assurance_maladie' ne peuvent pas être vides.",
         };
+    }
+
+    if (
+        (updates.lat === undefined || updates.long === undefined) &&
+        (updates.addresse ?? existing.addresse)
+    ) {
+        const coords = await geocodeFreeAddress(
+            updates.addresse ?? existing.addresse
+        );
+        if (coords) {
+            if (updates.lat === undefined) updates.lat = coords.lat;
+            if (updates.long === undefined) updates.long = coords.long;
+        }
     }
 
     const patient = await Patient.findByIdAndUpdate(
