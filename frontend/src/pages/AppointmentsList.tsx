@@ -56,6 +56,10 @@ export function AppointmentsListPage() {
     const [editOriginalTime, setEditOriginalTime] = useState("");
     const [editSlots, setEditSlots] = useState<string[]>([]);
     const [editSlotsLoading, setEditSlotsLoading] = useState(false);
+    const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(
+        null
+    );
+    const updatedTimerRef = useRef<number | null>(null);
 
     /* ---------------- Toasts ---------------- */
 
@@ -64,6 +68,13 @@ export function AppointmentsListPage() {
         message: string;
     } | null>(null);
     const toastTimerRef = useRef<number | null>(null);
+    useEffect(() => {
+        return () => {
+            if (updatedTimerRef.current) {
+                window.clearTimeout(updatedTimerRef.current);
+            }
+        };
+    }, []);
 
     /* ---------------- Pagination ---------------- */
 
@@ -451,6 +462,13 @@ export function AppointmentsListPage() {
         );
 
         if (ok) {
+            setRecentlyUpdatedId(id);
+            if (updatedTimerRef.current) {
+                window.clearTimeout(updatedTimerRef.current);
+            }
+            updatedTimerRef.current = window.setTimeout(() => {
+                setRecentlyUpdatedId(null);
+            }, 1600);
             stopEditing();
         }
     }
@@ -578,7 +596,16 @@ export function AppointmentsListPage() {
                             );
 
                             return (
-                            <tr key={a._id} className="border-t">
+                            <tr
+                                key={a._id}
+                                className={`border-t ${
+                                    a.status === "scheduled"
+                                        ? "bg-green-50"
+                                        : a.status === "cancelled"
+                                            ? "bg-red-50"
+                                            : ""
+                                }`}
+                            >
                                 <td className="p-2">
                                     {formatPatientName(a)}
                                 </td>
@@ -672,11 +699,25 @@ export function AppointmentsListPage() {
                                                 )}
                                         </div>
                                     ) : (
-                                        a.time
+                                        <span
+                                            className={
+                                                recentlyUpdatedId === a._id
+                                                    ? "time-flash"
+                                                    : ""
+                                            }
+                                        >
+                                            {a.time}
+                                        </span>
                                     )}
                                 </td>
                                 <td className="p-2">{a.status}</td>
-                                <td className="p-2 flex gap-2">
+                                <td
+                                    className={`p-2 flex gap-2 ${
+                                        a.status === "cancelled"
+                                            ? "hidden"
+                                            : ""
+                                    }`}
+                                >
                                     {editingId === a._id ? (
                                         <>
                                             <button
@@ -692,6 +733,7 @@ export function AppointmentsListPage() {
                                                         a._id
                                                     )
                                                 }
+                                                className="bg-lime-400 text-black px-2 py-1 rounded"
                                             >
                                                 Enregistrer
                                             </button>

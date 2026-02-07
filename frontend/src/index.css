@@ -6,3 +6,29 @@ body {
   @apply bg-background text-gray-900;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
+
+@keyframes time-flash {
+  0% {
+    background-color: transparent;
+    opacity: 0.6;
+  }
+  20% {
+    background-color: #86efac;
+    opacity: 1;
+  }
+  80% {
+    background-color: #86efac;
+    opacity: 1;
+  }
+  100% {
+    background-color: transparent;
+    opacity: 1;
+  }
+}
+
+.time-flash {
+  animation: time-flash 1.6s ease-in-out;
+  border-radius: 0.25rem;
+  display: inline-block;
+  padding: 0.125rem 0.25rem;
+}
