@@ -41,6 +41,7 @@ const NAV_COMMANDS: NavCommand[] = [
             "accueil",
             "maison",
             "home",
+            "clinia",
         ],
     },
     {
@@ -110,6 +111,7 @@ const VoiceNavButton: React.FC = () => {
     const isHandsFreeRef = useRef(false);
     const isSpeakingRef = useRef(false);
     const isListeningRef = useRef(false);
+    const lastDictationRef = useRef<{ text: string; at: number } | null>(null);
 
     useEffect(() => {
         isHandsFreeRef.current = isHandsFree;
@@ -151,6 +153,16 @@ const VoiceNavButton: React.FC = () => {
     const handleTranscript = useCallback(
         (transcript: string) => {
             const normalized = normalizeText(transcript);
+            const compactNormalized = normalized.replace(/\s+/g, "");
+            const isWakeWord = compactNormalized.includes("clinia");
+
+            if (isWakeWord) {
+                setStatus("Navigation: Accueil");
+                navigate("/");
+                setVoiceMode("dictation");
+                speak("ClinIA pret, dictez votre diagnostic.");
+                return;
+            }
             const matchedNav = NAV_COMMANDS.find((command) =>
                 command.keywords.some((keyword) =>
                     normalized.includes(normalizeText(keyword))
@@ -162,7 +174,11 @@ const VoiceNavButton: React.FC = () => {
                 navigate(matchedNav.path);
                 if (matchedNav.path === "/") {
                     setVoiceMode("dictation");
-                    speak("Retour a l'accueil.");
+                    if (normalized.includes("clinia")) {
+                        speak("ClinIA pret, dictez votre diagnostic.");
+                    } else {
+                        speak("Retour a l'accueil.");
+                    }
                 } else {
                     setVoiceMode("navigation");
                     speak(`Ouverture ${matchedNav.label}.`);
@@ -210,6 +226,13 @@ const VoiceNavButton: React.FC = () => {
             }
 
             if (voiceMode === "dictation" || location.pathname === "/") {
+                const now = Date.now();
+                const last = lastDictationRef.current;
+                if (last && last.text === normalized && now - last.at < 2000) {
+                    setStatus("Diagnostic capture.");
+                    return;
+                }
+                lastDictationRef.current = { text: normalized, at: now };
                 (window as any).__cliniaLastDictation = transcript;
                 window.dispatchEvent(
                     new CustomEvent("clinia:voice-dictation", {
@@ -237,7 +260,8 @@ const VoiceNavButton: React.FC = () => {
         recognition.lang = "fr-CA";
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
-        recognition.continuous = false;
+        (recognition as SpeechRecognition & { continuous?: boolean }).continuous =
+            false;
         recognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript;
             handleTranscript(transcript);
