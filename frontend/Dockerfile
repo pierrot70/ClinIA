@@ -6,8 +6,8 @@ WORKDIR /app
 # Copie explicite du package.json + lockfile pour un cache Docker stable
 COPY package.json package-lock.json ./
 
-# Install déterministe (utilise strictement package-lock.json)
-RUN npm ci
+# Install déterministe (inclut devDependencies pour le build)
+RUN npm ci --include=dev
 
 # Copie du reste du code
 COPY . .
