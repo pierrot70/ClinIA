@@ -10,5 +10,5 @@ COPY . .
 EXPOSE 5173
 
 # DEV Vite: host 0.0.0.0 pour être accessible via port mapping Docker
-#CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173", "--config", "vite.config.local.mts"]
+# PROD local: build + preview pour simuler la prod
+CMD ["sh", "-c", "if [ \"$VITE_APP_ENV\" = \"production\" ] || [ \"$NODE_ENV\" = \"production\" ]; then npm run build && npm run preview -- --host 0.0.0.0 --port 5173; else npm run dev -- --host 0.0.0.0 --port 5173 --config vite.config.local.mts; fi"]

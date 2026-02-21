@@ -12,8 +12,14 @@ const Header: React.FC = () => {
     };
 
     // 🔍 Détection environnement
-    const isDev = window.location.port === "5173";
-    const isProd = window.location.port === "8080";
+    const appEnv =
+        typeof import.meta !== "undefined" &&
+        (import.meta as any).env &&
+        (import.meta as any).env.VITE_APP_ENV
+            ? String((import.meta as any).env.VITE_APP_ENV)
+            : "development";
+    const isProd = appEnv === "production";
+    const isDev = !isProd;
 
     const linkClass = (path: string) =>
         "hover:text-primary transition-colors " +
@@ -57,7 +63,7 @@ const Header: React.FC = () => {
                 <div className="flex items-center gap-2">
                     {isDev && (
                         <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 border border-blue-300">
-                            DEV – localhost:5173
+                            DEV – Docker
                         </span>
                     )}
                     {isProd && (

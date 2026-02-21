@@ -103,7 +103,8 @@ const VoiceNavButton: React.FC = () => {
     const isDev =
         typeof import.meta !== "undefined" &&
         (import.meta as any).env &&
-        (import.meta as any).env.DEV;
+        (import.meta as any).env.DEV &&
+        (import.meta as any).env.VITE_APP_ENV !== "production";
     const [isListening, setIsListening] = useState(false);
     const [isHandsFree, setIsHandsFree] = useState(false);
     const [status, setStatus] = useState<string | null>(null);

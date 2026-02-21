@@ -7,6 +7,7 @@ set -euo pipefail
 
 COMPOSE_FILE="docker-compose-local.yml"
 PROJECT_NAME="${PROJECT_NAME:-clinia_local}"
+MODE="${MODE:-${1:-}}"
 
 # -----------------------------
 # Options (via env vars)
@@ -51,8 +52,17 @@ fi
 
 headline "ClinIA local rebuild"
 
+if [[ "${MODE^^}" == "PROD" ]]; then
+  export NODE_ENV="production"
+  export VITE_APP_ENV="production"
+elif [[ "${MODE^^}" == "DEV" ]]; then
+  export NODE_ENV="development"
+  export VITE_APP_ENV="development"
+fi
+
 echo "Compose file : $COMPOSE_FILE"
 echo "Project name : $PROJECT_NAME"
+echo "Mode        : ${MODE^^:-<unset>}"
 echo "Options:"
 echo "  WIPE_VOLUMES=$WIPE_VOLUMES"
 echo "  PRUNE=$PRUNE"
@@ -70,6 +80,7 @@ ENV_KEYS=(
   OPENAI_MODEL
   CLINIA_MOCK_AI
   NODE_ENV
+  VITE_APP_ENV
 )
 
 for key in "${ENV_KEYS[@]}"; do
@@ -80,6 +91,8 @@ done
 ENV_CHECKSUM=$(printf "%s=%s\n" \
   "OPENAI_MODEL" "${OPENAI_MODEL:-}" \
   "CLINIA_MOCK_AI" "${CLINIA_MOCK_AI:-}" \
+  "NODE_ENV" "${NODE_ENV:-}" \
+  "VITE_APP_ENV" "${VITE_APP_ENV:-}" \
   | sha256sum | cut -d' ' -f1)
 
 echo "  ENV_CHECKSUM        = $ENV_CHECKSUM"

@@ -39,10 +39,10 @@ services:
       MONGO_URI: "mongodb://root:321eRRe!p@mongo:27017/clinia?authSource=admin"
 
       # 🔑 ENV CLINIA (ESSENTIEL)
-      CLINIA_MOCK_AI: "true"
+      CLINIA_MOCK_AI: "${CLINIA_MOCK_AI:-true}"
       OPENAI_MODEL: "gpt-4.1-mini"
 
-      NODE_ENV: development
+      NODE_ENV: "${NODE_ENV:-development}"
       CHOKIDAR_USEPOLLING: "true"
     ports:
       - "4000:4000"
@@ -60,7 +60,8 @@ services:
       dockerfile: Dockerfile-local
     restart: unless-stopped
     environment:
-      NODE_ENV: development
+      NODE_ENV: "${NODE_ENV:-development}"
+      VITE_APP_ENV: "${VITE_APP_ENV:-development}"
 
       # ✅ RÈGLE UNIQUE — navigateur → host
       VITE_API_URL: "http://localhost:4000"
