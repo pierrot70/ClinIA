@@ -179,8 +179,11 @@ app.post("/api/ai/analyze", async (req, res) => {
         const patient = req.body;
         const fingerprint = makeFingerprint({ diagnosis, patient });
 
+        const isProd =
+            process.env.NODE_ENV === "production" ||
+            process.env.CLINIA_FORCE_MOCK === "true";
         const useMock =
-            process.env.CLINIA_MOCK_AI === "true" &&
+            (process.env.CLINIA_MOCK_AI === "true" || isProd) &&
             forceReal !== true;
 
         const model =
@@ -192,6 +195,7 @@ app.post("/api/ai/analyze", async (req, res) => {
             useMock,
             circuitOpen: !canCallOpenAI(),
             symptoms,
+            isProd,
         });
 
         /* ---------------- MOCK ---------------- */
