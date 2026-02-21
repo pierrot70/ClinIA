@@ -12,6 +12,7 @@ import { hypertensionTreatments, anticipatedQuestions } from "../data/hypertensi
 const useQuery = () => new URLSearchParams(useLocation().search);
 
 const Results: React.FC = () => {
+    const isProd = !!import.meta.env.PROD;
     const query = useQuery();
     const q = query.get("q") || "Hypertension essentielle";
 
@@ -37,6 +38,12 @@ const Results: React.FC = () => {
     const AI_ENDPOINT = "/api/ai/analyze";
 
     useEffect(() => {
+        if (isProd) {
+            localStorage.removeItem("clinia_force_real");
+            setRealAI(false);
+            realAIRef.current = false;
+            return;
+        }
         const stored = localStorage.getItem("clinia_force_real");
         const next = stored === "true";
         setRealAI((prev) => (prev === next ? prev : next));
@@ -59,7 +66,7 @@ const Results: React.FC = () => {
                 handleForceRealChange
             );
         };
-    }, []);
+    }, [isProd]);
 
     useEffect(() => {
         const fetchAI = async () => {
@@ -133,38 +140,43 @@ const Results: React.FC = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <h1 className="text-2xl font-semibold text-gray-900">{q}</h1>
 
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            disabled={!canToggle}
-                            onClick={() => {
-                                const next = !realAI;
-                                setRealAI(next);
-                                localStorage.setItem(
-                                    "clinia_force_real",
-                                    String(next)
-                                );
-                                window.dispatchEvent(
-                                    new CustomEvent("clinia:force-real-changed", {
-                                        detail: { forceReal: next },
-                                    })
-                                );
-                            }}
-                            className={`px-3 py-2 rounded-lg text-xs font-medium border transition disabled:opacity-50 ${
-                                realAI
-                                    ? "bg-emerald-600 text-white border-emerald-600"
-                                    : "bg-white text-gray-700 border-gray-200"
-                            }`}
-                        >
-                            {realAI ? "IA réelle: ON" : "IA réelle: OFF"}
-                        </button>
-                    </div>
+                    {!isProd && (
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                disabled={!canToggle}
+                                onClick={() => {
+                                    const next = !realAI;
+                                    setRealAI(next);
+                                    localStorage.setItem(
+                                        "clinia_force_real",
+                                        String(next)
+                                    );
+                                    window.dispatchEvent(
+                                        new CustomEvent(
+                                            "clinia:force-real-changed",
+                                            {
+                                                detail: { forceReal: next },
+                                            }
+                                        )
+                                    );
+                                }}
+                                className={`px-3 py-2 rounded-lg text-xs font-medium border transition disabled:opacity-50 ${
+                                    realAI
+                                        ? "bg-emerald-600 text-white border-emerald-600"
+                                        : "bg-white text-gray-700 border-gray-200"
+                                }`}
+                            >
+                                {realAI ? "IA réelle: ON" : "IA réelle: OFF"}
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-2 max-w-2xl">
                     Source: {sourceMode}
                 </p>
-                {realAI && (
+                {!isProd && realAI && (
                     <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 max-w-2xl">
                         ⚠️ IA réelle activée — consommation de crédits OpenAI.
                     </p>
@@ -173,7 +185,7 @@ const Results: React.FC = () => {
 
             {/* ANALYSE IA */}
             <section className="space-y-4">
-                {realAI && loadingAI && (
+                {!isProd && realAI && loadingAI && (
                     <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-6">
                         <div className="h-14 w-14 animate-spin rounded-full border-4 border-gray-200 border-t-primary" />
                         <div className="text-sm text-gray-700">

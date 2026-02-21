@@ -31,6 +31,7 @@ type OpenAIModel = "gpt-4.1-mini" | "gpt-4-0613";
 /* ------------------------------------------------------------------ */
 
 export function ClinicalAnalyzePage() {
+    const isProd = !!import.meta.env.PROD;
     const [activeTab, setActiveTab] =
         useState<"patient" | "clinical">("patient");
 
@@ -56,6 +57,11 @@ export function ClinicalAnalyzePage() {
         localStorage.removeItem("clinia_last_clinical_payload");
     }, []);
     useEffect(() => {
+        if (isProd) {
+            localStorage.removeItem("clinia_force_real");
+            setForceReal(false);
+            return;
+        }
         const stored = localStorage.getItem("clinia_force_real");
         setForceReal(stored === "true");
 
@@ -75,7 +81,7 @@ export function ClinicalAnalyzePage() {
                 handleForceRealChange
             );
         };
-    }, []);
+    }, [isProd]);
 
     /* ------------------------------------------------------------------ */
     /* 🔁 Changement de modèle → retour au formulaire                     */
@@ -134,7 +140,7 @@ export function ClinicalAnalyzePage() {
                 payload.symptoms.length > 0
                     ? payload.symptoms
                     : DEFAULT_CLINICAL_PAYLOAD.symptoms,
-            forceReal,
+            forceReal: isProd ? false : forceReal,
             openaiModel,
         };
 
@@ -206,29 +212,31 @@ export function ClinicalAnalyzePage() {
             </div>
 
             {/* 🔀 Toggle IA réelle */}
-            <div className="flex items-center gap-3">
-                <button
-                    type="button"
-                    onClick={toggleForceReal}
-                    disabled={serviceMode === "degraded"}
-                    className={`px-3 py-1 rounded text-sm border transition
-                        ${
-                        forceReal
-                            ? "bg-red-600 text-white border-red-600"
-                            : "bg-gray-100 text-gray-700 border-gray-300"
-                    }
-                        ${
-                        serviceMode === "degraded"
-                            ? "opacity-50 cursor-not-allowed"
-                            : ""
-                    }
-                    `}
-                >
-                    {forceReal
-                        ? "IA réelle activée"
-                        : "Mode simulation"}
-                </button>
-            </div>
+            {!isProd && (
+                <div className="flex items-center gap-3">
+                    <button
+                        type="button"
+                        onClick={toggleForceReal}
+                        disabled={serviceMode === "degraded"}
+                        className={`px-3 py-1 rounded text-sm border transition
+                            ${
+                            forceReal
+                                ? "bg-red-600 text-white border-red-600"
+                                : "bg-gray-100 text-gray-700 border-gray-300"
+                        }
+                            ${
+                            serviceMode === "degraded"
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                        }
+                        `}
+                    >
+                        {forceReal
+                            ? "IA réelle activée"
+                            : "Mode simulation"}
+                    </button>
+                </div>
+            )}
 
             {/* 🧑‍⚕️ Formulaire */}
             {activeTab === "patient" && !result && (

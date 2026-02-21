@@ -12,14 +12,8 @@ const Header: React.FC = () => {
         window.location.href = "/";
     };
 
-    // 🔍 Détection environnement
-    const appEnv =
-        typeof import.meta !== "undefined" &&
-        (import.meta as any).env &&
-        (import.meta as any).env.VITE_APP_ENV
-            ? String((import.meta as any).env.VITE_APP_ENV)
-            : "development";
-    const isProd = appEnv === "production";
+    // 🔍 Détection environnement (Vite)
+    const isProd = !!import.meta.env.PROD;
     const isDev = !isProd;
     const [forceReal, setForceReal] = useState(false);
 
