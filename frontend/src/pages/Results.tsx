@@ -30,6 +30,7 @@ const Results: React.FC = () => {
         }
         return localStorage.getItem("clinia_force_real") === "true";
     });
+    const realAIRef = useRef(realAI);
     const canToggle = useMemo(() => !loadingAI, [loadingAI]);
     const requestIdRef = useRef(0);
 
@@ -39,11 +40,13 @@ const Results: React.FC = () => {
         const stored = localStorage.getItem("clinia_force_real");
         const next = stored === "true";
         setRealAI((prev) => (prev === next ? prev : next));
+        realAIRef.current = next;
 
         const handleForceRealChange = (event: Event) => {
             const detail = (event as CustomEvent).detail;
             if (detail && typeof detail.forceReal === "boolean") {
                 setRealAI(detail.forceReal);
+                realAIRef.current = detail.forceReal;
             }
         };
         window.addEventListener(
@@ -76,7 +79,7 @@ const Results: React.FC = () => {
                         symptoms: [q],                 // ← 🔑 LA CLE
                         medical_history: [],
                         current_medications: [],
-                        forceReal: realAI,
+                        forceReal: realAIRef.current,
                     }),
                 });
 
@@ -116,7 +119,7 @@ const Results: React.FC = () => {
         };
 
         fetchAI();
-    }, [q, realAI]);
+    }, [q]);
 
     return (
         <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">

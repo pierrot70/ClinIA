@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -12,6 +12,7 @@ const suggestions = [
 const SearchBar: React.FC = () => {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
+  const lastInsertRef = useRef<{ text: string; at: number } | null>(null);
 
   const handleSearch = useCallback(() => {
     const q = query.trim() || suggestions[0];
@@ -19,6 +20,29 @@ const SearchBar: React.FC = () => {
   }, [navigate, query]);
 
   useEffect(() => {
+    const normalize = (value: string) =>
+      value
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\w\s-]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const shouldInsert = (text: string) => {
+      const normalized = normalize(text);
+      if (!normalized) {
+        return false;
+      }
+      const now = Date.now();
+      const last = lastInsertRef.current;
+      if (last && last.text === normalized && now - last.at < 2000) {
+        return false;
+      }
+      lastInsertRef.current = { text: normalized, at: now };
+      return true;
+    };
+
     const consumeBufferedDictation = () => {
       const buffered = (window as any).__cliniaLastDictation as
         | string
@@ -29,7 +53,7 @@ const SearchBar: React.FC = () => {
       (window as any).__cliniaLastDictation = "";
       setQuery((prev) => {
         const nextText = buffered.trim();
-        if (!nextText) {
+        if (!nextText || !shouldInsert(nextText)) {
           return prev;
         }
         return prev ? `${prev} ${nextText}` : nextText;
@@ -45,7 +69,7 @@ const SearchBar: React.FC = () => {
       }
       setQuery((prev) => {
         const nextText = detail.text.trim();
-        if (!nextText) {
+        if (!nextText || !shouldInsert(nextText)) {
           return prev;
         }
         return prev ? `${prev} ${nextText}` : nextText;
