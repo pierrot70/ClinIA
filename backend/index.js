@@ -168,7 +168,14 @@ app.post("/api/ai/analyze", async (req, res) => {
             });
         }
 
-        const diagnosis = "To be determined by ClinIA";
+        const diagnosisSeed = Array.isArray(symptoms)
+            ? symptoms.join(" ")
+            : "";
+        const diagnosis =
+            typeof req.body?.diagnosis === "string" &&
+            req.body.diagnosis.trim()
+                ? req.body.diagnosis.trim()
+                : diagnosisSeed || "To be determined by ClinIA";
         const patient = req.body;
         const fingerprint = makeFingerprint({ diagnosis, patient });
 
@@ -184,11 +191,12 @@ app.post("/api/ai/analyze", async (req, res) => {
             forceReal,
             useMock,
             circuitOpen: !canCallOpenAI(),
+            symptoms,
         });
 
         /* ---------------- MOCK ---------------- */
         if (useMock) {
-            const mock = getMockForDiagnosis(diagnosis);
+            const mock = getMockForDiagnosis(diagnosisSeed || diagnosis);
             const analysis = normalizeClinicalAnalysis(mock);
 
             const persist = await persistOrReuseDiagnosis({

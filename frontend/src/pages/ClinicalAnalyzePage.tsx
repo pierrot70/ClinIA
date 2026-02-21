@@ -55,6 +55,27 @@ export function ClinicalAnalyzePage() {
     useEffect(() => {
         localStorage.removeItem("clinia_last_clinical_payload");
     }, []);
+    useEffect(() => {
+        const stored = localStorage.getItem("clinia_force_real");
+        setForceReal(stored === "true");
+
+        const handleForceRealChange = (event: Event) => {
+            const detail = (event as CustomEvent).detail;
+            if (detail && typeof detail.forceReal === "boolean") {
+                setForceReal(detail.forceReal);
+            }
+        };
+        window.addEventListener(
+            "clinia:force-real-changed",
+            handleForceRealChange
+        );
+        return () => {
+            window.removeEventListener(
+                "clinia:force-real-changed",
+                handleForceRealChange
+            );
+        };
+    }, []);
 
     /* ------------------------------------------------------------------ */
     /* 🔁 Changement de modèle → retour au formulaire                     */
@@ -135,6 +156,17 @@ export function ClinicalAnalyzePage() {
         }
     }
 
+    const toggleForceReal = () => {
+        const next = !forceReal;
+        setForceReal(next);
+        localStorage.setItem("clinia_force_real", String(next));
+        window.dispatchEvent(
+            new CustomEvent("clinia:force-real-changed", {
+                detail: { forceReal: next },
+            })
+        );
+    };
+
     /* ------------------------------------------------------------------ */
     /* Render                                                             */
     /* ------------------------------------------------------------------ */
@@ -177,7 +209,7 @@ export function ClinicalAnalyzePage() {
             <div className="flex items-center gap-3">
                 <button
                     type="button"
-                    onClick={() => setForceReal((v) => !v)}
+                    onClick={toggleForceReal}
                     disabled={serviceMode === "degraded"}
                     className={`px-3 py-1 rounded text-sm border transition
                         ${

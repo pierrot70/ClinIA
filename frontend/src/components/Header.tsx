@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import VoiceNavButton from "./VoiceNavButton";
 
 const Header: React.FC = () => {
     const location = useLocation();
     const token = localStorage.getItem("clinia_admin_token");
+    const FORCE_REAL_STORAGE_KEY = "clinia_force_real";
 
     const logout = () => {
         localStorage.removeItem("clinia_admin_token");
@@ -20,6 +21,23 @@ const Header: React.FC = () => {
             : "development";
     const isProd = appEnv === "production";
     const isDev = !isProd;
+    const [forceReal, setForceReal] = useState(false);
+
+    useEffect(() => {
+        const stored = localStorage.getItem(FORCE_REAL_STORAGE_KEY);
+        setForceReal(stored === "true");
+
+        const handleChange = (event: Event) => {
+            const detail = (event as CustomEvent).detail;
+            if (detail && typeof detail.forceReal === "boolean") {
+                setForceReal(detail.forceReal);
+            }
+        };
+        window.addEventListener("clinia:force-real-changed", handleChange);
+        return () => {
+            window.removeEventListener("clinia:force-real-changed", handleChange);
+        };
+    }, []);
 
     const linkClass = (path: string) =>
         "hover:text-primary transition-colors " +
@@ -37,6 +55,17 @@ const Header: React.FC = () => {
     const isClinicGroupActive = clinicNavPaths.some((path) =>
         location.pathname.startsWith(path)
     );
+
+    const toggleForceReal = () => {
+        const next = !forceReal;
+        setForceReal(next);
+        localStorage.setItem(FORCE_REAL_STORAGE_KEY, String(next));
+        window.dispatchEvent(
+            new CustomEvent("clinia:force-real-changed", {
+                detail: { forceReal: next },
+            })
+        );
+    };
 
     return (
         <header className="bg-white border-b border-gray-200">
@@ -70,6 +99,25 @@ const Header: React.FC = () => {
                         <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700 border border-green-300">
                             PROD – Docker
                         </span>
+                    )}
+                    {isDev && (
+                        <button
+                            type="button"
+                            onClick={toggleForceReal}
+                            className={
+                                "px-2 py-1 text-xs rounded border transition " +
+                                (forceReal
+                                    ? "bg-red-600 text-white border-red-600"
+                                    : "bg-gray-100 text-gray-700 border-gray-300")
+                            }
+                            title={
+                                forceReal
+                                    ? "Forcer IA réelle"
+                                    : "Utiliser le mode mock"
+                            }
+                        >
+                            {forceReal ? "IA réelle" : "IA mock"}
+                        </button>
                     )}
                 </div>
 

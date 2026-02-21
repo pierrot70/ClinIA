@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, Link } from "react-router-dom";
 
 import AICard from "../components/AICard";
@@ -20,14 +20,47 @@ const Results: React.FC = () => {
     const [analysis, setAnalysis] = useState<any>(null);
     const [loadingAI, setLoadingAI] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [sourceMode, setSourceMode] = useState<
+        "mock" | "real" | "degraded" | "unknown"
+    >("unknown");
 
-    const [realAI, setRealAI] = useState(false);
+    const [realAI, setRealAI] = useState(() => {
+        if (typeof window === "undefined") {
+            return false;
+        }
+        return localStorage.getItem("clinia_force_real") === "true";
+    });
     const canToggle = useMemo(() => !loadingAI, [loadingAI]);
+    const requestIdRef = useRef(0);
 
     const AI_ENDPOINT = "/api/ai/analyze";
 
     useEffect(() => {
+        const stored = localStorage.getItem("clinia_force_real");
+        const next = stored === "true";
+        setRealAI((prev) => (prev === next ? prev : next));
+
+        const handleForceRealChange = (event: Event) => {
+            const detail = (event as CustomEvent).detail;
+            if (detail && typeof detail.forceReal === "boolean") {
+                setRealAI(detail.forceReal);
+            }
+        };
+        window.addEventListener(
+            "clinia:force-real-changed",
+            handleForceRealChange
+        );
+        return () => {
+            window.removeEventListener(
+                "clinia:force-real-changed",
+                handleForceRealChange
+            );
+        };
+    }, []);
+
+    useEffect(() => {
         const fetchAI = async () => {
+            const requestId = ++requestIdRef.current;
             setLoadingAI(true);
             setErrorMessage(null);
             setAnalysis(null);
@@ -49,17 +82,36 @@ const Results: React.FC = () => {
 
                 const json = await res.json();
 
-                if (json?.error) {
-                    setErrorMessage(json.error.message || "Erreur lors de l’analyse.");
+                if (requestId !== requestIdRef.current) {
                     return;
                 }
 
-                setAnalysis(json);
+                if (json?.error) {
+                    setErrorMessage(
+                        json.error.message || "Erreur lors de l’analyse."
+                    );
+                    setSourceMode("unknown");
+                    return;
+                }
+
+                setAnalysis(json?.data ?? json);
+                const metaSource = json?.meta?.source;
+                if (metaSource === "mock" || metaSource === "real" || metaSource === "degraded") {
+                    setSourceMode(metaSource);
+                } else {
+                    setSourceMode("unknown");
+                }
             } catch (err) {
+                if (requestId !== requestIdRef.current) {
+                    return;
+                }
                 console.error("Erreur IA:", err);
                 setErrorMessage("Erreur réseau ou serveur.");
+                setSourceMode("unknown");
             } finally {
-                setLoadingAI(false);
+                if (requestId === requestIdRef.current) {
+                    setLoadingAI(false);
+                }
             }
         };
 
@@ -82,7 +134,19 @@ const Results: React.FC = () => {
                         <button
                             type="button"
                             disabled={!canToggle}
-                            onClick={() => setRealAI(v => !v)}
+                            onClick={() => {
+                                const next = !realAI;
+                                setRealAI(next);
+                                localStorage.setItem(
+                                    "clinia_force_real",
+                                    String(next)
+                                );
+                                window.dispatchEvent(
+                                    new CustomEvent("clinia:force-real-changed", {
+                                        detail: { forceReal: next },
+                                    })
+                                );
+                            }}
                             className={`px-3 py-2 rounded-lg text-xs font-medium border transition disabled:opacity-50 ${
                                 realAI
                                     ? "bg-emerald-600 text-white border-emerald-600"
@@ -94,6 +158,9 @@ const Results: React.FC = () => {
                     </div>
                 </div>
 
+                <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-2 max-w-2xl">
+                    Source: {sourceMode}
+                </p>
                 {realAI && (
                     <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 max-w-2xl">
                         ⚠️ IA réelle activée — consommation de crédits OpenAI.
@@ -103,6 +170,14 @@ const Results: React.FC = () => {
 
             {/* ANALYSE IA */}
             <section className="space-y-4">
+                {realAI && loadingAI && (
+                    <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-6">
+                        <div className="h-14 w-14 animate-spin rounded-full border-4 border-gray-200 border-t-primary" />
+                        <div className="text-sm text-gray-700">
+                            Requete OpenAI en cours...
+                        </div>
+                    </div>
+                )}
                 <AICard
                     loading={loadingAI}
                     error={!!errorMessage}
