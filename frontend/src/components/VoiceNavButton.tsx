@@ -100,9 +100,15 @@ const ACTION_COMMANDS: ActionCommand[] = [
 const VoiceNavButton: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const isDev =
+        typeof import.meta !== "undefined" &&
+        (import.meta as any).env &&
+        (import.meta as any).env.DEV;
     const [isListening, setIsListening] = useState(false);
     const [isHandsFree, setIsHandsFree] = useState(false);
     const [status, setStatus] = useState<string | null>(null);
+    const [micLevel, setMicLevel] = useState<number | null>(null);
+    const [isMicTestActive, setIsMicTestActive] = useState(false);
     const [voiceMode, setVoiceMode] = useState<"navigation" | "dictation">(
         "navigation"
     );
@@ -112,6 +118,12 @@ const VoiceNavButton: React.FC = () => {
     const isSpeakingRef = useRef(false);
     const isListeningRef = useRef(false);
     const lastDictationRef = useRef<{ text: string; at: number } | null>(null);
+    const micStreamRef = useRef<MediaStream | null>(null);
+    const micTestStreamRef = useRef<MediaStream | null>(null);
+    const micTestIntervalRef = useRef<number | null>(null);
+    const micTestAudioCtxRef = useRef<AudioContext | null>(null);
+    const silenceTimerRef = useRef<number | null>(null);
+    const silenceStopRef = useRef(false);
 
     useEffect(() => {
         isHandsFreeRef.current = isHandsFree;
@@ -137,14 +149,25 @@ const VoiceNavButton: React.FC = () => {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "fr-CA";
         isSpeakingRef.current = true;
+        const fallbackTimer = window.setTimeout(() => {
+            isSpeakingRef.current = false;
+            if (isHandsFreeRef.current && !isListeningRef.current) {
+                startListeningRef.current();
+            }
+        }, 1500);
         utterance.onend = () => {
+            window.clearTimeout(fallbackTimer);
             isSpeakingRef.current = false;
             if (isHandsFreeRef.current) {
                 startListeningRef.current();
             }
         };
         utterance.onerror = () => {
+            window.clearTimeout(fallbackTimer);
             isSpeakingRef.current = false;
+            if (isHandsFreeRef.current && !isListeningRef.current) {
+                startListeningRef.current();
+            }
         };
         recognitionRef.current?.stop();
         window.speechSynthesis.speak(utterance);
@@ -155,6 +178,17 @@ const VoiceNavButton: React.FC = () => {
             const normalized = normalizeText(transcript);
             const compactNormalized = normalized.replace(/\s+/g, "");
             const isWakeWord = compactNormalized.includes("clinia");
+
+            setStatus(`Entendu: "${transcript}"`);
+            if (isDev && typeof window !== "undefined") {
+                console.info("[VoiceNav] transcript", {
+                    raw: transcript,
+                    normalized,
+                    compactNormalized,
+                    voiceMode,
+                    path: location.pathname,
+                });
+            }
 
             if (isWakeWord) {
                 setStatus("Navigation: Accueil");
@@ -262,18 +296,95 @@ const VoiceNavButton: React.FC = () => {
         recognition.maxAlternatives = 1;
         (recognition as SpeechRecognition & { continuous?: boolean }).continuous =
             false;
+        recognition.onstart = () => {
+            setStatus("Micro actif, parlez maintenant...");
+            if (isDev) {
+                console.info("[VoiceNav] recognition start");
+            }
+            if (silenceTimerRef.current) {
+                window.clearTimeout(silenceTimerRef.current);
+            }
+            silenceTimerRef.current = window.setTimeout(() => {
+                silenceStopRef.current = true;
+                recognition.stop();
+            }, 5000);
+        };
+        recognition.onaudiostart = () => {
+            if (isDev) {
+                console.info("[VoiceNav] audio start");
+            }
+        };
+        recognition.onaudioend = () => {
+            if (isDev) {
+                console.info("[VoiceNav] audio end");
+            }
+        };
+        recognition.onspeechstart = () => {
+            if (isDev) {
+                console.info("[VoiceNav] speech start");
+            }
+            if (silenceTimerRef.current) {
+                window.clearTimeout(silenceTimerRef.current);
+                silenceTimerRef.current = null;
+            }
+        };
+        recognition.onspeechend = () => {
+            if (isDev) {
+                console.info("[VoiceNav] speech end");
+            }
+            if (silenceTimerRef.current) {
+                window.clearTimeout(silenceTimerRef.current);
+            }
+            silenceTimerRef.current = window.setTimeout(() => {
+                silenceStopRef.current = true;
+                recognition.stop();
+            }, 5000);
+        };
         recognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript;
             handleTranscript(transcript);
         };
+        recognition.onnomatch = () => {
+            setStatus("Aucune reconnaissance vocale.");
+            if (isDev) {
+                console.info("[VoiceNav] no match");
+            }
+        };
         recognition.onerror = (event) => {
-            setStatus(`Erreur vocale: ${event.error}`);
+            if (event.error === "audio-capture") {
+                setStatus(
+                    "Micro non accessible. Verifiez les permissions du navigateur et de l'OS."
+                );
+            } else {
+                setStatus(`Erreur vocale: ${event.error}`);
+            }
+            if (isDev) {
+                console.error("[VoiceNav] recognition error", event.error);
+            }
+            if (silenceTimerRef.current) {
+                window.clearTimeout(silenceTimerRef.current);
+                silenceTimerRef.current = null;
+            }
             setIsListening(false);
             isListeningRef.current = false;
         };
         recognition.onend = () => {
+            if (isDev) {
+                console.info("[VoiceNav] recognition end");
+            }
+            if (silenceTimerRef.current) {
+                window.clearTimeout(silenceTimerRef.current);
+                silenceTimerRef.current = null;
+            }
             setIsListening(false);
             isListeningRef.current = false;
+            if (silenceStopRef.current) {
+                silenceStopRef.current = false;
+                setIsHandsFree(false);
+                isHandsFreeRef.current = false;
+                setStatus("Ecoute arretee (silence).");
+                return;
+            }
             if (isSpeakingRef.current) {
                 return;
             }
@@ -297,7 +408,57 @@ const VoiceNavButton: React.FC = () => {
         setStatus("Ecoute en cours...");
         setIsListening(true);
         isListeningRef.current = true;
-        recognition.start();
+        const startRecognition = () => {
+            try {
+                recognition.start();
+            } catch (error) {
+                console.error("[VoiceNav] start error", error);
+                setStatus("Erreur de demarrage micro.");
+                setIsListening(false);
+                isListeningRef.current = false;
+            }
+        };
+        if (typeof window === "undefined" || !navigator.mediaDevices) {
+            setStatus("API micro indisponible. Essayez Chrome/HTTPS/localhost.");
+            startRecognition();
+            return;
+        }
+        navigator.mediaDevices
+            .enumerateDevices()
+            .then((devices) => {
+                const audioInputs = devices.filter(
+                    (device) => device.kind === "audioinput"
+                );
+                if (isDev) {
+                    console.info("[VoiceNav] audio inputs", audioInputs.length);
+                }
+            })
+            .catch((error) => {
+                if (isDev) {
+                    console.info("[VoiceNav] enumerateDevices error", error);
+                }
+            });
+        navigator.mediaDevices
+            .getUserMedia({ audio: true })
+            .then((stream) => {
+                if (micStreamRef.current) {
+                    micStreamRef.current.getTracks().forEach((track) =>
+                        track.stop()
+                    );
+                }
+                micStreamRef.current = stream;
+                startRecognition();
+            })
+            .catch((error) => {
+                if (isDev) {
+                    console.error("[VoiceNav] getUserMedia error", error);
+                }
+                setStatus(
+                    `Micro non accessible: ${error?.name || "inconnu"}.`
+                );
+                setIsListening(false);
+                isListeningRef.current = false;
+            });
     }, [createRecognition]);
 
     useEffect(() => {
@@ -312,6 +473,17 @@ const VoiceNavButton: React.FC = () => {
 
         if (isHandsFree) {
             recognitionRef.current?.stop();
+            if (silenceTimerRef.current) {
+                window.clearTimeout(silenceTimerRef.current);
+                silenceTimerRef.current = null;
+            }
+            silenceStopRef.current = false;
+            if (micStreamRef.current) {
+                micStreamRef.current.getTracks().forEach((track) =>
+                    track.stop()
+                );
+                micStreamRef.current = null;
+            }
             isListeningRef.current = false;
             setIsListening(false);
             setIsHandsFree(false);
@@ -328,6 +500,79 @@ const VoiceNavButton: React.FC = () => {
             return;
         }
         startListening();
+    };
+
+    const stopMicTest = () => {
+        if (micTestIntervalRef.current) {
+            window.clearInterval(micTestIntervalRef.current);
+            micTestIntervalRef.current = null;
+        }
+        if (micTestStreamRef.current) {
+            micTestStreamRef.current.getTracks().forEach((track) =>
+                track.stop()
+            );
+            micTestStreamRef.current = null;
+        }
+        if (micTestAudioCtxRef.current) {
+            micTestAudioCtxRef.current.close();
+            micTestAudioCtxRef.current = null;
+        }
+        setIsMicTestActive(false);
+        setMicLevel(null);
+    };
+
+    const toggleMicTest = () => {
+        if (isMicTestActive) {
+            stopMicTest();
+            return;
+        }
+        if (!isDev) {
+            return;
+        }
+        if (typeof window === "undefined" || !navigator.mediaDevices) {
+            setStatus("API micro indisponible. Essayez Chrome/HTTPS/localhost.");
+            return;
+        }
+        navigator.mediaDevices
+            .getUserMedia({ audio: true })
+            .then((stream) => {
+                const AudioCtx =
+                    window.AudioContext || (window as any).webkitAudioContext;
+                if (!AudioCtx) {
+                    setStatus("AudioContext indisponible.");
+                    stream.getTracks().forEach((track) => track.stop());
+                    return;
+                }
+                micTestStreamRef.current = stream;
+                const audioCtx = new AudioCtx();
+                micTestAudioCtxRef.current = audioCtx;
+                const source = audioCtx.createMediaStreamSource(stream);
+                const analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 1024;
+                const data = new Uint8Array(analyser.fftSize);
+                source.connect(analyser);
+                micTestIntervalRef.current = window.setInterval(() => {
+                    analyser.getByteTimeDomainData(data);
+                    let sum = 0;
+                    for (let i = 0; i < data.length; i += 1) {
+                        const v = (data[i] - 128) / 128;
+                        sum += v * v;
+                    }
+                    const rms = Math.sqrt(sum / data.length);
+                    setMicLevel(Math.min(100, Math.round(rms * 200)));
+                }, 100);
+                setIsMicTestActive(true);
+                setStatus("Test micro actif.");
+            })
+            .catch((error) => {
+                if (isDev) {
+                    console.error("[VoiceNav] mic test error", error);
+                }
+                setStatus(
+                    `Test micro impossible: ${error?.name || "inconnu"}.`
+                );
+                stopMicTest();
+            });
     };
 
     return (
@@ -349,6 +594,26 @@ const VoiceNavButton: React.FC = () => {
                         : "Vocal actif"
                     : "Commande vocale"}
             </button>
+            {isDev && (
+                <button
+                    type="button"
+                    onClick={toggleMicTest}
+                    className={
+                        "inline-flex items-center gap-2 rounded-md border px-3 py-1 text-xs transition " +
+                        (isMicTestActive
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-gray-200 text-gray-700 hover:bg-gray-50")
+                    }
+                    title="Test rapide du micro (niveau sonore)"
+                >
+                    {isMicTestActive ? "Test micro actif" : "Tester micro"}
+                </button>
+            )}
+            {isDev && micLevel !== null && (
+                <span className="text-xs text-gray-500">
+                    Niveau micro: {micLevel}%
+                </span>
+            )}
             {status && (
                 <span className="text-xs text-gray-500" aria-live="polite">
                     {status}
