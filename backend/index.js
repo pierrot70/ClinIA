@@ -182,16 +182,17 @@ app.post("/api/ai/analyze", async (req, res) => {
         const isProd =
             process.env.NODE_ENV === "production" ||
             process.env.CLINIA_FORCE_MOCK === "true";
+        const forceRealSafe = !isProd && forceReal === true;
         const useMock =
             (process.env.CLINIA_MOCK_AI === "true" || isProd) &&
-            forceReal !== true;
+            !forceRealSafe;
 
         const model =
             openaiModel || process.env.OPENAI_MODEL;
 
         console.log("AI_REQUEST from Frontend", {
             model,
-            forceReal,
+            forceReal: forceRealSafe,
             useMock,
             circuitOpen: !canCallOpenAI(),
             symptoms,
@@ -221,7 +222,7 @@ app.post("/api/ai/analyze", async (req, res) => {
         }
 
         /* ---------------- CIRCUIT BREAKER ---------------- */
-        if (!canCallOpenAI() && forceReal !== true) {
+        if (!canCallOpenAI() && !forceRealSafe) {
             const degraded = normalizeClinicalAnalysis({});
             return res.json({
                 data: degraded,
