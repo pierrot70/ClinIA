@@ -1,28 +1,22 @@
-Résumé pour reprendre le contexte
-•
-Problème: après un rollback, cliquer “Commande vocale” et dire “retourne à la maison” ne déclenche rien.
-•
-Diagnostic: erreur console récurrente recognition error audio-capture sur Chrome Ubuntu = micro inaccessible, donc aucune transcription.
-•
-Fichier principal: frontend/src/components/VoiceNavButton.tsx.
-Modifs déjà faites dans frontend/src/components/VoiceNavButton.tsx
-1.
-Ajout d’un fallback dans speak() pour relancer l’écoute si speechSynthesis ne déclenche pas onend/onerror (évite un blocage d’écoute).
-2.
-Ajout de diagnostics:
-◦
-UI: setStatus("Entendu: \"...\"") quand un transcript arrive.
-◦
-Console: [VoiceNav] transcript avec raw, normalized, compactNormalized, voiceMode, path.
-◦
-Console: [VoiceNav] recognition error sur erreur.
-3.
-Message UI spécifique pour audio-capture:
-◦
-“Micro non accessible. Verifiez les permissions du navigateur et de l'OS.”
-Constat actuel
-•
-Sur Chrome Ubuntu, audio-capture indique un problème d’accès micro (permissions navigateur/OS, micro occupé, HTTPS/localhost, etc.). Pas un problème de matching “retourne à la maison”.
-Prochaine étape proposée
-•
-Vérifier permissions micro Chrome + OS Ubuntu, s’assurer que le site est en HTTPS ou localhost, et que le micro n’est pas utilisé par une autre ap
+Voici un résumé prêt à coller dans un nouveau chat.
+Contexte ClinIA (22 Feb 2026)
+Objectif: masquer le toggle “IA réelle / IA mock” en production (Coolify) et verrouiller côté backend pour ignorer toute activation involontaire.
+
+Frontend (Vite):
+- Masquage en prod basé sur `import.meta.env.PROD` (pas sur `VITE_APP_ENV`, souvent absent sur Coolify).
+- En prod: suppression de `clinia_force_real` du localStorage et `forceReal` forcé à `false`.
+- Boutons/toggles et warning “IA réelle activée” masqués en prod.
+Fichiers modifiés:
+- frontend/src/components/Header.tsx
+- frontend/src/pages/Results.tsx
+- frontend/src/pages/ClinicalAnalyzePage.tsx
+
+Backend:
+- Verrouillage: en prod ou si `CLINIA_FORCE_MOCK=true`, on force `forceReal` à `false`.
+- `useMock` et circuit breaker utilisent `forceRealSafe` (normalisé).
+Fichier modifié:
+- backend/index.js
+
+Remarque:
+- Tout est désormais bloqué en prod même si le client envoie `forceReal=true`.
+- Option possible: ajouter un log explicite quand `forceReal` est reçu en prod.

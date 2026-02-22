@@ -183,6 +183,9 @@ app.post("/api/ai/analyze", async (req, res) => {
             process.env.NODE_ENV === "production" ||
             process.env.CLINIA_FORCE_MOCK === "true";
         const forceRealSafe = !isProd && forceReal === true;
+        if (isProd && forceReal === true) {
+            console.warn("⚠️ forceReal ignored in production");
+        }
         const useMock =
             (process.env.CLINIA_MOCK_AI === "true" || isProd) &&
             !forceRealSafe;
