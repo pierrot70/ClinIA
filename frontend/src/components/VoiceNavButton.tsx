@@ -129,6 +129,7 @@ const VoiceNavButton: React.FC = () => {
     const isHandsFreeRef = useRef(false);
     const isSpeakingRef = useRef(false);
     const isListeningRef = useRef(false);
+    const lastStartAtRef = useRef<number>(0);
     const lastDictationRef = useRef<{ text: string; at: number } | null>(null);
     const micStreamRef = useRef<MediaStream | null>(null);
     const micTestStreamRef = useRef<MediaStream | null>(null);
@@ -414,6 +415,30 @@ const VoiceNavButton: React.FC = () => {
                     "Micro non accessible. Verifiez les permissions du navigateur et de l'OS."
                 );
             } else {
+                // Treat common transient errors (no-speech) specially when hands-free is enabled
+                if (event.error === "no-speech") {
+                    setStatus("Aucune parole détectée.");
+                    if (isDev) {
+                        console.info("[VoiceNav] recognition no-speech");
+                    }
+                    if (isHandsFreeRef.current) {
+                        // Attempt to restart listening shortly after a transient no-speech
+                        window.setTimeout(() => {
+                            try {
+                                startListeningRef.current();
+                            } catch (e) {
+                                /* ignore */
+                            }
+                        }, 500);
+                        return;
+                    } else {
+                        setStatus("Aucune parole détectée.");
+                        setIsListening(false);
+                        isListeningRef.current = false;
+                        return;
+                    }
+                }
+
                 setStatus(`Erreur vocale: ${event.error}`);
             }
             if (isDev) {
@@ -527,6 +552,16 @@ const VoiceNavButton: React.FC = () => {
 
     const startListening = useCallback(() => {
         console.info("[VoiceNav] startListening invoked");
+        // Cooldown to avoid rapid restart loops (e.g. no-speech -> restart -> no-speech)
+        const START_COOLDOWN_MS = 1000;
+        const now = Date.now();
+        if (now - (lastStartAtRef.current || 0) < START_COOLDOWN_MS) {
+            if (isDev) {
+                console.info("[VoiceNav] startListening suppressed by cooldown");
+            }
+            return;
+        }
+        lastStartAtRef.current = now;
         if (isListeningRef.current) {
             return;
         }
