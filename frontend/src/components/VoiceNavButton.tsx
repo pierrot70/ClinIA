@@ -334,7 +334,16 @@ const VoiceNavButton: React.FC = () => {
                 );
                 setVoiceMode("dictation");
                 setStatus("Diagnostic capture.");
-                speak("Diagnostic capture.");
+                speak("Diagnostic capturé.");
+                // Short follow-up instruction (delay slightly longer than speak fallback)
+                setTimeout(() => {
+                    if (typeof console !== "undefined") {
+                        console.info("[VoiceNav] speaking follow-up instruction");
+                    }
+                    speak(
+                        "Si satisfait, cliquez sur Rechercher ou dites Efface pour recommencer."
+                    );
+                }, 1200);
                 return;
             }
 
