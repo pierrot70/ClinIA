@@ -63,6 +63,26 @@ curl -X POST http://localhost:4000/api/ai/analyze \
 ```bash
 docker compose -f docker-compose-local.yml logs --tail=500 > diagnostics/all-logs.txt
 docker compose -f docker-compose-local.yml ps > diagnostics/compose-ps.txt
+
+7) Optional: enable a local push confirmation dialog
+
+If you want a confirmation popup (or terminal prompt) before any `git push`, enable the bundled git hook:
+
+```bash
+# make the enable script executable and run it once
+chmod +x scripts/enable-git-hooks.sh
+./scripts/enable-git-hooks.sh
+```
+
+This sets `git config core.hooksPath .githooks` and activates the `pre-push` hook which will show a
+GUI confirmation using `zenity` when available, or a terminal prompt otherwise.
+
+If you prefer to enable manually without the script:
+
+```bash
+git config core.hooksPath .githooks
+```
+
 ```
 
 Security note: never commit secrets. Use Coolify secrets or an external secret manager for production.

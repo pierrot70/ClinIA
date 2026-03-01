@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Local pre-push hook that asks for confirmation using a GUI popup (zenity)
+# or a terminal prompt when zenity is not available.
+
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "(unknown)")
+remote="$1"
+url="$2"
+
+commits=""
+if git rev-parse --verify --quiet origin/$branch >/dev/null 2>&1; then
+  commits=$(git --no-pager log --oneline origin/$branch..$branch)
+else
+  commits=$(git --no-pager log --oneline $branch)
+fi
+
+if [ -z "$commits" ]; then
+  # Nothing to push
+  exit 0
+fi
+
+message="Branch: $branch\nRemote: ${remote:-origin}\n\nCommits:\n$commits\n\nDo you want to continue and push?"
+
+if command -v zenity >/dev/null 2>&1; then
+  # Use a GUI dialog
+  zenity --question --title="Confirm git push" --text="$message"
+  rc=$?
+  if [ $rc -eq 0 ]; then
+    exit 0
+  else
+    echo "Push aborted by user (zenity)."
+    exit 1
+  fi
+else
+  # Fallback to terminal prompt
+  printf "%b\n" "$message"
+  read -p "Push? [y/N] " ans
+  case "$ans" in
+    y|Y) exit 0 ;;
+    *) echo "Push aborted by user." ; exit 1 ;;
+  esac
+fi
