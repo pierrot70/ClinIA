@@ -171,38 +171,111 @@ const VoiceNavButton: React.FC = () => {
     }, []);
 
     const speak = useCallback((text: string) => {
-        if (typeof window === "undefined") {
-            return;
-        }
-        if (!("speechSynthesis" in window)) {
-            return;
-        }
+        if (typeof window === "undefined") return;
+        if (!("speechSynthesis" in window)) return;
+
         window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = "fr-CA";
-        isSpeakingRef.current = true;
-        const fallbackTimer = window.setTimeout(() => {
+
+        const playBeep = () => {
+            try {
+                const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+                if (!AudioCtx) return;
+                const ac = new AudioCtx();
+                const o = ac.createOscillator();
+                const g = ac.createGain();
+                o.type = "sine";
+                o.frequency.value = 880;
+                g.gain.value = 0.03;
+                o.connect(g);
+                g.connect(ac.destination);
+                o.start();
+                setTimeout(() => {
+                    try {
+                        o.stop();
+                        ac.close();
+                    } catch (e) {}
+                }, 180);
+            } catch (e) {}
+        };
+
+        const cleanupAfterSpeak = () => {
             isSpeakingRef.current = false;
             if (isHandsFreeRef.current && !isListeningRef.current) {
                 startListeningRef.current();
             }
+        };
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "fr-CA";
+        utterance.volume = 1;
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        isSpeakingRef.current = true;
+
+        const fallbackTimer = window.setTimeout(() => {
+            cleanupAfterSpeak();
         }, 1500);
+
         utterance.onend = () => {
             window.clearTimeout(fallbackTimer);
-            isSpeakingRef.current = false;
-            if (isHandsFreeRef.current) {
-                startListeningRef.current();
-            }
+            cleanupAfterSpeak();
         };
         utterance.onerror = () => {
             window.clearTimeout(fallbackTimer);
+            cleanupAfterSpeak();
+        };
+
+        const speakNow = () => {
+            try {
+                recognitionRef.current?.stop();
+                window.speechSynthesis.speak(utterance);
+            } catch (e) {
+                window.clearTimeout(fallbackTimer);
+                cleanupAfterSpeak();
+                playBeep();
+            }
+        };
+
+        try {
+            const voices = window.speechSynthesis.getVoices();
+            if (!voices || voices.length === 0) {
+                const onVoicesChanged = () => {
+                    try {
+                        window.speechSynthesis.removeEventListener("voiceschanged", onVoicesChanged);
+                    } catch (e) {}
+                    speakNow();
+                };
+                try {
+                    window.speechSynthesis.addEventListener("voiceschanged", onVoicesChanged);
+                } catch (e) {}
+                window.speechSynthesis.getVoices();
+                setTimeout(() => {
+                    try {
+                        const after = window.speechSynthesis.getVoices();
+                        if (!after || after.length === 0) {
+                            try {
+                                window.speechSynthesis.removeEventListener("voiceschanged", onVoicesChanged);
+                            } catch (e) {}
+                            window.clearTimeout(fallbackTimer);
+                            isSpeakingRef.current = false;
+                            playBeep();
+                            if (isHandsFreeRef.current && !isListeningRef.current) {
+                                startListeningRef.current();
+                            }
+                        }
+                    } catch (e) {}
+                }, 700);
+            } else {
+                speakNow();
+            }
+        } catch (e) {
+            window.clearTimeout(fallbackTimer);
             isSpeakingRef.current = false;
+            playBeep();
             if (isHandsFreeRef.current && !isListeningRef.current) {
                 startListeningRef.current();
             }
-        };
-        recognitionRef.current?.stop();
-        window.speechSynthesis.speak(utterance);
+        }
     }, []);
 
     const handleTranscript = useCallback(
