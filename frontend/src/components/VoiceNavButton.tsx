@@ -114,6 +114,16 @@ const VoiceNavButton: React.FC = () => {
     const [voiceMode, setVoiceMode] = useState<"navigation" | "dictation">(
         "navigation"
     );
+    const [wakeEnabled, setWakeEnabled] = useState<boolean>(() => {
+        try {
+            return (
+                typeof window !== "undefined" &&
+                window.localStorage.getItem("clinia_wake_enabled") === "1"
+            );
+        } catch (e) {
+            return false;
+        }
+    });
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const startListeningRef = useRef<() => void>(() => {});
     const isHandsFreeRef = useRef(false);
@@ -180,6 +190,31 @@ const VoiceNavButton: React.FC = () => {
             const normalized = normalizeText(transcript);
             const compactNormalized = normalized.replace(/\s+/g, "");
             const isWakeWord = compactNormalized.includes("clinia");
+            // Robust detection for "diagnostic" with common variants.
+            const DIAGNOSTIC_VARIANTS = [
+                "diagnostic",
+                "diagnostique",
+                "diagnostik",
+                "diag",
+            ];
+            const isDiagnosticWord = DIAGNOSTIC_VARIANTS.some((kw) => {
+                const plain = kw.toLowerCase();
+                return (
+                    normalized.includes(plain) ||
+                    compactNormalized.includes(plain.replace(/\s+/g, ""))
+                );
+            });
+
+            // Short debug log to help testing — shows whether the word was detected.
+            // Leave this in during local dev; remove if noisy.
+            if (typeof console !== "undefined") {
+                console.info("[VoiceNav] diagnostic check", {
+                    transcript,
+                    normalized,
+                    compactNormalized,
+                    isDiagnosticWord,
+                });
+            }
 
             setStatus(`Entendu: "${transcript}"`);
             if (isDev && typeof window !== "undefined") {
@@ -197,6 +232,20 @@ const VoiceNavButton: React.FC = () => {
                 navigate("/");
                 setVoiceMode("dictation");
                 speak("ClinIA pret, dictez votre diagnostic.");
+                return;
+            }
+
+            // If user says "diagnostic", navigate home and activate dictation mode.
+            if (isDiagnosticWord) {
+                setStatus("Activation du mode dictée...");
+                navigate("/");
+                setVoiceMode("dictation");
+                // Enable hands-free so speak() will restart listening after the prompt.
+                setIsHandsFree(true);
+                isHandsFreeRef.current = true;
+                speak(
+                    "Dites ou écrivez votre diagnostic, puis dites «Rechercher» ou cliquez sur «Rechercher» pour lancer."
+                );
                 return;
             }
             const matchedNav = NAV_COMMANDS.find((command) =>
@@ -404,7 +453,80 @@ const VoiceNavButton: React.FC = () => {
         return recognition;
     }, [handleTranscript]);
 
+    // Try to auto-enable persistent wake if previously enabled.
+    useEffect(() => {
+        if (!wakeEnabled) return;
+        if (typeof navigator === "undefined" || !navigator.mediaDevices) return;
+        // Attempt to acquire media silently; browser may reuse prior permission.
+        navigator.mediaDevices
+            .getUserMedia({ audio: true })
+            .then((stream) => {
+                if (micStreamRef.current) {
+                    micStreamRef.current.getTracks().forEach((t) => t.stop());
+                }
+                micStreamRef.current = stream;
+                setIsHandsFree(true);
+                isHandsFreeRef.current = true;
+                // start listening if possible
+                try {
+                    startListeningRef.current();
+                } catch (e) {
+                    /* ignore */
+                }
+            })
+            .catch(() => {
+                // If permission revoked, clear stored preference
+                try {
+                    window.localStorage.removeItem("clinia_wake_enabled");
+                } catch (e) {}
+                setWakeEnabled(false);
+            });
+    }, [wakeEnabled]);
+
+    const enablePersistentWake = useCallback(() => {
+        if (typeof navigator === "undefined" || !navigator.mediaDevices) {
+            setStatus("API micro indisponible sur ce navigateur.");
+            return;
+        }
+        navigator.mediaDevices
+            .getUserMedia({ audio: true })
+            .then((stream) => {
+                if (micStreamRef.current) {
+                    micStreamRef.current.getTracks().forEach((t) => t.stop());
+                }
+                micStreamRef.current = stream;
+                setIsHandsFree(true);
+                isHandsFreeRef.current = true;
+                setWakeEnabled(true);
+                try {
+                    window.localStorage.setItem("clinia_wake_enabled", "1");
+                } catch (e) {}
+                setStatus("Écoute persistante activée.");
+                // start listening right away
+                startListeningRef.current();
+            })
+            .catch((err) => {
+                setStatus(`Autorisation micro refusée: ${err?.name || "inconnu"}`);
+            });
+    }, []);
+
+    const disablePersistentWake = useCallback(() => {
+        recognitionRef.current?.stop();
+        if (micStreamRef.current) {
+            micStreamRef.current.getTracks().forEach((t) => t.stop());
+            micStreamRef.current = null;
+        }
+        setIsHandsFree(false);
+        isHandsFreeRef.current = false;
+        setWakeEnabled(false);
+        try {
+            window.localStorage.removeItem("clinia_wake_enabled");
+        } catch (e) {}
+        setStatus("Écoute persistante désactivée.");
+    }, []);
+
     const startListening = useCallback(() => {
+        console.info("[VoiceNav] startListening invoked");
         if (isListeningRef.current) {
             return;
         }
@@ -456,6 +578,7 @@ const VoiceNavButton: React.FC = () => {
                     );
                 }
                 micStreamRef.current = stream;
+                console.info("[VoiceNav] getUserMedia success, starting recognition");
                 startRecognition();
             })
             .catch((error) => {
@@ -475,6 +598,7 @@ const VoiceNavButton: React.FC = () => {
     }, [startListening]);
 
     const toggleListening = () => {
+        console.info("[VoiceNav] toggleListening, isHandsFree=", isHandsFree, "isListening=", isListening);
         if (!isSupported) {
             setStatus("Navigation vocale non supportee sur ce navigateur.");
             return;
@@ -503,6 +627,7 @@ const VoiceNavButton: React.FC = () => {
 
         setIsHandsFree(true);
         isHandsFreeRef.current = true;
+        console.info("[VoiceNav] hands-free enabled");
         if (typeof window !== "undefined" && "speechSynthesis" in window) {
             window.speechSynthesis.getVoices();
             speak("Mode vocal actif.");
@@ -622,6 +747,24 @@ const VoiceNavButton: React.FC = () => {
                 <span className="text-xs text-gray-500">
                     Niveau micro: {micLevel}%
                 </span>
+            )}
+            {isSupported && (
+                <button
+                    type="button"
+                    onClick={() => {
+                        if (wakeEnabled) disablePersistentWake();
+                        else enablePersistentWake();
+                    }}
+                    className={
+                        "inline-flex items-center gap-2 rounded-md border px-3 py-1 text-xs transition " +
+                        (wakeEnabled
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-gray-200 text-gray-700 hover:bg-gray-50")
+                    }
+                    title={wakeEnabled ? "Désactiver écoute persistante" : "Activer écoute persistante"}
+                >
+                    {wakeEnabled ? "Écoute persistante: ON" : "Activer écoute persistante"}
+                </button>
             )}
             {status && (
                 <span className="text-xs text-gray-500" aria-live="polite">
