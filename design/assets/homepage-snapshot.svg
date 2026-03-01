@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0%" stop-color="#FFDEE9" />
+      <stop offset="100%" stop-color="#B5FFFC" />
+    </linearGradient>
+    <style>
+      .bg { fill: url(#g); }
+      .header { font-family: Inter, Arial, sans-serif; font-size:28px; font-weight:700; fill:#0f172a }
+      .logo { font-family: Inter, Arial, sans-serif; font-size:20px; font-weight:700; fill:#111827 }
+      .hero-title { font-family: Inter, Arial, sans-serif; font-size:48px; font-weight:800; fill:#071133 }
+      .hero-sub { font-family: Inter, Arial, sans-serif; font-size:20px; fill:#0b1220 }
+      .card { fill:rgba(255,255,255,0.9); stroke:#e6e9ef; stroke-width:1; rx:12 }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1200" height="800" />
+
+  <!-- Header -->
+  <rect x="0" y="0" width="1200" height="72" fill="rgba(255,255,255,0.85)" />
+  <text x="36" y="44" class="logo">Clinia</text>
+  <g transform="translate(980,18)">
+    <rect x="0" y="8" width="160" height="40" rx="8" fill="#111827" />
+    <text x="80" y="34" text-anchor="middle" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="16">Se connecter</text>
+  </g>
+
+  <!-- Hero area -->
+  <g transform="translate(80,120)">
+    <rect x="0" y="0" width="1040" height="420" rx="20" fill="rgba(255,255,255,0.6)" />
+    <g transform="translate(32,32)">
+      <text class="hero-title">Analyse clinique assistée par IA</text>
+      <text y="64" class="hero-sub">Entrez les symptômes, obtenez un résumé et des recommandations de traitement.</text>
+
+      <rect x="0" y="110" width="300" height="56" rx="12" fill="#0f172a" />
+      <text x="150" y="150" text-anchor="middle" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="18">Lancer une analyse</text>
+
+      <!-- placeholder card -->
+      <g transform="translate(360,0)">
+        <rect x="0" y="0" width="640" height="300" rx="12" fill="#fff" stroke="#e2e8f0" />
+        <text x="24" y="36" font-family="Inter, Arial, sans-serif" font-size="20" fill="#0b1220">Derniers diagnostics</text>
+        <rect x="24" y="56" width="280" height="80" rx="10" fill="#f8fafc" />
+        <rect x="328" y="56" width="280" height="80" rx="10" fill="#f8fafc" />
+      </g>
+    </g>
+  </g>
+
+  <!-- Footer -->
+  <g transform="translate(0,700)">
+    <rect x="0" y="0" width="1200" height="100" fill="rgba(255,255,255,0.8)" />
+    <text x="36" y="34" class="header">© Clinia — Prototype</text>
+  </g>
+
+</svg>
