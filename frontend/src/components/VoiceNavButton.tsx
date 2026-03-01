@@ -80,13 +80,32 @@ const ACTION_COMMANDS: ActionCommand[] = [
     {
         label: "Rechercher",
         action: "execute",
-        keywords: ["execute", "recherche", "rechercher", "lancer"],
+        keywords: [
+            "execute",
+            "recherche",
+            "rechercher",
+            "lancer",
+            "lancer requete",
+            "lancer la requete",
+            "lancer requête",
+            "lancer la requête",
+        ],
         response: "Recherche lancee.",
     },
     {
         label: "Effacer",
         action: "clear",
-        keywords: ["efface", "effacer", "annule", "annuler", "vider"],
+        keywords: [
+            "efface",
+            "effacer",
+            "annule",
+            "annuler",
+            "vider",
+            "nouveau diagnostic",
+            "nouveau diagnostique",
+            "nouveau diagnostik",
+            "nouveau diag",
+        ],
         response: "Diagnostic efface.",
     },
     {
@@ -230,6 +249,16 @@ const VoiceNavButton: React.FC = () => {
 
             if (isWakeWord) {
                 setStatus("Navigation: Accueil");
+                // Clear previous diagnostic and mark we're waiting for dictation
+                try {
+                    window.localStorage.setItem("clinia_waiting_dictation", "1");
+                } catch (e) {}
+                try {
+                    window.dispatchEvent(new CustomEvent("clinia:voice-clear"));
+                } catch (e) {}
+                try {
+                    window.dispatchEvent(new CustomEvent("clinia:voice-start"));
+                } catch (e) {}
                 navigate("/");
                 setVoiceMode("dictation");
                 speak("ClinIA pret, dictez votre diagnostic.");
@@ -244,9 +273,20 @@ const VoiceNavButton: React.FC = () => {
                 // Enable hands-free so speak() will restart listening after the prompt.
                 setIsHandsFree(true);
                 isHandsFreeRef.current = true;
-                speak(
-                    "Dites ou écrivez votre diagnostic, puis dites «Rechercher» ou cliquez sur «Rechercher» pour lancer."
-                );
+                // Notify other components that dictation is expected (disable search button).
+                // Persist a flag in localStorage before navigation so freshly mounted components
+                // will see the waiting state even if they mount after navigation.
+                try {
+                    window.localStorage.setItem("clinia_waiting_dictation", "1");
+                } catch (e) {}
+                try {
+                    window.dispatchEvent(new CustomEvent("clinia:voice-clear"));
+                } catch (e) {}
+                try {
+                    window.dispatchEvent(new CustomEvent("clinia:voice-start"));
+                } catch (e) {}
+                // Short prompt
+                speak("Dites ou ecrivez votre diagnostic.");
                 return;
             }
             const matchedNav = NAV_COMMANDS.find((command) =>
@@ -260,6 +300,16 @@ const VoiceNavButton: React.FC = () => {
                 navigate(matchedNav.path);
                 if (matchedNav.path === "/") {
                     setVoiceMode("dictation");
+                    // Clear previous diagnostic and set waiting state when returning home
+                    try {
+                        window.localStorage.setItem("clinia_waiting_dictation", "1");
+                    } catch (e) {}
+                    try {
+                        window.dispatchEvent(new CustomEvent("clinia:voice-clear"));
+                    } catch (e) {}
+                    try {
+                        window.dispatchEvent(new CustomEvent("clinia:voice-start"));
+                    } catch (e) {}
                     if (normalized.includes("clinia")) {
                         speak("ClinIA pret, dictez votre diagnostic.");
                     } else {
@@ -268,7 +318,7 @@ const VoiceNavButton: React.FC = () => {
                         // After 1 second, provide follow-up instructions
                         setTimeout(() => {
                             speak(
-                                "Dites ou écrivez votre diagnostic, puis dites «Rechercher» ou cliquez sur «Rechercher» pour lancer."
+                                "Dites ou écrivez votre diagnostic, puis dites «Lancer Requete» ou cliquez sur «Lancer Requete» pour lancer."
                             );
                         }, 1000);
                     }
@@ -341,7 +391,8 @@ const VoiceNavButton: React.FC = () => {
                         console.info("[VoiceNav] speaking follow-up instruction");
                     }
                     speak(
-                        "Si satisfait, cliquez sur Rechercher ou dites Efface pour recommencer."
+                        "Si satisfait, cliquez ou dites «Lancer Requete», ou dites «Nouveau diagnostic" +
+                            "" + " pour recommencer."
                     );
                 }, 1200);
                 return;
