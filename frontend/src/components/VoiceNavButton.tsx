@@ -213,7 +213,14 @@ const VoiceNavButton: React.FC = () => {
                     if (normalized.includes("clinia")) {
                         speak("ClinIA pret, dictez votre diagnostic.");
                     } else {
+                        // First, announce return to home
                         speak("Retour a l'accueil.");
+                        // After 1 second, provide follow-up instructions
+                        setTimeout(() => {
+                            speak(
+                                "Dites ou écrivez votre diagnostic, puis dites «Rechercher» ou cliquez sur «Rechercher» pour lancer."
+                            );
+                        }, 1000);
                     }
                 } else {
                     setVoiceMode("navigation");
@@ -309,7 +316,7 @@ const VoiceNavButton: React.FC = () => {
             silenceTimerRef.current = window.setTimeout(() => {
                 silenceStopRef.current = true;
                 recognition.stop();
-            }, 5000);
+            }, 30000);
         };
         recognition.onaudiostart = () => {
             if (isDev) {
@@ -340,7 +347,7 @@ const VoiceNavButton: React.FC = () => {
             silenceTimerRef.current = window.setTimeout(() => {
                 silenceStopRef.current = true;
                 recognition.stop();
-            }, 5000);
+            }, 30000);
         };
         recognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript;
