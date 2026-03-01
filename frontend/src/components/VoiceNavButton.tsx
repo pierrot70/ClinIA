@@ -100,11 +100,12 @@ const ACTION_COMMANDS: ActionCommand[] = [
 const VoiceNavButton: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    // Vite exposes `import.meta.env.DEV` as `true` in development builds.
+    // Keep the mic-test UI strictly for dev mode only.
     const isDev =
         typeof import.meta !== "undefined" &&
         (import.meta as any).env &&
-        (import.meta as any).env.DEV &&
-        (import.meta as any).env.VITE_APP_ENV !== "production";
+        Boolean((import.meta as any).env.DEV);
     const [isListening, setIsListening] = useState(false);
     const [isHandsFree, setIsHandsFree] = useState(false);
     const [status, setStatus] = useState<string | null>(null);
