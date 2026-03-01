@@ -278,6 +278,81 @@ const VoiceNavButton: React.FC = () => {
         }
     }, []);
 
+    // On some mobile browsers (Safari/iOS) audio and speechSynthesis are locked
+    // until a user gesture occurs. Add a one-time unlock handler that will be
+    // triggered on the first touch/click so TTS and AudioContext can be used.
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        try {
+            const unlocked = window.localStorage.getItem("clinia_audio_unlocked");
+            if (unlocked === "1") return;
+        } catch (e) {}
+
+        const unlock = () => {
+            try {
+                // Try to load voices (allowed in user gesture)
+                if (window.speechSynthesis) {
+                    window.speechSynthesis.getVoices();
+                }
+            } catch (e) {}
+            try {
+                // Create/resume a short AudioContext to satisfy autoplay policies
+                const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+                if (AudioCtx) {
+                    const ac = new AudioCtx();
+                    if (ac.state === "suspended" && typeof ac.resume === "function") {
+                        ac.resume().catch(() => {});
+                    }
+                    // Play an inaudible buffer to ensure the audio output is unlocked
+                    try {
+                        const o = ac.createOscillator();
+                        const g = ac.createGain();
+                        o.type = "sine";
+                        o.frequency.value = 220;
+                        g.gain.value = 0.0001;
+                        o.connect(g);
+                        g.connect(ac.destination);
+                        o.start();
+                        setTimeout(() => {
+                            try {
+                                o.stop();
+                            } catch (e) {}
+                            try {
+                                ac.close();
+                            } catch (e) {}
+                        }, 50);
+                    } catch (e) {
+                        try {
+                            ac.close();
+                        } catch (e) {}
+                    }
+                }
+            } catch (e) {}
+            try {
+                window.localStorage.setItem("clinia_audio_unlocked", "1");
+            } catch (e) {}
+            // remove listeners after first unlock
+            try {
+                window.removeEventListener("touchstart", unlock);
+            } catch (e) {}
+            try {
+                window.removeEventListener("click", unlock);
+            } catch (e) {}
+        };
+
+        window.addEventListener("touchstart", unlock, { once: true, passive: true });
+        window.addEventListener("click", unlock, { once: true, passive: true });
+
+        return () => {
+            try {
+                window.removeEventListener("touchstart", unlock);
+            } catch (e) {}
+            try {
+                window.removeEventListener("click", unlock);
+            } catch (e) {}
+        };
+    }, []);
+
     const handleTranscript = useCallback(
         (transcript: string) => {
             const normalized = normalizeText(transcript);
