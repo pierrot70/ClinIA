@@ -15,7 +15,8 @@ const Home: React.FC = () => {
           <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
             ClinIA propose, à partir d&apos;un diagnostic, des options de traitement
             classées selon leur efficacité, leur tolérance et les données actuelles
-            — le tout présenté en quelques secondes, sous forme de synthèse claire.
+            — le tout présenté en quelques secondes, sous forme de synthèse claire,
+            avec saisie clinique anonymisée.
           </p>
           <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 inline-block px-3 py-1 rounded-full">
             Prototype avec données simulées – non destiné à la pratique clinique réelle.

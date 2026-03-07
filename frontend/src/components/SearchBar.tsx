@@ -110,6 +110,13 @@ const SearchBar: React.FC = () => {
   const navigate = useNavigate();
   const lastInsertRef = useRef<{ text: string; at: number } | null>(null);
 
+  const clearVoiceWaitingState = useCallback(() => {
+    setIsWaitingDictation(false);
+    try {
+      window.localStorage.removeItem("clinia_waiting_dictation");
+    } catch (e) {}
+  }, []);
+
   const handleSearch = useCallback(() => {
     if (!privacyAttestation) {
       setInputWarning(
@@ -267,14 +274,15 @@ const SearchBar: React.FC = () => {
     "bg-white shadow-sm rounded-xl px-4 py-3 flex items-center gap-3 border " +
     (isWaitingDictation ? "border-red-500" : "border-black");
   const attestationMissing = !privacyAttestation;
+  const isAwaitingVoiceOnly = isWaitingDictation && !clinicalNotes.trim();
   const isSubmitDisabled =
-    isWaitingDictation || Boolean(inputWarning) || attestationMissing;
+    isAwaitingVoiceOnly || Boolean(inputWarning) || attestationMissing;
 
   return (
     <div className="w-full max-w-2xl space-y-3">
       <div className="text-xs text-sky-800 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2 text-left">
-        Mode rapide : décrivez brièvement le problème clinique anonymisé, puis lancez l&apos;analyse.
-        Les paramètres avancés restent optionnels.
+        Mode rapide : saisie clinique anonymisée uniquement. Les paramètres avancés restent
+        optionnels.
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
@@ -418,9 +426,10 @@ const SearchBar: React.FC = () => {
       <div className={containerClass}>
         <Search className="text-gray-400 w-5 h-5" />
         <textarea
-          placeholder="Notes cliniques optionnelles (anonymisées uniquement)"
+          placeholder="Notes cliniques anonymisées (aucun identifiant patient)"
           value={clinicalNotes}
           onChange={(e) => {
+            clearVoiceWaitingState();
             const next = e.target.value;
             setClinicalNotes(next);
             const reason = getSensitiveInputReason(next);
@@ -462,6 +471,7 @@ const SearchBar: React.FC = () => {
           type="checkbox"
           checked={privacyAttestation}
           onChange={(e) => {
+            clearVoiceWaitingState();
             const checked = e.target.checked;
             setPrivacyAttestation(checked);
             if (checked && inputWarning === "Veuillez confirmer l'attestation de confidentialité avant l'envoi.") {
@@ -471,7 +481,7 @@ const SearchBar: React.FC = () => {
           className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
         />
         <span>
-          J&apos;atteste ne pas avoir saisi d&apos;identifiants patients
+          J&apos;atteste que cette saisie est anonymisée et ne contient aucun identifiant patient
           (nom, RAMQ, date de naissance, téléphone, courriel, adresse).
         </span>
       </label>
@@ -482,8 +492,8 @@ const SearchBar: React.FC = () => {
         </div>
       )}
       <div className="text-xs text-gray-500">
-        N&apos;entrez jamais de nom de patient, numéro d&apos;assurance maladie, téléphone,
-        courriel ou adresse.
+        ClinIA n&apos;exige aucune donnée nominative : n&apos;entrez jamais de nom, RAMQ,
+        téléphone, courriel, date de naissance ou adresse.
       </div>
     </div>
   );
