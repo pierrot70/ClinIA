@@ -105,10 +105,18 @@ const SearchBar: React.FC = () => {
   const [comorbidityContext, setComorbidityContext] = useState(comorbidityContexts[0]);
   const [clinicalNotes, setClinicalNotes] = useState("");
   const [inputWarning, setInputWarning] = useState<string | null>(null);
+  const [privacyAttestation, setPrivacyAttestation] = useState(false);
   const navigate = useNavigate();
   const lastInsertRef = useRef<{ text: string; at: number } | null>(null);
 
   const handleSearch = useCallback(() => {
+    if (!privacyAttestation) {
+      setInputWarning(
+        "Veuillez confirmer l'attestation de confidentialité avant l'envoi."
+      );
+      return;
+    }
+
     const reason = getSensitiveInputReason(clinicalNotes);
     if (reason) {
       setInputWarning(
@@ -140,6 +148,7 @@ const SearchBar: React.FC = () => {
     duration,
     navigate,
     objective,
+    privacyAttestation,
     redFlagStatus,
     severity,
     symptomProfile,
@@ -234,6 +243,7 @@ const SearchBar: React.FC = () => {
     const handleClear = () => {
       setClinicalNotes("");
       setInputWarning(null);
+      setPrivacyAttestation(false);
       // Visual waiting state: show red border when cleared by voice
       setIsWaitingDictation(true);
     };
@@ -255,6 +265,9 @@ const SearchBar: React.FC = () => {
   const containerClass =
     "bg-white shadow-sm rounded-xl px-4 py-3 flex items-center gap-3 border " +
     (isWaitingDictation ? "border-red-500" : "border-black");
+  const attestationMissing = !privacyAttestation;
+  const isSubmitDisabled =
+    isWaitingDictation || Boolean(inputWarning) || attestationMissing;
 
   return (
     <div className="w-full max-w-2xl space-y-3">
@@ -406,12 +419,48 @@ const SearchBar: React.FC = () => {
         />
         <button
           onClick={handleSearch}
-          disabled={isWaitingDictation || Boolean(inputWarning)}
+          disabled={isSubmitDisabled}
           className="text-sm bg-primary text-white px-3 py-1.5 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+          title={attestationMissing ? "Cochez d'abord l'attestation" : undefined}
         >
-          Lancer Requête sécurisée
+          {attestationMissing
+            ? "Cochez l'attestation"
+            : "Lancer Requête sécurisée"}
         </button>
       </div>
+
+      {attestationMissing && (
+        <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          Étape obligatoire avant envoi: cochez l&apos;attestation ci-dessous pour activer le bouton.
+        </div>
+      )}
+
+      <label
+        className={
+          "flex items-start gap-2 text-xs rounded-lg px-3 py-2 transition-colors " +
+          (attestationMissing
+            ? "text-amber-900 bg-amber-50 border border-amber-300"
+            : "text-gray-700 bg-gray-50 border border-gray-200")
+        }
+      >
+        <input
+          type="checkbox"
+          checked={privacyAttestation}
+          onChange={(e) => {
+            const checked = e.target.checked;
+            setPrivacyAttestation(checked);
+            if (checked && inputWarning === "Veuillez confirmer l'attestation de confidentialité avant l'envoi.") {
+              setInputWarning(null);
+            }
+          }}
+          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+        />
+        <span>
+          J&apos;atteste ne pas avoir saisi d&apos;identifiants patients
+          (nom, RAMQ, date de naissance, téléphone, courriel, adresse).
+        </span>
+      </label>
+
       {inputWarning && (
         <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
           {inputWarning}
