@@ -25,6 +25,67 @@ const normalizeText = (value: string) =>
         .replace(/\s+/g, " ")
         .trim();
 
+const LANGUAGE_ALIASES: Record<string, string> = {
+    // French
+    francais: "fr",
+    français: "fr",
+    french: "fr",
+    anglais: "en",
+    english: "en",
+    allemand: "de",
+    allemande: "de",
+    deutsch: "de",
+    german: "de",
+    japonais: "ja",
+    japan: "ja",
+    japanese: "ja",
+    nihongo: "ja",
+    chinois: "zh",
+    chinoismandarin: "zh",
+    mandarin: "zh",
+    chinese: "zh",
+    // Native scripts
+    日本語: "ja",
+    中文: "zh",
+    漢語: "zh",
+    汉语: "zh",
+    deutschsprache: "de",
+};
+
+const detectLocaleFromTranscript = (transcript: string): string | null => {
+    const raw = (transcript || "").trim();
+    if (!raw) {
+        return null;
+    }
+
+    const rawLower = raw.toLowerCase();
+    const normalized = normalizeText(rawLower);
+
+    // Direct aliases first
+    for (const [alias, code] of Object.entries(LANGUAGE_ALIASES)) {
+        if (
+            rawLower.includes(alias.toLowerCase()) ||
+            normalized.includes(normalizeText(alias))
+        ) {
+            return code;
+        }
+    }
+
+    // Pattern: "en <langue>" / "in <language>"
+    const match = normalized.match(/\b(?:en|in)\s+([a-z\-]+)\b/);
+    if (match?.[1]) {
+        const token = match[1];
+        const code = LANGUAGE_ALIASES[token];
+        if (code) {
+            return code;
+        }
+        // Explicit language request but unknown target: fallback to French.
+        return "fr";
+    }
+
+    return null;
+};
+
 const NAV_COMMANDS: NavCommand[] = [
     {
         label: "Rendez-vous",
@@ -457,15 +518,7 @@ const VoiceNavButton: React.FC = () => {
             const normalized = normalizeText(transcript);
             const compactNormalized = normalized.replace(/\s+/g, "");
             const isWakeWord = compactNormalized.includes("clinia");
-            const wantsEnglish =
-                normalized.includes("en anglais") ||
-                normalized.includes("anglais") ||
-                normalized.includes("english");
-            const wantsFrench =
-                normalized.includes("en francais") ||
-                normalized.includes("francais") ||
-                normalized.includes("français") ||
-                normalized.includes("french");
+            const requestedLocale = detectLocaleFromTranscript(transcript);
             // Robust detection for "diagnostic" with common variants.
             const DIAGNOSTIC_VARIANTS = [
                 "diagnostic",
@@ -521,33 +574,27 @@ const VoiceNavButton: React.FC = () => {
                 return;
             }
 
-            if (wantsEnglish) {
-                setStatus("Traduction de l'accueil en anglais...");
-                setLocaleFromVoice("en")
+            if (requestedLocale) {
+                const localeLabel = requestedLocale.toUpperCase();
+                setStatus(`Traduction de l'accueil (${localeLabel})...`);
+                setLocaleFromVoice(requestedLocale)
                     .then(() => {
-                        setStatus("Accueil en anglais.");
-                        speak("Switching home page to English.", {
+                        if (requestedLocale === "fr") {
+                            setStatus("Accueil en français.");
+                            speak("Retour au français.", {
+                                interrupt: true,
+                            });
+                            return;
+                        }
+                        setStatus(`Accueil traduit (${localeLabel}).`);
+                        speak("Home page translated.", {
                             interrupt: true,
                         });
                     })
                     .catch(() => {
-                        setStatus("Échec de traduction en anglais.");
+                        setStatus("Langue non reconnue, retour au français.");
+                        setLocaleFromVoice("fr").catch(() => {});
                         speak("Translation failed.");
-                    });
-                return;
-            }
-
-            if (wantsFrench) {
-                setStatus("Retour au français...");
-                setLocaleFromVoice("fr")
-                    .then(() => {
-                        setStatus("Accueil en français.");
-                        speak("Retour au français.", {
-                            interrupt: true,
-                        });
-                    })
-                    .catch(() => {
-                        setStatus("Échec du retour en français.");
                     });
                 return;
             }

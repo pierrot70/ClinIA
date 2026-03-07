@@ -333,11 +333,17 @@ app.post("/api/i18n/home-translate", async (req, res) => {
     try {
         const { targetLang, sourceStrings } = req.body ?? {};
 
-        if (targetLang !== "en" && targetLang !== "fr") {
+        const target =
+            typeof targetLang === "string"
+                ? targetLang.trim().toLowerCase()
+                : "";
+
+        if (!/^[a-z]{2}(?:-[a-z]{2})?$/.test(target)) {
             return res.status(400).json({
                 error: {
                     code: "INVALID_INPUT",
-                    message: "targetLang must be 'en' or 'fr'.",
+                    message:
+                        "targetLang must be an ISO language code like 'en', 'fr', 'ja', 'de' or 'zh'.",
                     retryable: false,
                 },
             });
@@ -353,7 +359,7 @@ app.post("/api/i18n/home-translate", async (req, res) => {
             });
         }
 
-        if (targetLang === "fr") {
+        if (target === "fr") {
             return res.json({
                 data: sourceStrings,
                 meta: { source: "passthrough", lang: "fr" },
@@ -368,7 +374,7 @@ app.post("/api/i18n/home-translate", async (req, res) => {
 
         const userPrompt = {
             task: "Translate this UI string bundle",
-            targetLang,
+            targetLang: target,
             constraints: [
                 "Preserve JSON keys exactly",
                 "Keep arrays lengths and order",
@@ -422,7 +428,7 @@ app.post("/api/i18n/home-translate", async (req, res) => {
 
         return res.json({
             data: translated,
-            meta: { source: "openai", model, lang: targetLang },
+            meta: { source: "openai", model, lang: target },
         });
     } catch (err) {
         console.error("🔥 /api/i18n/home-translate ERROR", err);

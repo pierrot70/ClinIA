@@ -3,7 +3,7 @@ import { HOME_STRINGS_FR, type HomeStrings } from "../i18n/homeStrings";
 const API_URL = import.meta.env.VITE_API_URL as string;
 
 export async function translateHomeStrings(
-  targetLang: "en" | "fr"
+  targetLang: string
 ): Promise<HomeStrings> {
   if (targetLang === "fr") {
     return HOME_STRINGS_FR;

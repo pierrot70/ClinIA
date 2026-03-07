@@ -2,7 +2,7 @@ import React, { createContext, useContext, useMemo, useState } from "react";
 import { HOME_STRINGS_FR, type HomeStrings } from "../i18n/homeStrings";
 import { translateHomeStrings } from "../services/i18nApi";
 
-type Locale = "fr" | "en";
+type Locale = string;
 
 type HomeI18nContextValue = {
   locale: Locale;
@@ -13,7 +13,8 @@ type HomeI18nContextValue = {
 
 const HomeI18nContext = createContext<HomeI18nContextValue | null>(null);
 
-const CACHE_KEY_EN = "clinia_home_i18n_en_v1";
+const cacheKeyForLocale = (locale: string) =>
+  `clinia_home_i18n_${locale}_v1`;
 
 export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -23,30 +24,41 @@ export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isTranslating, setIsTranslating] = useState(false);
 
   const setLocaleFromVoice = async (target: Locale) => {
-    if (target === locale) {
-      return;
-    }
+    const normalizedTarget = (target || "fr").toLowerCase();
 
-    if (target === "fr") {
+    if (!normalizedTarget || normalizedTarget === "fr") {
       setLocale("fr");
       setStrings(HOME_STRINGS_FR);
       return;
     }
 
+    if (normalizedTarget === locale) {
+      return;
+    }
+
     setIsTranslating(true);
     try {
-      const cached = window.localStorage.getItem(CACHE_KEY_EN);
+      const cached = window.localStorage.getItem(
+        cacheKeyForLocale(normalizedTarget)
+      );
       if (cached) {
         const parsed = JSON.parse(cached) as HomeStrings;
         setStrings(parsed);
-        setLocale("en");
+        setLocale(normalizedTarget);
         return;
       }
 
-      const translated = await translateHomeStrings("en");
+      const translated = await translateHomeStrings(normalizedTarget);
       setStrings(translated);
-      setLocale("en");
-      window.localStorage.setItem(CACHE_KEY_EN, JSON.stringify(translated));
+      setLocale(normalizedTarget);
+      window.localStorage.setItem(
+        cacheKeyForLocale(normalizedTarget),
+        JSON.stringify(translated)
+      );
+    } catch (err) {
+      setLocale("fr");
+      setStrings(HOME_STRINGS_FR);
+      throw err;
     } finally {
       setIsTranslating(false);
     }
