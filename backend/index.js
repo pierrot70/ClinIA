@@ -124,6 +124,16 @@ function normalizeClinicalAnalysis(raw) {
     };
 }
 
+function hasHomeI18nShape(obj) {
+    return (
+        obj &&
+        typeof obj === "object" &&
+        obj.home &&
+        obj.search &&
+        obj.options
+    );
+}
+
 async function persistOrReuseDiagnosis(payload) {
     try {
         const created = await DiagnosisResult.create(payload);
@@ -309,6 +319,117 @@ app.post("/api/ai/analyze", async (req, res) => {
                 code: "INTERNAL_ERROR",
                 message:
                     "Erreur interne du service ClinIA.",
+                retryable: true,
+            },
+        });
+    }
+});
+
+/* ================================================================== */
+/* /api/i18n/home-translate                                           */
+/* ================================================================== */
+
+app.post("/api/i18n/home-translate", async (req, res) => {
+    try {
+        const { targetLang, sourceStrings } = req.body ?? {};
+
+        if (targetLang !== "en" && targetLang !== "fr") {
+            return res.status(400).json({
+                error: {
+                    code: "INVALID_INPUT",
+                    message: "targetLang must be 'en' or 'fr'.",
+                    retryable: false,
+                },
+            });
+        }
+
+        if (!hasHomeI18nShape(sourceStrings)) {
+            return res.status(400).json({
+                error: {
+                    code: "INVALID_INPUT",
+                    message: "sourceStrings has an invalid shape.",
+                    retryable: false,
+                },
+            });
+        }
+
+        if (targetLang === "fr") {
+            return res.json({
+                data: sourceStrings,
+                meta: { source: "passthrough", lang: "fr" },
+            });
+        }
+
+        const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+        const systemPrompt =
+            "You are a UI localization engine for a medical assistant application. " +
+            "Translate only values to target language while preserving JSON structure, keys, arrays, punctuation and placeholders. " +
+            "Do not add medical claims. Return valid JSON only.";
+
+        const userPrompt = {
+            task: "Translate this UI string bundle",
+            targetLang,
+            constraints: [
+                "Preserve JSON keys exactly",
+                "Keep arrays lengths and order",
+                "No extra keys",
+                "Output strictly valid JSON object",
+            ],
+            sourceStrings,
+        };
+
+        const baseRequest = {
+            model,
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: JSON.stringify(userPrompt) },
+            ],
+            temperature: 0.1,
+        };
+
+        const request = supportsJsonResponseFormat(model)
+            ? {
+                ...baseRequest,
+                response_format: { type: "json_object" },
+            }
+            : baseRequest;
+
+        const completion = await openai.chat.completions.create(request);
+        const content = completion?.choices?.[0]?.message?.content ?? "{}";
+
+        let translated;
+        try {
+            translated = JSON.parse(content);
+        } catch (e) {
+            return res.status(502).json({
+                error: {
+                    code: "UPSTREAM_INVALID_JSON",
+                    message: "OpenAI returned invalid JSON for translation.",
+                    retryable: true,
+                },
+            });
+        }
+
+        if (!hasHomeI18nShape(translated)) {
+            return res.status(502).json({
+                error: {
+                    code: "UPSTREAM_INVALID_SHAPE",
+                    message: "Translated payload has invalid shape.",
+                    retryable: true,
+                },
+            });
+        }
+
+        return res.json({
+            data: translated,
+            meta: { source: "openai", model, lang: targetLang },
+        });
+    } catch (err) {
+        console.error("🔥 /api/i18n/home-translate ERROR", err);
+        return res.status(500).json({
+            error: {
+                code: "INTERNAL_ERROR",
+                message: "Translation service failed.",
                 retryable: true,
             },
         });

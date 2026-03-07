@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Loader2, Mic, MicOff } from "lucide-react";
+import { useHomeI18n } from "../contexts/HomeI18nContext";
 
 type NavCommand = {
     label: string;
@@ -119,6 +121,7 @@ const ACTION_COMMANDS: ActionCommand[] = [
 const VoiceNavButton: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { setLocaleFromVoice, isTranslating } = useHomeI18n();
     // Vite exposes `import.meta.env.DEV` as `true` in development builds.
     // Keep the mic-test UI strictly for dev mode only.
     const isDev =
@@ -454,6 +457,15 @@ const VoiceNavButton: React.FC = () => {
             const normalized = normalizeText(transcript);
             const compactNormalized = normalized.replace(/\s+/g, "");
             const isWakeWord = compactNormalized.includes("clinia");
+            const wantsEnglish =
+                normalized.includes("en anglais") ||
+                normalized.includes("anglais") ||
+                normalized.includes("english");
+            const wantsFrench =
+                normalized.includes("en francais") ||
+                normalized.includes("francais") ||
+                normalized.includes("français") ||
+                normalized.includes("french");
             // Robust detection for "diagnostic" with common variants.
             const DIAGNOSTIC_VARIANTS = [
                 "diagnostic",
@@ -506,6 +518,37 @@ const VoiceNavButton: React.FC = () => {
                 navigate("/");
                 setVoiceMode("dictation");
                 speak("ClinIA pret, dictez votre diagnostic.");
+                return;
+            }
+
+            if (wantsEnglish) {
+                setStatus("Traduction de l'accueil en anglais...");
+                setLocaleFromVoice("en")
+                    .then(() => {
+                        setStatus("Accueil en anglais.");
+                        speak("Switching home page to English.", {
+                            interrupt: true,
+                        });
+                    })
+                    .catch(() => {
+                        setStatus("Échec de traduction en anglais.");
+                        speak("Translation failed.");
+                    });
+                return;
+            }
+
+            if (wantsFrench) {
+                setStatus("Retour au français...");
+                setLocaleFromVoice("fr")
+                    .then(() => {
+                        setStatus("Accueil en français.");
+                        speak("Retour au français.", {
+                            interrupt: true,
+                        });
+                    })
+                    .catch(() => {
+                        setStatus("Échec du retour en français.");
+                    });
                 return;
             }
 
@@ -1056,18 +1099,23 @@ const VoiceNavButton: React.FC = () => {
                 type="button"
                 onClick={toggleListening}
                 className={
-                    "inline-flex items-center gap-2 rounded-md border px-3 py-1 text-xs transition " +
+                    "inline-flex h-9 w-9 items-center justify-center rounded-full border transition " +
                     (isListening
                         ? "border-red-200 bg-red-50 text-red-700"
-                        : "border-gray-200 text-gray-700 hover:bg-gray-50")
+                        : isHandsFree
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-gray-200 text-gray-700 hover:bg-gray-50")
                 }
                 title="Dire: ouvre la page des rendez-vous, patients, cliniques, specialistes; retourne a la maison; execute; efface; arrete"
+                aria-label={isHandsFree ? "Désactiver mode vocal" : "Activer mode vocal"}
             >
-                {isHandsFree
-                    ? isListening
-                        ? "Ecoute..."
-                        : "Vocal actif"
-                    : "Commande vocale"}
+                {isTranslating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                ) : isHandsFree ? (
+                    <Mic className={"h-4 w-4 " + (isListening ? "animate-pulse" : "")} />
+                ) : (
+                    <MicOff className="h-4 w-4" />
+                )}
             </button>
             {isDev && (
                 <button

@@ -1,63 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-const clinicalScopes = [
-  "Médecine générale",
-  "Cardiologie",
-  "Neurologie",
-  "Psychiatrie",
-  "Gériatrie",
-];
-
-const ageGroups = [
-  "Adulte",
-  "Pédiatrique",
-  "Gériatrique",
-  "Grossesse",
-];
-
-const objectives = [
-  "Traitement initial",
-  "Ajustement thérapeutique",
-  "Alternative si intolérance",
-  "Surveillance et suivi",
-];
-
-const symptomProfiles = [
-  "Hypertension",
-  "Douleur chronique",
-  "Migraine",
-  "Anxiété",
-  "Insomnie",
-  "Infection respiratoire",
-];
-
-const durations = [
-  "< 24h",
-  "1-7 jours",
-  "1-4 semaines",
-  "> 1 mois",
-];
-
-const severityLevels = [
-  "Légère",
-  "Modérée",
-  "Sévère",
-];
-
-const redFlagStatuses = [
-  "Aucun signal d'alarme",
-  "Signal(s) d'alarme présent(s)",
-];
-
-const comorbidityContexts = [
-  "Aucune comorbidité majeure",
-  "Insuffisance rénale",
-  "Insuffisance hépatique",
-  "Risque cardiovasculaire élevé",
-  "Polypharmacie",
-];
+import { useHomeI18n } from "../contexts/HomeI18nContext";
 
 const getSensitiveInputReason = (value: string): string | null => {
   const text = value.trim();
@@ -94,6 +38,18 @@ const getSensitiveInputReason = (value: string): string | null => {
 };
 
 const SearchBar: React.FC = () => {
+  const { strings } = useHomeI18n();
+  const {
+    objectives,
+    clinicalScopes,
+    ageGroups,
+    symptomProfiles,
+    durations,
+    severityLevels,
+    redFlagStatuses,
+    comorbidityContexts,
+  } = strings.options;
+
   const [isWaitingDictation, setIsWaitingDictation] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [clinicalScope, setClinicalScope] = useState(clinicalScopes[0]);
@@ -119,33 +75,29 @@ const SearchBar: React.FC = () => {
 
   const handleSearch = useCallback(() => {
     if (!privacyAttestation) {
-      setInputWarning(
-        "Veuillez confirmer l'attestation de confidentialité avant l'envoi."
-      );
+      setInputWarning(strings.search.privacyConfirmRequired);
       return;
     }
 
     const reason = getSensitiveInputReason(clinicalNotes);
     if (reason) {
-      setInputWarning(
-        `Entrée bloquée: ${reason}. Retirez toute donnée personnelle (nom, RAMQ, téléphone, courriel) avant de continuer.`
-      );
+      setInputWarning(`${strings.search.blockedSensitive} (${reason}).`);
       return;
     }
 
     setInputWarning(null);
     const notesSection = clinicalNotes.trim()
-      ? ` | Notes cliniques: ${clinicalNotes.trim()}`
+      ? ` | ${strings.search.notesLabel}: ${clinicalNotes.trim()}`
       : "";
     const q =
-      `Symptôme: ${symptomProfile}` +
-      ` | Durée: ${duration}` +
-      ` | Sévérité: ${severity}` +
-      ` | Drapeaux rouges: ${redFlagStatus}` +
-      ` | Comorbidités: ${comorbidityContext}` +
-      ` | Contexte: ${clinicalScope}` +
-      ` | Groupe: ${ageGroup}` +
-      ` | Objectif: ${objective}` +
+      `${strings.search.symptomLabel}: ${symptomProfile}` +
+      ` | ${strings.search.durationLabel}: ${duration}` +
+      ` | ${strings.search.severityLabel}: ${severity}` +
+      ` | ${strings.search.redFlagsLabel}: ${redFlagStatus}` +
+      ` | ${strings.search.comorbidityLabel}: ${comorbidityContext}` +
+      ` | ${strings.search.scopeLabel}: ${clinicalScope}` +
+      ` | ${strings.search.ageGroupLabel}: ${ageGroup}` +
+      ` | ${strings.search.objectiveLabel}: ${objective}` +
       notesSection;
     navigate(`/results?q=${encodeURIComponent(q)}`);
   }, [
@@ -160,6 +112,17 @@ const SearchBar: React.FC = () => {
     redFlagStatus,
     severity,
     symptomProfile,
+    strings.search.blockedSensitive,
+    strings.search.comorbidityLabel,
+    strings.search.durationLabel,
+    strings.search.ageGroupLabel,
+    strings.search.notesLabel,
+    strings.search.objectiveLabel,
+    strings.search.privacyConfirmRequired,
+    strings.search.redFlagsLabel,
+    strings.search.scopeLabel,
+    strings.search.severityLabel,
+    strings.search.symptomLabel,
   ]);
 
   useEffect(() => {
@@ -211,7 +174,7 @@ const SearchBar: React.FC = () => {
       const reason = getSensitiveInputReason(buffered);
       if (reason) {
         setInputWarning(
-          `Attention: dictée possiblement sensible détectée (${reason}). Vérifiez et retirez les identifiants.`
+          `${strings.search.voiceSensitiveDetected} (${reason}).`
         );
       }
     };
@@ -239,7 +202,7 @@ const SearchBar: React.FC = () => {
       const reason = getSensitiveInputReason(detail.text);
       if (reason) {
         setInputWarning(
-          `Attention: dictée possiblement sensible détectée (${reason}). Vérifiez et retirez les identifiants.`
+          `${strings.search.voiceSensitiveDetected} (${reason}).`
         );
       }
     };
@@ -268,7 +231,37 @@ const SearchBar: React.FC = () => {
       window.removeEventListener("clinia:voice-execute", handleExecute);
       window.removeEventListener("clinia:voice-clear", handleClear);
     };
-  }, [handleSearch]);
+  }, [handleSearch, strings.search.voiceSensitiveDetected]);
+
+  useEffect(() => {
+    setClinicalScope((prev) =>
+      clinicalScopes.includes(prev) ? prev : clinicalScopes[0]
+    );
+    setAgeGroup((prev) => (ageGroups.includes(prev) ? prev : ageGroups[0]));
+    setObjective((prev) => (objectives.includes(prev) ? prev : objectives[0]));
+    setSymptomProfile((prev) =>
+      symptomProfiles.includes(prev) ? prev : symptomProfiles[0]
+    );
+    setDuration((prev) => (durations.includes(prev) ? prev : durations[0]));
+    setSeverity((prev) =>
+      severityLevels.includes(prev) ? prev : severityLevels[0]
+    );
+    setRedFlagStatus((prev) =>
+      redFlagStatuses.includes(prev) ? prev : redFlagStatuses[0]
+    );
+    setComorbidityContext((prev) =>
+      comorbidityContexts.includes(prev) ? prev : comorbidityContexts[0]
+    );
+  }, [
+    ageGroups,
+    clinicalScopes,
+    comorbidityContexts,
+    durations,
+    objectives,
+    redFlagStatuses,
+    severityLevels,
+    symptomProfiles,
+  ]);
 
   const containerClass =
     "bg-white shadow-sm rounded-xl px-4 py-3 flex items-center gap-3 border " +
@@ -281,13 +274,12 @@ const SearchBar: React.FC = () => {
   return (
     <div className="w-full max-w-2xl space-y-3">
       <div className="text-xs text-sky-800 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2 text-left">
-        Mode rapide : saisie clinique anonymisée uniquement. Les paramètres avancés restent
-        optionnels.
+        {strings.search.secureModeHint}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
         <label className="text-xs text-gray-600">
-          Objectif
+          {strings.search.objectiveLabel}
           <select
             value={objective}
             onChange={(e) => setObjective(e.target.value)}
@@ -308,8 +300,8 @@ const SearchBar: React.FC = () => {
             className="text-xs text-gray-500 underline decoration-dotted underline-offset-2 hover:text-primary transition-colors"
           >
             {showAdvanced
-              ? "Masquer paramètres avancés"
-              : "Afficher paramètres avancés"}
+              ? strings.search.hideAdvanced
+              : strings.search.showAdvanced}
           </button>
         </div>
       </div>
@@ -317,7 +309,7 @@ const SearchBar: React.FC = () => {
       {showAdvanced && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-left rounded-xl border border-gray-200 bg-gray-50 p-3">
           <label className="text-xs text-gray-600">
-            Spécialité
+            {strings.search.scopeLabel}
             <select
               value={clinicalScope}
               onChange={(e) => setClinicalScope(e.target.value)}
@@ -332,7 +324,7 @@ const SearchBar: React.FC = () => {
           </label>
 
           <label className="text-xs text-gray-600">
-            Groupe patient
+            {strings.search.ageGroupLabel}
             <select
               value={ageGroup}
               onChange={(e) => setAgeGroup(e.target.value)}
@@ -347,7 +339,7 @@ const SearchBar: React.FC = () => {
           </label>
 
           <label className="text-xs text-gray-600">
-            Symptôme principal
+            {strings.search.symptomLabel}
             <select
               value={symptomProfile}
               onChange={(e) => setSymptomProfile(e.target.value)}
@@ -362,7 +354,7 @@ const SearchBar: React.FC = () => {
           </label>
 
           <label className="text-xs text-gray-600">
-            Durée des symptômes
+            {strings.search.durationLabel}
             <select
               value={duration}
               onChange={(e) => setDuration(e.target.value)}
@@ -377,7 +369,7 @@ const SearchBar: React.FC = () => {
           </label>
 
           <label className="text-xs text-gray-600">
-            Sévérité
+            {strings.search.severityLabel}
             <select
               value={severity}
               onChange={(e) => setSeverity(e.target.value)}
@@ -392,7 +384,7 @@ const SearchBar: React.FC = () => {
           </label>
 
           <label className="text-xs text-gray-600">
-            Drapeaux rouges
+            {strings.search.redFlagsLabel}
             <select
               value={redFlagStatus}
               onChange={(e) => setRedFlagStatus(e.target.value)}
@@ -407,7 +399,7 @@ const SearchBar: React.FC = () => {
           </label>
 
           <label className="text-xs text-gray-600 sm:col-span-3">
-            Contexte comorbidités
+            {strings.search.comorbidityLabel}
             <select
               value={comorbidityContext}
               onChange={(e) => setComorbidityContext(e.target.value)}
@@ -426,7 +418,7 @@ const SearchBar: React.FC = () => {
       <div className={containerClass}>
         <Search className="text-gray-400 w-5 h-5" />
         <textarea
-          placeholder="Notes cliniques anonymisées (aucun identifiant patient)"
+          placeholder={strings.search.notesPlaceholder}
           value={clinicalNotes}
           onChange={(e) => {
             clearVoiceWaitingState();
@@ -435,7 +427,7 @@ const SearchBar: React.FC = () => {
             const reason = getSensitiveInputReason(next);
             setInputWarning(
               reason
-                ? `Attention: contenu sensible possible détecté (${reason}).`
+                ? `${strings.search.sensitiveDetected} (${reason}).`
                 : null
             );
           }}
@@ -448,14 +440,14 @@ const SearchBar: React.FC = () => {
           title={attestationMissing ? "Cochez d'abord l'attestation" : undefined}
         >
           {attestationMissing
-            ? "Cochez l'attestation"
-            : "Lancer Requête sécurisée"}
+            ? strings.search.checkAttestation
+            : strings.search.launchSecure}
         </button>
       </div>
 
       {attestationMissing && (
         <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 animate-pulse">
-          Étape obligatoire avant envoi: cochez l&apos;attestation ci-dessous pour activer le bouton.
+          {strings.search.attestationRequiredHint}
         </div>
       )}
 
@@ -481,8 +473,7 @@ const SearchBar: React.FC = () => {
           className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
         />
         <span>
-          J&apos;atteste que cette saisie est anonymisée et ne contient aucun identifiant patient
-          (nom, RAMQ, date de naissance, téléphone, courriel, adresse).
+          {strings.search.attestationText}
         </span>
       </label>
 
@@ -492,8 +483,7 @@ const SearchBar: React.FC = () => {
         </div>
       )}
       <div className="text-xs text-gray-500">
-        ClinIA n&apos;exige aucune donnée nominative : n&apos;entrez jamais de nom, RAMQ,
-        téléphone, courriel, date de naissance ou adresse.
+        {strings.search.privacyFooter}
       </div>
     </div>
   );

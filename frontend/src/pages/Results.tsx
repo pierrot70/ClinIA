@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, Link } from "react-router-dom";
+import { useHomeI18n } from "../contexts/HomeI18nContext";
 
 import AICard from "../components/AICard";
 import AITreatmentTable from "../components/AITreatmentTable";
@@ -12,6 +13,7 @@ import { hypertensionTreatments, anticipatedQuestions } from "../data/hypertensi
 const useQuery = () => new URLSearchParams(useLocation().search);
 
 const Results: React.FC = () => {
+    const { locale } = useHomeI18n();
     const isProd = !!import.meta.env.PROD;
     const query = useQuery();
     const q = query.get("q") || "Hypertension essentielle";
@@ -134,7 +136,7 @@ const Results: React.FC = () => {
             {/* HEADER */}
             <header className="space-y-2">
                 <p className="text-xs text-gray-500 uppercase tracking-wide">
-                    Terme recherché
+                    {locale === "en" ? "Search Term" : "Terme recherché"}
                 </p>
 
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
