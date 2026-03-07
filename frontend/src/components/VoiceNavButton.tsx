@@ -112,7 +112,7 @@ const ACTION_COMMANDS: ActionCommand[] = [
         label: "Arret",
         action: "stop",
         keywords: ["arrete", "stop", "pause"],
-        response: "Ecoute arretee.",
+        response: "Écoute arrêtée.",
     },
 ];
 
