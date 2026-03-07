@@ -430,7 +430,7 @@ const SearchBar: React.FC = () => {
       </div>
 
       {attestationMissing && (
-        <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+        <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 animate-pulse">
           Étape obligatoire avant envoi: cochez l&apos;attestation ci-dessous pour activer le bouton.
         </div>
       )}
@@ -439,7 +439,7 @@ const SearchBar: React.FC = () => {
         className={
           "flex items-start gap-2 text-xs rounded-lg px-3 py-2 transition-colors " +
           (attestationMissing
-            ? "text-amber-900 bg-amber-50 border border-amber-300"
+            ? "text-amber-900 bg-amber-50 border border-amber-300 ring-1 ring-amber-300 animate-pulse"
             : "text-gray-700 bg-gray-50 border border-gray-200")
         }
       >
