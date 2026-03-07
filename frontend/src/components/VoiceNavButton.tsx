@@ -156,6 +156,12 @@ const VoiceNavButton: React.FC = () => {
     const micTestAudioCtxRef = useRef<AudioContext | null>(null);
     const silenceTimerRef = useRef<number | null>(null);
     const silenceStopRef = useRef(false);
+    const speechRequestSeqRef = useRef(0);
+    const activeSpeechRequestRef = useRef(0);
+    const lastSpokenRef = useRef<{ text: string; at: number } | null>(null);
+    const lastCancelAtRef = useRef(0);
+    const speechSoftTimerRef = useRef<number | null>(null);
+    const speechHardTimerRef = useRef<number | null>(null);
 
     useEffect(() => {
         isHandsFreeRef.current = isHandsFree;
@@ -170,18 +176,65 @@ const VoiceNavButton: React.FC = () => {
         );
     }, []);
 
+    const clearSpeechTimers = useCallback(() => {
+        if (speechSoftTimerRef.current) {
+            window.clearTimeout(speechSoftTimerRef.current);
+            speechSoftTimerRef.current = null;
+        }
+        if (speechHardTimerRef.current) {
+            window.clearTimeout(speechHardTimerRef.current);
+            speechHardTimerRef.current = null;
+        }
+    }, []);
+
     const speak = useCallback(
         (
             text: string,
-            options?: { restartListening?: boolean; onDone?: () => void }
+            options?: {
+                restartListening?: boolean;
+                onDone?: () => void;
+                interrupt?: boolean;
+            }
         ) => {
         if (typeof window === "undefined") return;
         if (!("speechSynthesis" in window)) return;
 
         const restartListening = options?.restartListening ?? true;
         const onDone = options?.onDone;
+        const shouldInterrupt = options?.interrupt ?? true;
 
-        window.speechSynthesis.cancel();
+        // Anti-double-fire: ignore duplicate prompt bursts.
+        const now = Date.now();
+        const normalizedText = normalizeText(text);
+        const lastSpoken = lastSpokenRef.current;
+        if (
+            lastSpoken &&
+            lastSpoken.text === normalizedText &&
+            now - lastSpoken.at < 900
+        ) {
+            return;
+        }
+        lastSpokenRef.current = { text: normalizedText, at: now };
+
+        const requestId = ++speechRequestSeqRef.current;
+        activeSpeechRequestRef.current = requestId;
+
+        const safeCancel = () => {
+            const cancelNow = Date.now();
+            // Anti-cancel sauvage: throttle aggressive cancel loops.
+            if (cancelNow - lastCancelAtRef.current < 250) {
+                return;
+            }
+            lastCancelAtRef.current = cancelNow;
+            try {
+                window.speechSynthesis.cancel();
+            } catch (e) {}
+        };
+
+        if (shouldInterrupt) {
+            safeCancel();
+        }
+        clearSpeechTimers();
 
         const playBeep = () => {
             try {
@@ -207,10 +260,15 @@ const VoiceNavButton: React.FC = () => {
 
         let cleanedUp = false;
         const cleanupAfterSpeak = () => {
+            // Ignore stale callbacks from older utterances.
+            if (requestId !== activeSpeechRequestRef.current) {
+                return;
+            }
             if (cleanedUp) {
                 return;
             }
             cleanedUp = true;
+            clearSpeechTimers();
             isSpeakingRef.current = false;
             if (restartListening && isHandsFreeRef.current && !isListeningRef.current) {
                 startListeningRef.current();
@@ -232,27 +290,29 @@ const VoiceNavButton: React.FC = () => {
         // iOS/Safari can be slower to trigger speech callbacks. Avoid short fixed timers
         // that can cut prompts and cause perceived clipping.
         const estimatedMs = Math.max(3000, Math.min(9000, text.length * 85));
-        const fallbackSoftTimer = window.setTimeout(() => {
+        speechSoftTimerRef.current = window.setTimeout(() => {
             try {
-                if (!window.speechSynthesis.speaking) {
+                // Anti-queue bloquee: if synthesis no longer speaks and callback was missed,
+                // recover by finalizing this request.
+                if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
                     cleanupAfterSpeak();
                 }
             } catch (e) {
                 cleanupAfterSpeak();
             }
         }, estimatedMs);
-        const fallbackHardTimer = window.setTimeout(() => {
+        speechHardTimerRef.current = window.setTimeout(() => {
+            // Hard watchdog: force recovery if queue is stuck or callbacks never fired.
+            try {
+                safeCancel();
+            } catch (e) {}
             cleanupAfterSpeak();
         }, estimatedMs + 5000);
 
         utterance.onend = () => {
-            window.clearTimeout(fallbackSoftTimer);
-            window.clearTimeout(fallbackHardTimer);
             cleanupAfterSpeak();
         };
         utterance.onerror = () => {
-            window.clearTimeout(fallbackSoftTimer);
-            window.clearTimeout(fallbackHardTimer);
             cleanupAfterSpeak();
         };
 
@@ -261,8 +321,6 @@ const VoiceNavButton: React.FC = () => {
                 recognitionRef.current?.stop();
                 window.speechSynthesis.speak(utterance);
             } catch (e) {
-                window.clearTimeout(fallbackSoftTimer);
-                window.clearTimeout(fallbackHardTimer);
                 cleanupAfterSpeak();
                 playBeep();
             }
@@ -288,8 +346,7 @@ const VoiceNavButton: React.FC = () => {
                             try {
                                 window.speechSynthesis.removeEventListener("voiceschanged", onVoicesChanged);
                             } catch (e) {}
-                            window.clearTimeout(fallbackSoftTimer);
-                            window.clearTimeout(fallbackHardTimer);
+                            clearSpeechTimers();
                             isSpeakingRef.current = false;
                             playBeep();
                             if (isHandsFreeRef.current && !isListeningRef.current) {
@@ -302,15 +359,20 @@ const VoiceNavButton: React.FC = () => {
                 speakNow();
             }
         } catch (e) {
-            window.clearTimeout(fallbackSoftTimer);
-            window.clearTimeout(fallbackHardTimer);
+            clearSpeechTimers();
             isSpeakingRef.current = false;
             playBeep();
             if (isHandsFreeRef.current && !isListeningRef.current) {
                 startListeningRef.current();
             }
         }
-    }, []);
+    }, [clearSpeechTimers]);
+
+    useEffect(() => {
+        return () => {
+            clearSpeechTimers();
+        };
+    }, [clearSpeechTimers]);
 
     // On some mobile browsers (Safari/iOS) audio and speechSynthesis are locked
     // until a user gesture occurs. Add a one-time unlock handler that will be
