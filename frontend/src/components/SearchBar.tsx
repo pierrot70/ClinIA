@@ -95,6 +95,7 @@ const getSensitiveInputReason = (value: string): string | null => {
 
 const SearchBar: React.FC = () => {
   const [isWaitingDictation, setIsWaitingDictation] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [clinicalScope, setClinicalScope] = useState(clinicalScopes[0]);
   const [ageGroup, setAgeGroup] = useState(ageGroups[0]);
   const [objective, setObjective] = useState(objectives[0]);
@@ -272,41 +273,11 @@ const SearchBar: React.FC = () => {
   return (
     <div className="w-full max-w-2xl space-y-3">
       <div className="text-xs text-sky-800 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2 text-left">
-        Mode sécurisé : utilisez d&apos;abord les listes guidées, puis ajoutez des notes cliniques
-        anonymisées au besoin.
+        Mode rapide : décrivez brièvement le problème clinique anonymisé, puis lancez l&apos;analyse.
+        Les paramètres avancés restent optionnels.
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-left">
-        <label className="text-xs text-gray-600">
-          Spécialité
-          <select
-            value={clinicalScope}
-            onChange={(e) => setClinicalScope(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
-          >
-            {clinicalScopes.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="text-xs text-gray-600">
-          Groupe patient
-          <select
-            value={ageGroup}
-            onChange={(e) => setAgeGroup(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
-          >
-            {ageGroups.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
-
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
         <label className="text-xs text-gray-600">
           Objectif
           <select
@@ -321,84 +292,128 @@ const SearchBar: React.FC = () => {
             ))}
           </select>
         </label>
+
+        <div className="flex items-end justify-start sm:justify-end">
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((prev) => !prev)}
+            className="text-xs text-gray-500 underline decoration-dotted underline-offset-2 hover:text-primary transition-colors"
+          >
+            {showAdvanced
+              ? "Masquer paramètres avancés"
+              : "Afficher paramètres avancés"}
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
-        <label className="text-xs text-gray-600">
-          Symptôme principal
-          <select
-            value={symptomProfile}
-            onChange={(e) => setSymptomProfile(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
-          >
-            {symptomProfiles.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
+      {showAdvanced && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-left rounded-xl border border-gray-200 bg-gray-50 p-3">
+          <label className="text-xs text-gray-600">
+            Spécialité
+            <select
+              value={clinicalScope}
+              onChange={(e) => setClinicalScope(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+            >
+              {clinicalScopes.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="text-xs text-gray-600">
-          Durée des symptômes
-          <select
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
-          >
-            {durations.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="text-xs text-gray-600">
+            Groupe patient
+            <select
+              value={ageGroup}
+              onChange={(e) => setAgeGroup(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+            >
+              {ageGroups.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="text-xs text-gray-600">
-          Sévérité
-          <select
-            value={severity}
-            onChange={(e) => setSeverity(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
-          >
-            {severityLevels.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="text-xs text-gray-600">
+            Symptôme principal
+            <select
+              value={symptomProfile}
+              onChange={(e) => setSymptomProfile(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+            >
+              {symptomProfiles.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="text-xs text-gray-600">
-          Drapeaux rouges
-          <select
-            value={redFlagStatus}
-            onChange={(e) => setRedFlagStatus(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
-          >
-            {redFlagStatuses.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="text-xs text-gray-600">
+            Durée des symptômes
+            <select
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+            >
+              {durations.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="text-xs text-gray-600 sm:col-span-2">
-          Contexte comorbidités
-          <select
-            value={comorbidityContext}
-            onChange={(e) => setComorbidityContext(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
-          >
-            {comorbidityContexts.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+          <label className="text-xs text-gray-600">
+            Sévérité
+            <select
+              value={severity}
+              onChange={(e) => setSeverity(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+            >
+              {severityLevels.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="text-xs text-gray-600">
+            Drapeaux rouges
+            <select
+              value={redFlagStatus}
+              onChange={(e) => setRedFlagStatus(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+            >
+              {redFlagStatuses.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="text-xs text-gray-600 sm:col-span-3">
+            Contexte comorbidités
+            <select
+              value={comorbidityContext}
+              onChange={(e) => setComorbidityContext(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+            >
+              {comorbidityContexts.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
       <div className={containerClass}>
         <Search className="text-gray-400 w-5 h-5" />
