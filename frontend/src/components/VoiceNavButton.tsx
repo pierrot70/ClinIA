@@ -170,9 +170,16 @@ const VoiceNavButton: React.FC = () => {
         );
     }, []);
 
-    const speak = useCallback((text: string) => {
+    const speak = useCallback(
+        (
+            text: string,
+            options?: { restartListening?: boolean; onDone?: () => void }
+        ) => {
         if (typeof window === "undefined") return;
         if (!("speechSynthesis" in window)) return;
+
+        const restartListening = options?.restartListening ?? true;
+        const onDone = options?.onDone;
 
         window.speechSynthesis.cancel();
 
@@ -198,10 +205,20 @@ const VoiceNavButton: React.FC = () => {
             } catch (e) {}
         };
 
+        let cleanedUp = false;
         const cleanupAfterSpeak = () => {
+            if (cleanedUp) {
+                return;
+            }
+            cleanedUp = true;
             isSpeakingRef.current = false;
-            if (isHandsFreeRef.current && !isListeningRef.current) {
+            if (restartListening && isHandsFreeRef.current && !isListeningRef.current) {
                 startListeningRef.current();
+            }
+            if (onDone) {
+                try {
+                    onDone();
+                } catch (e) {}
             }
         };
 
@@ -212,16 +229,30 @@ const VoiceNavButton: React.FC = () => {
         utterance.pitch = 1;
         isSpeakingRef.current = true;
 
-        const fallbackTimer = window.setTimeout(() => {
+        // iOS/Safari can be slower to trigger speech callbacks. Avoid short fixed timers
+        // that can cut prompts and cause perceived clipping.
+        const estimatedMs = Math.max(3000, Math.min(9000, text.length * 85));
+        const fallbackSoftTimer = window.setTimeout(() => {
+            try {
+                if (!window.speechSynthesis.speaking) {
+                    cleanupAfterSpeak();
+                }
+            } catch (e) {
+                cleanupAfterSpeak();
+            }
+        }, estimatedMs);
+        const fallbackHardTimer = window.setTimeout(() => {
             cleanupAfterSpeak();
-        }, 1500);
+        }, estimatedMs + 5000);
 
         utterance.onend = () => {
-            window.clearTimeout(fallbackTimer);
+            window.clearTimeout(fallbackSoftTimer);
+            window.clearTimeout(fallbackHardTimer);
             cleanupAfterSpeak();
         };
         utterance.onerror = () => {
-            window.clearTimeout(fallbackTimer);
+            window.clearTimeout(fallbackSoftTimer);
+            window.clearTimeout(fallbackHardTimer);
             cleanupAfterSpeak();
         };
 
@@ -230,7 +261,8 @@ const VoiceNavButton: React.FC = () => {
                 recognitionRef.current?.stop();
                 window.speechSynthesis.speak(utterance);
             } catch (e) {
-                window.clearTimeout(fallbackTimer);
+                window.clearTimeout(fallbackSoftTimer);
+                window.clearTimeout(fallbackHardTimer);
                 cleanupAfterSpeak();
                 playBeep();
             }
@@ -256,7 +288,8 @@ const VoiceNavButton: React.FC = () => {
                             try {
                                 window.speechSynthesis.removeEventListener("voiceschanged", onVoicesChanged);
                             } catch (e) {}
-                            window.clearTimeout(fallbackTimer);
+                            window.clearTimeout(fallbackSoftTimer);
+                            window.clearTimeout(fallbackHardTimer);
                             isSpeakingRef.current = false;
                             playBeep();
                             if (isHandsFreeRef.current && !isListeningRef.current) {
@@ -269,7 +302,8 @@ const VoiceNavButton: React.FC = () => {
                 speakNow();
             }
         } catch (e) {
-            window.clearTimeout(fallbackTimer);
+            window.clearTimeout(fallbackSoftTimer);
+            window.clearTimeout(fallbackHardTimer);
             isSpeakingRef.current = false;
             playBeep();
             if (isHandsFreeRef.current && !isListeningRef.current) {
@@ -461,14 +495,15 @@ const VoiceNavButton: React.FC = () => {
                     if (normalized.includes("clinia")) {
                         speak("ClinIA pret, dictez votre diagnostic.");
                     } else {
-                        // First, announce return to home
-                        speak("Retour a l'accueil.");
-                        // After 1 second, provide follow-up instructions
-                        setTimeout(() => {
-                            speak(
-                                "Dites ou écrivez votre diagnostic, puis dites «Lancer Requete» ou cliquez sur «Lancer Requete» pour lancer."
-                            );
-                        }, 1000);
+                        // Chain prompts on actual speech end to avoid clipping on iOS.
+                        speak("Retour a l'accueil.", {
+                            restartListening: false,
+                            onDone: () => {
+                                speak(
+                                    "Dites ou écrivez votre diagnostic, puis dites «Lancer Requete» ou cliquez sur «Lancer Requete» pour lancer."
+                                );
+                            },
+                        });
                     }
                 } else {
                     setVoiceMode("navigation");
@@ -532,17 +567,18 @@ const VoiceNavButton: React.FC = () => {
                 );
                 setVoiceMode("dictation");
                 setStatus("Diagnostic capture.");
-                speak("Diagnostic capturé.");
-                // Short follow-up instruction (delay slightly longer than speak fallback)
-                setTimeout(() => {
-                    if (typeof console !== "undefined") {
-                        console.info("[VoiceNav] speaking follow-up instruction");
-                    }
-                    speak(
-                        "Si satisfait, cliquez ou dites «Lancer Requete», ou dites «Nouveau diagnostic" +
-                            "" + " pour recommencer."
-                    );
-                }, 1200);
+                speak("Diagnostic capturé.", {
+                    restartListening: false,
+                    onDone: () => {
+                        if (typeof console !== "undefined") {
+                            console.info("[VoiceNav] speaking follow-up instruction");
+                        }
+                        speak(
+                            "Si satisfait, cliquez ou dites «Lancer Requete», ou dites «Nouveau diagnostic" +
+                                "" + " pour recommencer."
+                        );
+                    },
+                });
                 return;
             }
 
