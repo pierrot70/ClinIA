@@ -82,6 +82,10 @@ export async function translateHomeStrings(
 ): Promise<HomeTranslationResult> {
   const normalizedTarget = (targetLang || "").toLowerCase();
 
+  if (normalizedTarget === "he" || normalizedTarget === "ja") {
+    return buildFallbackResult(normalizedTarget);
+  }
+
   if (targetLang === "fr") {
     return {
       strings: HOME_STRINGS_FR,

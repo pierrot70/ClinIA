@@ -129,6 +129,8 @@ const LOCAL_HOME_STRINGS_BY_BASE: Record<string, HomeStrings> = {
 const getLocalHomeStrings = (baseLang: string): HomeStrings =>
   LOCAL_HOME_STRINGS_BY_BASE[baseLang] || HOME_STRINGS_EN;
 
+const LOCAL_SCRIPT_LOCK_LANGS = new Set(["he", "ja"]);
+
 export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -159,6 +161,17 @@ export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       window.localStorage.setItem(UI_LOCALE_STORAGE_KEY, normalizedTarget);
     } catch (e) {}
+
+    if (LOCAL_SCRIPT_LOCK_LANGS.has(targetBase)) {
+      // Keep native-script bundles deterministic for these locales.
+      try {
+        window.localStorage.removeItem(cacheKeyForLocale(targetBase));
+      } catch (e) {}
+      return {
+        voiceAck: buildVoiceAck(targetBase),
+        dictationInstruction: buildDictationPrompt(targetBase),
+      };
+    }
 
     setIsTranslating(true);
     try {
