@@ -131,6 +131,17 @@ const detectLocaleFromTranscript = (transcript: string): string | null => {
     const compactRawLower = rawLower.replace(/\s+/g, "");
     const compactNormalized = normalized.replace(/\s+/g, "");
 
+    // Strong phonetic fallback for Japanese STT variants of "In French".
+    const phoneticFrenchIntent =
+        /(?:\bin\b|\ben\b|イン|エン|いん|えん)\s*(?:french|francais|français|fr|フ(?:ラ|レ)ン(?:ス|チ|シ)|ふ(?:ら|れ)ん(?:す|ち|し)|法(?:语|文)|仏語|佛語)/i;
+    if (
+        phoneticFrenchIntent.test(raw) ||
+        phoneticFrenchIntent.test(compactRawLower) ||
+        phoneticFrenchIntent.test(compactNormalized)
+    ) {
+        return "fr";
+    }
+
     // Cross-script safety net: if transcript clearly mentions French,
     // always switch back to FR regardless of active recognition locale.
     const mentionsFrenchInAnyScript =
