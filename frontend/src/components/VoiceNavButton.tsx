@@ -55,6 +55,11 @@ const LANGUAGE_ALIASES: Record<string, string> = {
     hebreu: "he",
     hébreu: "he",
     hebrew: "he",
+    coreen: "ko",
+    coréen: "ko",
+    korean: "ko",
+    coren: "ko",
+    한국어: "ko",
     // Japanese words for French (common STT outputs)
     フランス語: "fr",
     フランス: "fr",
