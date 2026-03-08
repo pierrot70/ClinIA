@@ -55,6 +55,8 @@ const Header: React.FC = () => {
     const languageOptions = [
         { value: "fr-CA", label: "Francais (Canada)" },
         { value: "en-CA", label: "English (Canada)" },
+        { value: "ko-KR", label: "Coreen (Coree du Sud)" },
+        { value: "vi", label: "Vietnamien" },
         { value: "ja", label: "Japonais" },
         { value: "zh", label: "Chinois (Mandarin)" },
         { value: "he", label: "Hebreu" },

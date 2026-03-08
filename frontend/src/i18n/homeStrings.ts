@@ -464,25 +464,127 @@ export const HOME_STRINGS_HE: HomeStrings = {
 export const HOME_STRINGS_KO: HomeStrings = {
   ...HOME_STRINGS_EN,
   home: {
-    ...HOME_STRINGS_EN.home,
-    title: "Mae jinadan hu siganeul jeol-yak-haseyo.",
-    cardReadTitle: "6cho ilggi",
-    cardChartsTitle: "Myeonghwakan geuraep",
-    cardQuestionsTitle: "Yecheugdoen jilmun",
+    title: "진단 후 매번 시간을 절약하세요.",
+    subtitle:
+      "ClinIA는 진단을 바탕으로 효과, 내약성, 최신 근거에 따라 치료 옵션을 정리해 익명화된 임상 입력으로 몇 초 안에 명확한 요약을 제공합니다.",
+    disclaimer: "시뮬레이션 데이터 기반 프로토타입이며 실제 임상 진료용이 아닙니다.",
+    cardReadTitle: "6초 읽기",
+    cardReadBody:
+      "초간단 요약: 권장 치료 1개, 대안 2개, 핵심 포인트 3줄로 빠르게 파악합니다.",
+    cardChartsTitle: "명확한 차트",
+    cardChartsBody:
+      "효과 비교, 부작용 프로필, 임상적 적합성을 한눈에 확인할 수 있습니다.",
+    cardQuestionsTitle: "예상 질문",
+    cardQuestionsBody:
+      "자주 묻는 질문을 제안하고 구조화된 답변을 제공해 인지 부담을 줄입니다.",
   },
   search: {
-    ...HOME_STRINGS_EN.search,
-    objectiveLabel: "Mogpyo",
-    showAdvanced: "Gogeup seoljeong pyosi",
-    hideAdvanced: "Gogeup seoljeong sumgim",
-    scopeLabel: "Jeonmun bunya",
-    ageGroupLabel: "Hwanja geurup",
-    symptomLabel: "Juyo jeungsang",
-    durationLabel: "Jeungsang gigan",
-    severityLabel: "Simgakdo",
-    redFlagsLabel: "Jeoksaek sinho",
-    comorbidityLabel: "Dongban jilhwahn baegyeong",
-    notesLabel: "Imsang memo",
-    launchSecure: "Boan jilhui silhaeng",
+    secureModeHint:
+      "빠른 모드: 익명화된 임상 정보만 입력합니다. 고급 설정은 선택 사항입니다.",
+    objectiveLabel: "목표",
+    showAdvanced: "고급 설정 표시",
+    hideAdvanced: "고급 설정 숨기기",
+    scopeLabel: "전문 분야",
+    ageGroupLabel: "환자 그룹",
+    symptomLabel: "주요 증상",
+    durationLabel: "증상 기간",
+    severityLabel: "중증도",
+    redFlagsLabel: "위험 신호",
+    comorbidityLabel: "동반질환 맥락",
+    notesLabel: "임상 메모",
+    notesPlaceholder: "익명화된 임상 메모 (환자 식별 정보 없음)",
+    launchSecure: "보안 질의 실행",
+    checkAttestation: "확인 문구 체크",
+    attestationRequiredHint:
+      "전송 전 필수: 아래 확인 문구를 체크하면 버튼이 활성화됩니다.",
+    attestationText:
+      "이 입력은 익명화되었으며 환자 식별 정보(이름, RAMQ, 생년월일, 전화번호, 이메일, 주소)를 포함하지 않음을 확인합니다.",
+    privacyFooter:
+      "ClinIA는 개인 식별 정보를 요구하지 않습니다. 이름, RAMQ, 전화번호, 이메일, 생년월일, 주소를 입력하지 마세요.",
+    privacyConfirmRequired: "전송 전에 개인정보 확인 문구를 확인해 주세요.",
+    sensitiveDetected: "경고: 민감한 내용이 감지되었을 수 있습니다",
+    voiceSensitiveDetected: "경고: 음성 입력에 민감한 정보가 포함되었을 수 있습니다",
+    blockedSensitive:
+      "입력이 차단되었습니다: 계속하기 전에 개인정보(이름, RAMQ, 전화번호, 이메일)를 제거해 주세요.",
+  },
+  options: {
+    objectives: ["초기 치료", "치료 조정", "불내성 시 대안", "모니터링 및 추적"],
+    clinicalScopes: ["일반의학", "심장내과", "신경과", "정신건강의학과", "노인의학"],
+    ageGroups: ["성인", "소아", "노인", "임신"],
+    symptomProfiles: ["고혈압", "만성 통증", "편두통", "불안", "불면", "호흡기 감염"],
+    durations: ["< 24시간", "1-7일", "1-4주", "> 1개월"],
+    severityLevels: ["경증", "중등도", "중증"],
+    redFlagStatuses: ["위험 신호 없음", "위험 신호 있음"],
+    comorbidityContexts: [
+      "중대한 동반질환 없음",
+      "신장 기능 저하",
+      "간 기능 저하",
+      "높은 심혈관 위험",
+      "다제복용",
+    ],
+  },
+};
+
+export const HOME_STRINGS_VI: HomeStrings = {
+  ...HOME_STRINGS_EN,
+  home: {
+    title: "Tiet kiem thoi gian sau moi chan doan.",
+    subtitle:
+      "ClinIA de xuat cac lua chon dieu tri dua tren chan doan, sap xep theo hieu qua, kha nang dung nap va bang chung hien tai, trinh bay trong vai giay voi du lieu lam sang da an danh.",
+    disclaimer: "Nguyen mau voi du lieu mo phong - khong dung cho thuc hanh lam sang thuc te.",
+    cardReadTitle: "Doc trong 6 giay",
+    cardReadBody:
+      "Tom tat cuc ngan: 1 dieu tri de xuat, 2 phuong an thay the, 3 dong de nam y chinh.",
+    cardChartsTitle: "Bieu do ro rang",
+    cardChartsBody:
+      "So sanh hieu qua, tac dung phu va muc do phu hop lam sang trong mot cai nhin.",
+    cardQuestionsTitle: "Cau hoi du kien",
+    cardQuestionsBody:
+      "Giao dien goi y cau hoi thuong gap va hien thi cau tra loi co cau truc de giam tai nhan thuc.",
+  },
+  search: {
+    secureModeHint:
+      "Che do nhanh: chi nhap du lieu lam sang da an danh. Cac tuy chon nang cao la tuy chon.",
+    objectiveLabel: "Muc tieu",
+    showAdvanced: "Hien thi tuy chon nang cao",
+    hideAdvanced: "An tuy chon nang cao",
+    scopeLabel: "Chuyen khoa",
+    ageGroupLabel: "Nhom benh nhan",
+    symptomLabel: "Trieu chung chinh",
+    durationLabel: "Thoi gian trieu chung",
+    severityLabel: "Muc do nang",
+    redFlagsLabel: "Dau hieu bao dong",
+    comorbidityLabel: "Boi canh benh dong mac",
+    notesLabel: "Ghi chu lam sang",
+    notesPlaceholder: "Ghi chu lam sang da an danh (khong co dinh danh benh nhan)",
+    launchSecure: "Chay truy van bao mat",
+    checkAttestation: "Danh dau cam ket",
+    attestationRequiredHint:
+      "Bat buoc truoc khi gui: danh dau cam ket ben duoi de kich hoat nut.",
+    attestationText:
+      "Toi xac nhan du lieu nay da duoc an danh va khong chua thong tin dinh danh benh nhan (ten, RAMQ, ngay sinh, so dien thoai, email, dia chi).",
+    privacyFooter:
+      "ClinIA khong yeu cau du lieu dinh danh: khong nhap ten, RAMQ, so dien thoai, email, ngay sinh hoac dia chi.",
+    privacyConfirmRequired: "Vui long xac nhan cam ket bao mat truoc khi gui.",
+    sensitiveDetected: "Canh bao: co the da phat hien noi dung nhay cam",
+    voiceSensitiveDetected: "Canh bao: noi dung doc co the chua thong tin nhay cam",
+    blockedSensitive:
+      "Da chan du lieu nhap: hay xoa thong tin ca nhan (ten, RAMQ, so dien thoai, email) truoc khi tiep tuc.",
+  },
+  options: {
+    objectives: ["Dieu tri ban dau", "Dieu chinh dieu tri", "Thay the khi khong dung nap", "Theo doi va tai kham"],
+    clinicalScopes: ["Y hoc tong quat", "Tim mach", "Than kinh", "Tam than", "Lao khoa"],
+    ageGroups: ["Nguoi lon", "Nhi khoa", "Nguoi cao tuoi", "Thai ky"],
+    symptomProfiles: ["Tang huyet ap", "Dau man tinh", "Dau nua dau", "Lo au", "Mat ngu", "Nhiem trung ho hap"],
+    durations: ["< 24 gio", "1-7 ngay", "1-4 tuan", "> 1 thang"],
+    severityLevels: ["Nhe", "Trung binh", "Nang"],
+    redFlagStatuses: ["Khong co dau hieu bao dong", "Co dau hieu bao dong"],
+    comorbidityContexts: [
+      "Khong co benh dong mac dang ke",
+      "Suy than",
+      "Suy gan",
+      "Nguy co tim mach cao",
+      "Da dung thuoc",
+    ],
   },
 };

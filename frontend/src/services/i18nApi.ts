@@ -5,6 +5,7 @@ import {
   HOME_STRINGS_HE,
   HOME_STRINGS_JA,
   HOME_STRINGS_KO,
+  HOME_STRINGS_VI,
   HOME_STRINGS_ZH,
   type HomeStrings,
 } from "../i18n/homeStrings";
@@ -22,6 +23,7 @@ const VOICE_ACK_LABELS: Record<string, string> = {
   pt: "portuguese",
   ja: "japanese",
   ko: "korean",
+  vi: "vietnamese",
   zh: "chinese",
   ar: "arabic",
   he: "hebrew",
@@ -33,6 +35,7 @@ const DICTATION_PROMPT_BY_LANG: Record<string, string> = {
   es: "Por favor, dicte o escriba su diagnostico.",
   ja: "音声で診断を入力するか、テキストで入力してください。",
   ko: "Jindaneul malhagena ibryeokhae juseyo.",
+  vi: "Vui long doc hoac nhap chan doan cua ban.",
   zh: "Qing koushu huo shuru nin de zhenduan.",
   he: "נא להכתיב או להקליד את האבחנה שלך.",
 };
@@ -46,6 +49,7 @@ const buildFallbackResult = (targetLang: string): HomeTranslationResult => {
     es: HOME_STRINGS_ES,
     ja: HOME_STRINGS_JA,
     ko: HOME_STRINGS_KO,
+    vi: HOME_STRINGS_VI,
     zh: HOME_STRINGS_ZH,
     he: HOME_STRINGS_HE,
   };

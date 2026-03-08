@@ -13,6 +13,7 @@ import {
   HOME_STRINGS_HE,
   HOME_STRINGS_JA,
   HOME_STRINGS_KO,
+  HOME_STRINGS_VI,
   HOME_STRINGS_ZH,
   type HomeStrings,
 } from "../i18n/homeStrings";
@@ -36,7 +37,16 @@ type HomeI18nContextValue = {
 const HomeI18nContext = createContext<HomeI18nContextValue | null>(null);
 const UI_LOCALE_STORAGE_KEY = "clinia_ui_locale_v1";
 
-const SUPPORTED_UI_LOCALES = ["fr-CA", "en-CA", "ja", "zh", "he", "es"] as const;
+const SUPPORTED_UI_LOCALES = [
+  "fr-CA",
+  "en-CA",
+  "ja",
+  "zh",
+  "he",
+  "es",
+  "ko-KR",
+  "vi",
+] as const;
 type SupportedUiLocale = (typeof SUPPORTED_UI_LOCALES)[number];
 
 const toSupportedUiLocale = (value: string): SupportedUiLocale => {
@@ -51,6 +61,8 @@ const toSupportedUiLocale = (value: string): SupportedUiLocale => {
   if (normalized.startsWith("zh")) return "zh";
   if (normalized.startsWith("he") || normalized.startsWith("iw")) return "he";
   if (normalized.startsWith("es")) return "es";
+  if (normalized.startsWith("ko")) return "ko-KR";
+  if (normalized.startsWith("vi")) return "vi";
   return "fr-CA";
 };
 
@@ -84,6 +96,7 @@ const VOICE_ACK_LABELS: Record<string, string> = {
   ja: "japanese",
   ko: "korean",
   zh: "chinese",
+  vi: "vietnamese",
   ar: "arabic",
   ru: "russian",
 };
@@ -107,6 +120,7 @@ const DICTATION_PROMPT_BY_LANG: Record<string, string> = {
   pt: "Por favor, dite ou escreva seu diagnostico.",
   ja: "音声で診断を入力するか、テキストで入力してください。",
   ko: "Jindaneul malhagena ibryeokhae juseyo.",
+  vi: "Vui long doc hoac nhap chan doan cua ban.",
   zh: "Qing koushu huo shuru nin de zhenduan.",
   he: "נא להכתיב או להקליד את האבחנה שלך.",
 };
@@ -124,6 +138,7 @@ const LOCAL_HOME_STRINGS_BY_BASE: Record<string, HomeStrings> = {
   he: HOME_STRINGS_HE,
   es: HOME_STRINGS_ES,
   ko: HOME_STRINGS_KO,
+  vi: HOME_STRINGS_VI,
 };
 
 const getLocalHomeStrings = (baseLang: string): HomeStrings =>
