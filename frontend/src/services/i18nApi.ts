@@ -1,6 +1,7 @@
 import {
   HOME_STRINGS_EN,
   HOME_STRINGS_FR,
+  HOME_STRINGS_ZH,
   type HomeStrings,
 } from "../i18n/homeStrings";
 
@@ -34,11 +35,16 @@ const DICTATION_PROMPT_BY_LANG: Record<string, string> = {
 const buildFallbackResult = (targetLang: string): HomeTranslationResult => {
   const normalized = (targetLang || "en").toLowerCase().slice(0, 2);
   const label = VOICE_ACK_LABELS[normalized] || normalized;
+
+  const fallbackStrings: HomeStrings =
+    normalized === "zh" ? HOME_STRINGS_ZH : HOME_STRINGS_EN;
+
+  const resolvedLang = normalized === "zh" ? "zh" : "en";
+
   return {
-    strings: HOME_STRINGS_EN,
+    strings: fallbackStrings,
     voiceAck: `Back in ${label}.`,
-    // Fallback UI bundle is English, regardless of requested target language.
-    resolvedLang: "en",
+    resolvedLang,
     voicePrompts: {
       dictationInstruction:
         DICTATION_PROMPT_BY_LANG[normalized] ||

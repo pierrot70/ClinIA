@@ -217,3 +217,78 @@ export const HOME_STRINGS_EN: HomeStrings = {
     ],
   },
 };
+
+export const HOME_STRINGS_ZH: HomeStrings = {
+  home: {
+    title: "每次诊断后节省时间。",
+    subtitle:
+      "ClinIA 可根据诊断结果，按疗效、耐受性与当前证据排序给出治疗方案，并在数秒内以清晰摘要呈现，且仅使用匿名临床输入。",
+    disclaimer: "原型系统，使用模拟数据，不用于真实临床实践。",
+    cardReadTitle: "6 秒阅读",
+    cardReadBody:
+      "超精简摘要：1 个推荐方案、2 个替代方案、3 句核心结论。",
+    cardChartsTitle: "清晰图表",
+    cardChartsBody:
+      "疗效对比、不良反应特征与临床相关性一目了然。",
+    cardQuestionsTitle: "预判问题",
+    cardQuestionsBody:
+      "界面会建议常见问题并给出结构化答案，降低认知负担。",
+  },
+  search: {
+    secureModeHint:
+      "快速模式：仅输入匿名临床信息。高级参数为可选。",
+    objectiveLabel: "目标",
+    showAdvanced: "显示高级参数",
+    hideAdvanced: "隐藏高级参数",
+    scopeLabel: "专科",
+    ageGroupLabel: "患者分组",
+    symptomLabel: "主要症状",
+    durationLabel: "症状持续时间",
+    severityLabel: "严重程度",
+    redFlagsLabel: "危险信号",
+    comorbidityLabel: "合并症背景",
+    notesLabel: "临床备注",
+    notesPlaceholder: "匿名临床备注（不含患者身份信息）",
+    launchSecure: "启动安全查询",
+    checkAttestation: "勾选声明",
+    attestationRequiredHint:
+      "提交前必填：请勾选下方声明以启用按钮。",
+    attestationText:
+      "我确认本次输入已匿名，且不包含任何患者身份信息（姓名、RAMQ、出生日期、电话、邮箱、地址）。",
+    privacyFooter:
+      "ClinIA 不需要任何实名数据：请勿输入姓名、RAMQ、电话、邮箱、出生日期或地址。",
+    privacyConfirmRequired: "发送前请确认隐私声明。",
+    sensitiveDetected: "警告：可能检测到敏感内容",
+    voiceSensitiveDetected: "警告：语音输入可能包含敏感内容",
+    blockedSensitive:
+      "输入已阻止：请先移除所有个人信息（姓名、RAMQ、电话、邮箱）后再继续。",
+  },
+  options: {
+    objectives: [
+      "初始治疗",
+      "治疗方案调整",
+      "不耐受时替代方案",
+      "监测与随访",
+    ],
+    clinicalScopes: ["全科医学", "心脏科", "神经科", "精神科", "老年医学"],
+    ageGroups: ["成人", "儿科", "老年", "妊娠"],
+    symptomProfiles: [
+      "高血压",
+      "慢性疼痛",
+      "偏头痛",
+      "焦虑",
+      "失眠",
+      "呼吸道感染",
+    ],
+    durations: ["< 24 小时", "1-7 天", "1-4 周", "> 1 个月"],
+    severityLevels: ["轻度", "中度", "重度"],
+    redFlagStatuses: ["无危险信号", "存在危险信号"],
+    comorbidityContexts: [
+      "无重大合并症",
+      "肾功能不全",
+      "肝功能不全",
+      "高心血管风险",
+      "多重用药",
+    ],
+  },
+};
