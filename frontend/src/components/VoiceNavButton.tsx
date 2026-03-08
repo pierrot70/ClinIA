@@ -106,6 +106,10 @@ const FORCE_FRENCH_KEYWORDS = [
     "インフランセ",
     "エンフレンチ",
     "エンフランス",
+    "프렌치",
+    "프랑스어",
+    "불어",
+    "인프렌치",
     "furansu",
 ];
 
@@ -149,7 +153,7 @@ const detectLocaleFromTranscript = (transcript: string): string | null => {
     // Cross-script safety net: if transcript clearly mentions French,
     // always switch back to FR regardless of active recognition locale.
     const mentionsFrenchInAnyScript =
-        /(?:french|francais|français|frances|francés|\bfr\b|フランス語|フランス|フレンチ|フランチ|ふらんす|ふれんち|法语|法文|仏語|佛語)/i.test(
+        /(?:french|francais|français|frances|francés|\bfr\b|フランス語|フランス|フレンチ|フランチ|ふらんす|ふれんち|法语|法文|仏語|佛語|프렌치|프랑스어|불어)/i.test(
             raw
         ) || /(?:french|francais|frances|\bfr\b)/i.test(normalized);
     if (mentionsFrenchInAnyScript) {
@@ -167,7 +171,7 @@ const detectLocaleFromTranscript = (transcript: string): string | null => {
     // Emergency fallback: allow simple keywords to force French from any locale.
     const forceFrench = FORCE_FRENCH_KEYWORDS.some((keyword) => {
         const kLower = keyword.toLowerCase();
-        if (/[\u4e00-\u9fff]/.test(kLower)) {
+        if (/[^\x00-\x7F]/.test(kLower)) {
             return rawLower.includes(kLower);
         }
 
