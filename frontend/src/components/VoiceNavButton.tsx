@@ -1287,8 +1287,41 @@ const VoiceNavButton: React.FC = () => {
             }, 30000);
         };
         recognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript;
-            handleTranscript(transcript);
+            // Prefer the newest final result and inspect alternatives.
+            // This avoids missing intent when top hypothesis is unstable
+            // (common with cross-language commands like "In French").
+            const candidates: string[] = [];
+
+            for (let i = event.resultIndex; i < event.results.length; i += 1) {
+                const result = event.results[i];
+                if (!result?.isFinal) {
+                    continue;
+                }
+                for (let j = 0; j < result.length; j += 1) {
+                    const alt = result[j]?.transcript?.trim();
+                    if (alt) {
+                        candidates.push(alt);
+                    }
+                }
+            }
+
+            if (candidates.length === 0) {
+                const fallback =
+                    event.results[event.resultIndex]?.[0]?.transcript ||
+                    event.results[0]?.[0]?.transcript ||
+                    "";
+                if (fallback.trim()) {
+                    handleTranscript(fallback.trim());
+                }
+                return;
+            }
+
+            // If one alternative maps to a language command, use it directly.
+            const localeCandidate = candidates.find(
+                (candidate) => detectLocaleFromTranscript(candidate) !== null
+            );
+
+            handleTranscript(localeCandidate || candidates[0]);
         };
         recognition.onnomatch = () => {
             setStatus("Aucune reconnaissance vocale.");
