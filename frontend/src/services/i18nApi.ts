@@ -1,6 +1,10 @@
 import {
   HOME_STRINGS_EN,
+  HOME_STRINGS_ES,
   HOME_STRINGS_FR,
+  HOME_STRINGS_HE,
+  HOME_STRINGS_JA,
+  HOME_STRINGS_KO,
   HOME_STRINGS_ZH,
   type HomeStrings,
 } from "../i18n/homeStrings";
@@ -28,18 +32,29 @@ const DICTATION_PROMPT_BY_LANG: Record<string, string> = {
   en: "Please dictate or type your diagnosis.",
   es: "Por favor, dicte o escriba su diagnostico.",
   ja: "Shindan o onsei de nyuryoku suru ka, nyuryoku shite kudasai.",
+  ko: "Jindaneul malhagena ibryeokhae juseyo.",
   zh: "Qing koushu huo shuru nin de zhenduan.",
-  he: "Please dictate or type your diagnosis.",
+  he: "Anah dictate o hakled et ha-diagnosa shelcha.",
 };
 
 const buildFallbackResult = (targetLang: string): HomeTranslationResult => {
   const normalized = (targetLang || "en").toLowerCase().slice(0, 2);
   const label = VOICE_ACK_LABELS[normalized] || normalized;
 
-  const fallbackStrings: HomeStrings =
-    normalized === "zh" ? HOME_STRINGS_ZH : HOME_STRINGS_EN;
+  const fallbackStringsByLang: Record<string, HomeStrings> = {
+    en: HOME_STRINGS_EN,
+    es: HOME_STRINGS_ES,
+    ja: HOME_STRINGS_JA,
+    ko: HOME_STRINGS_KO,
+    zh: HOME_STRINGS_ZH,
+    he: HOME_STRINGS_HE,
+  };
 
-  const resolvedLang = normalized === "zh" ? "zh" : "en";
+  const fallbackStrings =
+    fallbackStringsByLang[normalized] || HOME_STRINGS_EN;
+
+  const resolvedLang =
+    normalized in fallbackStringsByLang ? normalized : "en";
 
   return {
     strings: fallbackStrings,

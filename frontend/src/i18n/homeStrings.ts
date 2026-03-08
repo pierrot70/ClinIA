@@ -292,3 +292,107 @@ export const HOME_STRINGS_ZH: HomeStrings = {
     ],
   },
 };
+
+export const HOME_STRINGS_ES: HomeStrings = {
+  ...HOME_STRINGS_EN,
+  home: {
+    ...HOME_STRINGS_EN.home,
+    title: "Ahorra tiempo despues de cada diagnostico.",
+    cardReadTitle: "Lectura de 6 segundos",
+    cardChartsTitle: "Graficos claros",
+    cardQuestionsTitle: "Preguntas anticipadas",
+  },
+  search: {
+    ...HOME_STRINGS_EN.search,
+    objectiveLabel: "Objetivo",
+    showAdvanced: "Mostrar parametros avanzados",
+    hideAdvanced: "Ocultar parametros avanzados",
+    scopeLabel: "Especialidad",
+    ageGroupLabel: "Grupo de paciente",
+    symptomLabel: "Sintoma principal",
+    durationLabel: "Duracion de sintomas",
+    severityLabel: "Severidad",
+    redFlagsLabel: "Senales de alarma",
+    comorbidityLabel: "Contexto de comorbilidades",
+    notesLabel: "Notas clinicas",
+    launchSecure: "Ejecutar consulta segura",
+  },
+};
+
+export const HOME_STRINGS_JA: HomeStrings = {
+  ...HOME_STRINGS_EN,
+  home: {
+    ...HOME_STRINGS_EN.home,
+    title: "Shindan goto ni jikan o setuyaku.",
+    cardReadTitle: "6-byo de yomeru",
+    cardChartsTitle: "Wakariyasui gurafu",
+    cardQuestionsTitle: "Yokuaru shitsumon",
+  },
+  search: {
+    ...HOME_STRINGS_EN.search,
+    objectiveLabel: "Mokuteki",
+    showAdvanced: "Shosai settei o hyouji",
+    hideAdvanced: "Shosai settei o kakusu",
+    scopeLabel: "Senmon bumon",
+    ageGroupLabel: "Kanja gurupu",
+    symptomLabel: "Omona shoujou",
+    durationLabel: "Shoujou no kikan",
+    severityLabel: "Juushoudo",
+    redFlagsLabel: "Kiken shingou",
+    comorbidityLabel: "Heisonshou jouhou",
+    notesLabel: "Rinsho memo",
+    launchSecure: "Anzen na kensaku o jikkou",
+  },
+};
+
+export const HOME_STRINGS_HE: HomeStrings = {
+  ...HOME_STRINGS_EN,
+  home: {
+    ...HOME_STRINGS_EN.home,
+    title: "Chasoch zman achar kol tashkik.",
+    cardReadTitle: "Kri'a shel 6 shniyot",
+    cardChartsTitle: "Grafim berurim",
+    cardQuestionsTitle: "Sheelot metzukot",
+  },
+  search: {
+    ...HOME_STRINGS_EN.search,
+    objectiveLabel: "Matarah",
+    showAdvanced: "Hatzeg hagdarot mitkadmot",
+    hideAdvanced: "Haster hagdarot mitkadmot",
+    scopeLabel: "Tchum hitmachut",
+    ageGroupLabel: "Kvutzat metupal",
+    symptomLabel: "Simptom ikari",
+    durationLabel: "Meshech simptomim",
+    severityLabel: "Chomer",
+    redFlagsLabel: "Simanei azhara",
+    comorbidityLabel: "Reka shel comorbidity",
+    notesLabel: "He'arot kliniyot",
+    launchSecure: "Haratz sh'eilta meuvtachat",
+  },
+};
+
+export const HOME_STRINGS_KO: HomeStrings = {
+  ...HOME_STRINGS_EN,
+  home: {
+    ...HOME_STRINGS_EN.home,
+    title: "Mae jinadan hu siganeul jeol-yak-haseyo.",
+    cardReadTitle: "6cho ilggi",
+    cardChartsTitle: "Myeonghwakan geuraep",
+    cardQuestionsTitle: "Yecheugdoen jilmun",
+  },
+  search: {
+    ...HOME_STRINGS_EN.search,
+    objectiveLabel: "Mogpyo",
+    showAdvanced: "Gogeup seoljeong pyosi",
+    hideAdvanced: "Gogeup seoljeong sumgim",
+    scopeLabel: "Jeonmun bunya",
+    ageGroupLabel: "Hwanja geurup",
+    symptomLabel: "Juyo jeungsang",
+    durationLabel: "Jeungsang gigan",
+    severityLabel: "Simgakdo",
+    redFlagsLabel: "Jeoksaek sinho",
+    comorbidityLabel: "Dongban jilhwahn baegyeong",
+    notesLabel: "Imsang memo",
+    launchSecure: "Boan jilhui silhaeng",
+  },
+};
