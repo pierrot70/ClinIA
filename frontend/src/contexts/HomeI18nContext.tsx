@@ -8,7 +8,12 @@ import React, {
 } from "react";
 import {
   HOME_STRINGS_EN,
+  HOME_STRINGS_ES,
   HOME_STRINGS_FR,
+  HOME_STRINGS_HE,
+  HOME_STRINGS_JA,
+  HOME_STRINGS_KO,
+  HOME_STRINGS_ZH,
   type HomeStrings,
 } from "../i18n/homeStrings";
 import { translateHomeStrings } from "../services/i18nApi";
@@ -111,6 +116,19 @@ const buildDictationPrompt = (localeCode: string) => {
   return DICTATION_PROMPT_BY_LANG[normalized] || DICTATION_PROMPT_BY_LANG.en;
 };
 
+const LOCAL_HOME_STRINGS_BY_BASE: Record<string, HomeStrings> = {
+  fr: HOME_STRINGS_FR,
+  en: HOME_STRINGS_EN,
+  ja: HOME_STRINGS_JA,
+  zh: HOME_STRINGS_ZH,
+  he: HOME_STRINGS_HE,
+  es: HOME_STRINGS_ES,
+  ko: HOME_STRINGS_KO,
+};
+
+const getLocalHomeStrings = (baseLang: string): HomeStrings =>
+  LOCAL_HOME_STRINGS_BY_BASE[baseLang] || HOME_STRINGS_EN;
+
 export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -133,6 +151,14 @@ export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
         dictationInstruction: buildDictationPrompt("fr"),
       };
     }
+
+    // KISS: apply a local bundle immediately so UI updates without reload,
+    // then refine with cache/API if available.
+    setLocaleState(normalizedTarget);
+    setStrings(getLocalHomeStrings(targetBase));
+    try {
+      window.localStorage.setItem(UI_LOCALE_STORAGE_KEY, normalizedTarget);
+    } catch (e) {}
 
     setIsTranslating(true);
     try {
@@ -217,12 +243,11 @@ export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
           buildDictationPrompt(targetBase),
       };
     } catch (err) {
-      setLocaleState("fr-CA");
-      setStrings(HOME_STRINGS_FR);
-      try {
-        window.localStorage.setItem(UI_LOCALE_STORAGE_KEY, "fr-CA");
-      } catch (e) {}
-      throw err;
+      // Keep the already-applied local bundle for the requested language.
+      return {
+        voiceAck: buildVoiceAck(targetBase),
+        dictationInstruction: buildDictationPrompt(targetBase),
+      };
     } finally {
       setIsTranslating(false);
     }
