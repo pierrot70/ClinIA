@@ -51,6 +51,11 @@ const LANGUAGE_ALIASES: Record<string, string> = {
     hebreu: "he",
     hébreu: "he",
     hebrew: "he",
+    // Japanese words for French (common STT outputs)
+    フランス語: "fr",
+    フランス: "fr",
+    フレンチ: "fr",
+    フランセ: "fr",
     castillan: "es",
     castellano: "es",
     // Native scripts
@@ -69,7 +74,10 @@ const FORCE_FRENCH_KEYWORDS = [
     "français",
     "french",
     "in french",
+    "infrench",
     "en french",
+    "enfrancais",
+    "enfrançais",
     "french language",
     "language french",
     "retour francais",
@@ -111,6 +119,8 @@ const detectLocaleFromTranscript = (transcript: string): string | null => {
 
     const rawLower = raw.toLowerCase();
     const normalized = normalizeText(rawLower);
+    const compactRawLower = rawLower.replace(/\s+/g, "");
+    const compactNormalized = normalized.replace(/\s+/g, "");
 
     // Emergency fallback: allow simple keywords to force French from any locale.
     const forceFrench = FORCE_FRENCH_KEYWORDS.some((keyword) => {
@@ -122,8 +132,12 @@ const detectLocaleFromTranscript = (transcript: string): string | null => {
         const normalizedKeyword = normalizeText(kLower);
         return (
             rawLower.includes(kLower) ||
+            compactRawLower.includes(kLower.replace(/\s+/g, "")) ||
             (normalizedKeyword.length > 0 &&
-                normalized.includes(normalizedKeyword))
+                (normalized.includes(normalizedKeyword) ||
+                    compactNormalized.includes(
+                        normalizedKeyword.replace(/\s+/g, "")
+                    )))
         );
     });
 
@@ -143,6 +157,33 @@ const detectLocaleFromTranscript = (transcript: string): string | null => {
         return "fr";
     }
 
+    // Handle compact forms often produced by non-latin STT engines:
+    // "infrench", "enjaponais", "inchinois", "inhebrew", "encoreen".
+    const compactTargets: Array<{ code: string; tokens: string[] }> = [
+        { code: "fr", tokens: ["francais", "french", "fr"] },
+        {
+            code: "ja",
+            tokens: ["japonais", "japanese", "japan", "nihongo", "ja"],
+        },
+        {
+            code: "zh",
+            tokens: ["chinois", "chinese", "mandarin", "zh"],
+        },
+        { code: "he", tokens: ["hebreu", "hebrew", "he"] },
+        { code: "ko", tokens: ["coreen", "korean", "ko"] },
+    ];
+
+    for (const target of compactTargets) {
+        for (const token of target.tokens) {
+            if (
+                compactNormalized.includes(`en${token}`) ||
+                compactNormalized.includes(`in${token}`)
+            ) {
+                return target.code;
+            }
+        }
+    }
+
     // Allow short direct language names only when transcript is short,
     // so medical dictation text does not trigger locale switches by accident.
     const tokens = normalized.split(" ").filter(Boolean);
@@ -155,9 +196,10 @@ const detectLocaleFromTranscript = (transcript: string): string | null => {
     for (const [alias, code] of Object.entries(LANGUAGE_ALIASES)) {
         const aliasLower = alias.toLowerCase();
 
-        // Non-latin aliases are matched exactly on short utterances.
+        // Non-latin aliases: allow contains matching for mixed transcripts
+        // such as "en フランス語" or "switch フレンチ".
         if (/[^\x00-\x7F]/.test(aliasLower)) {
-            if (rawLower === aliasLower) {
+            if (rawLower.includes(aliasLower)) {
                 return code;
             }
             continue;
