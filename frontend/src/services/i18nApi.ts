@@ -4,7 +4,10 @@ import {
   type HomeStrings,
 } from "../i18n/homeStrings";
 
-const API_URL = import.meta.env.VITE_API_URL as string;
+const RAW_API_URL = (import.meta.env.VITE_API_URL as string | undefined) || "";
+const API_URL = RAW_API_URL.endsWith("/")
+  ? RAW_API_URL.slice(0, -1)
+  : RAW_API_URL;
 
 const VOICE_ACK_LABELS: Record<string, string> = {
   en: "english",
