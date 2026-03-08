@@ -37,6 +37,7 @@ const buildFallbackResult = (targetLang: string): HomeTranslationResult => {
   return {
     strings: HOME_STRINGS_EN,
     voiceAck: `Back in ${label}.`,
+    resolvedLang: normalized,
     voicePrompts: {
       dictationInstruction:
         DICTATION_PROMPT_BY_LANG[normalized] ||
@@ -63,7 +64,6 @@ export async function translateHomeStrings(
     return {
       strings: HOME_STRINGS_FR,
       voiceAck: "Retour en francais.",
-      resolvedLang: normalized,
       resolvedLang: "fr",
       voicePrompts: {
         dictationInstruction: "Dites ou ecrivez votre diagnostic.",
