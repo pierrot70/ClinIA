@@ -92,7 +92,14 @@ const FORCE_FRENCH_KEYWORDS = [
     "フランス語",
     "フランス",
     "フレンチ",
+    "フランチ",
+    "フランスゴ",
+    "仏語",
+    "佛語",
     "インフレンチ",
+    "インフランセ",
+    "エンフレンチ",
+    "エンフランス",
     "furansu",
 ];
 
@@ -121,6 +128,14 @@ const detectLocaleFromTranscript = (transcript: string): string | null => {
     const normalized = normalizeText(rawLower);
     const compactRawLower = rawLower.replace(/\s+/g, "");
     const compactNormalized = normalized.replace(/\s+/g, "");
+
+    // Japanese STT frequently outputs katakana for "in/en french".
+    // Accept forms like "イン フレンチ" and "エン フランス語".
+    const japaneseForceFrenchPattern =
+        /(イン|エン)\s*(フランス語|フランス|フレンチ|フランセ|フランチ|仏語|佛語)/;
+    if (japaneseForceFrenchPattern.test(raw)) {
+        return "fr";
+    }
 
     // Emergency fallback: allow simple keywords to force French from any locale.
     const forceFrench = FORCE_FRENCH_KEYWORDS.some((keyword) => {
