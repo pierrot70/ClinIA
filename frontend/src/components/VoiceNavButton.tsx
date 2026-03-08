@@ -31,6 +31,8 @@ const LANGUAGE_ALIASES: Record<string, string> = {
     // French
     francais: "fr",
     français: "fr",
+    frances: "fr",
+    francés: "fr",
     french: "fr",
     anglais: "en",
     english: "en",
@@ -74,6 +76,8 @@ const LANGUAGE_ALIASES: Record<string, string> = {
 const FORCE_FRENCH_KEYWORDS = [
     "francais",
     "français",
+    "frances",
+    "francés",
     "french",
     "in french",
     "infrench",
@@ -145,9 +149,9 @@ const detectLocaleFromTranscript = (transcript: string): string | null => {
     // Cross-script safety net: if transcript clearly mentions French,
     // always switch back to FR regardless of active recognition locale.
     const mentionsFrenchInAnyScript =
-        /(?:french|francais|français|\bfr\b|フランス語|フランス|フレンチ|フランチ|ふらんす|ふれんち|法语|法文|仏語|佛語)/i.test(
+        /(?:french|francais|français|frances|francés|\bfr\b|フランス語|フランス|フレンチ|フランチ|ふらんす|ふれんち|法语|法文|仏語|佛語)/i.test(
             raw
-        ) || /(?:french|francais|\bfr\b)/i.test(normalized);
+        ) || /(?:french|francais|frances|\bfr\b)/i.test(normalized);
     if (mentionsFrenchInAnyScript) {
         return "fr";
     }
