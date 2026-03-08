@@ -1,5 +1,9 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
-import { HOME_STRINGS_FR, type HomeStrings } from "../i18n/homeStrings";
+import {
+  HOME_STRINGS_EN,
+  HOME_STRINGS_FR,
+  type HomeStrings,
+} from "../i18n/homeStrings";
 import { translateHomeStrings } from "../services/i18nApi";
 
 type Locale = string;
@@ -98,6 +102,7 @@ export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
           | HomeStrings
           | {
               strings: HomeStrings;
+              resolvedLang?: string;
               voicePrompts?: {
                 dictationInstruction?: string;
               };
@@ -111,22 +116,51 @@ export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
           (parsed as { voicePrompts?: { dictationInstruction?: string } })
             ?.voicePrompts?.dictationInstruction;
 
-        setStrings(cachedStrings);
-        setLocale(normalizedTarget);
-        return {
-          voiceAck: buildVoiceAck(normalizedTarget),
-          dictationInstruction:
-            cachedPrompt || buildDictationPrompt(normalizedTarget),
-        };
+        const cachedResolvedLang =
+          (parsed as { resolvedLang?: string })?.resolvedLang;
+
+        const cachedBase = (cachedResolvedLang || "").toLowerCase().slice(0, 2);
+        const targetBase = normalizedTarget.slice(0, 2);
+        const isFallbackEnglishUnderNonEnglishTarget =
+          targetBase !== "en" &&
+          JSON.stringify(cachedStrings) === JSON.stringify(HOME_STRINGS_EN);
+
+        if (
+          (cachedBase && cachedBase !== targetBase) ||
+          isFallbackEnglishUnderNonEnglishTarget
+        ) {
+          window.localStorage.removeItem(cacheKeyForLocale(normalizedTarget));
+        } else {
+          setStrings(cachedStrings);
+          setLocale(normalizedTarget);
+          return {
+            voiceAck: buildVoiceAck(normalizedTarget),
+            dictationInstruction:
+              cachedPrompt || buildDictationPrompt(normalizedTarget),
+          };
+        }
       }
 
       const translated = await translateHomeStrings(normalizedTarget);
+
+      const translatedBase = (translated.resolvedLang || "")
+        .toLowerCase()
+        .slice(0, 2);
+      const targetBase = normalizedTarget.slice(0, 2);
+      const isMismatchedTranslation =
+        translatedBase.length > 0 && translatedBase !== targetBase;
+
+      if (isMismatchedTranslation) {
+        throw new Error("MISMATCHED_TRANSLATION_LOCALE");
+      }
+
       setStrings(translated.strings);
       setLocale(normalizedTarget);
       window.localStorage.setItem(
         cacheKeyForLocale(normalizedTarget),
         JSON.stringify({
           strings: translated.strings,
+          resolvedLang: translated.resolvedLang || normalizedTarget,
           voicePrompts: translated.voicePrompts,
         })
       );

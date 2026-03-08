@@ -48,6 +48,7 @@ const buildFallbackResult = (targetLang: string): HomeTranslationResult => {
 export type HomeTranslationResult = {
   strings: HomeStrings;
   voiceAck?: string;
+  resolvedLang?: string;
   voicePrompts?: {
     dictationInstruction: string;
   };
@@ -62,6 +63,8 @@ export async function translateHomeStrings(
     return {
       strings: HOME_STRINGS_FR,
       voiceAck: "Retour en francais.",
+      resolvedLang: normalized,
+      resolvedLang: "fr",
       voicePrompts: {
         dictationInstruction: "Dites ou ecrivez votre diagnostic.",
       },
@@ -90,6 +93,10 @@ export async function translateHomeStrings(
               typeof json?.meta?.voiceAck === "string"
                 ? json.meta.voiceAck
                 : "Back in english.",
+            resolvedLang:
+              typeof json?.meta?.lang === "string"
+                ? json.meta.lang
+                : "en",
             voicePrompts:
               typeof json?.meta?.voicePrompts?.dictationInstruction === "string"
                 ? {
@@ -134,6 +141,10 @@ export async function translateHomeStrings(
         typeof json?.meta?.voiceAck === "string"
           ? json.meta.voiceAck
           : buildFallbackResult(normalizedTarget).voiceAck,
+      resolvedLang:
+        typeof json?.meta?.lang === "string"
+          ? json.meta.lang
+          : normalizedTarget,
       voicePrompts:
         typeof json?.meta?.voicePrompts?.dictationInstruction === "string"
           ? { dictationInstruction: json.meta.voicePrompts.dictationInstruction }
