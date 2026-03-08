@@ -57,6 +57,9 @@ const LANGUAGE_ALIASES: Record<string, string> = {
     hebrew: "he",
     coreen: "ko",
     coréen: "ko",
+    coreenne: "ko",
+    coréenne: "ko",
+    koreen: "ko",
     korean: "ko",
     coren: "ko",
     한국어: "ko",
@@ -221,7 +224,10 @@ const detectLocaleFromTranscript = (transcript: string): string | null => {
             tokens: ["chinois", "chinese", "mandarin", "zh"],
         },
         { code: "he", tokens: ["hebreu", "hebrew", "he"] },
-        { code: "ko", tokens: ["coreen", "korean", "ko"] },
+        {
+            code: "ko",
+            tokens: ["coreen", "coreenne", "koreen", "korean", "ko"],
+        },
     ];
 
     for (const target of compactTargets) {
