@@ -19,7 +19,9 @@ type ActionCommand = {
 const normalizeText = (value: string) =>
     value
         .toLowerCase()
-        .normalize("NFD")
+        // NFKD handles compatibility forms (e.g. full-width latin chars),
+        // making commands like "In French" parse consistently across locales.
+        .normalize("NFKD")
         .replace(/[\u0300-\u036f]/g, "")
         .replace(/[^\w\s-]/g, " ")
         .replace(/\s+/g, " ")
