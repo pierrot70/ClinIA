@@ -322,52 +322,142 @@ export const HOME_STRINGS_ES: HomeStrings = {
 export const HOME_STRINGS_JA: HomeStrings = {
   ...HOME_STRINGS_EN,
   home: {
-    ...HOME_STRINGS_EN.home,
-    title: "Shindan goto ni jikan o setuyaku.",
-    cardReadTitle: "6-byo de yomeru",
-    cardChartsTitle: "Wakariyasui gurafu",
-    cardQuestionsTitle: "Yokuaru shitsumon",
+    title: "診断のたびに時間を節約。",
+    subtitle:
+      "ClinIA は診断結果にもとづき、有効性・忍容性・最新エビデンスで治療選択肢を整理し、匿名化された臨床入力から数秒で分かりやすく提示します。",
+    disclaimer: "シミュレーションデータによるプロトタイプであり、実臨床には使用できません。",
+    cardReadTitle: "6秒で読める",
+    cardReadBody:
+      "超要約: 推奨治療 1 件、代替案 2 件、重要ポイント 3 行をすばやく確認できます。",
+    cardChartsTitle: "見やすいグラフ",
+    cardChartsBody:
+      "有効性比較、副作用プロファイル、臨床的妥当性を一目で把握できます。",
+    cardQuestionsTitle: "想定される質問",
+    cardQuestionsBody:
+      "よくある質問を提示し、構造化された回答で認知負荷を軽減します。",
   },
   search: {
-    ...HOME_STRINGS_EN.search,
-    objectiveLabel: "Mokuteki",
-    showAdvanced: "Shosai settei o hyouji",
-    hideAdvanced: "Shosai settei o kakusu",
-    scopeLabel: "Senmon bumon",
-    ageGroupLabel: "Kanja gurupu",
-    symptomLabel: "Omona shoujou",
-    durationLabel: "Shoujou no kikan",
-    severityLabel: "Juushoudo",
-    redFlagsLabel: "Kiken shingou",
-    comorbidityLabel: "Heisonshou jouhou",
-    notesLabel: "Rinsho memo",
-    launchSecure: "Anzen na kensaku o jikkou",
+    secureModeHint:
+      "クイックモード: 匿名化された臨床情報のみ入力します。詳細設定は任意です。",
+    objectiveLabel: "目的",
+    showAdvanced: "詳細設定を表示",
+    hideAdvanced: "詳細設定を非表示",
+    scopeLabel: "診療科",
+    ageGroupLabel: "患者グループ",
+    symptomLabel: "主症状",
+    durationLabel: "症状の期間",
+    severityLabel: "重症度",
+    redFlagsLabel: "レッドフラッグ",
+    comorbidityLabel: "併存疾患",
+    notesLabel: "臨床メモ",
+    notesPlaceholder: "匿名化された臨床メモ（患者識別情報なし）",
+    launchSecure: "安全クエリを実行",
+    checkAttestation: "誓約を確認",
+    attestationRequiredHint:
+      "送信前に必須: 下記の誓約にチェックするとボタンが有効になります。",
+    attestationText:
+      "この入力は匿名化されており、患者識別情報（氏名、RAMQ、生年月日、電話、メール、住所）を含まないことを確認します。",
+    privacyFooter:
+      "ClinIA は個人識別情報を必要としません。氏名、RAMQ、電話、メール、生年月日、住所は入力しないでください。",
+    privacyConfirmRequired: "送信前にプライバシー誓約を確認してください。",
+    sensitiveDetected: "警告: 機微情報の可能性を検出しました",
+    voiceSensitiveDetected: "警告: 音声入力に機微情報が含まれる可能性があります",
+    blockedSensitive:
+      "入力はブロックされました。個人情報（氏名、RAMQ、電話、メール）を削除してから続行してください。",
+  },
+  options: {
+    objectives: ["初期治療", "治療調整", "不耐時の代替", "モニタリングとフォローアップ"],
+    clinicalScopes: ["総合診療", "循環器", "神経内科", "精神科", "老年医学"],
+    ageGroups: ["成人", "小児", "高齢者", "妊娠"],
+    symptomProfiles: [
+      "高血圧",
+      "慢性疼痛",
+      "片頭痛",
+      "不安",
+      "不眠",
+      "呼吸器感染",
+    ],
+    durations: ["< 24時間", "1-7日", "1-4週間", "> 1か月"],
+    severityLevels: ["軽度", "中等度", "重度"],
+    redFlagStatuses: ["警告徴候なし", "警告徴候あり"],
+    comorbidityContexts: [
+      "重大な併存疾患なし",
+      "腎機能障害",
+      "肝機能障害",
+      "高心血管リスク",
+      "多剤併用",
+    ],
   },
 };
 
 export const HOME_STRINGS_HE: HomeStrings = {
   ...HOME_STRINGS_EN,
   home: {
-    ...HOME_STRINGS_EN.home,
-    title: "Chasoch zman achar kol tashkik.",
-    cardReadTitle: "Kri'a shel 6 shniyot",
-    cardChartsTitle: "Grafim berurim",
-    cardQuestionsTitle: "Sheelot metzukot",
+    title: "חסכו זמן אחרי כל אבחנה.",
+    subtitle:
+      "ClinIA מציעה מתוך האבחנה אפשרויות טיפול מדורגות לפי יעילות, סבילות ועדכניות הראיות, ומציגה סיכום ברור בתוך שניות עם קלט קליני אנונימי.",
+    disclaimer: "אב-טיפוס עם נתונים מדומים - לא מיועד לשימוש קליני אמיתי.",
+    cardReadTitle: "קריאה של 6 שניות",
+    cardReadBody:
+      "סיכום תמציתי: טיפול מומלץ אחד, שתי חלופות ושלוש שורות עם עיקרי הדברים.",
+    cardChartsTitle: "גרפים ברורים",
+    cardChartsBody:
+      "השוואת יעילות, פרופיל תופעות לוואי ורלוונטיות קלינית במבט אחד.",
+    cardQuestionsTitle: "שאלות צפויות",
+    cardQuestionsBody:
+      "הממשק מציע שאלות נפוצות ומציג תשובות מובנות להפחתת העומס הקוגניטיבי.",
   },
   search: {
-    ...HOME_STRINGS_EN.search,
-    objectiveLabel: "Matarah",
-    showAdvanced: "Hatzeg hagdarot mitkadmot",
-    hideAdvanced: "Haster hagdarot mitkadmot",
-    scopeLabel: "Tchum hitmachut",
-    ageGroupLabel: "Kvutzat metupal",
-    symptomLabel: "Simptom ikari",
-    durationLabel: "Meshech simptomim",
-    severityLabel: "Chomer",
-    redFlagsLabel: "Simanei azhara",
-    comorbidityLabel: "Reka shel comorbidity",
-    notesLabel: "He'arot kliniyot",
-    launchSecure: "Haratz sh'eilta meuvtachat",
+    secureModeHint:
+      "מצב מהיר: קלט קליני אנונימי בלבד. הגדרות מתקדמות הן אופציונליות.",
+    objectiveLabel: "מטרה",
+    showAdvanced: "הצג הגדרות מתקדמות",
+    hideAdvanced: "הסתר הגדרות מתקדמות",
+    scopeLabel: "תחום התמחות",
+    ageGroupLabel: "קבוצת מטופל",
+    symptomLabel: "תסמין עיקרי",
+    durationLabel: "משך התסמינים",
+    severityLabel: "חומרה",
+    redFlagsLabel: "דגלים אדומים",
+    comorbidityLabel: "רקע של תחלואה נלווית",
+    notesLabel: "הערות קליניות",
+    notesPlaceholder: "הערות קליניות אנונימיות (ללא מזהה מטופל)",
+    launchSecure: "הפעל שאילתה מאובטחת",
+    checkAttestation: "סמנו את ההצהרה",
+    attestationRequiredHint:
+      "חובה לפני שליחה: סמנו את ההצהרה למטה כדי להפעיל את הכפתור.",
+    attestationText:
+      "אני מאשר/ת שהקלט אנונימי ואינו כולל מזהה מטופל (שם, RAMQ, תאריך לידה, טלפון, אימייל, כתובת).",
+    privacyFooter:
+      "ClinIA אינה דורשת נתונים מזהים: אין להזין שם, RAMQ, טלפון, אימייל, תאריך לידה או כתובת.",
+    privacyConfirmRequired: "נא לאשר את הצהרת הפרטיות לפני השליחה.",
+    sensitiveDetected: "אזהרה: זוהה תוכן רגיש אפשרי",
+    voiceSensitiveDetected: "אזהרה: זוהה תוכן מוכתב שעשוי להיות רגיש",
+    blockedSensitive:
+      "הקלט נחסם: הסירו כל מידע אישי (שם, RAMQ, טלפון, אימייל) לפני ההמשך.",
+  },
+  options: {
+    objectives: ["טיפול התחלתי", "התאמת טיפול", "חלופה במקרה של אי-סבילות", "ניטור ומעקב"],
+    clinicalScopes: ["רפואה כללית", "קרדיולוגיה", "נוירולוגיה", "פסיכיאטריה", "גריאטריה"],
+    ageGroups: ["מבוגר", "ילדים", "גריאטרי", "הריון"],
+    symptomProfiles: [
+      "יתר לחץ דם",
+      "כאב כרוני",
+      "מיגרנה",
+      "חרדה",
+      "נדודי שינה",
+      "זיהום נשימתי",
+    ],
+    durations: ["< 24 שעות", "1-7 ימים", "1-4 שבועות", "> חודש"],
+    severityLevels: ["קל", "בינוני", "חמור"],
+    redFlagStatuses: ["ללא סימן אזהרה", "קיימים סימני אזהרה"],
+    comorbidityContexts: [
+      "ללא תחלואה נלווית משמעותית",
+      "אי-ספיקת כליות",
+      "אי-ספיקת כבד",
+      "סיכון קרדיו-וסקולרי גבוה",
+      "ריבוי תרופות",
+    ],
   },
 };
 

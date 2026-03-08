@@ -105,10 +105,10 @@ const DICTATION_PROMPT_BY_LANG: Record<string, string> = {
   de: "Bitte diktieren oder schreiben Sie Ihre Diagnose.",
   it: "Per favore, detti o scriva la sua diagnosi.",
   pt: "Por favor, dite ou escreva seu diagnostico.",
-  ja: "Shindan o onsei de nyuryoku suru ka, nyuryoku shite kudasai.",
+  ja: "音声で診断を入力するか、テキストで入力してください。",
   ko: "Jindaneul malhagena ibryeokhae juseyo.",
   zh: "Qing koushu huo shuru nin de zhenduan.",
-  he: "Please dictate or type your diagnosis.",
+  he: "נא להכתיב או להקליד את האבחנה שלך.",
 };
 
 const buildDictationPrompt = (localeCode: string) => {
