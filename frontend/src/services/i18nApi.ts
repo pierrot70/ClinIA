@@ -157,6 +157,17 @@ export async function translateHomeStrings(
       return buildFallbackResult(normalizedTarget);
     }
 
+    const apiResolvedLang =
+      typeof json?.meta?.lang === "string" ? json.meta.lang : normalizedTarget;
+    const apiResolvedBase = apiResolvedLang.toLowerCase().slice(0, 2);
+    const targetBase = normalizedTarget.slice(0, 2);
+
+    // If upstream reports another locale, keep UX stable by serving
+    // the local bundle for the requested target language.
+    if (apiResolvedBase && apiResolvedBase !== targetBase) {
+      return buildFallbackResult(normalizedTarget);
+    }
+
     return {
       strings: json.data as HomeStrings,
       voiceAck:
