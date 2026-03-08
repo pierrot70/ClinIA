@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import VoiceNavButton from "./VoiceNavButton";
+import { useHomeI18n } from "../contexts/HomeI18nContext";
 
 const Header: React.FC = () => {
     const location = useLocation();
+    const { locale, setLocaleFromDropdown, isTranslating } = useHomeI18n();
     const token = localStorage.getItem("clinia_admin_token");
     const FORCE_REAL_STORAGE_KEY = "clinia_force_real";
 
@@ -49,6 +51,22 @@ const Header: React.FC = () => {
     const isClinicGroupActive = clinicNavPaths.some((path) =>
         location.pathname.startsWith(path)
     );
+
+    const languageOptions = [
+        { value: "fr-CA", label: "Francais (Canada)" },
+        { value: "en-CA", label: "English (Canada)" },
+        { value: "ja", label: "Japonais" },
+        { value: "zh", label: "Chinois (Mandarin)" },
+        { value: "he", label: "Hebreu" },
+        { value: "es", label: "Espagnol" },
+    ];
+
+    const onLanguageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+        const nextLocale = event.target.value;
+        setLocaleFromDropdown(nextLocale).catch(() => {
+            // Keep current locale if translation request fails.
+        });
+    };
 
     const toggleForceReal = () => {
         const next = !forceReal;
@@ -118,6 +136,23 @@ const Header: React.FC = () => {
                 {/* ---------- NAVIGATION ---------- */}
                 <nav className="flex items-center gap-4 text-sm">
                     <VoiceNavButton />
+
+                    <label className="flex items-center gap-2 text-gray-600">
+                        <span className="text-xs">Langue</span>
+                        <select
+                            className="rounded border border-gray-300 bg-white px-2 py-1 text-xs"
+                            value={locale}
+                            onChange={onLanguageChange}
+                            disabled={isTranslating}
+                            aria-label="Choisir la langue"
+                        >
+                            {languageOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
 
                     <Link to="/" className={linkClass("/")}>
                         Accueil

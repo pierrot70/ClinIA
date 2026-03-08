@@ -23,7 +23,9 @@ const Home: React.FC = () => {
           </p>
           {isTranslating && (
             <p className="text-xs text-blue-700 bg-blue-50 border border-blue-100 inline-block px-3 py-1 rounded-full">
-              {locale === "en" ? "Translating interface..." : "Traduction de l'interface..."}
+              {locale.toLowerCase().startsWith("en")
+                ? "Translating interface..."
+                : "Traduction de l'interface..."}
             </p>
           )}
 

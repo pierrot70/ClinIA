@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   HOME_STRINGS_EN,
   HOME_STRINGS_FR,
@@ -17,10 +24,48 @@ type HomeI18nContextValue = {
   locale: Locale;
   strings: HomeStrings;
   isTranslating: boolean;
+  setLocaleFromDropdown: (target: Locale) => Promise<void>;
   setLocaleFromVoice: (target: Locale) => Promise<VoicePromptPayload>;
 };
 
 const HomeI18nContext = createContext<HomeI18nContextValue | null>(null);
+const UI_LOCALE_STORAGE_KEY = "clinia_ui_locale_v1";
+
+const SUPPORTED_UI_LOCALES = ["fr-CA", "en-CA", "ja", "zh", "he", "es"] as const;
+type SupportedUiLocale = (typeof SUPPORTED_UI_LOCALES)[number];
+
+const toSupportedUiLocale = (value: string): SupportedUiLocale => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) {
+    return "fr-CA";
+  }
+
+  if (normalized.startsWith("fr")) return "fr-CA";
+  if (normalized.startsWith("en")) return "en-CA";
+  if (normalized.startsWith("ja")) return "ja";
+  if (normalized.startsWith("zh")) return "zh";
+  if (normalized.startsWith("he") || normalized.startsWith("iw")) return "he";
+  if (normalized.startsWith("es")) return "es";
+  return "fr-CA";
+};
+
+const toBaseLang = (value: string) => toSupportedUiLocale(value).toLowerCase().slice(0, 2);
+
+const detectBrowserUiLocale = (): SupportedUiLocale => {
+  if (typeof navigator === "undefined") {
+    return "fr-CA";
+  }
+
+  const candidates = [navigator.language, ...(navigator.languages || [])].filter(Boolean);
+  for (const candidate of candidates) {
+    const mapped = toSupportedUiLocale(candidate);
+    if (mapped) {
+      return mapped;
+    }
+  }
+
+  return "fr-CA";
+};
 
 const cacheKeyForLocale = (locale: string) =>
   `clinia_home_i18n_${locale}_v1`;
@@ -69,33 +114,30 @@ const buildDictationPrompt = (localeCode: string) => {
 export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [locale, setLocale] = useState<Locale>("fr");
+  const [locale, setLocaleState] = useState<Locale>("fr-CA");
   const [strings, setStrings] = useState<HomeStrings>(HOME_STRINGS_FR);
   const [isTranslating, setIsTranslating] = useState(false);
 
-  const setLocaleFromVoice = async (target: Locale) => {
-    const normalizedTarget = (target || "fr").toLowerCase();
+  const setLocaleFromVoice = useCallback(async (target: Locale) => {
+    const normalizedTarget = toSupportedUiLocale(target);
+    const targetBase = toBaseLang(normalizedTarget);
 
-    if (!normalizedTarget || normalizedTarget === "fr") {
-      setLocale("fr");
+    if (!normalizedTarget || targetBase === "fr") {
+      setLocaleState("fr-CA");
       setStrings(HOME_STRINGS_FR);
+      try {
+        window.localStorage.setItem(UI_LOCALE_STORAGE_KEY, "fr-CA");
+      } catch (e) {}
       return {
         voiceAck: buildVoiceAck("fr"),
         dictationInstruction: buildDictationPrompt("fr"),
       };
     }
 
-    if (normalizedTarget === locale) {
-      return {
-        voiceAck: buildVoiceAck(normalizedTarget),
-        dictationInstruction: buildDictationPrompt(normalizedTarget),
-      };
-    }
-
     setIsTranslating(true);
     try {
       const cached = window.localStorage.getItem(
-        cacheKeyForLocale(normalizedTarget)
+        cacheKeyForLocale(targetBase)
       );
       if (cached) {
         const parsed = JSON.parse(cached) as
@@ -120,7 +162,6 @@ export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
           (parsed as { resolvedLang?: string })?.resolvedLang;
 
         const cachedBase = (cachedResolvedLang || "").toLowerCase().slice(0, 2);
-        const targetBase = normalizedTarget.slice(0, 2);
         const isFallbackEnglishUnderNonEnglishTarget =
           targetBase !== "en" &&
           JSON.stringify(cachedStrings) === JSON.stringify(HOME_STRINGS_EN);
@@ -129,24 +170,26 @@ export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
           (cachedBase && cachedBase !== targetBase) ||
           isFallbackEnglishUnderNonEnglishTarget
         ) {
-          window.localStorage.removeItem(cacheKeyForLocale(normalizedTarget));
+          window.localStorage.removeItem(cacheKeyForLocale(targetBase));
         } else {
           setStrings(cachedStrings);
-          setLocale(normalizedTarget);
+          setLocaleState(normalizedTarget);
+          try {
+            window.localStorage.setItem(UI_LOCALE_STORAGE_KEY, normalizedTarget);
+          } catch (e) {}
           return {
-            voiceAck: buildVoiceAck(normalizedTarget),
+            voiceAck: buildVoiceAck(targetBase),
             dictationInstruction:
-              cachedPrompt || buildDictationPrompt(normalizedTarget),
+              cachedPrompt || buildDictationPrompt(targetBase),
           };
         }
       }
 
-      const translated = await translateHomeStrings(normalizedTarget);
+      const translated = await translateHomeStrings(targetBase);
 
       const translatedBase = (translated.resolvedLang || "")
         .toLowerCase()
         .slice(0, 2);
-      const targetBase = normalizedTarget.slice(0, 2);
       const isMismatchedTranslation =
         translatedBase.length > 0 && translatedBase !== targetBase;
 
@@ -155,38 +198,92 @@ export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       setStrings(translated.strings);
-      setLocale(normalizedTarget);
+      setLocaleState(normalizedTarget);
       window.localStorage.setItem(
-        cacheKeyForLocale(normalizedTarget),
+        cacheKeyForLocale(targetBase),
         JSON.stringify({
           strings: translated.strings,
-          resolvedLang: translated.resolvedLang || normalizedTarget,
+          resolvedLang: translated.resolvedLang || targetBase,
           voicePrompts: translated.voicePrompts,
         })
       );
+      try {
+        window.localStorage.setItem(UI_LOCALE_STORAGE_KEY, normalizedTarget);
+      } catch (e) {}
       return {
-        voiceAck: translated.voiceAck || buildVoiceAck(normalizedTarget),
+        voiceAck: translated.voiceAck || buildVoiceAck(targetBase),
         dictationInstruction:
           translated.voicePrompts?.dictationInstruction ||
-          buildDictationPrompt(normalizedTarget),
+          buildDictationPrompt(targetBase),
       };
     } catch (err) {
-      setLocale("fr");
+      setLocaleState("fr-CA");
       setStrings(HOME_STRINGS_FR);
+      try {
+        window.localStorage.setItem(UI_LOCALE_STORAGE_KEY, "fr-CA");
+      } catch (e) {}
       throw err;
     } finally {
       setIsTranslating(false);
     }
-  };
+  }, []);
+
+  const setLocaleFromDropdown = useCallback(
+    async (target: Locale) => {
+      await setLocaleFromVoice(target);
+    },
+    [setLocaleFromVoice]
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const applyInitialLocale = async () => {
+      let initialLocale: SupportedUiLocale = "fr-CA";
+      try {
+        const stored = window.localStorage.getItem(UI_LOCALE_STORAGE_KEY);
+        if (stored) {
+          initialLocale = toSupportedUiLocale(stored);
+        } else {
+          initialLocale = detectBrowserUiLocale();
+        }
+      } catch (e) {
+        initialLocale = detectBrowserUiLocale();
+      }
+
+      if (!isMounted) return;
+      if (toBaseLang(initialLocale) === "fr") {
+        setLocaleState("fr-CA");
+        setStrings(HOME_STRINGS_FR);
+        try {
+          window.localStorage.setItem(UI_LOCALE_STORAGE_KEY, "fr-CA");
+        } catch (e) {}
+        return;
+      }
+
+      try {
+        await setLocaleFromVoice(initialLocale);
+      } catch (e) {
+        // Keep default FR fallback.
+      }
+    };
+
+    applyInitialLocale();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [setLocaleFromVoice]);
 
   const value = useMemo<HomeI18nContextValue>(
     () => ({
       locale,
       strings,
       isTranslating,
+      setLocaleFromDropdown,
       setLocaleFromVoice,
     }),
-    [locale, strings, isTranslating]
+    [locale, strings, isTranslating, setLocaleFromDropdown, setLocaleFromVoice]
   );
 
   return (
