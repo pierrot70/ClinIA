@@ -429,18 +429,24 @@ const pickBestVoiceForLang = (
         return null;
     }
 
-    const normalized = targetLang.toLowerCase();
+    const canonicalizeLang = (value: string) =>
+        String(value || "")
+            .toLowerCase()
+            .replace(/_/g, "-")
+            .trim();
+
+    const normalized = canonicalizeLang(targetLang);
     const base = normalized.slice(0, 2);
 
     const exact = voices.find(
-        (v) => String(v.lang || "").toLowerCase() === normalized
+        (v) => canonicalizeLang(v.lang || "") === normalized
     );
     if (exact) return exact;
 
     // Prefer Quebec/Canadian labeled voices when targeting fr-CA.
     if (normalized === "fr-ca") {
         const canadianFrench = voices.find((v) => {
-            const vLang = String(v.lang || "").toLowerCase();
+            const vLang = canonicalizeLang(v.lang || "");
             const vName = String(v.name || "").toLowerCase();
             return (
                 vLang.startsWith("fr-ca") ||
@@ -454,12 +460,24 @@ const pickBestVoiceForLang = (
     }
 
     const sameBase = voices.find((v) =>
-        String(v.lang || "").toLowerCase().startsWith(`${base}-`)
+        canonicalizeLang(v.lang || "").startsWith(`${base}-`)
     );
     if (sameBase) return sameBase;
 
+    if (base === "fr") {
+        const frenchByName = voices.find((v) => {
+            const vName = String(v.name || "").toLowerCase();
+            return (
+                vName.includes("french") ||
+                vName.includes("francais") ||
+                vName.includes("français")
+            );
+        });
+        if (frenchByName) return frenchByName;
+    }
+
     const looseBase = voices.find(
-        (v) => String(v.lang || "").toLowerCase().slice(0, 2) === base
+        (v) => canonicalizeLang(v.lang || "").slice(0, 2) === base
     );
     if (looseBase) return looseBase;
 
