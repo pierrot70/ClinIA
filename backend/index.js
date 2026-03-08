@@ -247,6 +247,23 @@ function buildTranslationCacheEntry({
     };
 }
 
+function isUntranslatedPayload(targetLang, payload, sourceStrings) {
+    if (!payload || !sourceStrings) {
+        return false;
+    }
+
+    const normalizedTarget = String(targetLang || "").toLowerCase().slice(0, 2);
+    if (normalizedTarget === "fr") {
+        return false;
+    }
+
+    try {
+        return JSON.stringify(payload) === JSON.stringify(sourceStrings);
+    } catch (e) {
+        return false;
+    }
+}
+
 function cacheTranslationInMemory({
     namespace,
     sourceHash,
@@ -547,6 +564,14 @@ app.post("/api/i18n/home-translate", async (req, res) => {
 
         const inMemory = translationMemoryCache.get(memoryKey);
         if (inMemory?.payload) {
+            if (isUntranslatedPayload(target, inMemory.payload, sourceStrings)) {
+                translationMemoryCache.delete(memoryKey);
+                console.warn("⚠️ I18N stale memory cache invalidated", {
+                    namespace,
+                    target,
+                    sourceHash,
+                });
+            } else {
             console.log("I18N_MEMORY_HIT", {
                 namespace,
                 target,
@@ -566,6 +591,7 @@ app.post("/api/i18n/home-translate", async (req, res) => {
                         : buildVoicePrompts(target),
                 },
             });
+            }
         }
 
         try {
@@ -576,6 +602,14 @@ app.post("/api/i18n/home-translate", async (req, res) => {
             }).lean();
 
             if (cached?.payload) {
+                if (isUntranslatedPayload(target, cached.payload, sourceStrings)) {
+                    console.warn("⚠️ I18N stale DB cache invalidated", {
+                        namespace,
+                        target,
+                        sourceHash,
+                    });
+                    await UiTranslationCache.deleteOne({ _id: cached._id });
+                } else {
                 const cachedVoicePrompts = hasVoicePromptsShape(cached.voicePrompts)
                     ? cached.voicePrompts
                     : buildVoicePrompts(target);
@@ -619,6 +653,7 @@ app.post("/api/i18n/home-translate", async (req, res) => {
                         voicePrompts: cachedVoicePrompts,
                     },
                 });
+                }
             }
         } catch (cacheReadErr) {
             console.warn("⚠️ I18N cache read failed", cacheReadErr?.message);
@@ -704,6 +739,12 @@ app.post("/api/i18n/home-translate", async (req, res) => {
                 throw error;
             }
 
+            if (isUntranslatedPayload(target, translated, sourceStrings)) {
+                const error = new Error("UPSTREAM_UNTRANSLATED");
+                error.code = "UPSTREAM_UNTRANSLATED";
+                throw error;
+            }
+
             const translatedVoicePrompts = hasVoicePromptsShape(translated.voicePrompts)
                 ? translated.voicePrompts
                 : buildVoicePrompts(target);
@@ -775,6 +816,16 @@ app.post("/api/i18n/home-translate", async (req, res) => {
                     error: {
                         code: "UPSTREAM_INVALID_SHAPE",
                         message: "Translated payload has invalid shape.",
+                        retryable: true,
+                    },
+                });
+            }
+
+            if (upstreamErr?.code === "UPSTREAM_UNTRANSLATED") {
+                return res.status(502).json({
+                    error: {
+                        code: "UPSTREAM_UNTRANSLATED",
+                        message: "Translation result was identical to source language.",
                         retryable: true,
                     },
                 });
