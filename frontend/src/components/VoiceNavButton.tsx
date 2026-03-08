@@ -82,6 +82,9 @@ const FORCE_FRENCH_KEYWORDS = [
     "法语",
     "法文",
     "フランス語",
+    "フランス",
+    "フレンチ",
+    "インフレンチ",
     "furansu",
 ];
 
