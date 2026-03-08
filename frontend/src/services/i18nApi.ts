@@ -37,7 +37,8 @@ const buildFallbackResult = (targetLang: string): HomeTranslationResult => {
   return {
     strings: HOME_STRINGS_EN,
     voiceAck: `Back in ${label}.`,
-    resolvedLang: normalized,
+    // Fallback UI bundle is English, regardless of requested target language.
+    resolvedLang: "en",
     voicePrompts: {
       dictationInstruction:
         DICTATION_PROMPT_BY_LANG[normalized] ||
