@@ -34,7 +34,7 @@ const DICTATION_PROMPT_BY_LANG: Record<string, string> = {
   en: "Please dictate or type your diagnosis.",
   es: "Por favor, dicte o escriba su diagnostico.",
   ja: "音声で診断を入力するか、テキストで入力してください。",
-  ko: "Jindaneul malhagena ibryeokhae juseyo.",
+  ko: "진단 내용을 음성으로 말하거나 텍스트로 입력해 주세요.",
   vi: "Vui long doc hoac nhap chan doan cua ban.",
   zh: "Qing koushu huo shuru nin de zhenduan.",
   he: "נא להכתיב או להקליד את האבחנה שלך.",

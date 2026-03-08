@@ -119,7 +119,7 @@ const DICTATION_PROMPT_BY_LANG: Record<string, string> = {
   it: "Per favore, detti o scriva la sua diagnosi.",
   pt: "Por favor, dite ou escreva seu diagnostico.",
   ja: "音声で診断を入力するか、テキストで入力してください。",
-  ko: "Jindaneul malhagena ibryeokhae juseyo.",
+  ko: "진단 내용을 음성으로 말하거나 텍스트로 입력해 주세요.",
   vi: "Vui long doc hoac nhap chan doan cua ban.",
   zh: "Qing koushu huo shuru nin de zhenduan.",
   he: "נא להכתיב או להקליד את האבחנה שלך.",
@@ -144,7 +144,7 @@ const LOCAL_HOME_STRINGS_BY_BASE: Record<string, HomeStrings> = {
 const getLocalHomeStrings = (baseLang: string): HomeStrings =>
   LOCAL_HOME_STRINGS_BY_BASE[baseLang] || HOME_STRINGS_EN;
 
-const LOCAL_SCRIPT_LOCK_LANGS = new Set(["he", "ja"]);
+const LOCAL_SCRIPT_LOCK_LANGS = new Set(["he", "ja", "ko"]);
 
 export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
