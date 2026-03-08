@@ -44,6 +44,13 @@ const LANGUAGE_ALIASES: Record<string, string> = {
     chinoismandarin: "zh",
     mandarin: "zh",
     chinese: "zh",
+    espagnol: "es",
+    espanol: "es",
+    español: "es",
+    spanish: "es",
+    castillan: "es",
+    castellano: "es",
+    es: "es",
     // Native scripts
     日本語: "ja",
     中文: "zh",

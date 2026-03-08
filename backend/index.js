@@ -8,6 +8,7 @@ import OpenAI from "openai";
 import { safeParseMedicalAI } from "./utils/aiParser.js";
 import { getMockForDiagnosis } from "./utils/mockLoader.js";
 import { DiagnosisResult } from "./models/DiagnosisResult.js";
+import { UiTranslationCache } from "./models/UiTranslationCache.js";
 
 import {
     canCallOpenAI,
@@ -56,6 +57,13 @@ function makeFingerprint({ diagnosis, patient }) {
     return crypto
         .createHash("sha256")
         .update(JSON.stringify({ diagnosis, patient }))
+        .digest("hex");
+}
+
+function makeSourceHash(sourceStrings) {
+    return crypto
+        .createHash("sha256")
+        .update(JSON.stringify(sourceStrings))
         .digest("hex");
 }
 
@@ -332,6 +340,7 @@ app.post("/api/ai/analyze", async (req, res) => {
 app.post("/api/i18n/home-translate", async (req, res) => {
     try {
         const { targetLang, sourceStrings } = req.body ?? {};
+        const namespace = "home";
 
         const target =
             typeof targetLang === "string"
@@ -365,6 +374,40 @@ app.post("/api/i18n/home-translate", async (req, res) => {
                 meta: { source: "passthrough", lang: "fr" },
             });
         }
+
+        const sourceHash = makeSourceHash(sourceStrings);
+
+        try {
+            const cached = await UiTranslationCache.findOne({
+                namespace,
+                targetLang: target,
+                sourceHash,
+            }).lean();
+
+            if (cached?.payload) {
+                console.log("I18N_CACHE_HIT", {
+                    namespace,
+                    target,
+                    sourceHash,
+                });
+                return res.json({
+                    data: cached.payload,
+                    meta: {
+                        source: "cache",
+                        lang: target,
+                        model: cached.model ?? "cache",
+                    },
+                });
+            }
+        } catch (cacheReadErr) {
+            console.warn("⚠️ I18N cache read failed", cacheReadErr?.message);
+        }
+
+        console.log("I18N_CACHE_MISS", {
+            namespace,
+            target,
+            sourceHash,
+        });
 
         const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
         const systemPrompt =
@@ -424,6 +467,23 @@ app.post("/api/i18n/home-translate", async (req, res) => {
                     retryable: true,
                 },
             });
+        }
+
+        try {
+            await UiTranslationCache.create({
+                namespace,
+                sourceLocale: "fr",
+                targetLang: target,
+                sourceHash,
+                payload: translated,
+                model,
+            });
+        } catch (cacheWriteErr) {
+            if (cacheWriteErr?.code === 11000) {
+                // Another concurrent request wrote it first; harmless.
+            } else {
+                console.warn("⚠️ I18N cache write failed", cacheWriteErr?.message);
+            }
         }
 
         return res.json({
