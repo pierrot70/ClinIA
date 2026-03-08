@@ -131,6 +131,16 @@ const detectLocaleFromTranscript = (transcript: string): string | null => {
     const compactRawLower = rawLower.replace(/\s+/g, "");
     const compactNormalized = normalized.replace(/\s+/g, "");
 
+    // Cross-script safety net: if transcript clearly mentions French,
+    // always switch back to FR regardless of active recognition locale.
+    const mentionsFrenchInAnyScript =
+        /(?:french|francais|français|\bfr\b|フランス語|フランス|フレンチ|フランチ|ふらんす|ふれんち|法语|法文|仏語|佛語)/i.test(
+            raw
+        ) || /(?:french|francais|\bfr\b)/i.test(normalized);
+    if (mentionsFrenchInAnyScript) {
+        return "fr";
+    }
+
     // Japanese STT frequently outputs katakana for "in/en french".
     // Accept forms like "イン フレンチ" and "エン フランス語".
     const japaneseForceFrenchPattern =
