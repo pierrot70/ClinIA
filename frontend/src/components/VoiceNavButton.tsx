@@ -68,12 +68,21 @@ const FORCE_FRENCH_KEYWORDS = [
     "francais",
     "français",
     "french",
+    "in french",
+    "en french",
+    "french language",
+    "language french",
     "retour francais",
     "retour français",
     "back to french",
     "reset french",
+    "switch to french",
+    "set french",
+    "france",
     "法语",
     "法文",
+    "フランス語",
+    "furansu",
 ];
 
 const hasAliasAsWholeWord = (normalizedTextValue: string, alias: string) => {
