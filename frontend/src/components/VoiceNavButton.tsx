@@ -48,6 +48,9 @@ const LANGUAGE_ALIASES: Record<string, string> = {
     espanol: "es",
     español: "es",
     spanish: "es",
+    hebreu: "he",
+    hébreu: "he",
+    hebrew: "he",
     castillan: "es",
     castellano: "es",
     // Native scripts
@@ -55,6 +58,7 @@ const LANGUAGE_ALIASES: Record<string, string> = {
     中文: "zh",
     漢語: "zh",
     汉语: "zh",
+    עברית: "he",
     法语: "fr",
     法文: "fr",
     deutschsprache: "de",

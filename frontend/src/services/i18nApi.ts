@@ -6,6 +6,42 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 
+const VOICE_ACK_LABELS: Record<string, string> = {
+  en: "english",
+  es: "spanish",
+  de: "german",
+  it: "italian",
+  pt: "portuguese",
+  ja: "japanese",
+  ko: "korean",
+  zh: "chinese",
+  ar: "arabic",
+  he: "hebrew",
+  ru: "russian",
+};
+
+const DICTATION_PROMPT_BY_LANG: Record<string, string> = {
+  en: "Please dictate or type your diagnosis.",
+  es: "Por favor, dicte o escriba su diagnostico.",
+  ja: "Shindan o onsei de nyuryoku suru ka, nyuryoku shite kudasai.",
+  zh: "Qing koushu huo shuru nin de zhenduan.",
+  he: "Please dictate or type your diagnosis.",
+};
+
+const buildFallbackResult = (targetLang: string): HomeTranslationResult => {
+  const normalized = (targetLang || "en").toLowerCase().slice(0, 2);
+  const label = VOICE_ACK_LABELS[normalized] || normalized;
+  return {
+    strings: HOME_STRINGS_EN,
+    voiceAck: `Back in ${label}.`,
+    voicePrompts: {
+      dictationInstruction:
+        DICTATION_PROMPT_BY_LANG[normalized] ||
+        DICTATION_PROMPT_BY_LANG.en,
+    },
+  };
+};
+
 export type HomeTranslationResult = {
   strings: HomeStrings;
   voiceAck?: string;
@@ -17,6 +53,8 @@ export type HomeTranslationResult = {
 export async function translateHomeStrings(
   targetLang: string
 ): Promise<HomeTranslationResult> {
+  const normalizedTarget = (targetLang || "").toLowerCase();
+
   if (targetLang === "fr") {
     return {
       strings: HOME_STRINGS_FR,
@@ -27,7 +65,7 @@ export async function translateHomeStrings(
     };
   }
 
-  if (targetLang === "en") {
+  if (normalizedTarget === "en") {
     try {
       const response = await fetch(`${API_URL}/api/i18n/home-translate`, {
         method: "POST",
@@ -63,41 +101,42 @@ export async function translateHomeStrings(
       // Ignore remote failure: local EN fallback below keeps voice command reliable in prod.
     }
 
-    return {
-      strings: HOME_STRINGS_EN,
-      voiceAck: "Back in english.",
-      voicePrompts: {
-        dictationInstruction: "Please dictate or type your diagnosis.",
+    return buildFallbackResult("en");
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/api/i18n/home-translate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        targetLang,
+        sourceStrings: HOME_STRINGS_FR,
+      }),
+    });
+
+    if (!response.ok) {
+      return buildFallbackResult(normalizedTarget);
+    }
+
+    const json = await response.json();
+    if (!json?.data) {
+      return buildFallbackResult(normalizedTarget);
+    }
+
+    return {
+      strings: json.data as HomeStrings,
+      voiceAck:
+        typeof json?.meta?.voiceAck === "string"
+          ? json.meta.voiceAck
+          : buildFallbackResult(normalizedTarget).voiceAck,
+      voicePrompts:
+        typeof json?.meta?.voicePrompts?.dictationInstruction === "string"
+          ? { dictationInstruction: json.meta.voicePrompts.dictationInstruction }
+          : buildFallbackResult(normalizedTarget).voicePrompts,
     };
+  } catch (e) {
+    return buildFallbackResult(normalizedTarget);
   }
-
-  const response = await fetch(`${API_URL}/api/i18n/home-translate`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      targetLang,
-      sourceStrings: HOME_STRINGS_FR,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Translation request failed with ${response.status}`);
-  }
-
-  const json = await response.json();
-  if (!json?.data) {
-    throw new Error("Invalid translation payload");
-  }
-
-  return {
-    strings: json.data as HomeStrings,
-    voiceAck: typeof json?.meta?.voiceAck === "string" ? json.meta.voiceAck : undefined,
-    voicePrompts:
-      typeof json?.meta?.voicePrompts?.dictationInstruction === "string"
-        ? { dictationInstruction: json.meta.voicePrompts.dictationInstruction }
-        : undefined,
-  };
 }

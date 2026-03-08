@@ -54,6 +54,7 @@ const DICTATION_PROMPT_BY_LANG: Record<string, string> = {
   ja: "Shindan o onsei de nyuryoku suru ka, nyuryoku shite kudasai.",
   ko: "Jindaneul malhagena ibryeokhae juseyo.",
   zh: "Qing koushu huo shuru nin de zhenduan.",
+  he: "Please dictate or type your diagnosis.",
 };
 
 const buildDictationPrompt = (localeCode: string) => {
