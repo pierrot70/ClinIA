@@ -27,6 +27,14 @@ const UiTranslationCacheSchema = new mongoose.Schema(
             type: Object,
             required: true,
         },
+        voiceAck: {
+            type: String,
+            default: "",
+        },
+        voicePrompts: {
+            type: Object,
+            default: {},
+        },
         model: {
             type: String,
             default: "unknown",

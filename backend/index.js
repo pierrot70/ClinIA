@@ -142,6 +142,164 @@ function hasHomeI18nShape(obj) {
     );
 }
 
+const VOICE_PROMPTS_SOURCE_FR = {
+    dictationInstruction: "Dites ou ecrivez votre diagnostic.",
+};
+
+const DICTATION_PROMPT_BY_LANG = {
+    fr: "Dites ou ecrivez votre diagnostic.",
+    en: "Please dictate or type your diagnosis.",
+    es: "Por favor, dicte o escriba su diagnostico.",
+    de: "Bitte diktieren oder schreiben Sie Ihre Diagnose.",
+    it: "Per favore, detti o scriva la sua diagnosi.",
+    pt: "Por favor, dite ou escreva seu diagnostico.",
+    ja: "Shindan o onsei de nyuryoku suru ka, nyuryoku shite kudasai.",
+    ko: "Jindaneul malhagena ibryeokhae juseyo.",
+    zh: "Qing koushu huo shuru nin de zhenduan.",
+};
+
+function buildVoicePrompts(langCode) {
+    const normalized = String(langCode || "fr")
+        .trim()
+        .toLowerCase()
+        .slice(0, 2);
+
+    return {
+        dictationInstruction:
+            DICTATION_PROMPT_BY_LANG[normalized] ||
+            DICTATION_PROMPT_BY_LANG.en,
+    };
+}
+
+function hasVoicePromptsShape(obj) {
+    return (
+        obj &&
+        typeof obj === "object" &&
+        typeof obj.dictationInstruction === "string" &&
+        obj.dictationInstruction.trim().length > 0
+    );
+}
+
+const VOICE_ACK_LABELS = {
+    en: "english",
+    es: "spanish",
+    de: "german",
+    it: "italian",
+    pt: "portuguese",
+    ja: "japanese",
+    ko: "korean",
+    zh: "chinese",
+    ar: "arabic",
+    ru: "russian",
+    hi: "hindi",
+    tr: "turkish",
+    nl: "dutch",
+    sv: "swedish",
+    no: "norwegian",
+    da: "danish",
+    fi: "finnish",
+    pl: "polish",
+    cs: "czech",
+    ro: "romanian",
+    el: "greek",
+    he: "hebrew",
+    id: "indonesian",
+    vi: "vietnamese",
+    th: "thai",
+};
+
+function buildVoiceAck(langCode) {
+    const normalized = String(langCode || "fr")
+        .trim()
+        .toLowerCase()
+        .slice(0, 2);
+
+    if (normalized === "fr") {
+        return "Retour en francais.";
+    }
+
+    const label = VOICE_ACK_LABELS[normalized] || normalized;
+    return `Back in ${label}.`;
+}
+
+const translationMemoryCache = new Map();
+const translationInFlightLocks = new Map();
+
+function makeTranslationCacheKey({ namespace, targetLang, sourceHash }) {
+    return `${namespace}::${targetLang}::${sourceHash}`;
+}
+
+function buildTranslationCacheEntry({
+    payload,
+    model,
+    targetLang,
+    voiceAck,
+    voicePrompts,
+}) {
+    return {
+        payload,
+        model: model || "cache",
+        targetLang,
+        voiceAck: voiceAck || buildVoiceAck(targetLang),
+        voicePrompts: hasVoicePromptsShape(voicePrompts)
+            ? voicePrompts
+            : buildVoicePrompts(targetLang),
+    };
+}
+
+function cacheTranslationInMemory({
+    namespace,
+    sourceHash,
+    targetLang,
+    payload,
+    model,
+    voiceAck,
+    voicePrompts,
+}) {
+    const key = makeTranslationCacheKey({
+        namespace,
+        targetLang,
+        sourceHash,
+    });
+
+    translationMemoryCache.set(
+        key,
+        buildTranslationCacheEntry({
+            payload,
+            model,
+            targetLang,
+            voiceAck,
+            voicePrompts,
+        })
+    );
+}
+
+async function warmTranslationMemoryCache() {
+    const docs = await UiTranslationCache.find({
+        namespace: "home",
+    }).lean();
+
+    let warmed = 0;
+    for (const doc of docs) {
+        if (!doc?.sourceHash || !doc?.targetLang || !doc?.payload) {
+            continue;
+        }
+
+        cacheTranslationInMemory({
+            namespace: doc.namespace || "home",
+            sourceHash: doc.sourceHash,
+            targetLang: doc.targetLang,
+            payload: doc.payload,
+            model: doc.model,
+            voiceAck: doc.voiceAck,
+            voicePrompts: doc.voicePrompts,
+        });
+        warmed += 1;
+    }
+
+    console.log(`[i18n] memory cache warmed with ${warmed} entries`);
+}
+
 async function persistOrReuseDiagnosis(payload) {
     try {
         const created = await DiagnosisResult.create(payload);
@@ -371,11 +529,44 @@ app.post("/api/i18n/home-translate", async (req, res) => {
         if (target === "fr") {
             return res.json({
                 data: sourceStrings,
-                meta: { source: "passthrough", lang: "fr" },
+                meta: {
+                    source: "passthrough",
+                    lang: "fr",
+                    voiceAck: buildVoiceAck("fr"),
+                    voicePrompts: buildVoicePrompts("fr"),
+                },
             });
         }
 
         const sourceHash = makeSourceHash(sourceStrings);
+        const memoryKey = makeTranslationCacheKey({
+            namespace,
+            targetLang: target,
+            sourceHash,
+        });
+
+        const inMemory = translationMemoryCache.get(memoryKey);
+        if (inMemory?.payload) {
+            console.log("I18N_MEMORY_HIT", {
+                namespace,
+                target,
+                sourceHash,
+            });
+            return res.json({
+                data: inMemory.payload,
+                meta: {
+                    source: "memory",
+                    lang: target,
+                    model: inMemory.model || "memory-cache",
+                    voiceAck:
+                        inMemory.voiceAck ||
+                        buildVoiceAck(target),
+                    voicePrompts: hasVoicePromptsShape(inMemory.voicePrompts)
+                        ? inMemory.voicePrompts
+                        : buildVoicePrompts(target),
+                },
+            });
+        }
 
         try {
             const cached = await UiTranslationCache.findOne({
@@ -385,17 +576,47 @@ app.post("/api/i18n/home-translate", async (req, res) => {
             }).lean();
 
             if (cached?.payload) {
+                const cachedVoicePrompts = hasVoicePromptsShape(cached.voicePrompts)
+                    ? cached.voicePrompts
+                    : buildVoicePrompts(target);
+
+                const cachedVoiceAck =
+                    cached.voiceAck ||
+                    buildVoiceAck(target);
+
+                if (!hasVoicePromptsShape(cached.voicePrompts)) {
+                    UiTranslationCache.updateOne(
+                        { _id: cached._id },
+                        { $set: { voicePrompts: cachedVoicePrompts } }
+                    ).catch((err) => {
+                        console.warn("⚠️ I18N cache backfill failed", err?.message);
+                    });
+                }
+
                 console.log("I18N_CACHE_HIT", {
                     namespace,
                     target,
                     sourceHash,
                 });
+
+                cacheTranslationInMemory({
+                    namespace,
+                    sourceHash,
+                    targetLang: target,
+                    payload: cached.payload,
+                    model: cached.model ?? "cache",
+                    voiceAck: cachedVoiceAck,
+                    voicePrompts: cachedVoicePrompts,
+                });
+
                 return res.json({
                     data: cached.payload,
                     meta: {
                         source: "cache",
                         lang: target,
                         model: cached.model ?? "cache",
+                        voiceAck: cachedVoiceAck,
+                        voicePrompts: cachedVoicePrompts,
                     },
                 });
             }
@@ -421,10 +642,11 @@ app.post("/api/i18n/home-translate", async (req, res) => {
             constraints: [
                 "Preserve JSON keys exactly",
                 "Keep arrays lengths and order",
-                "No extra keys",
+                "Return voicePrompts with the same keys",
                 "Output strictly valid JSON object",
             ],
             sourceStrings,
+            voicePrompts: VOICE_PROMPTS_SOURCE_FR,
         };
 
         const baseRequest = {
@@ -443,53 +665,127 @@ app.post("/api/i18n/home-translate", async (req, res) => {
             }
             : baseRequest;
 
-        const completion = await openai.chat.completions.create(request);
-        const content = completion?.choices?.[0]?.message?.content ?? "{}";
-
-        let translated;
-        try {
-            translated = JSON.parse(content);
-        } catch (e) {
-            return res.status(502).json({
-                error: {
-                    code: "UPSTREAM_INVALID_JSON",
-                    message: "OpenAI returned invalid JSON for translation.",
-                    retryable: true,
-                },
-            });
-        }
-
-        if (!hasHomeI18nShape(translated)) {
-            return res.status(502).json({
-                error: {
-                    code: "UPSTREAM_INVALID_SHAPE",
-                    message: "Translated payload has invalid shape.",
-                    retryable: true,
-                },
-            });
-        }
-
-        try {
-            await UiTranslationCache.create({
+        const inFlight = translationInFlightLocks.get(memoryKey);
+        if (inFlight) {
+            console.log("I18N_LOCK_WAIT", {
                 namespace,
-                sourceLocale: "fr",
-                targetLang: target,
+                target,
                 sourceHash,
+            });
+            const sharedResult = await inFlight;
+            return res.json({
+                data: sharedResult.payload,
+                meta: {
+                    source: "lock",
+                    model: sharedResult.model,
+                    lang: target,
+                    voiceAck: sharedResult.voiceAck,
+                    voicePrompts: sharedResult.voicePrompts,
+                },
+            });
+        }
+
+        const translatePromise = (async () => {
+            const completion = await openai.chat.completions.create(request);
+            const content = completion?.choices?.[0]?.message?.content ?? "{}";
+
+            let translated;
+            try {
+                translated = JSON.parse(content);
+            } catch (e) {
+                const error = new Error("UPSTREAM_INVALID_JSON");
+                error.code = "UPSTREAM_INVALID_JSON";
+                throw error;
+            }
+
+            if (!hasHomeI18nShape(translated)) {
+                const error = new Error("UPSTREAM_INVALID_SHAPE");
+                error.code = "UPSTREAM_INVALID_SHAPE";
+                throw error;
+            }
+
+            const translatedVoicePrompts = hasVoicePromptsShape(translated.voicePrompts)
+                ? translated.voicePrompts
+                : buildVoicePrompts(target);
+            const voiceAck = buildVoiceAck(target);
+
+            try {
+                await UiTranslationCache.create({
+                    namespace,
+                    sourceLocale: "fr",
+                    targetLang: target,
+                    sourceHash,
+                    payload: translated,
+                    voiceAck,
+                    voicePrompts: translatedVoicePrompts,
+                    model,
+                });
+            } catch (cacheWriteErr) {
+                if (cacheWriteErr?.code === 11000) {
+                    // Another concurrent request wrote it first; harmless.
+                } else {
+                    console.warn("⚠️ I18N cache write failed", cacheWriteErr?.message);
+                }
+            }
+
+            cacheTranslationInMemory({
+                namespace,
+                sourceHash,
+                targetLang: target,
                 payload: translated,
                 model,
+                voiceAck,
+                voicePrompts: translatedVoicePrompts,
             });
-        } catch (cacheWriteErr) {
-            if (cacheWriteErr?.code === 11000) {
-                // Another concurrent request wrote it first; harmless.
-            } else {
-                console.warn("⚠️ I18N cache write failed", cacheWriteErr?.message);
+
+            return {
+                payload: translated,
+                model,
+                voiceAck,
+                voicePrompts: translatedVoicePrompts,
+            };
+        })();
+
+        translationInFlightLocks.set(memoryKey, translatePromise);
+        try {
+            const translatedResult = await translatePromise;
+            return res.json({
+                data: translatedResult.payload,
+                meta: {
+                    source: "openai",
+                    model: translatedResult.model,
+                    lang: target,
+                    voiceAck: translatedResult.voiceAck,
+                    voicePrompts: translatedResult.voicePrompts,
+                },
+            });
+        } catch (upstreamErr) {
+            if (upstreamErr?.code === "UPSTREAM_INVALID_JSON") {
+                return res.status(502).json({
+                    error: {
+                        code: "UPSTREAM_INVALID_JSON",
+                        message: "OpenAI returned invalid JSON for translation.",
+                        retryable: true,
+                    },
+                });
+            }
+
+            if (upstreamErr?.code === "UPSTREAM_INVALID_SHAPE") {
+                return res.status(502).json({
+                    error: {
+                        code: "UPSTREAM_INVALID_SHAPE",
+                        message: "Translated payload has invalid shape.",
+                        retryable: true,
+                    },
+                });
+            }
+
+            throw upstreamErr;
+        } finally {
+            if (translationInFlightLocks.get(memoryKey) === translatePromise) {
+                translationInFlightLocks.delete(memoryKey);
             }
         }
-
-        return res.json({
-            data: translated,
-            meta: { source: "openai", model, lang: target },
-        });
     } catch (err) {
         console.error("🔥 /api/i18n/home-translate ERROR", err);
         return res.status(500).json({
@@ -510,7 +806,7 @@ mongoose
     .connect(process.env.MONGO_URI, {
         serverSelectionTimeoutMS: 2000, // ⏱️ max 2 secondes si Mongo est down
     })
-    .then(() => {
+    .then(async () => {
         console.log("✅ MongoDB connecté (ClinIA)");
         console.log(
             "CLINIA_MOCK_AI =",
@@ -520,6 +816,12 @@ mongoose
             "OPENAI_MODEL =",
             process.env.OPENAI_MODEL
         );
+
+        try {
+            await warmTranslationMemoryCache();
+        } catch (err) {
+            console.warn("⚠️ I18N warmup failed", err?.message);
+        }
     })
     .catch((err) => {
         console.error("❌ Mongo connection error (FAIL-FAST):", err.message);

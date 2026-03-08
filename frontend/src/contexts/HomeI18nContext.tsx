@@ -4,17 +4,62 @@ import { translateHomeStrings } from "../services/i18nApi";
 
 type Locale = string;
 
+type VoicePromptPayload = {
+  voiceAck: string;
+  dictationInstruction: string;
+};
+
 type HomeI18nContextValue = {
   locale: Locale;
   strings: HomeStrings;
   isTranslating: boolean;
-  setLocaleFromVoice: (target: Locale) => Promise<void>;
+  setLocaleFromVoice: (target: Locale) => Promise<VoicePromptPayload>;
 };
 
 const HomeI18nContext = createContext<HomeI18nContextValue | null>(null);
 
 const cacheKeyForLocale = (locale: string) =>
   `clinia_home_i18n_${locale}_v1`;
+
+const VOICE_ACK_LABELS: Record<string, string> = {
+  en: "english",
+  es: "spanish",
+  de: "german",
+  it: "italian",
+  pt: "portuguese",
+  ja: "japanese",
+  ko: "korean",
+  zh: "chinese",
+  ar: "arabic",
+  ru: "russian",
+};
+
+const buildVoiceAck = (localeCode: string) => {
+  const normalized = (localeCode || "fr").toLowerCase().slice(0, 2);
+  if (normalized === "fr") {
+    return "Retour en francais.";
+  }
+
+  const label = VOICE_ACK_LABELS[normalized] || normalized;
+  return `Back in ${label}.`;
+};
+
+const DICTATION_PROMPT_BY_LANG: Record<string, string> = {
+  fr: "Dites ou ecrivez votre diagnostic.",
+  en: "Please dictate or type your diagnosis.",
+  es: "Por favor, dicte o escriba su diagnostico.",
+  de: "Bitte diktieren oder schreiben Sie Ihre Diagnose.",
+  it: "Per favore, detti o scriva la sua diagnosi.",
+  pt: "Por favor, dite ou escreva seu diagnostico.",
+  ja: "Shindan o onsei de nyuryoku suru ka, nyuryoku shite kudasai.",
+  ko: "Jindaneul malhagena ibryeokhae juseyo.",
+  zh: "Qing koushu huo shuru nin de zhenduan.",
+};
+
+const buildDictationPrompt = (localeCode: string) => {
+  const normalized = (localeCode || "fr").toLowerCase().slice(0, 2);
+  return DICTATION_PROMPT_BY_LANG[normalized] || DICTATION_PROMPT_BY_LANG.en;
+};
 
 export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -29,11 +74,17 @@ export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!normalizedTarget || normalizedTarget === "fr") {
       setLocale("fr");
       setStrings(HOME_STRINGS_FR);
-      return;
+      return {
+        voiceAck: buildVoiceAck("fr"),
+        dictationInstruction: buildDictationPrompt("fr"),
+      };
     }
 
     if (normalizedTarget === locale) {
-      return;
+      return {
+        voiceAck: buildVoiceAck(normalizedTarget),
+        dictationInstruction: buildDictationPrompt(normalizedTarget),
+      };
     }
 
     setIsTranslating(true);
@@ -42,19 +93,48 @@ export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
         cacheKeyForLocale(normalizedTarget)
       );
       if (cached) {
-        const parsed = JSON.parse(cached) as HomeStrings;
-        setStrings(parsed);
+        const parsed = JSON.parse(cached) as
+          | HomeStrings
+          | {
+              strings: HomeStrings;
+              voicePrompts?: {
+                dictationInstruction?: string;
+              };
+            };
+
+        const cachedStrings =
+          (parsed as { strings?: HomeStrings }).strings ||
+          (parsed as HomeStrings);
+
+        const cachedPrompt =
+          (parsed as { voicePrompts?: { dictationInstruction?: string } })
+            ?.voicePrompts?.dictationInstruction;
+
+        setStrings(cachedStrings);
         setLocale(normalizedTarget);
-        return;
+        return {
+          voiceAck: buildVoiceAck(normalizedTarget),
+          dictationInstruction:
+            cachedPrompt || buildDictationPrompt(normalizedTarget),
+        };
       }
 
       const translated = await translateHomeStrings(normalizedTarget);
-      setStrings(translated);
+      setStrings(translated.strings);
       setLocale(normalizedTarget);
       window.localStorage.setItem(
         cacheKeyForLocale(normalizedTarget),
-        JSON.stringify(translated)
+        JSON.stringify({
+          strings: translated.strings,
+          voicePrompts: translated.voicePrompts,
+        })
       );
+      return {
+        voiceAck: translated.voiceAck || buildVoiceAck(normalizedTarget),
+        dictationInstruction:
+          translated.voicePrompts?.dictationInstruction ||
+          buildDictationPrompt(normalizedTarget),
+      };
     } catch (err) {
       setLocale("fr");
       setStrings(HOME_STRINGS_FR);

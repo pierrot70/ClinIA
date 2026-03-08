@@ -50,13 +50,41 @@ const LANGUAGE_ALIASES: Record<string, string> = {
     spanish: "es",
     castillan: "es",
     castellano: "es",
-    es: "es",
     // Native scripts
     日本語: "ja",
     中文: "zh",
     漢語: "zh",
     汉语: "zh",
+    法语: "fr",
+    法文: "fr",
     deutschsprache: "de",
+};
+
+const FORCE_FRENCH_KEYWORDS = [
+    "francais",
+    "français",
+    "french",
+    "retour francais",
+    "retour français",
+    "back to french",
+    "reset french",
+    "法语",
+    "法文",
+];
+
+const hasAliasAsWholeWord = (normalizedTextValue: string, alias: string) => {
+    const aliasNormalized = normalizeText(alias);
+    if (!aliasNormalized) {
+        return false;
+    }
+
+    if (aliasNormalized.length <= 2) {
+        return normalizedTextValue === aliasNormalized;
+    }
+
+    const escaped = aliasNormalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(^|\\s)${escaped}(\\s|$)`);
+    return re.test(normalizedTextValue);
 };
 
 const detectLocaleFromTranscript = (transcript: string): string | null => {
@@ -68,26 +96,63 @@ const detectLocaleFromTranscript = (transcript: string): string | null => {
     const rawLower = raw.toLowerCase();
     const normalized = normalizeText(rawLower);
 
-    // Direct aliases first
-    for (const [alias, code] of Object.entries(LANGUAGE_ALIASES)) {
-        if (
-            rawLower.includes(alias.toLowerCase()) ||
-            normalized.includes(normalizeText(alias))
-        ) {
-            return code;
+    // Emergency fallback: allow simple keywords to force French from any locale.
+    const forceFrench = FORCE_FRENCH_KEYWORDS.some((keyword) => {
+        const kLower = keyword.toLowerCase();
+        if (/[\u4e00-\u9fff]/.test(kLower)) {
+            return rawLower.includes(kLower);
         }
+
+        const normalizedKeyword = normalizeText(kLower);
+        return (
+            rawLower.includes(kLower) ||
+            (normalizedKeyword.length > 0 &&
+                normalized.includes(normalizedKeyword))
+        );
+    });
+
+    if (forceFrench) {
+        return "fr";
     }
 
-    // Pattern: "en <langue>" / "in <language>"
-    const match = normalized.match(/\b(?:en|in)\s+([a-z\-]+)\b/);
-    if (match?.[1]) {
-        const token = match[1];
+    // Pattern: explicit command first ("en <langue>" / "in <language>")
+    const explicitMatch = normalized.match(/\b(?:en|in)\s+([a-z\-]+)\b/);
+    if (explicitMatch?.[1]) {
+        const token = explicitMatch[1];
         const code = LANGUAGE_ALIASES[token];
         if (code) {
             return code;
         }
         // Explicit language request but unknown target: fallback to French.
         return "fr";
+    }
+
+    // Allow short direct language names only when transcript is short,
+    // so medical dictation text does not trigger locale switches by accident.
+    const tokens = normalized.split(" ").filter(Boolean);
+    const isShortUtterance = tokens.length > 0 && tokens.length <= 2;
+    if (!isShortUtterance) {
+        return null;
+    }
+
+    // Direct aliases first
+    for (const [alias, code] of Object.entries(LANGUAGE_ALIASES)) {
+        const aliasLower = alias.toLowerCase();
+
+        // Non-latin aliases are matched exactly on short utterances.
+        if (/[^\x00-\x7F]/.test(aliasLower)) {
+            if (rawLower === aliasLower) {
+                return code;
+            }
+            continue;
+        }
+
+        if (
+            rawLower === aliasLower ||
+            hasAliasAsWholeWord(normalized, alias)
+        ) {
+            return code;
+        }
     }
 
     return null;
@@ -144,7 +209,14 @@ const ACTION_COMMANDS: ActionCommand[] = [
     {
         label: "Dictee",
         action: "dictation",
-        keywords: ["dictee", "dicte", "dicter", "diagnostic"],
+        keywords: [
+            "dictee",
+            "dicte",
+            "dicter",
+            "diagnostic",
+            "dictation",
+            "diagnosis",
+        ],
         response: "Dites votre diagnostic.",
     },
     {
@@ -159,6 +231,9 @@ const ACTION_COMMANDS: ActionCommand[] = [
             "lancer la requete",
             "lancer requête",
             "lancer la requête",
+            "run query",
+            "launch query",
+            "search",
         ],
         response: "Recherche lancee.",
     },
@@ -175,21 +250,222 @@ const ACTION_COMMANDS: ActionCommand[] = [
             "nouveau diagnostique",
             "nouveau diagnostik",
             "nouveau diag",
+            "new diagnosis",
+            "new diagnostic",
+            "new diagnose",
+            "new des annonces",
+            "clear diagnosis",
+            "reset diagnosis",
+            "start over",
         ],
         response: "Diagnostic efface.",
     },
     {
         label: "Arret",
         action: "stop",
-        keywords: ["arrete", "stop", "pause"],
+        keywords: ["arrete", "stop", "pause", "stop listening"],
         response: "Écoute arrêtée.",
     },
 ];
 
+const LOCAL_VOICE_TEXT_BY_LANG: Record<
+    string,
+    {
+        wakeReady: string;
+        modeActive: string;
+        returnHome: string;
+        returnHomeInstruction: string;
+        captured: string;
+        followup: string;
+        action: {
+            dictation: string;
+            execute: string;
+            clear: string;
+            stop: string;
+        };
+        navOpen: {
+            appointments: string;
+            home: string;
+            patients: string;
+            cliniques: string;
+            specialists: string;
+            unknown: string;
+        };
+    }
+> = {
+    fr: {
+        wakeReady: "ClinIA pret, dictez votre diagnostic.",
+        modeActive: "Mode vocal actif.",
+        returnHome: "Retour a l'accueil.",
+        returnHomeInstruction:
+            "Dites ou ecrivez votre diagnostic, puis dites Lancer Requete ou cliquez sur Lancer Requete pour lancer.",
+        captured: "Diagnostic capture.",
+        followup:
+            "Si satisfait, cliquez ou dites «Lancer Requete», ou dites «Nouveau diagnostic» pour recommencer.",
+        action: {
+            dictation: "Dites votre diagnostic.",
+            execute: "Recherche lancee.",
+            clear: "Diagnostic efface.",
+            stop: "Ecoute arretee.",
+        },
+        navOpen: {
+            appointments: "Ouverture rendez-vous.",
+            home: "Ouverture accueil.",
+            patients: "Ouverture patients.",
+            cliniques: "Ouverture cliniques.",
+            specialists: "Ouverture specialistes.",
+            unknown: "Ouverture section.",
+        },
+    },
+    en: {
+        wakeReady: "ClinIA is ready, dictate your diagnosis.",
+        modeActive: "Voice mode enabled.",
+        returnHome: "Back to home.",
+        returnHomeInstruction:
+            "Please dictate or type your diagnosis, then say Run Query or click Run Query.",
+        captured: "Diagnosis captured.",
+        followup:
+            "If satisfied, click or say 'Run Query', or say 'New diagnosis' to start over.",
+        action: {
+            dictation: "Please say your diagnosis.",
+            execute: "Query started.",
+            clear: "Diagnosis cleared.",
+            stop: "Listening stopped.",
+        },
+        navOpen: {
+            appointments: "Opening appointments.",
+            home: "Opening home.",
+            patients: "Opening patients.",
+            cliniques: "Opening clinics.",
+            specialists: "Opening specialists.",
+            unknown: "Opening section.",
+        },
+    },
+};
+
+const getLocalVoiceText = (localeCode: string) => {
+    const normalized = (localeCode || "fr").toLowerCase().slice(0, 2);
+    return (
+        LOCAL_VOICE_TEXT_BY_LANG[normalized] ||
+        LOCAL_VOICE_TEXT_BY_LANG.en
+    );
+};
+
+const getNavOpenPrompt = (
+    localeCode: string,
+    path: string
+) => {
+    const voiceText = getLocalVoiceText(localeCode);
+    if (path === "/appointments") return voiceText.navOpen.appointments;
+    if (path === "/") return voiceText.navOpen.home;
+    if (path === "/patients") return voiceText.navOpen.patients;
+    if (path === "/cliniques") return voiceText.navOpen.cliniques;
+    if (path === "/specialists") return voiceText.navOpen.specialists;
+    return voiceText.navOpen.unknown;
+};
+
+const getRecognitionLang = (localeCode: string) => {
+    const normalized = (localeCode || "fr").toLowerCase().slice(0, 2);
+    if (normalized === "en") return "en-US";
+    if (normalized === "es") return "es-ES";
+    if (normalized === "de") return "de-DE";
+    if (normalized === "it") return "it-IT";
+    if (normalized === "pt") return "pt-PT";
+    if (normalized === "ja") return "ja-JP";
+    if (normalized === "ko") return "ko-KR";
+    if (normalized === "zh") return "zh-CN";
+    return "fr-CA";
+};
+
+const getSpeechSynthesisLang = (localeCode: string) => {
+    const normalized = (localeCode || "fr").toLowerCase().slice(0, 2);
+    if (normalized === "en") return "en-US";
+    if (normalized === "es") return "es-ES";
+    if (normalized === "de") return "de-DE";
+    if (normalized === "it") return "it-IT";
+    if (normalized === "pt") return "pt-PT";
+    if (normalized === "ja") return "ja-JP";
+    if (normalized === "ko") return "ko-KR";
+    if (normalized === "zh") return "zh-CN";
+
+    // French: prefer Canadian French when user locale/timezone suggests Canada/Quebec.
+    const browserLangs =
+        typeof navigator !== "undefined"
+            ? [navigator.language, ...(navigator.languages || [])]
+            : [];
+
+    const hasFrCaLocale = browserLangs.some((lang) =>
+        String(lang || "").toLowerCase().startsWith("fr-ca")
+    );
+
+    let timezone = "";
+    try {
+        timezone =
+            Intl.DateTimeFormat().resolvedOptions().timeZone?.toLowerCase() || "";
+    } catch (e) {}
+
+    const looksLikeCanadaTimezone =
+        timezone.includes("america/montreal") ||
+        timezone.includes("america/blanc-sablon") ||
+        timezone.includes("america/toronto") ||
+        timezone.includes("canada");
+
+    if (hasFrCaLocale || looksLikeCanadaTimezone) {
+        return "fr-CA";
+    }
+
+    return "fr-FR";
+};
+
+const pickBestVoiceForLang = (
+    voices: SpeechSynthesisVoice[],
+    targetLang: string
+) => {
+    if (!Array.isArray(voices) || voices.length === 0) {
+        return null;
+    }
+
+    const normalized = targetLang.toLowerCase();
+    const base = normalized.slice(0, 2);
+
+    const exact = voices.find(
+        (v) => String(v.lang || "").toLowerCase() === normalized
+    );
+    if (exact) return exact;
+
+    // Prefer Quebec/Canadian labeled voices when targeting fr-CA.
+    if (normalized === "fr-ca") {
+        const canadianFrench = voices.find((v) => {
+            const vLang = String(v.lang || "").toLowerCase();
+            const vName = String(v.name || "").toLowerCase();
+            return (
+                vLang.startsWith("fr-ca") ||
+                vName.includes("quebec") ||
+                vName.includes("quebecois") ||
+                vName.includes("québec") ||
+                vName.includes("canada")
+            );
+        });
+        if (canadianFrench) return canadianFrench;
+    }
+
+    const sameBase = voices.find((v) =>
+        String(v.lang || "").toLowerCase().startsWith(`${base}-`)
+    );
+    if (sameBase) return sameBase;
+
+    const looseBase = voices.find(
+        (v) => String(v.lang || "").toLowerCase().slice(0, 2) === base
+    );
+    if (looseBase) return looseBase;
+
+    return null;
+};
+
 const VoiceNavButton: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { setLocaleFromVoice, isTranslating } = useHomeI18n();
+    const { setLocaleFromVoice, isTranslating, locale } = useHomeI18n();
     // Vite exposes `import.meta.env.DEV` as `true` in development builds.
     // Keep the mic-test UI strictly for dev mode only.
     const isDev =
@@ -265,6 +541,7 @@ const VoiceNavButton: React.FC = () => {
                 restartListening?: boolean;
                 onDone?: () => void;
                 interrupt?: boolean;
+                localeOverride?: string;
             }
         ) => {
         if (typeof window === "undefined") return;
@@ -352,7 +629,9 @@ const VoiceNavButton: React.FC = () => {
         };
 
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = "fr-CA";
+        const effectiveLocale = options?.localeOverride || locale;
+        const ttsLang = getSpeechSynthesisLang(effectiveLocale);
+        utterance.lang = ttsLang;
         utterance.volume = 1;
         utterance.rate = 1;
         utterance.pitch = 1;
@@ -387,14 +666,45 @@ const VoiceNavButton: React.FC = () => {
             cleanupAfterSpeak();
         };
 
-        const speakNow = () => {
+        const speakNow = (voicesList?: SpeechSynthesisVoice[]) => {
             try {
+                const selectedVoice = pickBestVoiceForLang(
+                    voicesList || window.speechSynthesis.getVoices(),
+                    ttsLang
+                );
+                if (selectedVoice) {
+                    utterance.voice = selectedVoice;
+                    utterance.lang = selectedVoice.lang || ttsLang;
+                } else {
+                    utterance.voice = null;
+                    utterance.lang = ttsLang;
+                }
+
+                if (isDev) {
+                    console.info("[VoiceNav] tts voice", {
+                        locale,
+                        effectiveLocale,
+                        targetLang: ttsLang,
+                        selectedName: selectedVoice?.name || null,
+                        selectedLang: selectedVoice?.lang || utterance.lang,
+                    });
+                }
+
                 recognitionRef.current?.stop();
                 window.speechSynthesis.speak(utterance);
             } catch (e) {
                 cleanupAfterSpeak();
                 playBeep();
             }
+        };
+
+        let didStartSpeak = false;
+        const startSpeakOnce = (voicesList?: SpeechSynthesisVoice[]) => {
+            if (didStartSpeak) {
+                return;
+            }
+            didStartSpeak = true;
+            speakNow(voicesList);
         };
 
         try {
@@ -404,7 +714,7 @@ const VoiceNavButton: React.FC = () => {
                     try {
                         window.speechSynthesis.removeEventListener("voiceschanged", onVoicesChanged);
                     } catch (e) {}
-                    speakNow();
+                    startSpeakOnce(window.speechSynthesis.getVoices());
                 };
                 try {
                     window.speechSynthesis.addEventListener("voiceschanged", onVoicesChanged);
@@ -412,22 +722,15 @@ const VoiceNavButton: React.FC = () => {
                 window.speechSynthesis.getVoices();
                 setTimeout(() => {
                     try {
-                        const after = window.speechSynthesis.getVoices();
-                        if (!after || after.length === 0) {
-                            try {
-                                window.speechSynthesis.removeEventListener("voiceschanged", onVoicesChanged);
-                            } catch (e) {}
-                            clearSpeechTimers();
-                            isSpeakingRef.current = false;
-                            playBeep();
-                            if (isHandsFreeRef.current && !isListeningRef.current) {
-                                startListeningRef.current();
-                            }
-                        }
+                        try {
+                            window.speechSynthesis.removeEventListener("voiceschanged", onVoicesChanged);
+                        } catch (e) {}
+                        // Fallback: even without loaded voice list, speak with browser default voice.
+                        startSpeakOnce(window.speechSynthesis.getVoices());
                     } catch (e) {}
                 }, 700);
             } else {
-                speakNow();
+                startSpeakOnce(voices);
             }
         } catch (e) {
             clearSpeechTimers();
@@ -437,7 +740,7 @@ const VoiceNavButton: React.FC = () => {
                 startListeningRef.current();
             }
         }
-    }, [clearSpeechTimers]);
+    }, [clearSpeechTimers, locale]);
 
     useEffect(() => {
         return () => {
@@ -522,6 +825,7 @@ const VoiceNavButton: React.FC = () => {
 
     const handleTranscript = useCallback(
         (transcript: string) => {
+            const localVoiceText = getLocalVoiceText(locale);
             const normalized = normalizeText(transcript);
             const compactNormalized = normalized.replace(/\s+/g, "");
             const isWakeWord = compactNormalized.includes("clinia");
@@ -577,7 +881,7 @@ const VoiceNavButton: React.FC = () => {
                 } catch (e) {}
                 navigate("/");
                 setVoiceMode("dictation");
-                speak("ClinIA pret, dictez votre diagnostic.");
+                speak(localVoiceText.wakeReady);
                 return;
             }
 
@@ -585,23 +889,94 @@ const VoiceNavButton: React.FC = () => {
                 const localeLabel = requestedLocale.toUpperCase();
                 setStatus(`Traduction de l'accueil (${localeLabel})...`);
                 setLocaleFromVoice(requestedLocale)
-                    .then(() => {
+                    .then(
+                        ({
+                            voiceAck,
+                            dictationInstruction,
+                        }: {
+                            voiceAck: string;
+                            dictationInstruction: string;
+                        }) => {
+                        navigate("/");
+                        setVoiceMode("dictation");
+                        setIsHandsFree(true);
+                        isHandsFreeRef.current = true;
+                        try {
+                            window.localStorage.setItem("clinia_waiting_dictation", "1");
+                        } catch (e) {}
+                        try {
+                            window.dispatchEvent(new CustomEvent("clinia:voice-clear"));
+                        } catch (e) {}
+                        try {
+                            window.dispatchEvent(new CustomEvent("clinia:voice-start"));
+                        } catch (e) {}
+
                         if (requestedLocale === "fr") {
-                            setStatus("Accueil en français.");
-                            speak("Retour au français.", {
-                                interrupt: true,
-                            });
-                            return;
+                            setStatus("Accueil en francais.");
+                        } else {
+                            setStatus(`Accueil traduit (${localeLabel}).`);
                         }
-                        setStatus(`Accueil traduit (${localeLabel}).`);
-                        speak("Home page translated.", {
+                        speak(voiceAck, {
                             interrupt: true,
+                            restartListening: false,
+                            localeOverride: requestedLocale,
+                            onDone: () => {
+                                speak(dictationInstruction, {
+                                    localeOverride: requestedLocale,
+                                });
+                            },
                         });
-                    })
+                    }
+                    )
                     .catch(() => {
-                        setStatus("Langue non reconnue, retour au français.");
-                        setLocaleFromVoice("fr").catch(() => {});
-                        speak("Translation failed.");
+                        setStatus("Langue non reconnue, retour au francais.");
+                        setLocaleFromVoice("fr")
+                            .then(
+                                ({
+                                    voiceAck,
+                                    dictationInstruction,
+                                }: {
+                                    voiceAck: string;
+                                    dictationInstruction: string;
+                                }) => {
+                                navigate("/");
+                                setVoiceMode("dictation");
+                                setIsHandsFree(true);
+                                isHandsFreeRef.current = true;
+                                try {
+                                    window.localStorage.setItem("clinia_waiting_dictation", "1");
+                                } catch (e) {}
+                                try {
+                                    window.dispatchEvent(new CustomEvent("clinia:voice-clear"));
+                                } catch (e) {}
+                                try {
+                                    window.dispatchEvent(new CustomEvent("clinia:voice-start"));
+                                } catch (e) {}
+
+                                speak(voiceAck, {
+                                    interrupt: true,
+                                    restartListening: false,
+                                    localeOverride: "fr",
+                                    onDone: () => {
+                                        speak(dictationInstruction, {
+                                            localeOverride: "fr",
+                                        });
+                                    },
+                                });
+                            }
+                            )
+                            .catch(() => {
+                                speak(localVoiceText.returnHome, {
+                                    interrupt: true,
+                                    restartListening: false,
+                                    localeOverride: "fr",
+                                    onDone: () => {
+                                        speak(localVoiceText.returnHomeInstruction, {
+                                            localeOverride: "fr",
+                                        });
+                                    },
+                                });
+                            });
                     });
                 return;
             }
@@ -627,7 +1002,7 @@ const VoiceNavButton: React.FC = () => {
                     window.dispatchEvent(new CustomEvent("clinia:voice-start"));
                 } catch (e) {}
                 // Short prompt
-                speak("Dites ou ecrivez votre diagnostic.");
+                speak(localVoiceText.returnHomeInstruction);
                 return;
             }
             const matchedNav = NAV_COMMANDS.find((command) =>
@@ -652,21 +1027,19 @@ const VoiceNavButton: React.FC = () => {
                         window.dispatchEvent(new CustomEvent("clinia:voice-start"));
                     } catch (e) {}
                     if (normalized.includes("clinia")) {
-                        speak("ClinIA pret, dictez votre diagnostic.");
+                        speak(localVoiceText.wakeReady);
                     } else {
                         // Chain prompts on actual speech end to avoid clipping on iOS.
-                        speak("Retour a l'accueil.", {
+                        speak(localVoiceText.returnHome, {
                             restartListening: false,
                             onDone: () => {
-                                speak(
-                                    "Dites ou écrivez votre diagnostic, puis dites «Lancer Requete» ou cliquez sur «Lancer Requete» pour lancer."
-                                );
+                                speak(localVoiceText.returnHomeInstruction);
                             },
                         });
                     }
                 } else {
                     setVoiceMode("navigation");
-                    speak(`Ouverture ${matchedNav.label}.`);
+                    speak(getNavOpenPrompt(locale, matchedNav.path));
                 }
                 return;
             }
@@ -681,21 +1054,21 @@ const VoiceNavButton: React.FC = () => {
                 setStatus(`Commande: ${matchedAction.label}`);
                 if (matchedAction.action === "dictation") {
                     setVoiceMode("dictation");
-                    speak(matchedAction.response);
+                    speak(localVoiceText.action.dictation);
                     return;
                 }
                 if (matchedAction.action === "execute") {
                     window.dispatchEvent(
                         new CustomEvent("clinia:voice-execute")
                     );
-                    speak(matchedAction.response);
+                    speak(localVoiceText.action.execute);
                     return;
                 }
                 if (matchedAction.action === "clear") {
                     window.dispatchEvent(
                         new CustomEvent("clinia:voice-clear")
                     );
-                    speak(matchedAction.response);
+                    speak(localVoiceText.action.clear);
                     return;
                 }
                 if (matchedAction.action === "stop") {
@@ -704,8 +1077,8 @@ const VoiceNavButton: React.FC = () => {
                     isHandsFreeRef.current = false;
                     setIsListening(false);
                     isListeningRef.current = false;
-                    setStatus(matchedAction.response);
-                    speak(matchedAction.response);
+                    setStatus(localVoiceText.action.stop);
+                    speak(localVoiceText.action.stop);
                     return;
                 }
             }
@@ -726,16 +1099,13 @@ const VoiceNavButton: React.FC = () => {
                 );
                 setVoiceMode("dictation");
                 setStatus("Diagnostic capture.");
-                speak("Diagnostic capturé.", {
+                speak(localVoiceText.captured, {
                     restartListening: false,
                     onDone: () => {
                         if (typeof console !== "undefined") {
                             console.info("[VoiceNav] speaking follow-up instruction");
                         }
-                        speak(
-                            "Si satisfait, cliquez ou dites «Lancer Requete», ou dites «Nouveau diagnostic" +
-                                "" + " pour recommencer."
-                        );
+                        speak(localVoiceText.followup);
                     },
                 });
                 return;
@@ -743,7 +1113,7 @@ const VoiceNavButton: React.FC = () => {
 
             setStatus(`Commande non reconnue: "${transcript}"`);
         },
-        [location.pathname, navigate, speak, voiceMode]
+        [location.pathname, locale, navigate, speak, voiceMode]
     );
 
     const createRecognition = useCallback(() => {
@@ -753,7 +1123,7 @@ const VoiceNavButton: React.FC = () => {
             return null;
         }
         const recognition = new SpeechRecognitionCtor();
-        recognition.lang = "fr-CA";
+        recognition.lang = getRecognitionLang(locale);
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
         (recognition as SpeechRecognition & { continuous?: boolean }).continuous =
@@ -879,7 +1249,7 @@ const VoiceNavButton: React.FC = () => {
             }
         };
         return recognition;
-    }, [handleTranscript]);
+    }, [handleTranscript, locale]);
 
     // Try to auto-enable persistent wake if previously enabled.
     useEffect(() => {
@@ -1068,7 +1438,7 @@ const VoiceNavButton: React.FC = () => {
         console.info("[VoiceNav] hands-free enabled");
         if (typeof window !== "undefined" && "speechSynthesis" in window) {
             window.speechSynthesis.getVoices();
-            speak("Mode vocal actif.");
+            speak(getLocalVoiceText(locale).modeActive);
             return;
         }
         startListening();

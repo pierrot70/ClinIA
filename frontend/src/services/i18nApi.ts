@@ -2,11 +2,25 @@ import { HOME_STRINGS_FR, type HomeStrings } from "../i18n/homeStrings";
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 
+export type HomeTranslationResult = {
+  strings: HomeStrings;
+  voiceAck?: string;
+  voicePrompts?: {
+    dictationInstruction: string;
+  };
+};
+
 export async function translateHomeStrings(
   targetLang: string
-): Promise<HomeStrings> {
+): Promise<HomeTranslationResult> {
   if (targetLang === "fr") {
-    return HOME_STRINGS_FR;
+    return {
+      strings: HOME_STRINGS_FR,
+      voiceAck: "Retour en francais.",
+      voicePrompts: {
+        dictationInstruction: "Dites ou ecrivez votre diagnostic.",
+      },
+    };
   }
 
   const response = await fetch(`${API_URL}/api/i18n/home-translate`, {
@@ -29,5 +43,12 @@ export async function translateHomeStrings(
     throw new Error("Invalid translation payload");
   }
 
-  return json.data as HomeStrings;
+  return {
+    strings: json.data as HomeStrings,
+    voiceAck: typeof json?.meta?.voiceAck === "string" ? json.meta.voiceAck : undefined,
+    voicePrompts:
+      typeof json?.meta?.voicePrompts?.dictationInstruction === "string"
+        ? { dictationInstruction: json.meta.voicePrompts.dictationInstruction }
+        : undefined,
+  };
 }
