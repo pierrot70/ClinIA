@@ -53,14 +53,14 @@ const Header: React.FC = () => {
     );
 
     const languageOptions = [
-        { value: "fr-CA", label: "Francais (Canada)" },
+        { value: "fr-CA", label: "Français (Canada)" },
         { value: "en-CA", label: "English (Canada)" },
         { value: "ko-KR", label: "한국어 (대한민국)" },
-        { value: "vi", label: "Tieng Viet" },
+        { value: "vi", label: "Tiếng Việt" },
         { value: "ja", label: "日本語" },
         { value: "zh", label: "中文（普通话）" },
         { value: "he", label: "עברית" },
-        { value: "es", label: "Espanol" },
+        { value: "es", label: "Español" },
     ];
 
     const onLanguageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
