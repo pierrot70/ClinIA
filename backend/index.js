@@ -9,6 +9,15 @@ import { safeParseMedicalAI } from "./utils/aiParser.js";
 import { getMockForDiagnosis } from "./utils/mockLoader.js";
 import { DiagnosisResult } from "./models/DiagnosisResult.js";
 import { UiTranslationCache } from "./models/UiTranslationCache.js";
+import {
+    buildBlockingIncidentResponse,
+    detectNonSecureContent,
+    sanitizeNonSecureContent,
+} from "./utils/securityIncident.js";
+import {
+    createSecurityIncident,
+    getAcknowledgedSecurityIncident,
+} from "./services/securityIncidents.js";
 
 import {
     canCallOpenAI,
@@ -20,6 +29,7 @@ import appointmentsRouter from "./routes/appointments.js";
 import patientsRouter from "./routes/patients.js";
 import cliniquesRouter from "./routes/cliniques.js";
 import specialistsRouter from "./routes/specialists.js";
+import securityIncidentsRouter from "./routes/securityIncidents.js";
 
 dotenv.config();
 
@@ -342,13 +352,51 @@ async function persistOrReuseDiagnosis(payload) {
     }
 }
 
+async function respondWithSecurityIncident({
+    res,
+    phase,
+    reason,
+    requestPath,
+    matches,
+    context = {},
+}) {
+    try {
+        const incident = await createSecurityIncident({
+            phase,
+            reason,
+            requestPath,
+            matches,
+            context,
+            transport: "openai_chat_completions",
+        });
+
+        return res.status(422).json(buildBlockingIncidentResponse(incident));
+    } catch (err) {
+        console.error("❌ Security incident persistence error:", err);
+
+        return res.status(500).json({
+            error: {
+                code: "SECURITY_INCIDENT_LOG_FAILED",
+                message:
+                    "Contenu non securise detecte mais incident non enregistre. Workflow bloque: reessayez ou contactez l'administrateur.",
+                retryable: true,
+            },
+            blocking: {
+                required: true,
+                userMessage:
+                    "L'incident de securite doit etre journalise avant de continuer.",
+            },
+        });
+    }
+}
+
 /* ================================================================== */
 /* /api/ai/analyze                                                    */
 /* ================================================================== */
 
 app.post("/api/ai/analyze", async (req, res) => {
     try {
-        const { symptoms = [], forceReal, openaiModel } = req.body;
+        const { symptoms = [], forceReal, openaiModel, incidentAckId } = req.body;
 
         if (!Array.isArray(symptoms) || symptoms.length === 0) {
             return res.json({
@@ -370,6 +418,7 @@ app.post("/api/ai/analyze", async (req, res) => {
                 ? req.body.diagnosis.trim()
                 : diagnosisSeed || "To be determined by ClinIA";
         const patient = req.body;
+        let neutralizationMeta = null;
         const fingerprint = makeFingerprint({ diagnosis, patient });
 
         const isProd =
@@ -426,6 +475,40 @@ app.post("/api/ai/analyze", async (req, res) => {
             });
         }
 
+        const preCloudScan = detectNonSecureContent(patient);
+        if (preCloudScan.hasMatches) {
+            const ackedIncident = incidentAckId
+                ? await getAcknowledgedSecurityIncident(incidentAckId)
+                : null;
+
+            if (!ackedIncident) {
+                return respondWithSecurityIncident({
+                    res,
+                    phase: "pre_cloud",
+                    reason:
+                        "Non-secure patient identifiers detected before cloud transmission.",
+                    requestPath: "/api/ai/analyze",
+                    matches: preCloudScan.matches,
+                    context: {
+                        model,
+                        direction: "request",
+                    },
+                });
+            }
+
+            const sanitizedPatient = sanitizeNonSecureContent(patient);
+            neutralizationMeta = {
+                neutralized: true,
+                acknowledgmentIncidentId: String(ackedIncident._id),
+                originalMatches: preCloudScan.matches,
+                message:
+                    "Requete contenant des donnees sensibles neutralisee apres acknowledgment explicite du clinicien.",
+            };
+
+            // Replace unsafe payload with sanitized payload for cloud call.
+            Object.assign(patient, sanitizedPatient);
+        }
+
         /* ---------------- OPENAI ---------------- */
         const baseRequest = {
             model,
@@ -451,6 +534,7 @@ app.post("/api/ai/analyze", async (req, res) => {
             : baseRequest;
 
         let normalized;
+        let rawContent = "";
 
         try {
             const completion =
@@ -458,8 +542,27 @@ app.post("/api/ai/analyze", async (req, res) => {
                     request
                 );
 
+            rawContent =
+                completion?.choices?.[0]?.message?.content || "";
+
+            const postCloudScan = detectNonSecureContent(rawContent);
+            if (postCloudScan.hasMatches) {
+                return respondWithSecurityIncident({
+                    res,
+                    phase: "post_cloud",
+                    reason:
+                        "Non-secure patient identifiers detected after cloud transmission.",
+                    requestPath: "/api/ai/analyze",
+                    matches: postCloudScan.matches,
+                    context: {
+                        model,
+                        direction: "response",
+                    },
+                });
+            }
+
             const parsed = safeParseMedicalAI(
-                completion.choices[0].message.content
+                rawContent
             );
 
             normalized = normalizeClinicalAnalysis(parsed);
@@ -468,12 +571,12 @@ app.post("/api/ai/analyze", async (req, res) => {
             console.error("❌ OpenAI error:", err.message);
             recordOpenAIFailure();
 
-            const degraded = normalizeClinicalAnalysis({});
-            return res.json({
-                data: degraded,
-                meta: {
-                    source: "degraded",
-                    model: "fallback",
+            return res.status(502).json({
+                error: {
+                    code: "OPENAI_UPSTREAM_FAILED",
+                    message:
+                        "Le service OpenAI est indisponible. Corrigez le contenu ou reessayez plus tard.",
+                    retryable: true,
                 },
             });
         }
@@ -489,11 +592,15 @@ app.post("/api/ai/analyze", async (req, res) => {
         console.log("AI_RESPONSE From OpenAI", normalized);
 
         if (!persist.ok)
-            return res.json({ error: persist.error });
+            return res.status(500).json({ error: persist.error });
 
         return res.json({
             data: persist.doc.output,
-            meta: { source: "real", model },
+            meta: {
+                source: "real",
+                model,
+                ...neutralizationMeta,
+            },
         });
     } catch (err) {
         console.error("🔥 FATAL /api/ai/analyze ERROR", err);
@@ -885,6 +992,7 @@ app.use("/api/appointments", appointmentsRouter);
 app.use("/api/patients", patientsRouter);
 app.use("/api/cliniques", cliniquesRouter);
 app.use("/api/specialists", specialistsRouter);
+app.use("/api/security/incidents", securityIncidentsRouter);
 
 app.listen(4000, () =>
     console.log(

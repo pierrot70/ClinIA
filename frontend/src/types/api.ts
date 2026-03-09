@@ -9,6 +9,7 @@ export type ApiErrorCode =
     | "AI_DEGRADED"           // IA OK mais fallback/mock utilisé
     | "PERSISTENCE_FAILED"    // Mongo indisponible
     | "INVALID_INPUT"         // Payload invalide
+    | "SECURITY_INCIDENT_BLOCKING" // Acknowledgment explicite obligatoire
     | "INTERNAL_ERROR";       // Bug serveur inattendu
 
 /* ------------------------------------------------------------------ */
@@ -24,6 +25,28 @@ export interface ApiError {
 
     /** Peut-on réessayer automatiquement ? */
     retryable: boolean;
+
+    /** Action de remediation demandee par le backend (optionnelle) */
+    action?: string;
+}
+
+export interface SecurityIncidentBlockingData {
+    required: boolean;
+    incident: {
+        id: string;
+        type: string;
+        reason: string;
+        phase: string;
+        timestamp: string;
+        context: Record<string, unknown>;
+        matches: Array<Record<string, unknown>>;
+    };
+    acknowledgment: {
+        requiredAction: string;
+        method: "POST";
+        endpoint: string;
+    };
+    userMessage: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -50,6 +73,7 @@ export interface ApiSuccess<T> {
 
 export interface ApiFailure {
     error: ApiError;
+    blocking?: SecurityIncidentBlockingData;
 }
 
 /* ------------------------------------------------------------------ */

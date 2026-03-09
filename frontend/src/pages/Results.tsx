@@ -1,6 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, Link } from "react-router-dom";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
+import {
+    acknowledgeSecurityIncident,
+    REQUIRED_ACK_ACTION,
+} from "../services/securityIncidentApi";
+import { SecurityBlockingAlert } from "../components/system/SecurityBlockingAlert";
+import type { SecurityIncidentBlockingData } from "../types/api";
 
 import AICard from "../components/AICard";
 import AITreatmentTable from "../components/AITreatmentTable";
@@ -26,6 +32,12 @@ const Results: React.FC = () => {
     const [sourceMode, setSourceMode] = useState<
         "mock" | "real" | "degraded" | "unknown"
     >("unknown");
+    const [blockingIncident, setBlockingIncident] =
+        useState<SecurityIncidentBlockingData | null>(null);
+    const [acknowledgingIncident, setAcknowledgingIncident] = useState(false);
+    const [blockingActionableMessage, setBlockingActionableMessage] =
+        useState<string | null>(null);
+    const [neutralizedMessage, setNeutralizedMessage] = useState<string | null>(null);
 
     const [realAI, setRealAI] = useState(() => {
         if (typeof window === "undefined") {
@@ -38,6 +50,83 @@ const Results: React.FC = () => {
     const requestIdRef = useRef(0);
 
     const AI_ENDPOINT = "/api/ai/analyze";
+
+    const fetchAI = async (incidentAckId?: string) => {
+        const requestId = ++requestIdRef.current;
+        setLoadingAI(true);
+        setErrorMessage(null);
+        setAnalysis(null);
+        if (!incidentAckId) {
+            setNeutralizedMessage(null);
+        }
+
+        try {
+            const res = await fetch(AI_ENDPOINT, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    age: 55,
+                    sex: "male",
+                    symptoms: [q],
+                    medical_history: [],
+                    current_medications: [],
+                    forceReal: realAIRef.current,
+                    incidentAckId,
+                }),
+            });
+
+            const json = await res.json();
+
+            if (requestId !== requestIdRef.current) {
+                return;
+            }
+
+            if (json?.error) {
+                if (
+                    json?.error?.code === "SECURITY_INCIDENT_BLOCKING" &&
+                    json?.blocking
+                ) {
+                    setBlockingIncident(json.blocking as SecurityIncidentBlockingData);
+                    setBlockingActionableMessage(
+                        "Contenu sensible detecte. Cliquez sur 'J'ai lu et compris' pour neutraliser puis continuer."
+                    );
+                    setSourceMode("unknown");
+                    return;
+                }
+
+                setErrorMessage(json.error.message || "Erreur lors de l’analyse.");
+                setSourceMode("unknown");
+                return;
+            }
+
+            setBlockingIncident(null);
+            setAnalysis(json?.data ?? json);
+            const metaSource = json?.meta?.source;
+            if (metaSource === "mock" || metaSource === "real" || metaSource === "degraded") {
+                setSourceMode(metaSource);
+            } else {
+                setSourceMode("unknown");
+            }
+
+            if (json?.meta?.neutralized) {
+                setNeutralizedMessage(
+                    json?.meta?.message ||
+                        "Une requete a dejoue les gardes de securite et a ete neutralisee avant traitement cloud."
+                );
+            }
+        } catch (err) {
+            if (requestId !== requestIdRef.current) {
+                return;
+            }
+            console.error("Erreur IA:", err);
+            setErrorMessage("Erreur réseau ou serveur.");
+            setSourceMode("unknown");
+        } finally {
+            if (requestId === requestIdRef.current) {
+                setLoadingAI(false);
+            }
+        }
+    };
 
     useEffect(() => {
         if (isProd) {
@@ -71,67 +160,52 @@ const Results: React.FC = () => {
     }, [isProd]);
 
     useEffect(() => {
-        const fetchAI = async () => {
-            const requestId = ++requestIdRef.current;
-            setLoadingAI(true);
-            setErrorMessage(null);
-            setAnalysis(null);
-
-            try {
-                const res = await fetch(AI_ENDPOINT, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        // ✅ CONTRAT BACKEND RESPECTÉ
-                        age: 55,
-                        sex: "male",
-                        symptoms: [q],                 // ← 🔑 LA CLE
-                        medical_history: [],
-                        current_medications: [],
-                        forceReal: realAIRef.current,
-                    }),
-                });
-
-                const json = await res.json();
-
-                if (requestId !== requestIdRef.current) {
-                    return;
-                }
-
-                if (json?.error) {
-                    setErrorMessage(
-                        json.error.message || "Erreur lors de l’analyse."
-                    );
-                    setSourceMode("unknown");
-                    return;
-                }
-
-                setAnalysis(json?.data ?? json);
-                const metaSource = json?.meta?.source;
-                if (metaSource === "mock" || metaSource === "real" || metaSource === "degraded") {
-                    setSourceMode(metaSource);
-                } else {
-                    setSourceMode("unknown");
-                }
-            } catch (err) {
-                if (requestId !== requestIdRef.current) {
-                    return;
-                }
-                console.error("Erreur IA:", err);
-                setErrorMessage("Erreur réseau ou serveur.");
-                setSourceMode("unknown");
-            } finally {
-                if (requestId === requestIdRef.current) {
-                    setLoadingAI(false);
-                }
-            }
-        };
-
         fetchAI();
     }, [q]);
 
+    async function handleAcknowledgeBlockingIncident() {
+        if (!blockingIncident) {
+            return;
+        }
+
+        setAcknowledgingIncident(true);
+        setBlockingActionableMessage(null);
+
+        const ackResponse = await acknowledgeSecurityIncident({
+            incidentId: blockingIncident.incident.id,
+            action: REQUIRED_ACK_ACTION,
+            context: {
+                route: "/results",
+                flow: "quick_search",
+                query: q,
+            },
+        });
+
+        if ("error" in ackResponse) {
+            setBlockingActionableMessage(
+                ackResponse.error.message ||
+                    "Impossible d'enregistrer l'acknowledgment de securite."
+            );
+            setAcknowledgingIncident(false);
+            return;
+        }
+
+        setBlockingIncident(null);
+        setAcknowledgingIncident(false);
+        await fetchAI(ackResponse.data.incidentId);
+    }
+
     return (
         <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+
+            {blockingIncident && (
+                <SecurityBlockingAlert
+                    blocking={blockingIncident}
+                    actionableMessage={blockingActionableMessage}
+                    acknowledging={acknowledgingIncident}
+                    onAcknowledge={handleAcknowledgeBlockingIncident}
+                />
+            )}
 
             {/* HEADER */}
             <header className="space-y-2">
@@ -178,6 +252,11 @@ const Results: React.FC = () => {
                 <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-2 max-w-2xl">
                     Source: {sourceMode}
                 </p>
+                {neutralizedMessage && (
+                    <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 max-w-2xl">
+                        {neutralizedMessage}
+                    </p>
+                )}
                 {!isProd && realAI && (
                     <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 max-w-2xl">
                         ⚠️ IA réelle activée — consommation de crédits OpenAI.

@@ -63,6 +63,9 @@ const SearchBar: React.FC = () => {
   const [clinicalNotes, setClinicalNotes] = useState("");
   const [inputWarning, setInputWarning] = useState<string | null>(null);
   const [privacyAttestation, setPrivacyAttestation] = useState(false);
+  const [sensitiveReason, setSensitiveReason] = useState<string | null>(null);
+  const [sensitiveAcknowledged, setSensitiveAcknowledged] =
+    useState(false);
   const navigate = useNavigate();
   const lastInsertRef = useRef<{ text: string; at: number } | null>(null);
 
@@ -80,7 +83,8 @@ const SearchBar: React.FC = () => {
     }
 
     const reason = getSensitiveInputReason(clinicalNotes);
-    if (reason) {
+    if (reason && !sensitiveAcknowledged) {
+      setSensitiveReason(reason);
       setInputWarning(`${strings.search.blockedSensitive} (${reason}).`);
       return;
     }
@@ -269,7 +273,9 @@ const SearchBar: React.FC = () => {
   const attestationMissing = !privacyAttestation;
   const isAwaitingVoiceOnly = isWaitingDictation && !clinicalNotes.trim();
   const isSubmitDisabled =
-    isAwaitingVoiceOnly || Boolean(inputWarning) || attestationMissing;
+    isAwaitingVoiceOnly ||
+    attestationMissing ||
+    Boolean(sensitiveReason && !sensitiveAcknowledged);
 
   return (
     <div className="w-full max-w-2xl space-y-3">
@@ -425,6 +431,8 @@ const SearchBar: React.FC = () => {
             const next = e.target.value;
             setClinicalNotes(next);
             const reason = getSensitiveInputReason(next);
+            setSensitiveReason(reason);
+            setSensitiveAcknowledged(false);
             setInputWarning(
               reason
                 ? `${strings.search.sensitiveDetected} (${reason}).`
@@ -480,6 +488,25 @@ const SearchBar: React.FC = () => {
       {inputWarning && (
         <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
           {inputWarning}
+        </div>
+      )}
+
+      {sensitiveReason && !sensitiveAcknowledged && (
+        <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-3 text-xs text-red-800 space-y-2">
+          <div>
+            Contenu potentiellement non securitaire detecte ({sensitiveReason}).
+            Confirmez explicitement avant de continuer.
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSensitiveAcknowledged(true);
+              setInputWarning(null);
+            }}
+            className="rounded bg-red-600 px-3 py-1.5 text-white hover:bg-red-700 transition-colors"
+          >
+            J'ai lu et compris
+          </button>
         </div>
       )}
       <div className="text-xs text-gray-500">

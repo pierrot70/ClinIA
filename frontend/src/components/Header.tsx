@@ -6,8 +6,11 @@ import { useHomeI18n } from "../contexts/HomeI18nContext";
 const Header: React.FC = () => {
     const location = useLocation();
     const { locale, setLocaleFromDropdown, isTranslating } = useHomeI18n();
-    const token = localStorage.getItem("clinia_admin_token");
     const FORCE_REAL_STORAGE_KEY = "clinia_force_real";
+    const token =
+        typeof window !== "undefined"
+            ? window.localStorage.getItem("clinia_admin_token")
+            : null;
 
     const logout = () => {
         localStorage.removeItem("clinia_admin_token");

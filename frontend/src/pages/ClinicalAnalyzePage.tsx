@@ -2,9 +2,18 @@ import { useEffect, useState } from "react";
 import { ClinicalForm } from "../components/clinical/ClinicalForm";
 import { ClinicalResultPage } from "./ClinicalResultPage";
 import { analyzeClinicalCase } from "../services/clinicalApi";
+import {
+    acknowledgeSecurityIncident,
+    REQUIRED_ACK_ACTION,
+} from "../services/securityIncidentApi";
+import { SecurityBlockingAlert } from "../components/system/SecurityBlockingAlert";
 
 import type { ClinicalPayload, ClinicalAnalysis } from "../types/clinical";
-import type { ApiResponse, ApiError } from "../types/api";
+import type {
+    ApiResponse,
+    ApiError,
+    SecurityIncidentBlockingData,
+} from "../types/api";
 
 /* ------------------------------------------------------------------ */
 /* Preset clinique par défaut (JAMAIS invalide)                        */
@@ -39,6 +48,12 @@ export function ClinicalAnalyzePage() {
     const [loading, setLoading] = useState(false);
 
     const [apiError, setApiError] = useState<ApiError | null>(null);
+    const [blockingIncident, setBlockingIncident] =
+        useState<SecurityIncidentBlockingData | null>(null);
+    const [acknowledgingIncident, setAcknowledgingIncident] =
+        useState(false);
+    const [blockingActionableMessage, setBlockingActionableMessage] =
+        useState<string | null>(null);
     const [serviceMode, setServiceMode] =
         useState<"real" | "mock" | "degraded" | null>(null);
 
@@ -110,12 +125,26 @@ export function ClinicalAnalyzePage() {
     ) {
         setLoading(true);
         setApiError(null);
+        setBlockingActionableMessage(null);
 
         const response: ApiResponse<ClinicalAnalysis> =
             await analyzeClinicalCase(payload);
 
         if ("error" in response) {
             setApiError(response.error);
+
+            if (
+                response.error.code === "SECURITY_INCIDENT_BLOCKING" &&
+                response.blocking
+            ) {
+                setBlockingIncident(response.blocking);
+                setBlockingActionableMessage(
+                    "Contenu non securise detecte. Cliquez sur 'J'ai lu et compris' pour enregistrer la confirmation obligatoire."
+                );
+            } else {
+                setBlockingIncident(null);
+            }
+
             setResult(null);
             setServiceMode(null);
             setActiveTab("patient");
@@ -123,10 +152,53 @@ export function ClinicalAnalyzePage() {
             return;
         }
 
+        setBlockingIncident(null);
         setResult(response.data);
         setServiceMode(response.meta.source);
         setActiveTab("clinical");
         setLoading(false);
+    }
+
+    async function handleAcknowledgeBlockingIncident() {
+        if (!blockingIncident) {
+            setBlockingActionableMessage(
+                "Incident de securite manquant. Relancez l'analyse pour continuer."
+            );
+            return;
+        }
+
+        setAcknowledgingIncident(true);
+        setBlockingActionableMessage(null);
+
+        const ackResponse = await acknowledgeSecurityIncident({
+            incidentId: blockingIncident.incident.id,
+            action: REQUIRED_ACK_ACTION,
+            context: {
+                route: "/clinical",
+                flow: "clinical_analysis",
+                incidentType: blockingIncident.incident.type,
+                incidentReason: blockingIncident.incident.reason,
+                incidentPhase: blockingIncident.incident.phase,
+                incidentTimestamp: blockingIncident.incident.timestamp,
+                incidentContext: blockingIncident.incident.context,
+            },
+        });
+
+        if ("error" in ackResponse) {
+            setBlockingActionableMessage(
+                ackResponse.error.message ||
+                    "Impossible d'enregistrer la confirmation de securite. Reessayez ou contactez l'administrateur."
+            );
+            setAcknowledgingIncident(false);
+            return;
+        }
+
+        setBlockingIncident(null);
+        setApiError(null);
+        setBlockingActionableMessage(
+            "Confirmation enregistree. Vous pouvez maintenant corriger le contenu et relancer l'analyse."
+        );
+        setAcknowledgingIncident(false);
     }
 
     /* ------------------------------------------------------------------ */
@@ -179,11 +251,25 @@ export function ClinicalAnalyzePage() {
 
     return (
         <div className="max-w-5xl mx-auto p-6 space-y-6">
+            {blockingIncident && (
+                <SecurityBlockingAlert
+                    blocking={blockingIncident}
+                    actionableMessage={blockingActionableMessage}
+                    acknowledging={acknowledgingIncident}
+                    onAcknowledge={handleAcknowledgeBlockingIncident}
+                />
+            )}
 
             {/* ❌ Erreur backend brute (sans flafla) */}
             {apiError && (
                 <div className="text-red-600 text-sm">
                     {apiError.message}
+                </div>
+            )}
+
+            {!blockingIncident && blockingActionableMessage && (
+                <div className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+                    {blockingActionableMessage}
                 </div>
             )}
 
