@@ -444,37 +444,6 @@ app.post("/api/ai/analyze", async (req, res) => {
             isProd,
         });
 
-        /* ---------------- MOCK ---------------- */
-        if (useMock) {
-            const mock = getMockForDiagnosis(diagnosisSeed || diagnosis);
-            const analysis = normalizeClinicalAnalysis(mock);
-
-            const persist = await persistOrReuseDiagnosis({
-                fingerprint,
-                input: patient,
-                output: analysis,
-                mode: "mock",
-                model: "mock",
-            });
-
-            if (!persist.ok)
-                return res.json({ error: persist.error });
-
-            return res.json({
-                data: persist.doc.output,
-                meta: { source: "mock", model: "mock" },
-            });
-        }
-
-        /* ---------------- CIRCUIT BREAKER ---------------- */
-        if (!canCallOpenAI() && !forceRealSafe) {
-            const degraded = normalizeClinicalAnalysis({});
-            return res.json({
-                data: degraded,
-                meta: { source: "degraded", model: "fallback" },
-            });
-        }
-
         const preCloudScan = detectNonSecureContent(patient);
         if (preCloudScan.hasMatches) {
             const ackedIncident = incidentAckId
@@ -507,6 +476,45 @@ app.post("/api/ai/analyze", async (req, res) => {
 
             // Replace unsafe payload with sanitized payload for cloud call.
             Object.assign(patient, sanitizedPatient);
+        }
+
+        /* ---------------- MOCK ---------------- */
+        if (useMock) {
+            const mock = getMockForDiagnosis(diagnosisSeed || diagnosis);
+            const analysis = normalizeClinicalAnalysis(mock);
+
+            const persist = await persistOrReuseDiagnosis({
+                fingerprint,
+                input: patient,
+                output: analysis,
+                mode: "mock",
+                model: "mock",
+            });
+
+            if (!persist.ok)
+                return res.json({ error: persist.error });
+
+            return res.json({
+                data: persist.doc.output,
+                meta: {
+                    source: "mock",
+                    model: "mock",
+                    ...neutralizationMeta,
+                },
+            });
+        }
+
+        /* ---------------- CIRCUIT BREAKER ---------------- */
+        if (!canCallOpenAI() && !forceRealSafe) {
+            const degraded = normalizeClinicalAnalysis({});
+            return res.json({
+                data: degraded,
+                meta: {
+                    source: "degraded",
+                    model: "fallback",
+                    ...neutralizationMeta,
+                },
+            });
         }
 
         /* ---------------- OPENAI ---------------- */
