@@ -61,6 +61,37 @@ function getRequestIp(req) {
     return req.ip || req.socket?.remoteAddress || "unknown";
 }
 
+function assertSuperAdmin(authUser) {
+    if (!authUser?.role || authUser.role !== "SUPERADMIN") {
+        throw createAuthError(
+            "FORBIDDEN",
+            "Action reservee au SUPERADMIN."
+        );
+    }
+}
+
+function assertValidUserId(userId) {
+    if (
+        typeof userId !== "string" ||
+        !/^[a-fA-F0-9]{24}$/.test(userId)
+    ) {
+        throw createAuthError("INVALID_INPUT", "Identifiant utilisateur invalide.");
+    }
+}
+
+function mapPublicUser(user) {
+    return {
+        id: String(user._id),
+        username: user.username,
+        email: user.email || null,
+        role: user.role,
+        isActive: user.isActive !== false,
+        createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt || null,
+        lastLogoutAt: user.lastLogoutAt || null,
+    };
+}
+
 function normalizeUsername(username) {
     return String(username || "").trim().toLowerCase();
 }
@@ -251,6 +282,22 @@ export async function login({ username, email, password, req }) {
         throw createAuthError(
             "INVALID_CREDENTIALS",
             "Nom d'utilisateur ou mot de passe invalide."
+        );
+    }
+
+    if (user.isActive === false) {
+        await recordAuthAuditEvent({
+            action: "FAILED_LOGIN",
+            outcome: "FAILED",
+            userId: user._id,
+            username: user.username,
+            role: user.role,
+            ip,
+            reason: "ACCOUNT_INACTIVE",
+        });
+        throw createAuthError(
+            "ACCOUNT_INACTIVE",
+            "Compte inactif."
         );
     }
 
@@ -555,6 +602,215 @@ export async function registerSelf({ email, password, role, req }) {
             email: created.email,
             role: created.role,
         },
+    };
+}
+
+export async function listUsers({ authUser }) {
+    assertSuperAdmin(authUser);
+
+    const users = await AdminUser.find({})
+        .select("username email role isActive createdAt lastLoginAt lastLogoutAt")
+        .sort({ createdAt: -1 })
+        .lean();
+
+    return {
+        users: users.map(mapPublicUser),
+    };
+}
+
+export async function updateUser({ userId, updates, authUser, req }) {
+    assertSuperAdmin(authUser);
+    assertValidUserId(userId);
+
+    const ip = getRequestIp(req);
+    const user = await AdminUser.findById(userId);
+    if (!user) {
+        throw createAuthError("USER_NOT_FOUND", "Utilisateur introuvable.");
+    }
+
+    const next = {};
+    if (typeof updates?.username === "string") {
+        const username = normalizeUsername(updates.username);
+        if (!/^[a-z0-9._%+\-@]{3,64}$/.test(username)) {
+            throw createAuthError("INVALID_INPUT", "Nom d'utilisateur invalide.");
+        }
+        next.username = username;
+    }
+
+    if (typeof updates?.email !== "undefined") {
+        next.email = normalizeOptionalEmail(updates.email);
+    }
+
+    if (typeof updates?.role === "string") {
+        if (!AUTH_ROLE_VALUES.includes(updates.role)) {
+            throw createAuthError("INVALID_INPUT", "Role invalide.");
+        }
+        next.role = updates.role;
+    }
+
+    if (Object.keys(next).length === 0) {
+        throw createAuthError("INVALID_INPUT", "Aucune mise a jour valide fournie.");
+    }
+
+    if (
+        String(user._id) === String(authUser.userId) &&
+        next.role &&
+        next.role !== "SUPERADMIN"
+    ) {
+        throw createAuthError(
+            "FORBIDDEN",
+            "Vous ne pouvez pas retrograder votre propre compte SUPERADMIN."
+        );
+    }
+
+    if (next.username && next.username !== user.username) {
+        const existingByUsername = await AdminUser.findOne({
+            username: next.username,
+            _id: { $ne: user._id },
+        });
+        if (existingByUsername) {
+            throw createAuthError("USER_EXISTS", "Nom d'utilisateur deja utilise.");
+        }
+    }
+
+    if (typeof next.email !== "undefined" && next.email !== user.email) {
+        if (next.email) {
+            const existingByEmail = await AdminUser.findOne({
+                email: next.email,
+                _id: { $ne: user._id },
+            });
+            if (existingByEmail) {
+                throw createAuthError("USER_EXISTS", "Email deja utilise.");
+            }
+        }
+    }
+
+    Object.assign(user, next);
+    await user.save();
+
+    await recordAuthAuditEvent({
+        action: "USER_MANAGEMENT",
+        outcome: "SUCCESS",
+        userId: authUser.userId,
+        username: authUser.username,
+        role: authUser.role,
+        ip,
+        reason: `UPDATE_USER:${String(user._id)}`,
+    });
+
+    return {
+        user: mapPublicUser(user),
+    };
+}
+
+export async function setUserActiveStatus({ userId, isActive, authUser, req }) {
+    assertSuperAdmin(authUser);
+    assertValidUserId(userId);
+
+    if (typeof isActive !== "boolean") {
+        throw createAuthError("INVALID_INPUT", "Statut actif invalide.");
+    }
+
+    if (String(authUser.userId) === String(userId) && !isActive) {
+        throw createAuthError(
+            "FORBIDDEN",
+            "Vous ne pouvez pas desactiver votre propre compte."
+        );
+    }
+
+    const ip = getRequestIp(req);
+    const user = await AdminUser.findById(userId);
+    if (!user) {
+        throw createAuthError("USER_NOT_FOUND", "Utilisateur introuvable.");
+    }
+
+    user.isActive = isActive;
+    if (!isActive) {
+        user.refreshTokenHash = null;
+        user.refreshTokenExpiresAt = null;
+    }
+    await user.save();
+
+    await recordAuthAuditEvent({
+        action: "USER_MANAGEMENT",
+        outcome: "SUCCESS",
+        userId: authUser.userId,
+        username: authUser.username,
+        role: authUser.role,
+        ip,
+        reason: `${isActive ? "ACTIVATE" : "DEACTIVATE"}_USER:${String(user._id)}`,
+    });
+
+    return {
+        user: mapPublicUser(user),
+    };
+}
+
+export async function resetUserPassword({ userId, newPassword, authUser, req }) {
+    assertSuperAdmin(authUser);
+    assertValidUserId(userId);
+
+    if (typeof newPassword !== "string" || newPassword.length < 8 || newPassword.length > 128) {
+        throw createAuthError("INVALID_INPUT", "Mot de passe invalide.");
+    }
+
+    const ip = getRequestIp(req);
+    const user = await AdminUser.findById(userId);
+    if (!user) {
+        throw createAuthError("USER_NOT_FOUND", "Utilisateur introuvable.");
+    }
+
+    user.passwordHash = await hashPassword(newPassword);
+    user.refreshTokenHash = null;
+    user.refreshTokenExpiresAt = null;
+    await user.save();
+
+    await recordAuthAuditEvent({
+        action: "USER_MANAGEMENT",
+        outcome: "SUCCESS",
+        userId: authUser.userId,
+        username: authUser.username,
+        role: authUser.role,
+        ip,
+        reason: `RESET_PASSWORD:${String(user._id)}`,
+    });
+
+    return {
+        user: mapPublicUser(user),
+    };
+}
+
+export async function deleteUser({ userId, authUser, req }) {
+    assertSuperAdmin(authUser);
+    assertValidUserId(userId);
+
+    if (String(authUser.userId) === String(userId)) {
+        throw createAuthError(
+            "FORBIDDEN",
+            "Vous ne pouvez pas supprimer votre propre compte."
+        );
+    }
+
+    const ip = getRequestIp(req);
+    const user = await AdminUser.findById(userId);
+    if (!user) {
+        throw createAuthError("USER_NOT_FOUND", "Utilisateur introuvable.");
+    }
+
+    await AdminUser.deleteOne({ _id: user._id });
+
+    await recordAuthAuditEvent({
+        action: "USER_MANAGEMENT",
+        outcome: "SUCCESS",
+        userId: authUser.userId,
+        username: authUser.username,
+        role: authUser.role,
+        ip,
+        reason: `DELETE_USER:${String(user._id)}`,
+    });
+
+    return {
+        success: true,
     };
 }
 

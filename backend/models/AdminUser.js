@@ -23,6 +23,10 @@ const AdminUserSchema = new mongoose.Schema({
         default: "MEDECIN",
         required: true,
     },
+    isActive: {
+        type: Boolean,
+        default: true,
+    },
     refreshTokenHash: {
         type: String,
         default: null,

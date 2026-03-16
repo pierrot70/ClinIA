@@ -7,9 +7,19 @@ const { verify } = vi.hoisted(() => ({
     verify: vi.fn(),
 }));
 
+const { findById } = vi.hoisted(() => ({
+    findById: vi.fn(),
+}));
+
 vi.mock("jsonwebtoken", () => ({
     default: {
         verify,
+    },
+}));
+
+vi.mock("../../models/AdminUser.js", () => ({
+    AdminUser: {
+        findById,
     },
 }));
 
@@ -21,23 +31,33 @@ function makeRes() {
 }
 
 describe("verifyJWT middleware", () => {
-    it("rejects missing bearer token", () => {
+    it("rejects missing bearer token", async () => {
         const req = { headers: {} };
         const res = makeRes();
         const next = vi.fn();
 
-        verifyJWT(req, res, next);
+        await verifyJWT(req, res, next);
 
         expect(res.status).toHaveBeenCalledWith(401);
         expect(next).not.toHaveBeenCalled();
     });
 
-    it("accepts valid token and sets req.auth", () => {
+    it("accepts valid token and sets req.auth", async () => {
         process.env.JWT_ACCESS_SECRET = "test-access-secret";
         verify.mockReturnValue({
             sub: "user-1",
             role: "ADMIN",
             username: "admin",
+        });
+        findById.mockReturnValue({
+            select: vi.fn().mockReturnValue({
+                lean: vi.fn().mockResolvedValue({
+                    _id: "user-1",
+                    role: "ADMIN",
+                    username: "admin",
+                    isActive: true,
+                }),
+            }),
         });
 
         const req = {
@@ -48,7 +68,7 @@ describe("verifyJWT middleware", () => {
         const res = makeRes();
         const next = vi.fn();
 
-        verifyJWT(req, res, next);
+        await verifyJWT(req, res, next);
 
         expect(req.auth).toEqual({
             userId: "user-1",
@@ -67,7 +87,7 @@ describe("verifyJWT middleware", () => {
         expect(next).toHaveBeenCalledTimes(1);
     });
 
-    it("rejects token payload with invalid role", () => {
+    it("rejects token payload with invalid role", async () => {
         process.env.JWT_ACCESS_SECRET = "test-access-secret";
         verify.mockReturnValue({
             sub: "user-1",
@@ -83,7 +103,7 @@ describe("verifyJWT middleware", () => {
         const res = makeRes();
         const next = vi.fn();
 
-        verifyJWT(req, res, next);
+        await verifyJWT(req, res, next);
 
         expect(res.status).toHaveBeenCalledWith(401);
         expect(next).not.toHaveBeenCalled();

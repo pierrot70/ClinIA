@@ -4,7 +4,13 @@ const AuthAuditLogSchema = new mongoose.Schema(
     {
         action: {
             type: String,
-            enum: ["LOGIN", "FAILED_LOGIN", "LOGOUT", "REGISTER"],
+            enum: [
+                "LOGIN",
+                "FAILED_LOGIN",
+                "LOGOUT",
+                "REGISTER",
+                "USER_MANAGEMENT",
+            ],
             required: true,
         },
         outcome: {

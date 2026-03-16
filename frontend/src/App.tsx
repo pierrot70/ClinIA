@@ -24,6 +24,7 @@ import { SpecialistsPage } from "./pages/SpecialistsPage";
 
 const CLINICAL_ROLES = ["MEDECIN", "ADMIN", "SUPERADMIN"] as const;
 const ADMIN_ROLES = ["ADMIN", "SUPERADMIN"] as const;
+const SUPERADMIN_ROLES = ["SUPERADMIN"] as const;
 
 const App: React.FC = () => {
     return (
@@ -99,9 +100,9 @@ const App: React.FC = () => {
                         }
                     />
                     <Route
-                        path="/admin/users/register"
+                        path="/admin/users/manage"
                         element={
-                            <ProtectedRoute allowedRoles={[...ADMIN_ROLES]}>
+                            <ProtectedRoute allowedRoles={[...SUPERADMIN_ROLES]}>
                                 <UserRegisterPage />
                             </ProtectedRoute>
                         }

@@ -8,11 +8,16 @@ import { requireRole } from "../middleware/requireRole.js";
 import { verifyJWT } from "../middleware/verifyJWT.js";
 import { AUTH_ROLES } from "../auth/constants.js";
 import {
+    deleteUser,
     login,
+    listUsers,
     logout,
     register,
     registerSelf,
+    resetUserPassword,
     refresh,
+    setUserActiveStatus,
+    updateUser,
 } from "../services/auth.js";
 
 const router = express.Router();
@@ -58,6 +63,16 @@ router.post("/login", loginRateLimiter, async (req, res) => {
 
         if (err.code === "INVALID_CREDENTIALS") {
             return res.status(401).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        if (err.code === "ACCOUNT_INACTIVE") {
+            return res.status(403).json({
                 error: {
                     code: err.code,
                     message: err.message,
@@ -259,6 +274,281 @@ router.post(
                 error: {
                     code: "AUTH_REGISTER_FAILED",
                     message: "Impossible de creer l'utilisateur pour le moment.",
+                    retryable: true,
+                },
+            });
+        }
+    }
+);
+
+router.get(
+    "/users",
+    verifyJWT,
+    requireRole(AUTH_ROLES.SUPERADMIN),
+    async (req, res) => {
+        try {
+            const data = await listUsers({ authUser: req.auth });
+            return res.status(200).json({
+                data,
+                meta: {
+                    source: "real",
+                    model: "auth",
+                },
+            });
+        } catch (err) {
+            console.error("❌ Auth users list error:", err?.code || err?.message);
+            return res.status(500).json({
+                error: {
+                    code: "AUTH_USERS_LIST_FAILED",
+                    message: "Impossible de lister les utilisateurs.",
+                    retryable: true,
+                },
+            });
+        }
+    }
+);
+
+router.patch(
+    "/users/:userId",
+    verifyJWT,
+    requireRole(AUTH_ROLES.SUPERADMIN),
+    async (req, res) => {
+        try {
+            const data = await updateUser({
+                userId: req.params.userId,
+                updates: req.body,
+                authUser: req.auth,
+                req,
+            });
+
+            return res.status(200).json({
+                data,
+                meta: {
+                    source: "real",
+                    model: "auth",
+                },
+            });
+        } catch (err) {
+            if (err.code === "INVALID_INPUT") {
+                return res.status(400).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            if (err.code === "USER_NOT_FOUND") {
+                return res.status(404).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            if (err.code === "USER_EXISTS") {
+                return res.status(409).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            if (err.code === "FORBIDDEN") {
+                return res.status(403).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            console.error("❌ Auth user update error:", err?.code || err?.message);
+            return res.status(500).json({
+                error: {
+                    code: "AUTH_USER_UPDATE_FAILED",
+                    message: "Impossible de mettre a jour l'utilisateur.",
+                    retryable: true,
+                },
+            });
+        }
+    }
+);
+
+router.patch(
+    "/users/:userId/status",
+    verifyJWT,
+    requireRole(AUTH_ROLES.SUPERADMIN),
+    async (req, res) => {
+        try {
+            const data = await setUserActiveStatus({
+                userId: req.params.userId,
+                isActive: req.body?.isActive,
+                authUser: req.auth,
+                req,
+            });
+            return res.status(200).json({
+                data,
+                meta: {
+                    source: "real",
+                    model: "auth",
+                },
+            });
+        } catch (err) {
+            if (err.code === "INVALID_INPUT") {
+                return res.status(400).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            if (err.code === "USER_NOT_FOUND") {
+                return res.status(404).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            if (err.code === "FORBIDDEN") {
+                return res.status(403).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            console.error("❌ Auth user status error:", err?.code || err?.message);
+            return res.status(500).json({
+                error: {
+                    code: "AUTH_USER_STATUS_FAILED",
+                    message: "Impossible de changer le statut utilisateur.",
+                    retryable: true,
+                },
+            });
+        }
+    }
+);
+
+router.post(
+    "/users/:userId/reset-password",
+    verifyJWT,
+    requireRole(AUTH_ROLES.SUPERADMIN),
+    async (req, res) => {
+        try {
+            const data = await resetUserPassword({
+                userId: req.params.userId,
+                newPassword: req.body?.newPassword,
+                authUser: req.auth,
+                req,
+            });
+            return res.status(200).json({
+                data,
+                meta: {
+                    source: "real",
+                    model: "auth",
+                },
+            });
+        } catch (err) {
+            if (err.code === "INVALID_INPUT") {
+                return res.status(400).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            if (err.code === "USER_NOT_FOUND") {
+                return res.status(404).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            console.error("❌ Auth reset password error:", err?.code || err?.message);
+            return res.status(500).json({
+                error: {
+                    code: "AUTH_USER_RESET_PASSWORD_FAILED",
+                    message: "Impossible de reinitialiser le mot de passe.",
+                    retryable: true,
+                },
+            });
+        }
+    }
+);
+
+router.delete(
+    "/users/:userId",
+    verifyJWT,
+    requireRole(AUTH_ROLES.SUPERADMIN),
+    async (req, res) => {
+        try {
+            const data = await deleteUser({
+                userId: req.params.userId,
+                authUser: req.auth,
+                req,
+            });
+            return res.status(200).json({
+                data,
+                meta: {
+                    source: "real",
+                    model: "auth",
+                },
+            });
+        } catch (err) {
+            if (err.code === "INVALID_INPUT") {
+                return res.status(400).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            if (err.code === "USER_NOT_FOUND") {
+                return res.status(404).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            if (err.code === "FORBIDDEN") {
+                return res.status(403).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            console.error("❌ Auth delete user error:", err?.code || err?.message);
+            return res.status(500).json({
+                error: {
+                    code: "AUTH_USER_DELETE_FAILED",
+                    message: "Impossible de supprimer l'utilisateur.",
                     retryable: true,
                 },
             });

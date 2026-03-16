@@ -200,10 +200,10 @@ const MockStudio: React.FC = () => {
                         Éditeur des réponses simulées par diagnostic.
                     </p>
                     <Link
-                        to="/admin/users/register"
+                        to="/admin/users/manage"
                         className="mt-2 inline-block text-sm text-blue-600 hover:text-blue-700"
                     >
-                        Creer un utilisateur
+                        Gerer les utilisateurs
                     </Link>
                 </div>
                 <button

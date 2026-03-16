@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { AUTH_ROLE_VALUES } from "../auth/constants.js";
+import { AdminUser } from "../models/AdminUser.js";
 
 function getJwtAccessSecret() {
     return process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
@@ -14,7 +15,7 @@ function getTokenFromRequest(req) {
     return authHeader.slice("Bearer ".length).trim();
 }
 
-export function verifyJWT(req, res, next) {
+export async function verifyJWT(req, res, next) {
     const token = getTokenFromRequest(req);
 
     if (!token) {
@@ -45,10 +46,34 @@ export function verifyJWT(req, res, next) {
             throw new Error("Invalid JWT payload");
         }
 
+        const user = await AdminUser.findById(payload.sub)
+            .select("_id username role isActive")
+            .lean();
+
+        if (!user || user.isActive === false) {
+            return res.status(401).json({
+                error: {
+                    code: "ACCOUNT_INACTIVE",
+                    message: "Compte inactif ou inaccessible.",
+                    retryable: false,
+                },
+            });
+        }
+
+        if (user.role !== payload.role) {
+            return res.status(401).json({
+                error: {
+                    code: "INVALID_TOKEN",
+                    message: "Token d'acces invalide ou expire.",
+                    retryable: false,
+                },
+            });
+        }
+
         req.auth = {
-            userId: payload.sub,
-            role: payload.role,
-            username: payload.username,
+            userId: String(user._id),
+            role: user.role,
+            username: user.username,
         };
         return next();
     } catch {
