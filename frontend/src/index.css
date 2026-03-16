@@ -6,3 +6,26 @@ body {
   @apply bg-background text-gray-900;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
+
+@keyframes cliniaFadeInOut {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  82% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
+.clinia-fade-feedback {
+  animation: cliniaFadeInOut 3.2s ease-in-out forwards;
+}

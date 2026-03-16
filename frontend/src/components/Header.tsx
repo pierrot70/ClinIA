@@ -274,6 +274,20 @@ const Header: React.FC = () => {
                         </Link>
                     )}
 
+                    {canAccessAdmin && user?.role === "SUPERADMIN" && (
+                        <Link
+                            to="/admin/users/manage"
+                            className={
+                                "hover:text-blue-600 transition-colors " +
+                                (location.pathname === "/admin/users/manage"
+                                    ? "text-blue-600 font-medium"
+                                    : "text-gray-600")
+                            }
+                        >
+                            Utilisateurs
+                        </Link>
+                    )}
+
                     {canAccessAdmin && (
                         <button
                             onClick={logout}

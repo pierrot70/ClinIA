@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { SessionExpiredError } from "../services/authService";
@@ -58,6 +58,8 @@ const UserRegisterPage: React.FC = () => {
     const [editEmail, setEditEmail] = useState("");
     const [editRole, setEditRole] = useState<NewUserRole>("MEDECIN");
     const [resetPassword, setResetPassword] = useState("");
+    const [editSaveStatus, setEditSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+    const [editSaveMessage, setEditSaveMessage] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
@@ -86,9 +88,39 @@ const UserRegisterPage: React.FC = () => {
         }
     };
 
-    React.useEffect(() => {
+    useEffect(() => {
         void loadUsers();
     }, []);
+
+    useEffect(() => {
+        if (!error && !success) {
+            return;
+        }
+
+        const timerId = window.setTimeout(() => {
+            setError(null);
+            setSuccess(null);
+        }, 3400);
+
+        return () => {
+            window.clearTimeout(timerId);
+        };
+    }, [error, success]);
+
+    useEffect(() => {
+        if (editSaveStatus !== "success" && editSaveStatus !== "error") {
+            return;
+        }
+
+        const timerId = window.setTimeout(() => {
+            setEditSaveStatus("idle");
+            setEditSaveMessage("");
+        }, 3400);
+
+        return () => {
+            window.clearTimeout(timerId);
+        };
+    }, [editSaveStatus]);
 
     const startEdit = (managedUser: ManagedUser) => {
         setSelectedUserId(managedUser.id);
@@ -96,6 +128,8 @@ const UserRegisterPage: React.FC = () => {
         setEditEmail(managedUser.email || "");
         setEditRole(managedUser.role);
         setResetPassword("");
+        setEditSaveStatus("idle");
+        setEditSaveMessage("");
         setError(null);
         setSuccess(null);
     };
@@ -106,10 +140,13 @@ const UserRegisterPage: React.FC = () => {
         }
 
         setSaving(true);
+        setEditSaveStatus("saving");
+        setEditSaveMessage("Sauvegarde en cours...");
         setError(null);
         setSuccess(null);
 
         try {
+            const editedUsername = editUsername.trim();
             const response = await authFetch(`/api/auth/users/${selectedUserId}`, {
                 method: "PATCH",
                 headers: {
@@ -124,17 +161,29 @@ const UserRegisterPage: React.FC = () => {
 
             const payload = (await response.json().catch(() => ({}))) as RegisterResponse;
             if (!response.ok) {
-                setError(payload?.error?.message || "Impossible de modifier l'utilisateur.");
+                const failureMessage = payload?.error?.message || "Impossible de modifier l'utilisateur.";
+                setEditSaveStatus("error");
+                setEditSaveMessage(`Echec de la sauvegarde: ${failureMessage}`);
+                setError(failureMessage);
                 return;
             }
 
-            setSuccess("Utilisateur mis a jour.");
+            const successMessage = `Sauvegarde reussie pour ${editedUsername || "cet utilisateur"}.`;
+            setEditSaveStatus("success");
+            setEditSaveMessage(successMessage);
+            setSuccess(successMessage);
+            setSelectedUserId(null);
+            setEditUsername("");
+            setEditEmail("");
+            setEditRole("MEDECIN");
             await loadUsers();
         } catch (err) {
             if (err instanceof SessionExpiredError) {
                 navigate("/admin/login", { replace: true });
                 return;
             }
+            setEditSaveStatus("error");
+            setEditSaveMessage("Echec de la sauvegarde: erreur reseau.");
             setError("Erreur reseau.");
         } finally {
             setSaving(false);
@@ -330,13 +379,13 @@ const UserRegisterPage: React.FC = () => {
             )}
 
             {error && (
-                <div className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">
+                <div className="clinia-fade-feedback mb-4 rounded bg-red-50 p-3 text-sm text-red-700">
                     {error}
                 </div>
             )}
 
             {success && (
-                <div className="mb-4 rounded bg-green-50 p-3 text-sm text-green-700">
+                <div className="clinia-fade-feedback mb-4 rounded bg-green-50 p-3 text-sm text-green-700">
                     {success}
                 </div>
             )}
@@ -427,6 +476,37 @@ const UserRegisterPage: React.FC = () => {
                     </button>
                 </div>
 
+                {editSaveStatus !== "idle" && (
+                    <div
+                        className={
+                            "mb-3 rounded border px-3 py-2 text-sm " +
+                            (editSaveStatus === "success"
+                                ? "border-green-200 bg-green-50 text-green-800"
+                                : editSaveStatus === "error"
+                                    ? "border-red-200 bg-red-50 text-red-800"
+                                    : "border-blue-200 bg-blue-50 text-blue-800") +
+                            (editSaveStatus === "success" || editSaveStatus === "error"
+                                ? " clinia-fade-feedback"
+                                : "")
+                        }
+                        role="status"
+                        aria-live="polite"
+                    >
+                        <span className="mr-2 font-semibold" aria-hidden="true">
+                            {editSaveStatus === "success"
+                                ? "✓"
+                                : editSaveStatus === "error"
+                                    ? "✕"
+                                    : "..."}
+                        </span>
+                        <span>{editSaveMessage}</span>
+                    </div>
+                )}
+
+                <p className="mb-3 text-xs text-gray-500">
+                    Cliquez sur <span className="font-semibold text-blue-700">Modifier</span> pour ouvrir le panneau d'edition d'un utilisateur.
+                </p>
+
                 {loadingUsers ? (
                     <p className="text-sm text-gray-500">Chargement des utilisateurs...</p>
                 ) : users.length === 0 ? (
@@ -436,7 +516,12 @@ const UserRegisterPage: React.FC = () => {
                         {users.map((managedUser) => (
                             <div
                                 key={managedUser.id}
-                                className="rounded-lg border border-gray-200 p-3"
+                                className={
+                                    "rounded-lg border p-3 " +
+                                    (selectedUserId === managedUser.id
+                                        ? "border-blue-300 bg-blue-50/40"
+                                        : "border-gray-200")
+                                }
                             >
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                     <div>
@@ -455,9 +540,9 @@ const UserRegisterPage: React.FC = () => {
                                         <button
                                             type="button"
                                             onClick={() => startEdit(managedUser)}
-                                            className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 hover:bg-blue-200"
+                                            className="rounded bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-700"
                                         >
-                                            Editer
+                                            {selectedUserId === managedUser.id ? "Modification ouverte" : "Modifier"}
                                         </button>
                                         <button
                                             type="button"
