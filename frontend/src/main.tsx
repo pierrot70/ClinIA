@@ -4,13 +4,16 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
 import { HomeI18nProvider } from "./contexts/HomeI18nContext";
+import { AuthProvider } from "./auth/AuthContext";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   // <React.StrictMode>
     <BrowserRouter>
-      <HomeI18nProvider>
-        <App />
-      </HomeI18nProvider>
+      <AuthProvider>
+        <HomeI18nProvider>
+          <App />
+        </HomeI18nProvider>
+      </AuthProvider>
     </BrowserRouter>
   // </React.StrictMode>
 );

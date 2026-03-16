@@ -2,19 +2,24 @@ import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import VoiceNavButton from "./VoiceNavButton";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
+import { useAuth } from "../hooks/useAuth";
+import { isAdminRole } from "../auth/roles";
 
 const Header: React.FC = () => {
     const location = useLocation();
     const { locale, setLocaleFromDropdown, isTranslating } = useHomeI18n();
+    const {
+        isAuthenticated,
+        user,
+        logout: logoutSession,
+    } = useAuth();
     const FORCE_REAL_STORAGE_KEY = "clinia_force_real";
-    const token =
-        typeof window !== "undefined"
-            ? window.localStorage.getItem("clinia_admin_token")
-            : null;
+    const canAccessAdmin = isAuthenticated && isAdminRole(user?.role);
 
     const logout = () => {
-        localStorage.removeItem("clinia_admin_token");
-        window.location.href = "/";
+        logoutSession().finally(() => {
+            window.location.href = "/";
+        });
     };
 
     // 🔍 Détection environnement (Vite)
@@ -227,7 +232,21 @@ const Header: React.FC = () => {
                     </Link>
 
                     {/* ---------- ADMIN ---------- */}
-                    {!token && (
+                    {!isAuthenticated && (
+                        <Link
+                            to="/login"
+                            className={
+                                "hover:text-primary transition-colors " +
+                                (location.pathname === "/login"
+                                    ? "text-primary font-medium"
+                                    : "text-gray-600")
+                            }
+                        >
+                            Connexion
+                        </Link>
+                    )}
+
+                    {!canAccessAdmin && (
                         <Link
                             to="/admin/login"
                             className={
@@ -241,7 +260,7 @@ const Header: React.FC = () => {
                         </Link>
                     )}
 
-                    {token && (
+                    {canAccessAdmin && (
                         <Link
                             to="/mock-studio"
                             className={
@@ -255,7 +274,7 @@ const Header: React.FC = () => {
                         </Link>
                     )}
 
-                    {token && (
+                    {canAccessAdmin && (
                         <button
                             onClick={logout}
                             className="text-sm text-red-600 hover:text-red-700 ml-3"

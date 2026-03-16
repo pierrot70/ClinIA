@@ -24,12 +24,20 @@ import {
     recordOpenAISuccess,
     recordOpenAIFailure,
 } from "./utils/openaiCircuitBreaker.js";
+import {
+    detectPromptInjection,
+    sanitizeRequestPayload,
+} from "./utils/requestSafety.js";
 
 import appointmentsRouter from "./routes/appointments.js";
 import patientsRouter from "./routes/patients.js";
 import cliniquesRouter from "./routes/cliniques.js";
 import specialistsRouter from "./routes/specialists.js";
 import securityIncidentsRouter from "./routes/securityIncidents.js";
+import authRouter from "./routes/auth.js";
+import { verifyJWT } from "./middleware/verifyJWT.js";
+import { requireRole } from "./middleware/requireRole.js";
+import { AUTH_ROLES } from "./auth/constants.js";
 
 dotenv.config();
 
@@ -52,8 +60,47 @@ process.on("uncaughtException", (err) => {
 /* ------------------------------------------------------------------ */
 
 const app = express();
+app.set("trust proxy", 1);
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
+app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.setHeader("Permissions-Policy", "geolocation=(), microphone=()");
+
+    const isProd = process.env.NODE_ENV === "production";
+    const forwardedProto = req.headers["x-forwarded-proto"];
+    const hostHeader = String(req.headers.host || "").toLowerCase();
+    const hostname = hostHeader.split(":")[0];
+    const isLocalHostRequest =
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname === "::1";
+    const isSecure =
+        req.secure ||
+        (typeof forwardedProto === "string" &&
+            forwardedProto.toLowerCase().includes("https"));
+
+    if (isProd && !isSecure && !isLocalHostRequest) {
+        return res.status(400).json({
+            error: {
+                code: "HTTPS_REQUIRED",
+                message: "HTTPS est requis.",
+                retryable: false,
+            },
+        });
+    }
+
+    if (isSecure) {
+        res.setHeader(
+            "Strict-Transport-Security",
+            "max-age=31536000; includeSubDomains"
+        );
+    }
+
+    return next();
+});
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -396,7 +443,25 @@ async function respondWithSecurityIncident({
 
 app.post("/api/ai/analyze", async (req, res) => {
     try {
-        const { symptoms = [], forceReal, openaiModel, incidentAckId } = req.body;
+        const safeBody = sanitizeRequestPayload(req.body ?? {});
+        const promptInjectionScan = detectPromptInjection(safeBody);
+        if (promptInjectionScan.hasMatch) {
+            return res.status(400).json({
+                error: {
+                    code: "PROMPT_INJECTION_DETECTED",
+                    message:
+                        "La requete contient des instructions non autorisees.",
+                    retryable: false,
+                },
+            });
+        }
+
+        const {
+            symptoms = [],
+            forceReal,
+            openaiModel,
+            incidentAckId,
+        } = safeBody;
 
         if (!Array.isArray(symptoms) || symptoms.length === 0) {
             return res.json({
@@ -417,7 +482,7 @@ app.post("/api/ai/analyze", async (req, res) => {
             req.body.diagnosis.trim()
                 ? req.body.diagnosis.trim()
                 : diagnosisSeed || "To be determined by ClinIA";
-        const patient = req.body;
+        const patient = safeBody;
         let neutralizationMeta = null;
         const fingerprint = makeFingerprint({ diagnosis, patient });
 
@@ -440,7 +505,9 @@ app.post("/api/ai/analyze", async (req, res) => {
             forceReal: forceRealSafe,
             useMock,
             circuitOpen: !canCallOpenAI(),
-            symptoms,
+            symptomCount: Array.isArray(symptoms)
+                ? symptoms.length
+                : 0,
             isProd,
         });
 
@@ -597,7 +664,11 @@ app.post("/api/ai/analyze", async (req, res) => {
             model: model ?? "unknown",
         });
 
-        console.log("AI_RESPONSE From OpenAI", normalized);
+        console.log("AI_RESPONSE From OpenAI", {
+            model,
+            source: "real",
+            hasDiagnosis: Boolean(normalized?.diagnosis?.suspected),
+        });
 
         if (!persist.ok)
             return res.status(500).json({ error: persist.error });
@@ -996,11 +1067,46 @@ mongoose
 /*
     Dans ce block j'ajoute mes API endpoints
  */
-app.use("/api/appointments", appointmentsRouter);
-app.use("/api/patients", patientsRouter);
-app.use("/api/cliniques", cliniquesRouter);
-app.use("/api/specialists", specialistsRouter);
-app.use("/api/security/incidents", securityIncidentsRouter);
+app.use("/api/auth", authRouter);
+
+app.use(
+    "/api/appointments",
+    verifyJWT,
+    requireRole(
+        AUTH_ROLES.MEDECIN,
+        AUTH_ROLES.ADMIN,
+        AUTH_ROLES.SUPERADMIN
+    ),
+    appointmentsRouter
+);
+app.use(
+    "/api/patients",
+    verifyJWT,
+    requireRole(
+        AUTH_ROLES.MEDECIN,
+        AUTH_ROLES.ADMIN,
+        AUTH_ROLES.SUPERADMIN
+    ),
+    patientsRouter
+);
+app.use(
+    "/api/cliniques",
+    verifyJWT,
+    requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+    cliniquesRouter
+);
+app.use(
+    "/api/specialists",
+    verifyJWT,
+    requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+    specialistsRouter
+);
+app.use(
+    "/api/security/incidents",
+    verifyJWT,
+    requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+    securityIncidentsRouter
+);
 
 app.listen(4000, () =>
     console.log(

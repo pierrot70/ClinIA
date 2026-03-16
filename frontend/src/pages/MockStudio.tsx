@@ -1,6 +1,8 @@
 // frontend/src/pages/MockStudio.tsx
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
+import { SessionExpiredError } from "../services/authService";
 
 type Treatment = {
     name: string;
@@ -26,28 +28,17 @@ const MockStudio: React.FC = () => {
     const [info, setInfo] = useState<string | null>(null);
 
     const navigate = useNavigate();
+    const { authFetch } = useAuth();
 
     // ------------------------------------------
     // 🔐 Charger les mocks (JWT obligatoire)
     // ------------------------------------------
     useEffect(() => {
         const fetchMocks = async () => {
-            const token = localStorage.getItem("clinia_admin_token");
-
-            if (!token) {
-                navigate("/admin/login");
-                return;
-            }
-
             try {
-                const res = await fetch("/api/mocks", {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
+                const res = await authFetch("/api/mocks");
 
                 if (res.status === 401 || res.status === 403) {
-                    localStorage.removeItem("clinia_admin_token");
                     navigate("/admin/login");
                     return;
                 }
@@ -58,7 +49,10 @@ const MockStudio: React.FC = () => {
                 const keys = Object.keys(json).filter((k) => k !== "_fallback");
                 if (keys.length > 0) setSelectedKey(keys[0]);
             } catch (err) {
-                console.error(err);
+                if (err instanceof SessionExpiredError) {
+                    navigate("/admin/login");
+                    return;
+                }
                 setError("Impossible de charger les mocks.");
             } finally {
                 setLoading(false);
@@ -66,7 +60,7 @@ const MockStudio: React.FC = () => {
         };
 
         fetchMocks();
-    }, [navigate]);
+    }, [authFetch, navigate]);
 
     const current = selectedKey ? mocks[selectedKey] : null;
 
@@ -87,24 +81,15 @@ const MockStudio: React.FC = () => {
         setInfo(null);
 
         try {
-            const token = localStorage.getItem("clinia_admin_token");
-
-            if (!token) {
-                navigate("/admin/login");
-                return;
-            }
-
-            const res = await fetch("/api/mocks", {
+            const res = await authFetch("/api/mocks", {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify(mocks),
             });
 
             if (res.status === 401 || res.status === 403) {
-                localStorage.removeItem("clinia_admin_token");
                 navigate("/admin/login");
                 return;
             }
@@ -115,8 +100,17 @@ const MockStudio: React.FC = () => {
             }
 
             setInfo("Mocks sauvegardés avec succès !");
-        } catch (err: any) {
-            setError(err.message || "Erreur inconnue.");
+        } catch (err: unknown) {
+            if (err instanceof SessionExpiredError) {
+                navigate("/admin/login");
+                return;
+            }
+
+            if (err instanceof Error) {
+                setError(err.message);
+            } else {
+                setError("Erreur inconnue.");
+            }
         } finally {
             setSaving(false);
         }
@@ -205,6 +199,12 @@ const MockStudio: React.FC = () => {
                     <p className="text-sm text-gray-600">
                         Éditeur des réponses simulées par diagnostic.
                     </p>
+                    <Link
+                        to="/admin/users/register"
+                        className="mt-2 inline-block text-sm text-blue-600 hover:text-blue-700"
+                    >
+                        Creer un utilisateur
+                    </Link>
                 </div>
                 <button
                     onClick={handleSave}
