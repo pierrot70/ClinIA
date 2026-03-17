@@ -1,0 +1,3 @@
+# ClinIA TODO
+
+- [ ] Configurer Mongo Express en HTTPS via un sous-domaine dedie (ex: mongo.clinique-ai.ca) dans Coolify/Traefik, puis retirer l'acces public direct en HTTP sur :8081.
