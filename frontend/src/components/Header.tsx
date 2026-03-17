@@ -4,6 +4,7 @@ import VoiceNavButton from "./VoiceNavButton";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { useAuth } from "../hooks/useAuth";
 import { isAdminRole } from "../auth/roles";
+import { SessionExpiredError } from "../services/authService";
 
 const Header: React.FC = () => {
     const location = useLocation();
@@ -12,6 +13,7 @@ const Header: React.FC = () => {
         isAuthenticated,
         user,
         logout: logoutSession,
+        authFetch,
     } = useAuth();
     const FORCE_REAL_STORAGE_KEY = "clinia_force_real";
     const canAccessAdmin = isAuthenticated && isAdminRole(user?.role);
@@ -92,6 +94,45 @@ const Header: React.FC = () => {
                 detail: { forceReal: next },
             })
         );
+    };
+
+    const triggerAppShutdown = async () => {
+        const confirmed = window.confirm(
+            "Activer l'arret de l'application dans 30 secondes ? Tous les utilisateurs (sauf SUPERADMIN) seront deconnectes."
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const response = await authFetch("/api/auth/app-shutdown", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ delaySeconds: 30 }),
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                window.alert(
+                    payload?.error?.message ||
+                        "Impossible de planifier l'arret de l'application."
+                );
+                return;
+            }
+
+            window.alert(
+                "Arret de l'application planifie dans 30 secondes pour les utilisateurs non SUPERADMIN."
+            );
+        } catch (err) {
+            if (err instanceof SessionExpiredError) {
+                logout();
+                return;
+            }
+            window.alert("Erreur reseau lors de la planification de l'arret.");
+        }
     };
 
     return (
@@ -222,6 +263,17 @@ const Header: React.FC = () => {
                                     {item.label}
                                 </Link>
                             ))}
+                            {user?.role === "SUPERADMIN" && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        void triggerAppShutdown();
+                                    }}
+                                    className="block w-full px-4 py-2 text-left text-sm text-red-700 transition hover:bg-red-50"
+                                >
+                                    Arret de l'application
+                                </button>
+                            )}
                         </div>
                     </div>
 

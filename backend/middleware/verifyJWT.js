@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { AUTH_ROLE_VALUES } from "../auth/constants.js";
 import { AdminUser } from "../models/AdminUser.js";
+import { isShutdownEnforcedForRole } from "../services/appShutdown.js";
 
 function getJwtAccessSecret() {
     return process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
@@ -65,6 +66,16 @@ export async function verifyJWT(req, res, next) {
                 error: {
                     code: "INVALID_TOKEN",
                     message: "Token d'acces invalide ou expire.",
+                    retryable: false,
+                },
+            });
+        }
+
+        if (isShutdownEnforcedForRole(user.role)) {
+            return res.status(401).json({
+                error: {
+                    code: "APP_SHUTDOWN",
+                    message: "Application arretee par le SUPERADMIN.",
                     retryable: false,
                 },
             });

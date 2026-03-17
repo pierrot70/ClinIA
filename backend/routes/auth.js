@@ -19,6 +19,7 @@ import {
     setUserActiveStatus,
     updateUser,
 } from "../services/auth.js";
+import { scheduleAppShutdown } from "../services/appShutdown.js";
 
 const router = express.Router();
 
@@ -72,6 +73,16 @@ router.post("/login", loginRateLimiter, async (req, res) => {
         }
 
         if (err.code === "ACCOUNT_INACTIVE") {
+            return res.status(403).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        if (err.code === "APP_SHUTDOWN") {
             return res.status(403).json({
                 error: {
                     code: err.code,
@@ -167,7 +178,8 @@ router.post("/refresh", refreshRateLimiter, async (req, res) => {
 
         if (
             err.code === "INVALID_REFRESH_TOKEN" ||
-            err.code === "REFRESH_TOKEN_EXPIRED"
+            err.code === "REFRESH_TOKEN_EXPIRED" ||
+            err.code === "APP_SHUTDOWN"
         ) {
             return res.status(401).json({
                 error: {
@@ -549,6 +561,53 @@ router.delete(
                 error: {
                     code: "AUTH_USER_DELETE_FAILED",
                     message: "Impossible de supprimer l'utilisateur.",
+                    retryable: true,
+                },
+            });
+        }
+    }
+);
+
+router.post(
+    "/app-shutdown",
+    verifyJWT,
+    requireRole(AUTH_ROLES.SUPERADMIN),
+    async (req, res) => {
+        try {
+            const delaySecondsRaw = req.body?.delaySeconds;
+            const delaySeconds =
+                typeof delaySecondsRaw === "number"
+                    ? delaySecondsRaw
+                    : Number(delaySecondsRaw ?? 30);
+
+            const data = scheduleAppShutdown({
+                delaySeconds,
+                activatedBy: req.auth?.userId ?? null,
+            });
+
+            return res.status(200).json({
+                data,
+                meta: {
+                    source: "real",
+                    model: "auth",
+                },
+            });
+        } catch (err) {
+            if (err.code === "INVALID_INPUT") {
+                return res.status(400).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            console.error("❌ App shutdown scheduling error:", err?.code || err?.message);
+            return res.status(500).json({
+                error: {
+                    code: "APP_SHUTDOWN_SCHEDULE_FAILED",
+                    message: "Impossible de planifier l'arret de l'application.",
                     retryable: true,
                 },
             });

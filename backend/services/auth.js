@@ -11,6 +11,7 @@ import {
 } from "../auth/constants.js";
 import { recordAuthAuditEvent } from "../audit/authAudit.js";
 import { AdminUser } from "../models/AdminUser.js";
+import { isShutdownEnforcedForRole } from "./appShutdown.js";
 
 function createAuthError(code, message) {
     return { code, message };
@@ -301,6 +302,13 @@ export async function login({ username, email, password, req }) {
         );
     }
 
+    if (isShutdownEnforcedForRole(user.role)) {
+        throw createAuthError(
+            "APP_SHUTDOWN",
+            "Application arretee par le SUPERADMIN."
+        );
+    }
+
     if (user.lockUntil && user.lockUntil.getTime() > Date.now()) {
         await recordAuthAuditEvent({
             action: "FAILED_LOGIN",
@@ -399,6 +407,16 @@ export async function refresh({ refreshToken, req }) {
         throw createAuthError(
             "REFRESH_TOKEN_EXPIRED",
             "Refresh token expire."
+        );
+    }
+
+    if (isShutdownEnforcedForRole(user.role)) {
+        user.refreshTokenHash = null;
+        user.refreshTokenExpiresAt = null;
+        await user.save();
+        throw createAuthError(
+            "APP_SHUTDOWN",
+            "Application arretee par le SUPERADMIN."
         );
     }
 
