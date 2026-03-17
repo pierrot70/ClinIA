@@ -38,6 +38,7 @@ const Header: React.FC = () => {
     const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
     const [loadingActiveUsers, setLoadingActiveUsers] = useState(false);
     const [activeUsersError, setActiveUsersError] = useState<string | null>(null);
+    const ACTIVE_USERS_REFRESH_MS = 5_000;
 
     const logout = () => {
         logoutSession().finally(() => {
@@ -148,9 +149,10 @@ const Header: React.FC = () => {
         }
     };
 
-    const openActiveUsersModal = async () => {
-        setShowActiveUsersModal(true);
-        setLoadingActiveUsers(true);
+    const loadActiveUsers = async (showLoadingState = false) => {
+        if (showLoadingState) {
+            setLoadingActiveUsers(true);
+        }
         setActiveUsersError(null);
 
         try {
@@ -176,9 +178,30 @@ const Header: React.FC = () => {
             setActiveUsersError("Erreur reseau lors du chargement des usagers actifs.");
             setActiveUsers([]);
         } finally {
-            setLoadingActiveUsers(false);
+            if (showLoadingState) {
+                setLoadingActiveUsers(false);
+            }
         }
     };
+
+    const openActiveUsersModal = async () => {
+        setShowActiveUsersModal(true);
+        await loadActiveUsers(true);
+    };
+
+    useEffect(() => {
+        if (!showActiveUsersModal) {
+            return;
+        }
+
+        const intervalId = window.setInterval(() => {
+            void loadActiveUsers(false);
+        }, ACTIVE_USERS_REFRESH_MS);
+
+        return () => {
+            window.clearInterval(intervalId);
+        };
+    }, [showActiveUsersModal]);
 
     return (
         <header className="bg-white border-b border-gray-200">
