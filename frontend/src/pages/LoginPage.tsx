@@ -25,9 +25,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
             return from;
         }
         if (user) {
-            return getDefaultRouteForRole(user.role);
+            return adminOnly ? getDefaultRouteForRole(user.role) : "/";
         }
-        return adminOnly ? "/mock-studio" : "/clinical";
+        return adminOnly ? "/mock-studio" : "/";
     }, [adminOnly, location.state, user]);
 
     if (isAuthenticated && user) {
@@ -58,7 +58,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
             const destination =
                 typeof from === "string" && from.trim().length > 0
                     ? from
-                    : getDefaultRouteForRole(session.user.role);
+                    : adminOnly
+                        ? getDefaultRouteForRole(session.user.role)
+                        : "/";
 
             navigate(destination, { replace: true });
         } catch (err: unknown) {

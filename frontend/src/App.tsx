@@ -21,18 +21,32 @@ import { AppointmentsListPage } from "./pages/AppointmentsList";
 import { PatientsPage } from "./pages/PatientsPage";
 import { CliniquesPage } from "./pages/CliniquesPage";
 import { SpecialistsPage } from "./pages/SpecialistsPage";
+import { useAuth } from "./hooks/useAuth";
 
 const CLINICAL_ROLES = ["MEDECIN", "ADMIN", "SUPERADMIN"] as const;
 const ADMIN_ROLES = ["ADMIN", "SUPERADMIN"] as const;
 const SUPERADMIN_ROLES = ["SUPERADMIN"] as const;
 
 const App: React.FC = () => {
+    const { status, isAuthenticated } = useAuth();
+
+    const homeEntry =
+        status === "loading" ? (
+            <div className="max-w-6xl mx-auto px-4 py-8">
+                <p className="text-sm text-gray-500">Validation de session...</p>
+            </div>
+        ) : isAuthenticated ? (
+            <Home />
+        ) : (
+            <Navigate to="/login" replace />
+        );
+
     return (
         <div className="min-h-screen flex flex-col bg-background">
             <Header />
             <main className="flex-1">
                 <Routes>
-                    <Route path="/" element={<Home />} />
+                    <Route path="/" element={homeEntry} />
                     <Route path="/results" element={<Results />} />
                     <Route path="/treatment/:id" element={<TreatmentDetails />} />
                     <Route path="/quick" element={<QuickMode />} />
