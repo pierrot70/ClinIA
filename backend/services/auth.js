@@ -545,7 +545,7 @@ export async function registerSelf({ email, password, role, req }) {
         throw createAuthError("INVALID_INPUT", "Email invalide.");
     }
 
-    const targetRole = AUTH_ROLE_VALUES.includes(role) ? role : "MEDECIN";
+    const targetRole = AUTH_ROLE_VALUES.includes(role) ? role : "USER";
 
     const requestedUsername = makeUsernameFromEmail(normalizedEmail);
     const normalizedUsername = assertRegisterInput({

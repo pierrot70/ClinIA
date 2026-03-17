@@ -11,7 +11,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [registerMode, setRegisterMode] = useState(false);
-    const [registerRole, setRegisterRole] = useState<UserRole>("MEDECIN");
+    const [registerRole, setRegisterRole] = useState<UserRole>("USER");
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
@@ -91,7 +91,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                 {adminOnly
                     ? "Acces reserve a la console d'administration ClinIA."
                     : registerMode
-                        ? "Creer un compte MEDECIN avec votre courriel et mot de passe."
+                        ? "Creer un compte avec votre courriel, mot de passe et role."
                         : "Connectez-vous pour acceder aux modules cliniques securises."}
             </p>
 
@@ -160,6 +160,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                             }
                         >
                             <option value="MEDECIN">MEDECIN</option>
+                            <option value="USER">USER</option>
                             <option value="ADMIN">ADMIN</option>
                             <option value="SUPERADMIN">SUPERADMIN</option>
                         </select>

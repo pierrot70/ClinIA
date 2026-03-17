@@ -1,4 +1,4 @@
-export type UserRole = "MEDECIN" | "ADMIN" | "SUPERADMIN";
+export type UserRole = "USER" | "MEDECIN" | "ADMIN" | "SUPERADMIN";
 
 export function isAdminRole(role: UserRole | null | undefined): boolean {
     return role === "ADMIN" || role === "SUPERADMIN";

@@ -19,8 +19,8 @@ const AdminUserSchema = new mongoose.Schema({
     passwordHash: { type: String, required: true },
     role: {
         type: String,
-        enum: ["MEDECIN", "ADMIN", "SUPERADMIN"],
-        default: "MEDECIN",
+        enum: ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"],
+        default: "USER",
         required: true,
     },
     isActive: {

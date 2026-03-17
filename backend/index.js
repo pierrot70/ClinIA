@@ -1073,6 +1073,7 @@ app.use(
     "/api/appointments",
     verifyJWT,
     requireRole(
+        AUTH_ROLES.USER,
         AUTH_ROLES.MEDECIN,
         AUTH_ROLES.ADMIN,
         AUTH_ROLES.SUPERADMIN
@@ -1083,6 +1084,7 @@ app.use(
     "/api/patients",
     verifyJWT,
     requireRole(
+        AUTH_ROLES.USER,
         AUTH_ROLES.MEDECIN,
         AUTH_ROLES.ADMIN,
         AUTH_ROLES.SUPERADMIN

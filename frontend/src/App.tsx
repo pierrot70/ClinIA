@@ -23,7 +23,7 @@ import { CliniquesPage } from "./pages/CliniquesPage";
 import { SpecialistsPage } from "./pages/SpecialistsPage";
 import { useAuth } from "./hooks/useAuth";
 
-const CLINICAL_ROLES = ["MEDECIN", "ADMIN", "SUPERADMIN"] as const;
+const CLINICAL_ROLES = ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
 const ADMIN_ROLES = ["ADMIN", "SUPERADMIN"] as const;
 const SUPERADMIN_ROLES = ["SUPERADMIN"] as const;
 

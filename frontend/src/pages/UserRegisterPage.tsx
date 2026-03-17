@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { SessionExpiredError } from "../services/authService";
 
-const ROLE_OPTIONS = ["MEDECIN", "ADMIN", "SUPERADMIN"] as const;
+const ROLE_OPTIONS = ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
 
 type NewUserRole = (typeof ROLE_OPTIONS)[number];
 
