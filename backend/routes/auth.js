@@ -10,6 +10,7 @@ import { AUTH_ROLES } from "../auth/constants.js";
 import {
     deleteUser,
     login,
+    listActiveUsers,
     listUsers,
     logout,
     register,
@@ -286,6 +287,33 @@ router.post(
                 error: {
                     code: "AUTH_REGISTER_FAILED",
                     message: "Impossible de creer l'utilisateur pour le moment.",
+                    retryable: true,
+                },
+            });
+        }
+    }
+);
+
+router.get(
+    "/users/active",
+    verifyJWT,
+    requireRole(AUTH_ROLES.SUPERADMIN),
+    async (req, res) => {
+        try {
+            const data = await listActiveUsers({ authUser: req.auth });
+            return res.status(200).json({
+                data,
+                meta: {
+                    source: "real",
+                    model: "auth",
+                },
+            });
+        } catch (err) {
+            console.error("❌ Auth active users list error:", err?.code || err?.message);
+            return res.status(500).json({
+                error: {
+                    code: "AUTH_ACTIVE_USERS_LIST_FAILED",
+                    message: "Impossible de lister les usagers actifs.",
                     retryable: true,
                 },
             });

@@ -636,6 +636,23 @@ export async function listUsers({ authUser }) {
     };
 }
 
+export async function listActiveUsers({ authUser }) {
+    assertSuperAdmin(authUser);
+
+    const users = await AdminUser.find({
+        isActive: true,
+        refreshTokenHash: { $ne: null },
+        refreshTokenExpiresAt: { $gt: new Date() },
+    })
+        .select("username email role isActive createdAt lastLoginAt lastLogoutAt")
+        .sort({ lastLoginAt: -1, createdAt: -1 })
+        .lean();
+
+    return {
+        users: users.map(mapPublicUser),
+    };
+}
+
 export async function updateUser({ userId, updates, authUser, req }) {
     assertSuperAdmin(authUser);
     assertValidUserId(userId);

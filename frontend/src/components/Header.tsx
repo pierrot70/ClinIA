@@ -6,6 +6,15 @@ import { useAuth } from "../hooks/useAuth";
 import { isAdminRole } from "../auth/roles";
 import { SessionExpiredError } from "../services/authService";
 
+type ActiveUser = {
+    id: string;
+    username: string;
+    email: string | null;
+    role: string;
+    isActive: boolean;
+    lastLoginAt?: string | null;
+};
+
 const Header: React.FC = () => {
     const location = useLocation();
     const { locale, setLocaleFromDropdown, isTranslating } = useHomeI18n();
@@ -25,6 +34,10 @@ const Header: React.FC = () => {
         hostname === "127.0.0.1" ||
         hostname === "::1";
     const isRemoteProd = isProd && !isLocalRuntime;
+    const [showActiveUsersModal, setShowActiveUsersModal] = useState(false);
+    const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
+    const [loadingActiveUsers, setLoadingActiveUsers] = useState(false);
+    const [activeUsersError, setActiveUsersError] = useState<string | null>(null);
 
     const logout = () => {
         logoutSession().finally(() => {
@@ -132,6 +145,38 @@ const Header: React.FC = () => {
                 return;
             }
             window.alert("Erreur reseau lors de la planification de l'arret.");
+        }
+    };
+
+    const openActiveUsersModal = async () => {
+        setShowActiveUsersModal(true);
+        setLoadingActiveUsers(true);
+        setActiveUsersError(null);
+
+        try {
+            const response = await authFetch("/api/auth/users/active");
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                setActiveUsersError(
+                    payload?.error?.message ||
+                        "Impossible de charger les usagers actifs."
+                );
+                setActiveUsers([]);
+                return;
+            }
+
+            setActiveUsers(payload?.data?.users || []);
+        } catch (err) {
+            if (err instanceof SessionExpiredError) {
+                logout();
+                return;
+            }
+
+            setActiveUsersError("Erreur reseau lors du chargement des usagers actifs.");
+            setActiveUsers([]);
+        } finally {
+            setLoadingActiveUsers(false);
         }
     };
 
@@ -267,6 +312,17 @@ const Header: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => {
+                                        void openActiveUsersModal();
+                                    }}
+                                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
+                                >
+                                    Montre Usager Actif
+                                </button>
+                            )}
+                            {user?.role === "SUPERADMIN" && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
                                         void triggerAppShutdown();
                                     }}
                                     className="block w-full px-4 py-2 text-left text-sm text-red-700 transition hover:bg-red-50"
@@ -355,6 +411,56 @@ const Header: React.FC = () => {
                     )}
                 </nav>
             </div>
+
+            {showActiveUsersModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+                    <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-2xl">
+                        <div className="mb-4 flex items-center justify-between gap-4">
+                            <h2 className="text-lg font-semibold text-gray-900">
+                                Usagers actifs
+                            </h2>
+                            <button
+                                type="button"
+                                onClick={() => setShowActiveUsersModal(false)}
+                                className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                            >
+                                Fermer
+                            </button>
+                        </div>
+
+                        {loadingActiveUsers ? (
+                            <p className="text-sm text-gray-500">Chargement des usagers actifs...</p>
+                        ) : activeUsersError ? (
+                            <div className="rounded bg-red-50 p-3 text-sm text-red-700">
+                                {activeUsersError}
+                            </div>
+                        ) : activeUsers.length === 0 ? (
+                            <p className="text-sm text-gray-500">Aucun usager actif.</p>
+                        ) : (
+                            <div className="max-h-[360px] space-y-3 overflow-y-auto">
+                                {activeUsers.map((activeUser) => (
+                                    <div
+                                        key={activeUser.id}
+                                        className="rounded-lg border border-gray-200 p-3"
+                                    >
+                                        <div className="text-sm font-semibold text-gray-900">
+                                            {activeUser.username} ({activeUser.role})
+                                        </div>
+                                        <div className="text-xs text-gray-600">
+                                            {activeUser.email || "Aucun courriel"}
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                            Derniere connexion: {activeUser.lastLoginAt
+                                                ? new Date(activeUser.lastLoginAt).toLocaleString()
+                                                : "Inconnue"}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </header>
     );
 };
