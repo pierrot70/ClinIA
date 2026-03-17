@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
 import Home from "./pages/Home";
@@ -26,9 +26,43 @@ import { useAuth } from "./hooks/useAuth";
 const CLINICAL_ROLES = ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
 const ADMIN_ROLES = ["ADMIN", "SUPERADMIN"] as const;
 const SUPERADMIN_ROLES = ["SUPERADMIN"] as const;
+const API_URL = import.meta.env.VITE_API_URL as string;
+const APP_STATUS_REFRESH_MS = 10_000;
 
 const App: React.FC = () => {
     const { status, isAuthenticated } = useAuth();
+    const [maintenanceActive, setMaintenanceActive] = useState(false);
+
+    useEffect(() => {
+        let mounted = true;
+
+        const loadAppStatus = async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/auth/app-status`);
+                const payload = await response.json().catch(() => ({}));
+
+                if (!mounted) {
+                    return;
+                }
+
+                setMaintenanceActive(Boolean(payload?.data?.maintenanceActive));
+            } catch {
+                if (mounted) {
+                    setMaintenanceActive(false);
+                }
+            }
+        };
+
+        void loadAppStatus();
+        const intervalId = window.setInterval(() => {
+            void loadAppStatus();
+        }, APP_STATUS_REFRESH_MS);
+
+        return () => {
+            mounted = false;
+            window.clearInterval(intervalId);
+        };
+    }, []);
 
     const homeEntry =
         status === "loading" ? (
@@ -44,6 +78,11 @@ const App: React.FC = () => {
     return (
         <div className="min-h-screen flex flex-col bg-background">
             <Header />
+            {maintenanceActive && (
+                <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">
+                    Maintenance en cours. L'application est temporairement arretee pour les usagers non SUPERADMIN.
+                </div>
+            )}
             <main className="flex-1">
                 <Routes>
                     <Route path="/" element={homeEntry} />

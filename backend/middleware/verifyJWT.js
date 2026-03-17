@@ -1,7 +1,10 @@
 import jwt from "jsonwebtoken";
 import { AUTH_ROLE_VALUES } from "../auth/constants.js";
 import { AdminUser } from "../models/AdminUser.js";
-import { isShutdownEnforcedForRole } from "../services/appShutdown.js";
+import {
+    enforceScheduledShutdownIfDue,
+    isShutdownEnforcedForRole,
+} from "../services/appShutdown.js";
 
 function getJwtAccessSecret() {
     return process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
@@ -30,6 +33,8 @@ export async function verifyJWT(req, res, next) {
     }
 
     try {
+        await enforceScheduledShutdownIfDue();
+
         const payload = jwt.verify(
             token,
             getJwtAccessSecret(),

@@ -442,13 +442,24 @@ const Header: React.FC = () => {
                             <h2 className="text-lg font-semibold text-gray-900">
                                 Usagers actifs
                             </h2>
-                            <button
-                                type="button"
-                                onClick={() => setShowActiveUsersModal(false)}
-                                className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                            >
-                                Fermer
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        void loadActiveUsers(true);
+                                    }}
+                                    className="rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
+                                >
+                                    Rafraichir
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowActiveUsersModal(false)}
+                                    className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                                >
+                                    Fermer
+                                </button>
+                            </div>
                         </div>
 
                         {loadingActiveUsers ? (

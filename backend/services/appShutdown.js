@@ -1,4 +1,5 @@
 import { AUTH_ROLES } from "../auth/constants.js";
+import { AdminUser } from "../models/AdminUser.js";
 
 let shutdownState = {
     isScheduled: false,
@@ -6,6 +7,7 @@ let shutdownState = {
     activatedAt: null,
     activatedBy: null,
     delaySeconds: null,
+    enforcedAt: null,
 };
 
 function assertDelay(delaySeconds) {
@@ -31,6 +33,7 @@ export function scheduleAppShutdown({ delaySeconds = 30, activatedBy = null }) {
         activatedAt: now,
         activatedBy,
         delaySeconds,
+        enforcedAt: null,
     };
 
     return getAppShutdownState();
@@ -43,7 +46,44 @@ export function getAppShutdownState() {
         activatedAt: shutdownState.activatedAt,
         activatedBy: shutdownState.activatedBy,
         delaySeconds: shutdownState.delaySeconds,
+        enforcedAt: shutdownState.enforcedAt,
     };
+}
+
+export function isMaintenanceActive() {
+    return Boolean(
+        shutdownState.isScheduled &&
+        shutdownState.shutdownAt &&
+        Date.now() >= shutdownState.shutdownAt.getTime()
+    );
+}
+
+export async function enforceScheduledShutdownIfDue() {
+    if (
+        !shutdownState.isScheduled ||
+        !shutdownState.shutdownAt ||
+        shutdownState.enforcedAt ||
+        Date.now() < shutdownState.shutdownAt.getTime()
+    ) {
+        return false;
+    }
+
+    await AdminUser.updateMany(
+        {
+            role: { $ne: AUTH_ROLES.SUPERADMIN },
+            refreshTokenHash: { $ne: null },
+        },
+        {
+            $set: {
+                refreshTokenHash: null,
+                refreshTokenExpiresAt: null,
+                lastLogoutAt: new Date(),
+            },
+        }
+    );
+
+    shutdownState.enforcedAt = new Date();
+    return true;
 }
 
 export function isShutdownEnforcedForRole(role) {

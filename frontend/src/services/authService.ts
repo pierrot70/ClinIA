@@ -159,6 +159,19 @@ function clearSession(): void {
     setStoredRefreshToken(undefined);
 }
 
+function redirectToLoginIfSessionWasForcedOut(user: AuthUser | null): void {
+    if (!user || user.role === "SUPERADMIN") {
+        return;
+    }
+
+    const currentPath = window.location.pathname;
+    if (currentPath === "/login") {
+        return;
+    }
+
+    window.location.replace("/login");
+}
+
 function getResponsePayload(data: LoginApiResponse): LoginApiResponse {
     if (data?.data && typeof data.data === "object") {
         return data.data;
@@ -293,7 +306,9 @@ export async function refreshAccessToken(): Promise<string | null> {
 
     const storedRefreshToken = getStoredRefreshToken();
     if (!storedRefreshToken) {
+        const previousUser = inMemoryUser;
         clearSession();
+        redirectToLoginIfSessionWasForcedOut(previousUser);
         return null;
     }
 
@@ -306,7 +321,9 @@ export async function refreshAccessToken(): Promise<string | null> {
             const payload = getResponsePayload(data);
 
             if (!response.ok) {
+                const previousUser = inMemoryUser;
                 clearSession();
+                redirectToLoginIfSessionWasForcedOut(previousUser);
                 return null;
             }
 
@@ -317,7 +334,9 @@ export async function refreshAccessToken(): Promise<string | null> {
             applySession(session);
             return session.accessToken;
         } catch {
+            const previousUser = inMemoryUser;
             clearSession();
+            redirectToLoginIfSessionWasForcedOut(previousUser);
             return null;
         } finally {
             refreshPromise = null;
@@ -421,7 +440,9 @@ export async function authFetch(input: RequestInfo | URL, init: AuthFetchOptions
     });
 
     if (response.status === 401) {
+        const previousUser = inMemoryUser;
         clearSession();
+        redirectToLoginIfSessionWasForcedOut(previousUser);
         throw new SessionExpiredError();
     }
 

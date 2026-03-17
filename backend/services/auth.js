@@ -11,7 +11,10 @@ import {
 } from "../auth/constants.js";
 import { recordAuthAuditEvent } from "../audit/authAudit.js";
 import { AdminUser } from "../models/AdminUser.js";
-import { isShutdownEnforcedForRole } from "./appShutdown.js";
+import {
+    enforceScheduledShutdownIfDue,
+    isShutdownEnforcedForRole,
+} from "./appShutdown.js";
 
 function createAuthError(code, message) {
     return { code, message };
@@ -254,6 +257,8 @@ async function setRotatedRefreshToken(user) {
 }
 
 export async function login({ username, email, password, req }) {
+    await enforceScheduledShutdownIfDue();
+
     const normalizedIdentifier = resolveLoginIdentifier({
         username,
         email,
@@ -382,6 +387,8 @@ export async function login({ username, email, password, req }) {
 }
 
 export async function refresh({ refreshToken, req }) {
+    await enforceScheduledShutdownIfDue();
+
     assertRefreshInput(refreshToken);
 
     const tokenHash = hashToken(refreshToken);
@@ -638,6 +645,8 @@ export async function listUsers({ authUser }) {
 
 export async function listActiveUsers({ authUser }) {
     assertSuperAdmin(authUser);
+
+    await enforceScheduledShutdownIfDue();
 
     const users = await AdminUser.find({
         isActive: true,

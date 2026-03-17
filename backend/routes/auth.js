@@ -20,9 +20,32 @@ import {
     setUserActiveStatus,
     updateUser,
 } from "../services/auth.js";
-import { scheduleAppShutdown } from "../services/appShutdown.js";
+import {
+    enforceScheduledShutdownIfDue,
+    getAppShutdownState,
+    isMaintenanceActive,
+    scheduleAppShutdown,
+} from "../services/appShutdown.js";
 
 const router = express.Router();
+
+router.get("/app-status", async (_req, res) => {
+    await enforceScheduledShutdownIfDue();
+
+    const shutdownState = getAppShutdownState();
+    return res.status(200).json({
+        data: {
+            maintenanceActive: isMaintenanceActive(),
+            shutdownAt: shutdownState.shutdownAt,
+            activatedAt: shutdownState.activatedAt,
+            enforcedAt: shutdownState.enforcedAt,
+        },
+        meta: {
+            source: "real",
+            model: "auth",
+        },
+    });
+});
 
 router.post("/login", loginRateLimiter, async (req, res) => {
     const { username, email, password } = req.body ?? {};
@@ -225,6 +248,22 @@ router.post("/logout", verifyJWT, async (req, res) => {
             },
         });
     }
+});
+
+router.get("/session", verifyJWT, async (req, res) => {
+    return res.status(200).json({
+        data: {
+            user: {
+                id: req.auth?.userId,
+                username: req.auth?.username,
+                role: req.auth?.role,
+            },
+        },
+        meta: {
+            source: "real",
+            model: "auth",
+        },
+    });
 });
 
 router.post(

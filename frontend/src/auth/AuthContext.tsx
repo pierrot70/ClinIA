@@ -66,7 +66,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         let timerId: number | undefined;
 
         const syncSession = async () => {
-            await getValidAccessToken();
+            const token = await getValidAccessToken();
+            if (!token) {
+                if (!mounted) {
+                    return;
+                }
+                syncFromService();
+                return;
+            }
+
+            try {
+                await authFetch("/api/auth/session");
+            } catch {
+                // authFetch already clears invalid sessions when necessary.
+            }
+
             if (!mounted) {
                 return;
             }
