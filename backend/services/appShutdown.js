@@ -1,5 +1,8 @@
 import { AUTH_ROLES } from "../auth/constants.js";
 import { AdminUser } from "../models/AdminUser.js";
+import { AppSettings } from "../models/AppSettings.js";
+
+const SETTINGS_KEY = "main";
 
 let shutdownState = {
     isScheduled: false,
@@ -23,11 +26,46 @@ function assertDelay(delaySeconds) {
     }
 }
 
-export function scheduleAppShutdown({ delaySeconds = 30, activatedBy = null }) {
+function applyDocToState(doc) {
+    shutdownState = {
+        isScheduled: Boolean(doc.maintenanceIsScheduled),
+        shutdownAt: doc.maintenanceShutdownAt ?? null,
+        activatedAt: doc.maintenanceActivatedAt ?? null,
+        activatedBy: doc.maintenanceActivatedBy ?? null,
+        delaySeconds: doc.maintenanceDelaySeconds ?? null,
+        enforcedAt: doc.maintenanceEnforcedAt ?? null,
+    };
+}
+
+async function persistState(fields) {
+    await AppSettings.findOneAndUpdate(
+        { key: SETTINGS_KEY },
+        { $set: { key: SETTINGS_KEY, ...fields } },
+        { upsert: true, new: true }
+    );
+}
+
+/**
+ * Called once at backend startup to hydrate in-memory state from MongoDB.
+ * This ensures the maintenance state survives restarts and is shared
+ * between the Coolify remote instance and any other deployment.
+ */
+export async function initShutdownState() {
+    try {
+        const doc = await AppSettings.findOne({ key: SETTINGS_KEY });
+        if (doc) {
+            applyDocToState(doc);
+        }
+    } catch (err) {
+        console.error("[appShutdown] Failed to load state from DB:", err.message);
+    }
+}
+
+export async function scheduleAppShutdown({ delaySeconds = 30, activatedBy = null }) {
     assertDelay(delaySeconds);
 
     const now = new Date();
-    shutdownState = {
+    const nextState = {
         isScheduled: true,
         shutdownAt: new Date(now.getTime() + delaySeconds * 1000),
         activatedAt: now,
@@ -35,6 +73,17 @@ export function scheduleAppShutdown({ delaySeconds = 30, activatedBy = null }) {
         delaySeconds,
         enforcedAt: null,
     };
+
+    shutdownState = nextState;
+
+    await persistState({
+        maintenanceIsScheduled: true,
+        maintenanceShutdownAt: nextState.shutdownAt,
+        maintenanceActivatedAt: nextState.activatedAt,
+        maintenanceActivatedBy: nextState.activatedBy,
+        maintenanceDelaySeconds: nextState.delaySeconds,
+        maintenanceEnforcedAt: null,
+    });
 
     return getAppShutdownState();
 }
@@ -83,6 +132,9 @@ export async function enforceScheduledShutdownIfDue() {
     );
 
     shutdownState.enforcedAt = new Date();
+
+    await persistState({ maintenanceEnforcedAt: shutdownState.enforcedAt });
+
     return true;
 }
 
@@ -96,4 +148,27 @@ export function isShutdownEnforcedForRole(role) {
     }
 
     return Date.now() >= shutdownState.shutdownAt.getTime();
+}
+
+/**
+ * Clears the maintenance state (called by SUPERADMIN to end maintenance).
+ */
+export async function clearMaintenanceState() {
+    shutdownState = {
+        isScheduled: false,
+        shutdownAt: null,
+        activatedAt: null,
+        activatedBy: null,
+        delaySeconds: null,
+        enforcedAt: null,
+    };
+
+    await persistState({
+        maintenanceIsScheduled: false,
+        maintenanceShutdownAt: null,
+        maintenanceActivatedAt: null,
+        maintenanceActivatedBy: null,
+        maintenanceDelaySeconds: null,
+        maintenanceEnforcedAt: null,
+    });
 }

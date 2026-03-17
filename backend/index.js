@@ -38,6 +38,7 @@ import authRouter from "./routes/auth.js";
 import { verifyJWT } from "./middleware/verifyJWT.js";
 import { requireRole } from "./middleware/requireRole.js";
 import { AUTH_ROLES } from "./auth/constants.js";
+import { initShutdownState } from "./services/appShutdown.js";
 
 dotenv.config();
 
@@ -1058,6 +1059,13 @@ mongoose
             await warmTranslationMemoryCache();
         } catch (err) {
             console.warn("⚠️ I18N warmup failed", err?.message);
+        }
+
+        try {
+            await initShutdownState();
+            console.log("✅ Maintenance state chargé depuis MongoDB");
+        } catch (err) {
+            console.warn("⚠️ initShutdownState failed", err?.message);
         }
     })
     .catch((err) => {

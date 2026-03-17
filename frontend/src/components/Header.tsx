@@ -149,6 +149,39 @@ const Header: React.FC = () => {
         }
     };
 
+    const clearMaintenance = async () => {
+        const confirmed = window.confirm(
+            "Terminer la maintenance ? L'application sera accessible a tous les utilisateurs."
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const response = await authFetch("/api/auth/app-shutdown/clear", {
+                method: "POST",
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                window.alert(
+                    payload?.error?.message ||
+                        "Impossible de terminer la maintenance."
+                );
+                return;
+            }
+
+            window.alert("Maintenance terminee. L'application est de nouveau accessible.");
+        } catch (err) {
+            if (err instanceof SessionExpiredError) {
+                logout();
+                return;
+            }
+            window.alert("Erreur reseau lors de la fin de maintenance.");
+        }
+    };
+
     const loadActiveUsers = async (showLoadingState = false) => {
         if (showLoadingState) {
             setLoadingActiveUsers(true);
@@ -351,6 +384,17 @@ const Header: React.FC = () => {
                                     className="block w-full px-4 py-2 text-left text-sm text-red-700 transition hover:bg-red-50"
                                 >
                                     Arret de l'application
+                                </button>
+                            )}
+                            {user?.role === "SUPERADMIN" && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        void clearMaintenance();
+                                    }}
+                                    className="block w-full px-4 py-2 text-left text-sm text-green-700 transition hover:bg-green-50"
+                                >
+                                    Fin de maintenance
                                 </button>
                             )}
                         </div>

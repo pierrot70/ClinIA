@@ -25,6 +25,7 @@ import {
     getAppShutdownState,
     isMaintenanceActive,
     scheduleAppShutdown,
+    clearMaintenanceState,
 } from "../services/appShutdown.js";
 
 const router = express.Router();
@@ -647,7 +648,7 @@ router.post(
                     ? delaySecondsRaw
                     : Number(delaySecondsRaw ?? 30);
 
-            const data = scheduleAppShutdown({
+            const data = await scheduleAppShutdown({
                 delaySeconds,
                 activatedBy: req.auth?.userId ?? null,
             });
@@ -675,6 +676,30 @@ router.post(
                 error: {
                     code: "APP_SHUTDOWN_SCHEDULE_FAILED",
                     message: "Impossible de planifier l'arret de l'application.",
+                    retryable: true,
+                },
+            });
+        }
+    }
+);
+
+router.post(
+    "/app-shutdown/clear",
+    verifyJWT,
+    requireRole(AUTH_ROLES.SUPERADMIN),
+    async (_req, res) => {
+        try {
+            await clearMaintenanceState();
+            return res.status(200).json({
+                data: { maintenanceActive: false },
+                meta: { source: "real", model: "auth" },
+            });
+        } catch (err) {
+            console.error("❌ App shutdown clear error:", err?.message);
+            return res.status(500).json({
+                error: {
+                    code: "APP_SHUTDOWN_CLEAR_FAILED",
+                    message: "Impossible de terminer la maintenance.",
                     retryable: true,
                 },
             });
