@@ -15,14 +15,6 @@ const Header: React.FC = () => {
     } = useAuth();
     const FORCE_REAL_STORAGE_KEY = "clinia_force_real";
     const canAccessAdmin = isAuthenticated && isAdminRole(user?.role);
-
-    const logout = () => {
-        logoutSession().finally(() => {
-            window.location.href = "/";
-        });
-    };
-
-    // 🔍 Détection environnement (Vite)
     const isProd = !!import.meta.env.PROD;
     const isDev = !isProd;
     const hostname = window.location.hostname;
@@ -30,6 +22,14 @@ const Header: React.FC = () => {
         hostname === "localhost" ||
         hostname === "127.0.0.1" ||
         hostname === "::1";
+    const isRemoteProd = isProd && !isLocalRuntime;
+
+    const logout = () => {
+        logoutSession().finally(() => {
+            window.location.href = isRemoteProd ? "/login" : "/";
+        });
+    };
+
     const [forceReal, setForceReal] = useState(false);
 
     useEffect(() => {
