@@ -25,6 +25,11 @@ const Header: React.FC = () => {
     // 🔍 Détection environnement (Vite)
     const isProd = !!import.meta.env.PROD;
     const isDev = !isProd;
+    const hostname = window.location.hostname;
+    const isLocalRuntime =
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname === "::1";
     const [forceReal, setForceReal] = useState(false);
 
     useEffect(() => {
@@ -119,7 +124,7 @@ const Header: React.FC = () => {
                     )}
                     {isProd && (
                         <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700 border border-green-300">
-                            PROD – Docker
+                            {isLocalRuntime ? "PROD - LOCAL" : "PROD - REMOTE"}
                         </span>
                     )}
                     {isDev && (
