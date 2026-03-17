@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Validate syntax of staged shell scripts before commit.
+STAGED_SHELL_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\\.(sh|bash)$' || true)
+
+if [[ -z "$STAGED_SHELL_FILES" ]]; then
+  exit 0
+fi
+
+echo "Running bash -n on staged shell scripts..."
+while IFS= read -r file; do
+  [[ -f "$file" ]] || continue
+  bash -n "$file"
+done <<< "$STAGED_SHELL_FILES"
+
+echo "Shell syntax check passed."
