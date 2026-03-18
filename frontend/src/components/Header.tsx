@@ -284,7 +284,26 @@ const Header: React.FC = () => {
     return (
         <header className="bg-white border-b border-gray-200">
             <div className="max-w-6xl mx-auto px-4 py-3">
-                <div className="flex items-center justify-start gap-3 lg:justify-between">
+                <div className="grid grid-cols-3 items-center lg:hidden">
+                    <Link to="/" className="justify-self-start text-lg font-semibold leading-tight text-gray-900">
+                        ClinIA
+                    </Link>
+
+                    <div className="justify-self-center">
+                        <VoiceNavButton />
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+                        className="justify-self-end rounded border border-gray-300 px-3 py-1 text-sm text-gray-700"
+                        aria-label="Ouvrir le menu"
+                    >
+                        {isMobileMenuOpen ? "Fermer" : "Menu"}
+                    </button>
+                </div>
+
+                <div className="hidden items-center justify-between gap-3 lg:flex">
                     <Link to="/" className="flex min-w-0 items-center gap-3">
                         <img
                             src="/logo.png"
@@ -295,53 +314,42 @@ const Header: React.FC = () => {
                             <div className="truncate font-semibold text-lg leading-tight">
                                 ClinIA
                             </div>
-                            <div className="hidden text-xs text-gray-500 sm:block">
+                            <div className="text-xs text-gray-500">
                                 Assistant clinique IA – Prototype
                             </div>
                         </div>
                     </Link>
 
                     <div className="flex items-center gap-2">
-                        <div className="hidden items-center gap-2 lg:flex">
-                            {isDev && (
-                                <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 border border-blue-300">
-                                    DEV – Docker
-                                </span>
-                            )}
-                            {isProd && (
-                                <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700 border border-green-300">
-                                    {isLocalRuntime ? "PROD - LOCAL" : "PROD - REMOTE"}
-                                </span>
-                            )}
-                            {isDev && (
-                                <button
-                                    type="button"
-                                    onClick={toggleForceReal}
-                                    className={
-                                        "px-2 py-1 text-xs rounded border transition " +
-                                        (forceReal
-                                            ? "bg-red-600 text-white border-red-600"
-                                            : "bg-gray-100 text-gray-700 border-gray-300")
-                                    }
-                                    title={
-                                        forceReal
-                                            ? "Forcer IA réelle"
-                                            : "Utiliser le mode mock"
-                                    }
-                                >
-                                    {forceReal ? "IA réelle" : "IA mock"}
-                                </button>
-                            )}
-                        </div>
-
-                        <button
-                            type="button"
-                            onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-                            className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 lg:hidden"
-                            aria-label="Ouvrir le menu"
-                        >
-                            {isMobileMenuOpen ? "Fermer" : "Menu"}
-                        </button>
+                        {isDev && (
+                            <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 border border-blue-300">
+                                DEV – Docker
+                            </span>
+                        )}
+                        {isProd && (
+                            <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700 border border-green-300">
+                                {isLocalRuntime ? "PROD - LOCAL" : "PROD - REMOTE"}
+                            </span>
+                        )}
+                        {isDev && (
+                            <button
+                                type="button"
+                                onClick={toggleForceReal}
+                                className={
+                                    "px-2 py-1 text-xs rounded border transition " +
+                                    (forceReal
+                                        ? "bg-red-600 text-white border-red-600"
+                                        : "bg-gray-100 text-gray-700 border-gray-300")
+                                }
+                                title={
+                                    forceReal
+                                        ? "Forcer IA réelle"
+                                        : "Utiliser le mode mock"
+                                }
+                            >
+                                {forceReal ? "IA réelle" : "IA mock"}
+                            </button>
+                        )}
                     </div>
                 </div>
 
