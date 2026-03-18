@@ -404,7 +404,19 @@ const Header: React.FC = () => {
                                     {item.label}
                                 </Link>
                             ))}
-                            {user?.role === "SUPERADMIN" && (
+                        </div>
+                    </div>
+
+                    {user?.role === "SUPERADMIN" && (
+                        <div className="relative group">
+                            <button
+                                type="button"
+                                className="flex items-center gap-1 rounded px-3 py-1 text-sm text-gray-600 transition hover:text-primary"
+                            >
+                                Gestion Application
+                                <span className="text-xs">▾</span>
+                            </button>
+                            <div className="absolute right-0 top-full z-10 mt-2 hidden min-w-[220px] rounded-lg border border-gray-200 bg-white shadow-lg transition group-hover:block group-focus-within:block">
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -412,10 +424,8 @@ const Header: React.FC = () => {
                                     }}
                                     className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
                                 >
-                                    Montre Usager Actif
+                                    Montrer Usager Actif
                                 </button>
-                            )}
-                            {user?.role === "SUPERADMIN" && (
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -425,8 +435,6 @@ const Header: React.FC = () => {
                                 >
                                     Arret de l'application
                                 </button>
-                            )}
-                            {user?.role === "SUPERADMIN" && (
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -436,8 +444,6 @@ const Header: React.FC = () => {
                                 >
                                     Fin de maintenance
                                 </button>
-                            )}
-                            {user?.role === "SUPERADMIN" && (
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -447,9 +453,9 @@ const Header: React.FC = () => {
                                 >
                                     Forcer reouverture normale
                                 </button>
-                            )}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     <Link to="/quick" className={linkClass("/quick")}>
                         Mode rapide
