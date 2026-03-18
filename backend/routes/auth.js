@@ -11,6 +11,7 @@ import {
     deleteUser,
     login,
     listActiveUsers,
+    listAuthLogs,
     listUsers,
     logout,
     register,
@@ -355,6 +356,51 @@ router.get(
                 error: {
                     code: "AUTH_ACTIVE_USERS_LIST_FAILED",
                     message: "Impossible de lister les usagers actifs.",
+                    retryable: true,
+                },
+            });
+        }
+    }
+);
+
+router.get(
+    "/auth-logs",
+    verifyJWT,
+    requireRole(AUTH_ROLES.SUPERADMIN),
+    async (req, res) => {
+        try {
+            const data = await listAuthLogs({
+                authUser: req.auth,
+                page: req.query?.page,
+                limit: req.query?.limit,
+                startDate: req.query?.startDate,
+                endDate: req.query?.endDate,
+                action: req.query?.action,
+            });
+
+            return res.status(200).json({
+                data,
+                meta: {
+                    source: "real",
+                    model: "auth",
+                },
+            });
+        } catch (err) {
+            if (err.code === "INVALID_INPUT") {
+                return res.status(400).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            console.error("❌ Auth logs list error:", err?.code || err?.message);
+            return res.status(500).json({
+                error: {
+                    code: "AUTH_LOGS_LIST_FAILED",
+                    message: "Impossible de lister les logs d'authentification.",
                     retryable: true,
                 },
             });

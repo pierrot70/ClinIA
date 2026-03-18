@@ -15,7 +15,35 @@ type ActiveUser = {
     lastLoginAt?: string | null;
 };
 
+type AuthLogEntry = {
+    id: string;
+    action: string;
+    outcome: string;
+    userId: string | null;
+    usernameMasked: string;
+    role: string | null;
+    ip: string | null;
+    reason: string | null;
+    timestamp: string;
+};
+
+type AuthLogPagination = {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+};
+
+const AUTH_LOG_ACTION_OPTIONS = [
+    { value: "", label: "Toutes" },
+    { value: "LOGIN", label: "LOGIN" },
+    { value: "LOGOUT", label: "LOGOUT" },
+    { value: "FAILED_LOGIN", label: "FAILED_LOGIN" },
+    { value: "USER_MANAGEMENT", label: "USER_MANAGEMENT" },
+];
+
 const Header: React.FC = () => {
+    const todayDateValue = new Date().toISOString().slice(0, 10);
     const location = useLocation();
     const { locale, setLocaleFromDropdown, isTranslating } = useHomeI18n();
     const {
@@ -38,6 +66,21 @@ const Header: React.FC = () => {
     const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
     const [loadingActiveUsers, setLoadingActiveUsers] = useState(false);
     const [activeUsersError, setActiveUsersError] = useState<string | null>(null);
+    const [showAuthLogsModal, setShowAuthLogsModal] = useState(false);
+    const [authLogs, setAuthLogs] = useState<AuthLogEntry[]>([]);
+    const [loadingAuthLogs, setLoadingAuthLogs] = useState(false);
+    const [authLogsError, setAuthLogsError] = useState<string | null>(null);
+    const [authLogsQueryDurationMs, setAuthLogsQueryDurationMs] = useState<number | null>(null);
+    const [authLogStartDate, setAuthLogStartDate] = useState(todayDateValue);
+    const [authLogEndDate, setAuthLogEndDate] = useState(todayDateValue);
+    const [authLogAction, setAuthLogAction] = useState("");
+    const [authLogPage, setAuthLogPage] = useState(1);
+    const [authLogPagination, setAuthLogPagination] = useState<AuthLogPagination>({
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 1,
+    });
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const ACTIVE_USERS_REFRESH_MS = 5_000;
 
@@ -263,6 +306,104 @@ const Header: React.FC = () => {
         await loadActiveUsers(true);
     };
 
+    const loadAuthLogs = async (targetPage = 1, showLoadingState = true) => {
+        const requestStartedAt = performance.now();
+        if (showLoadingState) {
+            setLoadingAuthLogs(true);
+        }
+        setAuthLogsError(null);
+
+        if (authLogStartDate && authLogEndDate && authLogStartDate > authLogEndDate) {
+            setAuthLogsError("Date debut ne peut pas etre plus grande que Date fin.");
+            setAuthLogs([]);
+            setAuthLogsQueryDurationMs(null);
+            if (showLoadingState) {
+                setLoadingAuthLogs(false);
+            }
+            return;
+        }
+
+        try {
+            const query = new URLSearchParams({
+                page: String(targetPage),
+                limit: "10",
+            });
+
+            if (authLogStartDate) {
+                query.set("startDate", authLogStartDate);
+            }
+            if (authLogEndDate) {
+                query.set("endDate", authLogEndDate);
+            }
+            if (authLogAction.trim()) {
+                query.set("action", authLogAction.trim());
+            }
+
+            const response = await authFetch(`/api/auth/auth-logs?${query.toString()}`);
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                setAuthLogsError(
+                    payload?.error?.message ||
+                        "Impossible de charger les logs d'authentification."
+                );
+                setAuthLogs([]);
+                setAuthLogsQueryDurationMs(Math.round(performance.now() - requestStartedAt));
+                return;
+            }
+
+            const logs = payload?.data?.logs || [];
+            const pagination = payload?.data?.pagination || {
+                page: targetPage,
+                limit: 10,
+                total: logs.length,
+                totalPages: 1,
+            };
+
+            setAuthLogs(logs);
+            setAuthLogPagination(pagination);
+            setAuthLogPage(pagination.page || targetPage);
+            setAuthLogsQueryDurationMs(Math.round(performance.now() - requestStartedAt));
+        } catch (err) {
+            if (err instanceof SessionExpiredError) {
+                logout();
+                return;
+            }
+
+            setAuthLogsError("Erreur reseau lors du chargement des logs auth.");
+            setAuthLogs([]);
+            setAuthLogsQueryDurationMs(Math.round(performance.now() - requestStartedAt));
+        } finally {
+            if (showLoadingState) {
+                setLoadingAuthLogs(false);
+            }
+        }
+    };
+
+    const openAuthLogsModal = () => {
+        setShowAuthLogsModal(true);
+    };
+
+    const applyAuthLogFilters = async () => {
+        await loadAuthLogs(1, true);
+    };
+
+    const closeAuthLogsModal = () => {
+        setShowAuthLogsModal(false);
+        setAuthLogsError(null);
+    };
+
+    const formatAuthLogTimestamp = (value: string) => {
+        if (!value) {
+            return "Inconnu";
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return "Invalide";
+        }
+        return date.toLocaleString();
+    };
+
     useEffect(() => {
         if (!showActiveUsersModal) {
             return;
@@ -276,6 +417,14 @@ const Header: React.FC = () => {
             window.clearInterval(intervalId);
         };
     }, [showActiveUsersModal]);
+
+    useEffect(() => {
+        if (!showAuthLogsModal) {
+            return;
+        }
+
+        void loadAuthLogs(1, true);
+    }, [showAuthLogsModal, authLogStartDate, authLogEndDate, authLogAction]);
 
     useEffect(() => {
         setIsMobileMenuOpen(false);
@@ -447,6 +596,15 @@ const Header: React.FC = () => {
                                     className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
                                 >
                                     Montrer Usager Actif
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        void openAuthLogsModal();
+                                    }}
+                                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
+                                >
+                                    Montrer Auth Log
                                 </button>
                                 <button
                                     type="button"
@@ -623,6 +781,7 @@ const Header: React.FC = () => {
                             <div className="space-y-1 border-t border-gray-100 pt-2">
                                 <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Gestion Application</div>
                                 <button type="button" onClick={() => { void openActiveUsersModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Montrer Usager Actif</button>
+                                <button type="button" onClick={() => { void openAuthLogsModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Montrer Auth Log</button>
                                 <button type="button" onClick={() => { void triggerAppShutdown(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-red-700 hover:bg-red-50">Arret de l'application</button>
                                 <button type="button" onClick={() => { void clearMaintenance(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-green-700 hover:bg-green-50">Fin de maintenance</button>
                                 <button type="button" onClick={() => { void forceReopenMaintenance(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-emerald-800 hover:bg-emerald-50">Forcer reouverture normale</button>
@@ -715,6 +874,200 @@ const Header: React.FC = () => {
                                     </div>
                                 ))}
                             </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {showAuthLogsModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+                    <div className="w-full max-w-5xl rounded-xl bg-white p-5 shadow-2xl">
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                            <h2 className="text-lg font-semibold text-gray-900">
+                                Auth Log
+                            </h2>
+                            <div className="flex items-center gap-3">
+                                {user?.role === "SUPERADMIN" && authLogsQueryDurationMs !== null && (
+                                    <span className="text-xs text-gray-500">
+                                        Temps requete: {authLogsQueryDurationMs} ms
+                                    </span>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={closeAuthLogsModal}
+                                    className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                                >
+                                    Fermer
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            <label className="text-sm text-gray-700">
+                                Date debut
+                                <input
+                                    type="date"
+                                    value={authLogStartDate}
+                                    max={authLogEndDate || undefined}
+                                    onChange={(event) => setAuthLogStartDate(event.target.value)}
+                                    className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                                />
+                            </label>
+                            <label className="text-sm text-gray-700">
+                                Date fin
+                                <input
+                                    type="date"
+                                    value={authLogEndDate}
+                                    min={authLogStartDate || undefined}
+                                    onChange={(event) => setAuthLogEndDate(event.target.value)}
+                                    className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                                />
+                            </label>
+                            <label className="text-sm text-gray-700 sm:col-span-2">
+                                Action
+                                <select
+                                    value={authLogAction}
+                                    onChange={(event) => setAuthLogAction(event.target.value)}
+                                    className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
+                                >
+                                    {AUTH_LOG_ACTION_OPTIONS.map((option) => (
+                                        <option key={option.value || "ALL"} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        </div>
+
+                        <div className="mb-4 flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    void applyAuthLogFilters();
+                                }}
+                                className="rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
+                            >
+                                Rechercher
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setAuthLogStartDate(todayDateValue);
+                                    setAuthLogEndDate(todayDateValue);
+                                    setAuthLogAction("");
+                                    void loadAuthLogs(1, true);
+                                }}
+                                className="rounded bg-gray-50 px-3 py-1 text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                                Reinitialiser
+                            </button>
+                        </div>
+
+                        {loadingAuthLogs ? (
+                            <div className="flex items-center gap-3 text-sm text-gray-500">
+                                <span
+                                    className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700"
+                                    aria-hidden="true"
+                                />
+                                <span>Chargement des logs auth...</span>
+                            </div>
+                        ) : authLogsError ? (
+                            <div className="rounded bg-red-50 p-3 text-sm text-red-700">
+                                {authLogsError}
+                            </div>
+                        ) : authLogs.length === 0 ? (
+                            <p className="text-sm text-gray-500">Aucun resultat.</p>
+                        ) : (
+                            <>
+                                <div className="max-h-[420px] overflow-auto rounded border border-gray-200">
+                                    <table className="min-w-full border-collapse text-left text-xs sm:text-sm">
+                                        <thead className="bg-gray-50 text-gray-600">
+                                            <tr>
+                                                <th className="px-3 py-2">Date</th>
+                                                <th className="px-3 py-2">Action</th>
+                                                <th className="px-3 py-2">Resultat</th>
+                                                <th className="px-3 py-2">Usager</th>
+                                                <th className="px-3 py-2">Role</th>
+                                                <th className="px-3 py-2">IP</th>
+                                                <th className="px-3 py-2">Raison</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {authLogs.map((log) => (
+                                                <tr key={log.id} className="border-t border-gray-100 align-top">
+                                                    <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{formatAuthLogTimestamp(log.timestamp)}</td>
+                                                    <td className="px-3 py-2 text-gray-800">{log.action || "-"}</td>
+                                                    <td className="px-3 py-2 text-gray-800">{log.outcome || "-"}</td>
+                                                    <td className="px-3 py-2 text-gray-700">{log.usernameMasked || "-"}</td>
+                                                    <td className="px-3 py-2 text-gray-700">{log.role || "-"}</td>
+                                                    <td className="px-3 py-2 text-gray-700">{log.ip || "-"}</td>
+                                                    <td className="px-3 py-2 text-gray-700">{log.reason || "-"}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-sm text-gray-600">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (authLogPage !== 1) {
+                                                void loadAuthLogs(1, true);
+                                            }
+                                        }}
+                                        disabled={authLogPage <= 1}
+                                        className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {"<<"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const previousPage = Math.max(1, authLogPage - 1);
+                                            if (previousPage !== authLogPage) {
+                                                void loadAuthLogs(previousPage, true);
+                                            }
+                                        }}
+                                        disabled={authLogPage <= 1}
+                                        className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {"<"}
+                                    </button>
+                                    <span>
+                                        Page {authLogPagination.page}/{Math.max(1, authLogPagination.totalPages)} - {authLogPagination.total} resultats
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const nextPage = Math.min(
+                                                Math.max(1, authLogPagination.totalPages),
+                                                authLogPage + 1
+                                            );
+                                            if (nextPage !== authLogPage) {
+                                                void loadAuthLogs(nextPage, true);
+                                            }
+                                        }}
+                                        disabled={authLogPage >= Math.max(1, authLogPagination.totalPages)}
+                                        className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {">"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const lastPage = Math.max(1, authLogPagination.totalPages);
+                                            if (authLogPage !== lastPage) {
+                                                void loadAuthLogs(lastPage, true);
+                                            }
+                                        }}
+                                        disabled={authLogPage >= Math.max(1, authLogPagination.totalPages)}
+                                        className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {">>"}
+                                    </button>
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>

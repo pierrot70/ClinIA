@@ -49,6 +49,8 @@ const AuthAuditLogSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+AuthAuditLogSchema.index({ action: 1, timestamp: -1 });
+
 export const AuthAuditLog =
     mongoose.models.AuthAuditLog ||
     mongoose.model("AuthAuditLog", AuthAuditLogSchema);

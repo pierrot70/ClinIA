@@ -11,6 +11,7 @@ import {
 } from "../auth/constants.js";
 import { recordAuthAuditEvent } from "../audit/authAudit.js";
 import { AdminUser } from "../models/AdminUser.js";
+import { AuthAuditLog } from "../models/AuthAuditLog.js";
 import {
     enforceScheduledShutdownIfDue,
     isShutdownEnforcedForRole,
@@ -18,6 +19,38 @@ import {
 
 function createAuthError(code, message) {
     return { code, message };
+}
+
+const AUTH_LOG_COUNT_CACHE_TTL_MS = 30_000;
+const authLogCountCache = new Map();
+
+function buildAuthLogCountCacheKey({ startDate, endDate, action }) {
+    return JSON.stringify({
+        startDate: startDate || null,
+        endDate: endDate || null,
+        action: action || null,
+    });
+}
+
+function getCachedAuthLogCount(cacheKey) {
+    const cached = authLogCountCache.get(cacheKey);
+    if (!cached) {
+        return null;
+    }
+
+    if (Date.now() - cached.cachedAt > AUTH_LOG_COUNT_CACHE_TTL_MS) {
+        authLogCountCache.delete(cacheKey);
+        return null;
+    }
+
+    return cached.total;
+}
+
+function setCachedAuthLogCount(cacheKey, total) {
+    authLogCountCache.set(cacheKey, {
+        total,
+        cachedAt: Date.now(),
+    });
 }
 
 function hashToken(token) {
@@ -659,6 +692,118 @@ export async function listActiveUsers({ authUser }) {
 
     return {
         users: users.map(mapPublicUser),
+    };
+}
+
+export async function listAuthLogs({
+    authUser,
+    page = 1,
+    limit = 20,
+    startDate,
+    endDate,
+    action,
+}) {
+    assertSuperAdmin(authUser);
+
+    const parsedPage = Number(page);
+    const parsedLimit = Number(limit);
+
+    if (
+        !Number.isFinite(parsedPage) ||
+        parsedPage < 1 ||
+        !Number.isFinite(parsedLimit) ||
+        parsedLimit < 1 ||
+        parsedLimit > 100
+    ) {
+        throw createAuthError("INVALID_INPUT", "Pagination invalide.");
+    }
+
+    const allowedActions = new Set([
+        "LOGIN",
+        "LOGOUT",
+        "FAILED_LOGIN",
+        "USER_MANAGEMENT",
+    ]);
+
+    const query = {};
+    const andClauses = [];
+
+    if (startDate || endDate) {
+        const dateQuery = {};
+
+        if (startDate) {
+            const parsedStart = new Date(startDate);
+            if (Number.isNaN(parsedStart.getTime())) {
+                throw createAuthError("INVALID_INPUT", "Date de debut invalide.");
+            }
+            dateQuery.$gte = parsedStart;
+        }
+
+        if (endDate) {
+            const parsedEnd = new Date(endDate);
+            if (Number.isNaN(parsedEnd.getTime())) {
+                throw createAuthError("INVALID_INPUT", "Date de fin invalide.");
+            }
+            dateQuery.$lte = parsedEnd;
+        }
+
+        andClauses.push({ timestamp: dateQuery });
+    }
+
+    if (typeof action === "string" && action.trim()) {
+        const normalizedAction = action.trim().toUpperCase();
+        if (!allowedActions.has(normalizedAction)) {
+            throw createAuthError("INVALID_INPUT", "Action invalide.");
+        }
+        andClauses.push({ action: normalizedAction });
+    }
+
+    if (andClauses.length > 0) {
+        query.$and = andClauses;
+    }
+
+    const skip = (parsedPage - 1) * parsedLimit;
+    const cacheKey = buildAuthLogCountCacheKey({
+        startDate,
+        endDate,
+        action,
+    });
+    const cachedTotal = getCachedAuthLogCount(cacheKey);
+    const totalPromise =
+        cachedTotal !== null
+            ? Promise.resolve(cachedTotal)
+            : AuthAuditLog.countDocuments(query).then((total) => {
+                setCachedAuthLogCount(cacheKey, total);
+                return total;
+            });
+
+    const [total, logs] = await Promise.all([
+        totalPromise,
+        AuthAuditLog.find(query)
+            .sort({ timestamp: -1 })
+            .skip(skip)
+            .limit(parsedLimit)
+            .lean(),
+    ]);
+
+    return {
+        logs: logs.map((log) => ({
+            id: String(log._id),
+            action: log.action,
+            outcome: log.outcome,
+            userId: log.userId ? String(log.userId) : null,
+            usernameMasked: log.usernameMasked,
+            role: log.role,
+            ip: log.ip,
+            reason: log.reason,
+            timestamp: log.timestamp,
+        })),
+        pagination: {
+            page: parsedPage,
+            limit: parsedLimit,
+            total,
+            totalPages: Math.max(1, Math.ceil(total / parsedLimit)),
+        },
     };
 }
 
