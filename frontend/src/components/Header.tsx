@@ -147,6 +147,7 @@ const Header: React.FC = () => {
     const [authLogStartDate, setAuthLogStartDate] = useState(todayDateValue);
     const [authLogEndDate, setAuthLogEndDate] = useState(todayDateValue);
     const [authLogAction, setAuthLogAction] = useState("");
+    const [authGraphAction, setAuthGraphAction] = useState("");
     const [authLogPage, setAuthLogPage] = useState(1);
     const [authGraphPoints, setAuthGraphPoints] = useState<AuthGraphPoint[]>([]);
     const [authGraphActions, setAuthGraphActions] = useState<string[]>([]);
@@ -490,8 +491,8 @@ const Header: React.FC = () => {
             if (authLogEndDate) {
                 query.set("endDate", authLogEndDate);
             }
-            if (authLogAction.trim()) {
-                query.set("action", authLogAction.trim());
+            if (authGraphAction.trim()) {
+                query.set("action", authGraphAction.trim());
             }
 
             query.set("graph", "true");
@@ -534,6 +535,7 @@ const Header: React.FC = () => {
     };
 
     const openAuthGraphsModal = () => {
+        setAuthGraphAction("");
         setShowAuthGraphsModal(true);
     };
 
@@ -596,7 +598,7 @@ const Header: React.FC = () => {
         }
 
         void loadAuthGraphs();
-    }, [showAuthGraphsModal, authLogStartDate, authLogEndDate, authLogAction]);
+    }, [showAuthGraphsModal, authLogStartDate, authLogEndDate, authGraphAction]);
 
     useEffect(() => {
         setIsMobileMenuOpen(false);
