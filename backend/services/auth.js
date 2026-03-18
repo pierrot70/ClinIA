@@ -807,6 +807,82 @@ export async function listAuthLogs({
     };
 }
 
+export async function listAuthLogGraphs({
+    authUser,
+    startDate,
+    endDate,
+    action,
+}) {
+    assertSuperAdmin(authUser);
+
+    const allowedActions = new Set([
+        "LOGIN",
+        "LOGOUT",
+        "FAILED_LOGIN",
+        "USER_MANAGEMENT",
+    ]);
+
+    const query = {};
+    const andClauses = [];
+
+    if (startDate || endDate) {
+        const dateQuery = {};
+
+        if (startDate) {
+            const parsedStart = new Date(`${startDate}T00:00:00.000`);
+            if (Number.isNaN(parsedStart.getTime())) {
+                throw createAuthError("INVALID_INPUT", "Date de debut invalide.");
+            }
+            dateQuery.$gte = parsedStart;
+        }
+
+        if (endDate) {
+            const parsedEnd = new Date(`${endDate}T23:59:59.999`);
+            if (Number.isNaN(parsedEnd.getTime())) {
+                throw createAuthError("INVALID_INPUT", "Date de fin invalide.");
+            }
+            dateQuery.$lte = parsedEnd;
+        }
+
+        andClauses.push({ timestamp: dateQuery });
+    }
+
+    if (typeof action === "string" && action.trim()) {
+        const normalizedAction = action.trim().toUpperCase();
+        if (!allowedActions.has(normalizedAction)) {
+            throw createAuthError("INVALID_INPUT", "Action invalide.");
+        }
+        andClauses.push({ action: normalizedAction });
+    }
+
+    if (andClauses.length > 0) {
+        query.$and = andClauses;
+    }
+
+    const rows = await AuthAuditLog.aggregate([
+        { $match: query },
+        {
+            $group: {
+                _id: {
+                    $dateToString: {
+                        format: "%Y-%m-%d",
+                        date: "$timestamp",
+                    },
+                },
+                count: { $sum: 1 },
+            },
+        },
+        { $sort: { _id: 1 } },
+    ]);
+
+    return {
+        points: rows.map((row) => ({
+            date: row._id,
+            count: row.count,
+        })),
+    };
+}
+
 export async function updateUser({ userId, updates, authUser, req }) {
     assertSuperAdmin(authUser);
     assertValidUserId(userId);

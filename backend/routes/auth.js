@@ -11,6 +11,7 @@ import {
     deleteUser,
     login,
     listActiveUsers,
+    listAuthLogGraphs,
     listAuthLogs,
     listUsers,
     logout,
@@ -364,11 +365,71 @@ router.get(
 );
 
 router.get(
+    "/auth-logs/graphs",
+    verifyJWT,
+    requireRole(AUTH_ROLES.SUPERADMIN),
+    async (req, res) => {
+        try {
+            const data = await listAuthLogGraphs({
+                authUser: req.auth,
+                startDate: req.query?.startDate,
+                endDate: req.query?.endDate,
+                action: req.query?.action,
+            });
+
+            return res.status(200).json({
+                data,
+                meta: {
+                    source: "real",
+                    model: "auth",
+                },
+            });
+        } catch (err) {
+            if (err.code === "INVALID_INPUT") {
+                return res.status(400).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            console.error("❌ Auth logs graph error:", err?.code || err?.message);
+            return res.status(500).json({
+                error: {
+                    code: "AUTH_LOGS_GRAPH_FAILED",
+                    message: "Impossible de charger le graphique des logs auth.",
+                    retryable: true,
+                },
+            });
+        }
+    }
+);
+
+router.get(
     "/auth-logs",
     verifyJWT,
     requireRole(AUTH_ROLES.SUPERADMIN),
     async (req, res) => {
         try {
+            if (req.query?.graph === "true") {
+                const data = await listAuthLogGraphs({
+                    authUser: req.auth,
+                    startDate: req.query?.startDate,
+                    endDate: req.query?.endDate,
+                    action: req.query?.action,
+                });
+
+                return res.status(200).json({
+                    data,
+                    meta: {
+                        source: "real",
+                        model: "auth",
+                    },
+                });
+            }
+
             const data = await listAuthLogs({
                 authUser: req.auth,
                 page: req.query?.page,

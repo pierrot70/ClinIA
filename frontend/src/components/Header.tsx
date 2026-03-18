@@ -5,6 +5,15 @@ import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { useAuth } from "../hooks/useAuth";
 import { isAdminRole } from "../auth/roles";
 import { SessionExpiredError } from "../services/authService";
+import {
+    CartesianGrid,
+    Line,
+    LineChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from "recharts";
 
 type ActiveUser = {
     id: string;
@@ -32,6 +41,56 @@ type AuthLogPagination = {
     limit: number;
     total: number;
     totalPages: number;
+};
+
+type AuthGraphPoint = {
+    date: string;
+    count: number;
+};
+
+type DateRangeSnapshot = {
+    startDate: string;
+    endDate: string;
+};
+
+type AuthGraphTooltipProps = {
+    active?: boolean;
+    payload?: Array<{ payload?: AuthGraphPoint; value?: number }>;
+    label?: string;
+    onOpenLogsForDate: (date: string) => void;
+};
+
+const AuthGraphTooltip: React.FC<AuthGraphTooltipProps> = ({
+    active,
+    payload,
+    label,
+    onOpenLogsForDate,
+}) => {
+    if (!active || !payload || payload.length === 0) {
+        return null;
+    }
+
+    const point = payload[0]?.payload;
+    const date = point?.date || label;
+    const count = typeof payload[0]?.value === "number" ? payload[0].value : point?.count;
+
+    if (!date) {
+        return null;
+    }
+
+    return (
+        <div className="rounded border border-gray-200 bg-white p-2 text-xs shadow">
+            <div className="text-gray-700">Date: {date}</div>
+            <div className="text-gray-700">Logs: {count ?? 0}</div>
+            <button
+                type="button"
+                onClick={() => onOpenLogsForDate(date)}
+                className="mt-2 rounded bg-blue-50 px-2 py-1 text-xs text-blue-700 hover:bg-blue-100"
+            >
+                Ouvrir logs
+            </button>
+        </div>
+    );
 };
 
 const AUTH_LOG_ACTION_OPTIONS = [
@@ -68,6 +127,7 @@ const Header: React.FC = () => {
     const [loadingActiveUsers, setLoadingActiveUsers] = useState(false);
     const [activeUsersError, setActiveUsersError] = useState<string | null>(null);
     const [showAuthLogsModal, setShowAuthLogsModal] = useState(false);
+    const [showAuthGraphsModal, setShowAuthGraphsModal] = useState(false);
     const [authLogs, setAuthLogs] = useState<AuthLogEntry[]>([]);
     const [loadingAuthLogs, setLoadingAuthLogs] = useState(false);
     const [authLogsError, setAuthLogsError] = useState<string | null>(null);
@@ -76,6 +136,10 @@ const Header: React.FC = () => {
     const [authLogEndDate, setAuthLogEndDate] = useState(todayDateValue);
     const [authLogAction, setAuthLogAction] = useState("");
     const [authLogPage, setAuthLogPage] = useState(1);
+    const [authGraphPoints, setAuthGraphPoints] = useState<AuthGraphPoint[]>([]);
+    const [loadingAuthGraphs, setLoadingAuthGraphs] = useState(false);
+    const [authGraphsError, setAuthGraphsError] = useState<string | null>(null);
+    const [authGraphsDateSnapshot, setAuthGraphsDateSnapshot] = useState<DateRangeSnapshot | null>(null);
     const [authLogPagination, setAuthLogPagination] = useState<AuthLogPagination>({
         page: 1,
         limit: 10,
@@ -385,6 +449,75 @@ const Header: React.FC = () => {
         setShowAuthLogsModal(true);
     };
 
+    const openAuthLogsForDate = (date: string) => {
+        setAuthGraphsDateSnapshot({
+            startDate: authLogStartDate,
+            endDate: authLogEndDate,
+        });
+        setAuthLogStartDate(date);
+        setAuthLogEndDate(date);
+        setShowAuthLogsModal(true);
+    };
+
+    const loadAuthGraphs = async () => {
+        if (authLogStartDate && authLogEndDate && authLogStartDate > authLogEndDate) {
+            setAuthGraphsError("Date debut ne peut pas etre plus grande que Date fin.");
+            setAuthGraphPoints([]);
+            return;
+        }
+
+        setLoadingAuthGraphs(true);
+        setAuthGraphsError(null);
+
+        try {
+            const query = new URLSearchParams();
+            if (authLogStartDate) {
+                query.set("startDate", authLogStartDate);
+            }
+            if (authLogEndDate) {
+                query.set("endDate", authLogEndDate);
+            }
+            if (authLogAction.trim()) {
+                query.set("action", authLogAction.trim());
+            }
+
+            query.set("graph", "true");
+
+            const response = await authFetch(`/api/auth/auth-logs?${query.toString()}`);
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                setAuthGraphsError(
+                    payload?.error?.message ||
+                        "Impossible de charger le graphique des logs auth."
+                );
+                setAuthGraphPoints([]);
+                return;
+            }
+
+            setAuthGraphPoints(payload?.data?.points || []);
+        } catch (err) {
+            if (err instanceof SessionExpiredError) {
+                logout();
+                return;
+            }
+
+            setAuthGraphsError("Erreur reseau lors du chargement du graphique auth.");
+            setAuthGraphPoints([]);
+        } finally {
+            setLoadingAuthGraphs(false);
+        }
+    };
+
+    const openAuthGraphsModal = () => {
+        setShowAuthGraphsModal(true);
+    };
+
+    const closeAuthGraphsModal = () => {
+        setShowAuthGraphsModal(false);
+        setAuthGraphsError(null);
+    };
+
     const applyAuthLogFilters = async () => {
         await loadAuthLogs(1, true);
     };
@@ -392,6 +525,12 @@ const Header: React.FC = () => {
     const closeAuthLogsModal = () => {
         setShowAuthLogsModal(false);
         setAuthLogsError(null);
+
+        if (showAuthGraphsModal && authGraphsDateSnapshot) {
+            setAuthLogStartDate(authGraphsDateSnapshot.startDate);
+            setAuthLogEndDate(authGraphsDateSnapshot.endDate);
+            setAuthGraphsDateSnapshot(null);
+        }
     };
 
     const formatAuthLogTimestamp = (value: string) => {
@@ -426,6 +565,14 @@ const Header: React.FC = () => {
 
         void loadAuthLogs(1, true);
     }, [showAuthLogsModal, authLogStartDate, authLogEndDate, authLogAction]);
+
+    useEffect(() => {
+        if (!showAuthGraphsModal) {
+            return;
+        }
+
+        void loadAuthGraphs();
+    }, [showAuthGraphsModal, authLogStartDate, authLogEndDate, authLogAction]);
 
     useEffect(() => {
         setIsMobileMenuOpen(false);
@@ -610,6 +757,15 @@ const Header: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => {
+                                        openAuthGraphsModal();
+                                    }}
+                                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
+                                >
+                                    Montrer Auth Graphs
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
                                         void triggerAppShutdown();
                                     }}
                                     className="block w-full px-4 py-2 text-left text-sm text-red-700 transition hover:bg-red-50"
@@ -783,6 +939,7 @@ const Header: React.FC = () => {
                                 <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Gestion Application</div>
                                 <button type="button" onClick={() => { void openActiveUsersModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Montrer Usager Actif</button>
                                 <button type="button" onClick={() => { void openAuthLogsModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Montrer Auth Log</button>
+                                <button type="button" onClick={() => { openAuthGraphsModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Montrer Auth Graphs</button>
                                 <button type="button" onClick={() => { void triggerAppShutdown(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-red-700 hover:bg-red-50">Arret de l'application</button>
                                 <button type="button" onClick={() => { void clearMaintenance(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-green-700 hover:bg-green-50">Fin de maintenance</button>
                                 <button type="button" onClick={() => { void forceReopenMaintenance(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-emerald-800 hover:bg-emerald-50">Forcer reouverture normale</button>
@@ -881,7 +1038,7 @@ const Header: React.FC = () => {
             )}
 
             {showAuthLogsModal && (
-                <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-4 sm:py-6">
+                <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/40 px-4 py-4 sm:py-6">
                     <div className="mx-auto flex min-h-full w-full max-w-5xl items-start sm:items-center">
                         <div className="w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
                         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -1072,6 +1229,98 @@ const Header: React.FC = () => {
                             </>
                         )}
                     </div>
+                    </div>
+                </div>
+            )}
+
+            {showAuthGraphsModal && (
+                <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-4 sm:py-6">
+                    <div className="mx-auto flex min-h-full w-full max-w-5xl items-start sm:items-center">
+                        <div className="w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
+                            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                                <h2 className="text-lg font-semibold text-gray-900">
+                                    Auth Graphs
+                                </h2>
+                                <button
+                                    type="button"
+                                    onClick={closeAuthGraphsModal}
+                                    className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                                >
+                                    Fermer
+                                </button>
+                            </div>
+
+                            <div className="mb-3 text-xs text-gray-500">
+                                Axe X: Date | Axe Y: Nombre de log
+                            </div>
+
+                            <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                                <label className="text-sm text-gray-700">
+                                    Date debut
+                                    <input
+                                        type="date"
+                                        value={authLogStartDate}
+                                        max={authLogEndDate || undefined}
+                                        onChange={(event) => setAuthLogStartDate(event.target.value)}
+                                        className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                                    />
+                                </label>
+                                <label className="text-sm text-gray-700">
+                                    Date fin
+                                    <input
+                                        type="date"
+                                        value={authLogEndDate}
+                                        min={authLogStartDate || undefined}
+                                        onChange={(event) => setAuthLogEndDate(event.target.value)}
+                                        className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                                    />
+                                </label>
+                            </div>
+
+                            {loadingAuthGraphs ? (
+                                <div className="flex items-center gap-3 text-sm text-gray-500">
+                                    <span
+                                        className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700"
+                                        aria-hidden="true"
+                                    />
+                                    <span>Chargement du graphique auth...</span>
+                                </div>
+                            ) : authGraphsError ? (
+                                <div className="rounded bg-red-50 p-3 text-sm text-red-700">
+                                    {authGraphsError}
+                                </div>
+                            ) : authGraphPoints.length === 0 ? (
+                                <p className="text-sm text-gray-500">Aucune donnee pour cette plage.</p>
+                            ) : (
+                                <div className="h-80 w-full rounded border border-gray-200 p-2 sm:p-4">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={authGraphPoints} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis dataKey="date" />
+                                            <YAxis allowDecimals={false} />
+                                            <Tooltip
+                                                trigger="click"
+                                                wrapperStyle={{ pointerEvents: "auto" }}
+                                                content={
+                                                    <AuthGraphTooltip
+                                                        onOpenLogsForDate={openAuthLogsForDate}
+                                                    />
+                                                }
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="count"
+                                                stroke="#2563eb"
+                                                strokeWidth={2}
+                                                dot={{ r: 3 }}
+                                                activeDot={{ r: 5 }}
+                                                name="Nombre de log"
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
