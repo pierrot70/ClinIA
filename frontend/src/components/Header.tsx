@@ -880,8 +880,9 @@ const Header: React.FC = () => {
             )}
 
             {showAuthLogsModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                    <div className="w-full max-w-5xl rounded-xl bg-white p-5 shadow-2xl">
+                <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-4 sm:py-6">
+                    <div className="mx-auto flex min-h-full w-full max-w-5xl items-start sm:items-center">
+                        <div className="w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
                         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                             <h2 className="text-lg font-semibold text-gray-900">
                                 Auth Log
@@ -1069,6 +1070,7 @@ const Header: React.FC = () => {
                                 </div>
                             </>
                         )}
+                    </div>
                     </div>
                 </div>
             )}
