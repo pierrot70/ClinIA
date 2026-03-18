@@ -172,3 +172,37 @@ export async function clearMaintenanceState() {
         maintenanceEnforcedAt: null,
     });
 }
+
+/**
+ * Emergency override: always clear maintenance in memory immediately,
+ * then try to persist. Returns persistence status instead of throwing.
+ */
+export async function forceClearMaintenanceState() {
+    shutdownState = {
+        isScheduled: false,
+        shutdownAt: null,
+        activatedAt: null,
+        activatedBy: null,
+        delaySeconds: null,
+        enforcedAt: null,
+    };
+
+    try {
+        await persistState({
+            maintenanceIsScheduled: false,
+            maintenanceShutdownAt: null,
+            maintenanceActivatedAt: null,
+            maintenanceActivatedBy: null,
+            maintenanceDelaySeconds: null,
+            maintenanceEnforcedAt: null,
+        });
+
+        return { persisted: true };
+    } catch (err) {
+        return {
+            persisted: false,
+            warning: "Etat reouvert en memoire, mais la sauvegarde Mongo a echoue.",
+            reason: err?.message || "UNKNOWN_ERROR",
+        };
+    }
+}

@@ -22,6 +22,7 @@ import {
 } from "../services/auth.js";
 import {
     enforceScheduledShutdownIfDue,
+    forceClearMaintenanceState,
     getAppShutdownState,
     isMaintenanceActive,
     scheduleAppShutdown,
@@ -704,6 +705,26 @@ router.post(
                 },
             });
         }
+    }
+);
+
+router.post(
+    "/app-shutdown/force-reopen",
+    verifyJWT,
+    requireRole(AUTH_ROLES.SUPERADMIN),
+    async (_req, res) => {
+        const result = await forceClearMaintenanceState();
+
+        return res.status(200).json({
+            data: {
+                maintenanceActive: false,
+                forceReopened: true,
+                persisted: Boolean(result?.persisted),
+                warning: result?.warning || null,
+                reason: result?.reason || null,
+            },
+            meta: { source: "real", model: "auth" },
+        });
     }
 );
 

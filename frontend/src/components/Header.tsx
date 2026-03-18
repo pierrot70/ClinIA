@@ -182,6 +182,46 @@ const Header: React.FC = () => {
         }
     };
 
+    const forceReopenMaintenance = async () => {
+        const confirmed = window.confirm(
+            "Forcer la reouverture normale maintenant ? Cette action est de secours si Mongo ne sauvegarde pas correctement."
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const response = await authFetch("/api/auth/app-shutdown/force-reopen", {
+                method: "POST",
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                window.alert(
+                    payload?.error?.message ||
+                        "Impossible de forcer la reouverture."
+                );
+                return;
+            }
+
+            if (payload?.data?.persisted === false) {
+                window.alert(
+                    "Reouverture forcee activee. Attention: la sauvegarde Mongo a echoue, verifier l'etat de la base."
+                );
+                return;
+            }
+
+            window.alert("Reouverture forcee appliquee. L'application est accessible.");
+        } catch (err) {
+            if (err instanceof SessionExpiredError) {
+                logout();
+                return;
+            }
+            window.alert("Erreur reseau lors de la reouverture forcee.");
+        }
+    };
+
     const loadActiveUsers = async (showLoadingState = false) => {
         if (showLoadingState) {
             setLoadingActiveUsers(true);
@@ -395,6 +435,17 @@ const Header: React.FC = () => {
                                     className="block w-full px-4 py-2 text-left text-sm text-green-700 transition hover:bg-green-50"
                                 >
                                     Fin de maintenance
+                                </button>
+                            )}
+                            {user?.role === "SUPERADMIN" && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        void forceReopenMaintenance();
+                                    }}
+                                    className="block w-full px-4 py-2 text-left text-sm text-emerald-800 transition hover:bg-emerald-50"
+                                >
+                                    Forcer reouverture normale
                                 </button>
                             )}
                         </div>
