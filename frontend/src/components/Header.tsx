@@ -38,6 +38,7 @@ const Header: React.FC = () => {
     const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
     const [loadingActiveUsers, setLoadingActiveUsers] = useState(false);
     const [activeUsersError, setActiveUsersError] = useState<string | null>(null);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const ACTIVE_USERS_REFRESH_MS = 5_000;
 
     const logout = () => {
@@ -276,62 +277,75 @@ const Header: React.FC = () => {
         };
     }, [showActiveUsersModal]);
 
+    useEffect(() => {
+        setIsMobileMenuOpen(false);
+    }, [location.pathname]);
+
     return (
         <header className="bg-white border-b border-gray-200">
-            <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-
-                {/* Logo + titre */}
-                <Link to="/" className="flex items-center gap-3">
-                    <img
-                        src="/logo.png"
-                        alt="ClinIA logo"
-                        className="h-10 w-auto"
-                    />
-                    <div>
-                        <div className="font-semibold text-lg leading-tight">
-                            ClinIA
+            <div className="max-w-6xl mx-auto px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                    <Link to="/" className="flex min-w-0 items-center gap-3">
+                        <img
+                            src="/logo.png"
+                            alt="ClinIA logo"
+                            className="h-10 w-auto"
+                        />
+                        <div className="min-w-0">
+                            <div className="truncate font-semibold text-lg leading-tight">
+                                ClinIA
+                            </div>
+                            <div className="hidden text-xs text-gray-500 sm:block">
+                                Assistant clinique IA – Prototype
+                            </div>
                         </div>
-                        <div className="text-xs text-gray-500">
-                            Assistant clinique IA – Prototype
-                        </div>
-                    </div>
-                </Link>
+                    </Link>
 
-                {/* ---------- BADGE ENVIRONNEMENT ---------- */}
-                <div className="flex items-center gap-2">
-                    {isDev && (
-                        <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 border border-blue-300">
-                            DEV – Docker
-                        </span>
-                    )}
-                    {isProd && (
-                        <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700 border border-green-300">
-                            {isLocalRuntime ? "PROD - LOCAL" : "PROD - REMOTE"}
-                        </span>
-                    )}
-                    {isDev && (
+                    <div className="flex items-center gap-2">
+                        <div className="hidden items-center gap-2 lg:flex">
+                            {isDev && (
+                                <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 border border-blue-300">
+                                    DEV – Docker
+                                </span>
+                            )}
+                            {isProd && (
+                                <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700 border border-green-300">
+                                    {isLocalRuntime ? "PROD - LOCAL" : "PROD - REMOTE"}
+                                </span>
+                            )}
+                            {isDev && (
+                                <button
+                                    type="button"
+                                    onClick={toggleForceReal}
+                                    className={
+                                        "px-2 py-1 text-xs rounded border transition " +
+                                        (forceReal
+                                            ? "bg-red-600 text-white border-red-600"
+                                            : "bg-gray-100 text-gray-700 border-gray-300")
+                                    }
+                                    title={
+                                        forceReal
+                                            ? "Forcer IA réelle"
+                                            : "Utiliser le mode mock"
+                                    }
+                                >
+                                    {forceReal ? "IA réelle" : "IA mock"}
+                                </button>
+                            )}
+                        </div>
+
                         <button
                             type="button"
-                            onClick={toggleForceReal}
-                            className={
-                                "px-2 py-1 text-xs rounded border transition " +
-                                (forceReal
-                                    ? "bg-red-600 text-white border-red-600"
-                                    : "bg-gray-100 text-gray-700 border-gray-300")
-                            }
-                            title={
-                                forceReal
-                                    ? "Forcer IA réelle"
-                                    : "Utiliser le mode mock"
-                            }
+                            onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+                            className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 lg:hidden"
+                            aria-label="Ouvrir le menu"
                         >
-                            {forceReal ? "IA réelle" : "IA mock"}
+                            {isMobileMenuOpen ? "Fermer" : "Menu"}
                         </button>
-                    )}
+                    </div>
                 </div>
 
-                {/* ---------- NAVIGATION ---------- */}
-                <nav className="flex items-center gap-4 text-sm">
+                <nav className="mt-3 hidden items-center gap-4 text-sm lg:flex">
                     <VoiceNavButton />
 
                     <label className="flex items-center gap-2 text-gray-600">
@@ -534,6 +548,107 @@ const Header: React.FC = () => {
                         </button>
                     )}
                 </nav>
+
+                {isMobileMenuOpen && (
+                    <div className="mt-3 space-y-3 rounded-xl border border-gray-200 bg-white p-3 lg:hidden">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                {isDev && (
+                                    <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 border border-blue-300">
+                                        DEV
+                                    </span>
+                                )}
+                                {isProd && (
+                                    <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700 border border-green-300">
+                                        {isLocalRuntime ? "PROD - LOCAL" : "PROD - REMOTE"}
+                                    </span>
+                                )}
+                            </div>
+                            {isDev && (
+                                <button
+                                    type="button"
+                                    onClick={toggleForceReal}
+                                    className={
+                                        "px-2 py-1 text-xs rounded border transition " +
+                                        (forceReal
+                                            ? "bg-red-600 text-white border-red-600"
+                                            : "bg-gray-100 text-gray-700 border-gray-300")
+                                    }
+                                >
+                                    {forceReal ? "IA réelle" : "IA mock"}
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                            <VoiceNavButton />
+                            <label className="flex items-center gap-2 text-gray-600">
+                                <span className="text-xs">Langue</span>
+                                <select
+                                    className="rounded border border-gray-300 bg-white px-2 py-1 text-xs"
+                                    value={locale}
+                                    onChange={onLanguageChange}
+                                    disabled={isTranslating}
+                                    aria-label="Choisir la langue"
+                                >
+                                    {languageOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        </div>
+
+                        <div className="space-y-1 border-t border-gray-100 pt-2">
+                            <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Accueil</Link>
+                            <Link to="/clinical" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Analyse clinique</Link>
+                            <Link to="/appointments" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Rendez-vous</Link>
+                            <Link to="/patients" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Patients</Link>
+                            <Link to="/cliniques" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Cliniques</Link>
+                            <Link to="/specialists" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Spécialistes</Link>
+                            <Link to="/quick" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Mode rapide</Link>
+                            <Link to="/patient-summary" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Résumé patient</Link>
+                        </div>
+
+                        {user?.role === "SUPERADMIN" && (
+                            <div className="space-y-1 border-t border-gray-100 pt-2">
+                                <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Gestion Application</div>
+                                <button type="button" onClick={() => { void openActiveUsersModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Montrer Usager Actif</button>
+                                <button type="button" onClick={() => { void triggerAppShutdown(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-red-700 hover:bg-red-50">Arret de l'application</button>
+                                <button type="button" onClick={() => { void clearMaintenance(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-green-700 hover:bg-green-50">Fin de maintenance</button>
+                                <button type="button" onClick={() => { void forceReopenMaintenance(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-emerald-800 hover:bg-emerald-50">Forcer reouverture normale</button>
+                            </div>
+                        )}
+
+                        <div className="space-y-1 border-t border-gray-100 pt-2">
+                            {!isAuthenticated && (
+                                <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Connexion</Link>
+                            )}
+
+                            {!canAccessAdmin && (
+                                <Link to="/admin/login" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Admin</Link>
+                            )}
+
+                            {canAccessAdmin && (
+                                <Link to="/mock-studio" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Mock Studio</Link>
+                            )}
+
+                            {canAccessAdmin && user?.role === "SUPERADMIN" && (
+                                <Link to="/admin/users/manage" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Utilisateurs</Link>
+                            )}
+
+                            {canAccessAdmin && (
+                                <button
+                                    onClick={logout}
+                                    className="block w-full rounded px-2 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                                >
+                                    Déconnexion
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {showActiveUsersModal && (
