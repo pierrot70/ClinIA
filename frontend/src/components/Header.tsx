@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import VoiceNavButton from "./VoiceNavButton";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
@@ -6,10 +6,15 @@ import { useAuth } from "../hooks/useAuth";
 import { isAdminRole } from "../auth/roles";
 import { SessionExpiredError } from "../services/authService";
 import {
+    Bar,
+    BarChart,
     CartesianGrid,
+    Cell,
     Legend,
     Line,
     LineChart,
+    Pie,
+    PieChart,
     ResponsiveContainer,
     Tooltip,
     XAxis,
@@ -55,11 +60,21 @@ type DateRangeSnapshot = {
     endDate: string;
 };
 
+type AuthGraphType = "xy" | "pie" | "histogram";
+
 type AuthGraphTooltipProps = {
     active?: boolean;
     payload?: Array<{ payload?: AuthGraphPoint; value?: number }>;
     label?: string;
     onOpenLogsForDate: (date: string) => void;
+};
+
+type AuthHistogramTooltipProps = {
+    active?: boolean;
+    payload?: Array<{ payload?: AuthGraphPoint; value?: number }>;
+    label?: string;
+    actionNames: string[];
+    onOpenLogsForDateAndAction: (date: string, actionName?: string) => void;
 };
 
 const AuthGraphTooltip: React.FC<AuthGraphTooltipProps> = ({
@@ -98,6 +113,60 @@ const AuthGraphTooltip: React.FC<AuthGraphTooltipProps> = ({
     );
 };
 
+const AuthHistogramTooltip: React.FC<AuthHistogramTooltipProps> = ({
+    active,
+    payload,
+    label,
+    actionNames,
+    onOpenLogsForDateAndAction,
+}) => {
+    if (!active || !payload || payload.length === 0) {
+        return null;
+    }
+
+    const point = payload[0]?.payload;
+    const date = point?.date || label;
+    if (!date) {
+        return null;
+    }
+
+    const total = typeof point?.total === "number" ? point.total : 0;
+
+    return (
+        <div className="max-w-[260px] rounded border border-gray-200 bg-white p-2 text-xs shadow">
+            <div className="mb-1 text-gray-700">Date: {date}</div>
+            <div className="mb-2 text-gray-700">Total logs: {total}</div>
+            <div className="space-y-1">
+                <button
+                    type="button"
+                    onClick={() => onOpenLogsForDateAndAction(date)}
+                    className="block w-full rounded bg-blue-50 px-2 py-1 text-left text-xs text-blue-700 hover:bg-blue-100"
+                >
+                    Tous
+                </button>
+                {actionNames.map((actionName) => {
+                    const value = point?.[actionName];
+                    const count = typeof value === "number" ? value : 0;
+                    if (count <= 0) {
+                        return null;
+                    }
+
+                    return (
+                        <button
+                            key={actionName}
+                            type="button"
+                            onClick={() => onOpenLogsForDateAndAction(date, actionName)}
+                            className="block w-full rounded bg-gray-50 px-2 py-1 text-left text-xs text-gray-700 hover:bg-gray-100"
+                        >
+                            {actionName} ({count})
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
 const AUTH_LOG_ACTION_OPTIONS = [
     { value: "", label: "Toutes" },
     { value: "LOGIN", label: "LOGIN" },
@@ -111,6 +180,12 @@ const AUTH_GRAPH_ACTION_COLORS = {
     LOGOUT: "#16a34a",
     FAILED_LOGIN: "#dc2626",
     USER_MANAGEMENT: "#d97706",
+};
+
+const AUTH_GRAPH_TYPE_LABELS: Record<AuthGraphType, string> = {
+    xy: "x-y graph",
+    pie: "Pie graph",
+    histogram: "Histogramme graph",
 };
 
 const Header: React.FC = () => {
@@ -140,6 +215,7 @@ const Header: React.FC = () => {
     const [activeUsersError, setActiveUsersError] = useState<string | null>(null);
     const [showAuthLogsModal, setShowAuthLogsModal] = useState(false);
     const [showAuthGraphsModal, setShowAuthGraphsModal] = useState(false);
+    const [authGraphType, setAuthGraphType] = useState<AuthGraphType>("xy");
     const [authLogs, setAuthLogs] = useState<AuthLogEntry[]>([]);
     const [loadingAuthLogs, setLoadingAuthLogs] = useState(false);
     const [authLogsError, setAuthLogsError] = useState<string | null>(null);
@@ -470,6 +546,27 @@ const Header: React.FC = () => {
         });
         setAuthLogStartDate(date);
         setAuthLogEndDate(date);
+        setAuthLogAction("");
+        setShowAuthLogsModal(true);
+    };
+
+    const openAuthLogsForDateAndAction = (date: string, actionName?: string) => {
+        setAuthGraphsDateSnapshot({
+            startDate: authLogStartDate,
+            endDate: authLogEndDate,
+        });
+        setAuthLogStartDate(date);
+        setAuthLogEndDate(date);
+        setAuthLogAction(actionName || "");
+        setShowAuthLogsModal(true);
+    };
+
+    const openAuthLogsForRangeAndAction = (actionName: string) => {
+        setAuthGraphsDateSnapshot({
+            startDate: authLogStartDate,
+            endDate: authLogEndDate,
+        });
+        setAuthLogAction(actionName);
         setShowAuthLogsModal(true);
     };
 
@@ -534,7 +631,8 @@ const Header: React.FC = () => {
         }
     };
 
-    const openAuthGraphsModal = () => {
+    const openAuthGraphsModal = (type: AuthGraphType) => {
+        setAuthGraphType(type);
         setAuthGraphAction("");
         setShowAuthGraphsModal(true);
     };
@@ -543,6 +641,26 @@ const Header: React.FC = () => {
         setShowAuthGraphsModal(false);
         setAuthGraphsError(null);
     };
+
+    const authGraphPieData = useMemo(() => {
+        if (authGraphActions.length === 0) {
+            return [];
+        }
+
+        return authGraphActions
+            .map((actionName) => {
+                const total = authGraphPoints.reduce((sum, point) => {
+                    const value = point[actionName];
+                    return sum + (typeof value === "number" ? value : 0);
+                }, 0);
+
+                return {
+                    action: actionName,
+                    value: total,
+                };
+            })
+            .filter((entry) => entry.value > 0);
+    }, [authGraphActions, authGraphPoints]);
 
     const applyAuthLogFilters = async () => {
         await loadAuthLogs(1, true);
@@ -780,15 +898,40 @@ const Header: React.FC = () => {
                                 >
                                     Montrer Auth Log
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        openAuthGraphsModal();
-                                    }}
-                                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
-                                >
-                                    Montrer Auth Graphs
-                                </button>
+                                <details className="group/graphs border-t border-gray-100">
+                                    <summary className="cursor-pointer list-none px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50">
+                                        Graphiques Auth
+                                    </summary>
+                                    <div className="space-y-1 pb-2 pl-4 pr-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                openAuthGraphsModal("xy");
+                                            }}
+                                            className="block w-full rounded px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
+                                        >
+                                            x-y graph
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                openAuthGraphsModal("pie");
+                                            }}
+                                            className="block w-full rounded px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
+                                        >
+                                            Pie graph
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                openAuthGraphsModal("histogram");
+                                            }}
+                                            className="block w-full rounded px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
+                                        >
+                                            Histogramme graph
+                                        </button>
+                                    </div>
+                                </details>
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -965,7 +1108,14 @@ const Header: React.FC = () => {
                                 <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Gestion Application</div>
                                 <button type="button" onClick={() => { void openActiveUsersModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Montrer Usager Actif</button>
                                 <button type="button" onClick={() => { void openAuthLogsModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Montrer Auth Log</button>
-                                <button type="button" onClick={() => { openAuthGraphsModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Montrer Auth Graphs</button>
+                                <details>
+                                    <summary className="cursor-pointer rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Graphiques Auth</summary>
+                                    <div className="mt-1 space-y-1 pl-2">
+                                        <button type="button" onClick={() => { openAuthGraphsModal("xy"); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">x-y graph</button>
+                                        <button type="button" onClick={() => { openAuthGraphsModal("pie"); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Pie graph</button>
+                                        <button type="button" onClick={() => { openAuthGraphsModal("histogram"); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Histogramme graph</button>
+                                    </div>
+                                </details>
                                 <button type="button" onClick={() => { void triggerAppShutdown(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-red-700 hover:bg-red-50">Arret de l'application</button>
                                 <button type="button" onClick={() => { void clearMaintenance(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-green-700 hover:bg-green-50">Fin de maintenance</button>
                                 <button type="button" onClick={() => { void forceReopenMaintenance(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-emerald-800 hover:bg-emerald-50">Forcer reouverture normale</button>
@@ -1265,7 +1415,7 @@ const Header: React.FC = () => {
                         <div className="w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
                             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                                 <h2 className="text-lg font-semibold text-gray-900">
-                                    Auth Graphs
+                                    Auth Graphs - {AUTH_GRAPH_TYPE_LABELS[authGraphType]}
                                 </h2>
                                 <button
                                     type="button"
@@ -1319,35 +1469,86 @@ const Header: React.FC = () => {
                                 <p className="text-sm text-gray-500">Aucune donnee pour cette plage.</p>
                             ) : (
                                 <div className="h-80 w-full rounded border border-gray-200 p-2 sm:p-4">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <LineChart data={authGraphPoints} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis dataKey="date" />
-                                            <YAxis allowDecimals={false} />
-                                            <Legend />
-                                            <Tooltip
-                                                trigger="click"
-                                                wrapperStyle={{ pointerEvents: "auto" }}
-                                                content={
-                                                    <AuthGraphTooltip
-                                                        onOpenLogsForDate={openAuthLogsForDate}
-                                                    />
-                                                }
-                                            />
-                                            {authGraphActions.map((actionName) => (
-                                                <Line
-                                                    key={actionName}
-                                                    type="monotone"
-                                                    dataKey={actionName}
-                                                    stroke={AUTH_GRAPH_ACTION_COLORS[actionName as keyof typeof AUTH_GRAPH_ACTION_COLORS] || "#4b5563"}
-                                                    strokeWidth={2}
-                                                    dot={{ r: 3 }}
-                                                    activeDot={{ r: 5 }}
-                                                    name={actionName}
+                                    {authGraphType === "pie" ? (
+                                        authGraphPieData.length === 0 ? (
+                                            <p className="px-2 py-4 text-sm text-gray-500">Aucune donnee action pour ce graphique.</p>
+                                        ) : (
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <PieChart>
+                                                    <Tooltip />
+                                                    <Legend />
+                                                    <Pie
+                                                        data={authGraphPieData}
+                                                        dataKey="value"
+                                                        nameKey="action"
+                                                        outerRadius={120}
+                                                        label
+                                                        onClick={(entry) => {
+                                                            const actionName = entry?.action;
+                                                            if (typeof actionName === "string" && actionName) {
+                                                                openAuthLogsForRangeAndAction(actionName);
+                                                            }
+                                                        }}
+                                                    >
+                                                        {authGraphPieData.map((entry) => (
+                                                            <Cell
+                                                                key={entry.action}
+                                                                fill={AUTH_GRAPH_ACTION_COLORS[entry.action as keyof typeof AUTH_GRAPH_ACTION_COLORS] || "#4b5563"}
+                                                            />
+                                                        ))}
+                                                    </Pie>
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                        )
+                                    ) : authGraphType === "histogram" ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={authGraphPoints} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <XAxis dataKey="date" />
+                                                <YAxis allowDecimals={false} />
+                                                <Tooltip
+                                                    wrapperStyle={{ pointerEvents: "auto" }}
+                                                    content={
+                                                        <AuthHistogramTooltip
+                                                            actionNames={authGraphActions}
+                                                            onOpenLogsForDateAndAction={openAuthLogsForDateAndAction}
+                                                        />
+                                                    }
                                                 />
-                                            ))}
-                                        </LineChart>
-                                    </ResponsiveContainer>
+                                                <Bar dataKey="total" name="Nombre de log" fill="#2563eb" />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    ) : (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <LineChart data={authGraphPoints} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <XAxis dataKey="date" />
+                                                <YAxis allowDecimals={false} />
+                                                <Legend />
+                                                <Tooltip
+                                                    trigger="click"
+                                                    wrapperStyle={{ pointerEvents: "auto" }}
+                                                    content={
+                                                        <AuthGraphTooltip
+                                                            onOpenLogsForDate={openAuthLogsForDate}
+                                                        />
+                                                    }
+                                                />
+                                                {authGraphActions.map((actionName) => (
+                                                    <Line
+                                                        key={actionName}
+                                                        type="monotone"
+                                                        dataKey={actionName}
+                                                        stroke={AUTH_GRAPH_ACTION_COLORS[actionName as keyof typeof AUTH_GRAPH_ACTION_COLORS] || "#4b5563"}
+                                                        strokeWidth={2}
+                                                        dot={{ r: 3 }}
+                                                        activeDot={{ r: 5 }}
+                                                        name={actionName}
+                                                    />
+                                                ))}
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    )}
                                 </div>
                             )}
                         </div>
