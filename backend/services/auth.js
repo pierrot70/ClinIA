@@ -864,22 +864,61 @@ export async function listAuthLogGraphs({
         {
             $group: {
                 _id: {
-                    $dateToString: {
-                        format: "%Y-%m-%d",
-                        date: "$timestamp",
+                    date: {
+                        $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$timestamp",
+                        },
                     },
+                    action: "$action",
                 },
                 count: { $sum: 1 },
             },
         },
-        { $sort: { _id: 1 } },
+        { $sort: { "_id.date": 1, "_id.action": 1 } },
     ]);
 
+    const preferredActionOrder = [
+        "LOGIN",
+        "LOGOUT",
+        "FAILED_LOGIN",
+        "USER_MANAGEMENT",
+    ];
+
+    const actionSet = new Set();
+    const byDate = new Map();
+
+    for (const row of rows) {
+        const date = row?._id?.date;
+        const actionName = row?._id?.action;
+        const count = Number(row?.count || 0);
+
+        if (!date || !actionName) {
+            continue;
+        }
+
+        actionSet.add(actionName);
+
+        if (!byDate.has(date)) {
+            byDate.set(date, {
+                date,
+                total: 0,
+            });
+        }
+
+        const current = byDate.get(date);
+        current[actionName] = count;
+        current.total += count;
+    }
+
+    const actions = preferredActionOrder.filter((name) => actionSet.has(name));
+    const points = Array.from(byDate.values()).sort((a, b) =>
+        String(a.date).localeCompare(String(b.date))
+    );
+
     return {
-        points: rows.map((row) => ({
-            date: row._id,
-            count: row.count,
-        })),
+        actions,
+        points,
     };
 }
 

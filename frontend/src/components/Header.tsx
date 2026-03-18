@@ -7,6 +7,7 @@ import { isAdminRole } from "../auth/roles";
 import { SessionExpiredError } from "../services/authService";
 import {
     CartesianGrid,
+    Legend,
     Line,
     LineChart,
     ResponsiveContainer,
@@ -45,7 +46,8 @@ type AuthLogPagination = {
 
 type AuthGraphPoint = {
     date: string;
-    count: number;
+    total: number;
+    [key: string]: string | number;
 };
 
 type DateRangeSnapshot = {
@@ -72,7 +74,10 @@ const AuthGraphTooltip: React.FC<AuthGraphTooltipProps> = ({
 
     const point = payload[0]?.payload;
     const date = point?.date || label;
-    const count = typeof payload[0]?.value === "number" ? payload[0].value : point?.count;
+    const countFromPayload = payload.reduce((sum, item) => {
+        return sum + (typeof item?.value === "number" ? item.value : 0);
+    }, 0);
+    const count = typeof point?.total === "number" ? point.total : countFromPayload;
 
     if (!date) {
         return null;
@@ -100,6 +105,13 @@ const AUTH_LOG_ACTION_OPTIONS = [
     { value: "FAILED_LOGIN", label: "FAILED_LOGIN" },
     { value: "USER_MANAGEMENT", label: "USER_MANAGEMENT" },
 ];
+
+const AUTH_GRAPH_ACTION_COLORS = {
+    LOGIN: "#2563eb",
+    LOGOUT: "#16a34a",
+    FAILED_LOGIN: "#dc2626",
+    USER_MANAGEMENT: "#d97706",
+};
 
 const Header: React.FC = () => {
     const now = new Date();
@@ -137,6 +149,7 @@ const Header: React.FC = () => {
     const [authLogAction, setAuthLogAction] = useState("");
     const [authLogPage, setAuthLogPage] = useState(1);
     const [authGraphPoints, setAuthGraphPoints] = useState<AuthGraphPoint[]>([]);
+    const [authGraphActions, setAuthGraphActions] = useState<string[]>([]);
     const [loadingAuthGraphs, setLoadingAuthGraphs] = useState(false);
     const [authGraphsError, setAuthGraphsError] = useState<string | null>(null);
     const [authGraphsDateSnapshot, setAuthGraphsDateSnapshot] = useState<DateRangeSnapshot | null>(null);
@@ -492,10 +505,20 @@ const Header: React.FC = () => {
                         "Impossible de charger le graphique des logs auth."
                 );
                 setAuthGraphPoints([]);
+                setAuthGraphActions([]);
                 return;
             }
 
-            setAuthGraphPoints(payload?.data?.points || []);
+            const points = payload?.data?.points || [];
+            const actionsFromApi = payload?.data?.actions || [];
+            const inferredActions =
+                points.length > 0
+                    ? Object.keys(points[0]).filter(
+                        (key) => key !== "date" && key !== "total"
+                    )
+                    : [];
+            setAuthGraphPoints(points);
+            setAuthGraphActions(actionsFromApi.length > 0 ? actionsFromApi : inferredActions);
         } catch (err) {
             if (err instanceof SessionExpiredError) {
                 logout();
@@ -504,6 +527,7 @@ const Header: React.FC = () => {
 
             setAuthGraphsError("Erreur reseau lors du chargement du graphique auth.");
             setAuthGraphPoints([]);
+            setAuthGraphActions([]);
         } finally {
             setLoadingAuthGraphs(false);
         }
@@ -1298,6 +1322,7 @@ const Header: React.FC = () => {
                                             <CartesianGrid strokeDasharray="3 3" />
                                             <XAxis dataKey="date" />
                                             <YAxis allowDecimals={false} />
+                                            <Legend />
                                             <Tooltip
                                                 trigger="click"
                                                 wrapperStyle={{ pointerEvents: "auto" }}
@@ -1307,15 +1332,18 @@ const Header: React.FC = () => {
                                                     />
                                                 }
                                             />
-                                            <Line
-                                                type="monotone"
-                                                dataKey="count"
-                                                stroke="#2563eb"
-                                                strokeWidth={2}
-                                                dot={{ r: 3 }}
-                                                activeDot={{ r: 5 }}
-                                                name="Nombre de log"
-                                            />
+                                            {authGraphActions.map((actionName) => (
+                                                <Line
+                                                    key={actionName}
+                                                    type="monotone"
+                                                    dataKey={actionName}
+                                                    stroke={AUTH_GRAPH_ACTION_COLORS[actionName as keyof typeof AUTH_GRAPH_ACTION_COLORS] || "#4b5563"}
+                                                    strokeWidth={2}
+                                                    dot={{ r: 3 }}
+                                                    activeDot={{ r: 5 }}
+                                                    name={actionName}
+                                                />
+                                            ))}
                                         </LineChart>
                                     </ResponsiveContainer>
                                 </div>
