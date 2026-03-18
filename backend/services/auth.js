@@ -732,7 +732,7 @@ export async function listAuthLogs({
         const dateQuery = {};
 
         if (startDate) {
-            const parsedStart = new Date(startDate);
+            const parsedStart = new Date(`${startDate}T00:00:00.000`);
             if (Number.isNaN(parsedStart.getTime())) {
                 throw createAuthError("INVALID_INPUT", "Date de debut invalide.");
             }
@@ -740,7 +740,7 @@ export async function listAuthLogs({
         }
 
         if (endDate) {
-            const parsedEnd = new Date(endDate);
+            const parsedEnd = new Date(`${endDate}T23:59:59.999`);
             if (Number.isNaN(parsedEnd.getTime())) {
                 throw createAuthError("INVALID_INPUT", "Date de fin invalide.");
             }
