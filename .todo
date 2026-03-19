@@ -1,3 +1,12 @@
 # ClinIA TODO
 
 - [ ] Configurer Mongo Express en HTTPS via un sous-domaine dedie (ex: mongo.clinique-ai.ca) dans Coolify/Traefik, puis retirer l'acces public direct en HTTP sur :8081.
+
+## Verification securite Loi 25 / PIPEDA
+
+- [ ] Ne pas publier le port BD vers l'exterieur sauf besoin explicite.
+- [ ] Utiliser un utilisateur BD a privileges minimaux.
+- [ ] Chiffrer les secrets, sauvegardes et idealement les donnees au repos.
+- [ ] Activer des logs d'audit sans donnees patient identifiables.
+- [ ] Segmenter le reseau Docker et limiter les communications inter-services.
+- [ ] Mettre a jour les images et dependances regulierement.
