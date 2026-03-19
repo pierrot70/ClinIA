@@ -111,69 +111,119 @@ export function ClinicalForm({
             )}
 
             <h2 className="text-lg font-semibold">Données cliniques</h2>
+            <p className="text-sm text-blue-700 bg-blue-50 border border-blue-100 rounded px-3 py-2">
+                Exemple de cas fictif: patient de 55 ans avec fatigue, polyurie et polydipsie.
+            </p>
 
             <Field highlight={isHighlighted("weight")}>
-                <input
-                    className="input w-full"
-                    placeholder="Poids (kg)"
-                    value={form.weight ?? ""}
-                    onChange={(e) =>
-                        update(
-                            "weight",
-                            e.target.value ? Number(e.target.value) : undefined
-                        )
-                    }
-                />
+                <div className="space-y-1">
+                    <label htmlFor="clinical-weight" className="text-sm font-medium text-gray-700">
+                        Poids du patient (kg)
+                    </label>
+                    <p className="text-xs text-gray-500">
+                        Entrez une valeur numerique, exemple: 92
+                    </p>
+                    <input
+                        id="clinical-weight"
+                        type="number"
+                        className="input w-full"
+                        placeholder="Ex: 92"
+                        value={form.weight ?? ""}
+                        onChange={(e) =>
+                            update(
+                                "weight",
+                                e.target.value ? Number(e.target.value) : undefined
+                            )
+                        }
+                    />
+                </div>
             </Field>
 
             <Field highlight={isHighlighted("height")}>
-                <input
-                    className="input w-full"
-                    placeholder="Taille (cm)"
-                    value={form.height ?? ""}
-                    onChange={(e) =>
-                        update(
-                            "height",
-                            e.target.value ? Number(e.target.value) : undefined
-                        )
-                    }
-                />
+                <div className="space-y-1">
+                    <label htmlFor="clinical-height" className="text-sm font-medium text-gray-700">
+                        Taille du patient (cm)
+                    </label>
+                    <p className="text-xs text-gray-500">
+                        Entrez une valeur numerique, exemple: 175
+                    </p>
+                    <input
+                        id="clinical-height"
+                        type="number"
+                        className="input w-full"
+                        placeholder="Ex: 175"
+                        value={form.height ?? ""}
+                        onChange={(e) =>
+                            update(
+                                "height",
+                                e.target.value ? Number(e.target.value) : undefined
+                            )
+                        }
+                    />
+                </div>
             </Field>
 
             <Field highlight={isHighlighted("symptoms")}>
-                <input
-                    className="input w-full"
-                    placeholder="Symptômes"
-                    value={form.symptoms.join(", ")}
-                    onChange={(e) =>
-                        update("symptoms", parseList(e.target.value))
-                    }
-                />
+                <div className="space-y-1">
+                    <label htmlFor="clinical-symptoms" className="text-sm font-medium text-gray-700">
+                        Symptomes principaux
+                    </label>
+                    <p className="text-xs text-gray-500">
+                        Separez chaque symptome par une virgule, exemple: fatigue, polydipsie
+                    </p>
+                    <input
+                        id="clinical-symptoms"
+                        className="input w-full"
+                        placeholder="Ex: fatigue, polyurie"
+                        value={form.symptoms.join(", ")}
+                        onChange={(e) =>
+                            update("symptoms", parseList(e.target.value))
+                        }
+                    />
+                </div>
             </Field>
 
             <Field highlight={isHighlighted("medical_history")}>
-                <input
-                    className="input w-full"
-                    placeholder="Antécédents médicaux"
-                    value={form.medical_history.join(", ")}
-                    onChange={(e) =>
-                        update("medical_history", parseList(e.target.value))
-                    }
-                />
+                <div className="space-y-1">
+                    <label htmlFor="clinical-medical-history" className="text-sm font-medium text-gray-700">
+                        Antecedents medicaux
+                    </label>
+                    <p className="text-xs text-gray-500">
+                        Conditions ou diagnostics connus, separes par des virgules
+                    </p>
+                    <input
+                        id="clinical-medical-history"
+                        className="input w-full"
+                        placeholder="Ex: diabete type 2, HTA"
+                        value={form.medical_history.join(", ")}
+                        onChange={(e) =>
+                            update("medical_history", parseList(e.target.value))
+                        }
+                    />
+                </div>
             </Field>
 
             <Field highlight={isHighlighted("current_medications")}>
-                <input
-                    className="input w-full"
-                    placeholder="Médication actuelle"
-                    value={form.current_medications.join(", ")}
-                    onChange={(e) =>
-                        update(
-                            "current_medications",
-                            parseList(e.target.value)
-                        )
-                    }
-                />
+                <div className="space-y-1">
+                    <label htmlFor="clinical-current-medications" className="text-sm font-medium text-gray-700">
+                        Medication actuelle
+                    </label>
+                    <p className="text-xs text-gray-500">
+                        Noms des medicaments en cours, separes par des virgules
+                    </p>
+                    <input
+                        id="clinical-current-medications"
+                        className="input w-full"
+                        placeholder="Ex: metformine 500mg bid"
+                        value={form.current_medications.join(", ")}
+                        onChange={(e) =>
+                            update(
+                                "current_medications",
+                                parseList(e.target.value)
+                            )
+                        }
+                    />
+                </div>
             </Field>
 
             <div className="flex gap-3">
