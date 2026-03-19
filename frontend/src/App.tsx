@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
 import Home from "./pages/Home";
+import DemoPage from "./pages/DemoPage";
 import Results from "./pages/Results";
 import TreatmentDetails from "./pages/TreatmentDetails";
 import QuickMode from "./pages/QuickMode";
@@ -86,6 +87,7 @@ const App: React.FC = () => {
             <main className="flex-1">
                 <Routes>
                     <Route path="/" element={homeEntry} />
+                    <Route path="/demo" element={<DemoPage />} />
                     <Route path="/results" element={<Results />} />
                     <Route path="/treatment/:id" element={<TreatmentDetails />} />
                     <Route path="/quick" element={<QuickMode />} />
