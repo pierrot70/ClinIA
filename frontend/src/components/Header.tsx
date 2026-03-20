@@ -193,6 +193,38 @@ const Header: React.FC = () => {
     const todayDateValue = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const location = useLocation();
     const { locale, setLocaleFromDropdown, isTranslating } = useHomeI18n();
+    const [localStorageLocale, setLocalStorageLocale] = useState(() => {
+        try {
+            return localStorage.getItem("clinia_ui_locale_v1") || locale;
+        } catch {
+            return locale;
+        }
+    });
+
+    // Synchronise le selecteur avec localStorage si modifié ailleurs
+    useEffect(() => {
+        const syncLocale = () => {
+            try {
+                const stored = localStorage.getItem("clinia_ui_locale_v1");
+                if (stored && stored !== localStorageLocale) {
+                    setLocalStorageLocale(stored);
+                } else if (!stored && localStorageLocale !== locale) {
+                    setLocalStorageLocale(locale);
+                }
+            } catch {}
+        };
+        window.addEventListener("storage", syncLocale);
+        const interval = setInterval(syncLocale, 1000);
+        return () => {
+            window.removeEventListener("storage", syncLocale);
+            clearInterval(interval);
+        };
+    }, [localStorageLocale, locale]);
+
+    // Met à jour localStorageLocale si le contexte change (ex: via dropdown)
+    useEffect(() => {
+        setLocalStorageLocale(locale);
+    }, [locale]);
     const {
         isAuthenticated,
         user,
@@ -801,7 +833,7 @@ const Header: React.FC = () => {
                         <span className="text-xs">Langue</span>
                         <select
                             className="rounded border border-gray-300 bg-white px-2 py-1 text-xs"
-                            value={locale}
+                            value={localStorageLocale}
                             onChange={onLanguageChange}
                             disabled={isTranslating}
                             aria-label="Choisir la langue"

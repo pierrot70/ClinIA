@@ -52,7 +52,7 @@ type SupportedUiLocale = (typeof SUPPORTED_UI_LOCALES)[number];
 const toSupportedUiLocale = (value: string): SupportedUiLocale => {
   const normalized = String(value || "").trim().toLowerCase();
   if (!normalized) {
-    return "fr-CA";
+    return "en-CA";
   }
 
   if (normalized.startsWith("fr")) return "fr-CA";
@@ -63,14 +63,14 @@ const toSupportedUiLocale = (value: string): SupportedUiLocale => {
   if (normalized.startsWith("es")) return "es";
   if (normalized.startsWith("ko")) return "ko-KR";
   if (normalized.startsWith("vi")) return "vi";
-  return "fr-CA";
+  return "en-CA";
 };
 
 const toBaseLang = (value: string) => toSupportedUiLocale(value).toLowerCase().slice(0, 2);
 
 const detectBrowserUiLocale = (): SupportedUiLocale => {
   if (typeof navigator === "undefined") {
-    return "fr-CA";
+    return "en-CA";
   }
 
   const candidates = [navigator.language, ...(navigator.languages || [])].filter(Boolean);
@@ -81,7 +81,7 @@ const detectBrowserUiLocale = (): SupportedUiLocale => {
     }
   }
 
-  return "fr-CA";
+  return "en-CA";
 };
 
 const cacheKeyForLocale = (locale: string) =>
@@ -149,8 +149,8 @@ const LOCAL_SCRIPT_LOCK_LANGS = new Set(["he", "ja", "ko"]);
 export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [locale, setLocaleState] = useState<Locale>("fr-CA");
-  const [strings, setStrings] = useState<HomeStrings>(HOME_STRINGS_FR);
+  const [locale, setLocaleState] = useState<Locale>("en-CA");
+  const [strings, setStrings] = useState<HomeStrings>(HOME_STRINGS_EN);
   const [isTranslating, setIsTranslating] = useState(false);
 
   const setLocaleFromVoice = useCallback(async (target: Locale) => {
@@ -292,7 +292,7 @@ export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
     let isMounted = true;
 
     const applyInitialLocale = async () => {
-      let initialLocale: SupportedUiLocale = "fr-CA";
+      let initialLocale: SupportedUiLocale = "en-CA";
       try {
         const stored = window.localStorage.getItem(UI_LOCALE_STORAGE_KEY);
         if (stored) {
