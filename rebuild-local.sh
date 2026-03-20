@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # -----------------------------
 # Scan sécurité Loi 25/PIPEDA : fuite de données identifiables
 # -----------------------------
@@ -17,7 +18,6 @@ else
   echo "✅ Aucun pattern de fuite de données identifiables détecté dans les logs ou réponses API."
   rm -f .security_scan_tmp
 fi
-#!/usr/bin/env bash
 set -euo pipefail
 
 # --------------------------------------------------
