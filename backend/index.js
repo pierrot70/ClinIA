@@ -41,6 +41,7 @@ import { requireRole } from "./middleware/requireRole.js";
 import { AUTH_ROLES } from "./auth/constants.js";
 import { initShutdownState } from "./services/appShutdown.js";
 import { clinicalDemoRateLimiter } from "./middleware/clinicalDemoRateLimiter.js";
+import { loi25DataLeakGuard } from "./middleware/loi25DataLeakGuard.js";
 
 dotenv.config();
 
@@ -1094,6 +1095,7 @@ app.use(
         AUTH_ROLES.ADMIN,
         AUTH_ROLES.SUPERADMIN
     ),
+    loi25DataLeakGuard,
     appointmentsRouter
 );
 app.use(
@@ -1105,25 +1107,34 @@ app.use(
         AUTH_ROLES.ADMIN,
         AUTH_ROLES.SUPERADMIN
     ),
+    loi25DataLeakGuard,
     patientsRouter
 );
 app.use(
     "/api/cliniques",
     verifyJWT,
     requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+    loi25DataLeakGuard,
     cliniquesRouter
 );
 app.use(
     "/api/specialists",
     verifyJWT,
     requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+    loi25DataLeakGuard,
     specialistsRouter
 );
 app.use(
     "/api/security/incidents",
     verifyJWT,
     requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+    loi25DataLeakGuard,
     securityIncidentsRouter
+);
+app.use(
+    "/api/auth",
+    loi25DataLeakGuard,
+    authRouter
 );
 
 app.listen(4000, () =>

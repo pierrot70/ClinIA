@@ -1,3 +1,4 @@
+import { withSecurityIncidentGuard } from "./securityIncidentGuard";
 import type { ApiResponse } from "../types/api";
 
 const API_URL = import.meta.env.VITE_API_URL as string;
@@ -84,21 +85,24 @@ export async function fetchCliniquesPaginated(
     if (params.code_postal) query.set("code_postal", params.code_postal);
     if (params.nom) query.set("nom", params.nom);
 
-    try {
-        const response = await fetch(
-            `${API_URL}/api/cliniques?${query.toString()}`
-        );
-
-        return (await safeJson(response)) as ApiResponse<PaginatedCliniques>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible de récupérer les cliniques.",
-                retryable: true,
-            },
-        };
-    }
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(
+                    `${API_URL}/api/cliniques?${query.toString()}`
+                );
+                return (await safeJson(response)) as ApiResponse<PaginatedCliniques>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de récupérer les cliniques.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
 }
 
 /* ------------------------------------------------------------------ */
@@ -108,23 +112,26 @@ export async function fetchCliniquesPaginated(
 export async function createClinique(
     payload: CliniquePayload
 ): Promise<ApiResponse<Clinique>> {
-    try {
-        const response = await fetch(`${API_URL}/api/cliniques`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-
-        return (await safeJson(response)) as ApiResponse<Clinique>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible de créer la clinique.",
-                retryable: true,
-            },
-        };
-    }
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/cliniques`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+                return (await safeJson(response)) as ApiResponse<Clinique>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de créer la clinique.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
 }
 
 /* ------------------------------------------------------------------ */
@@ -135,23 +142,26 @@ export async function updateClinique(
     id: string,
     payload: CliniquePayload
 ): Promise<ApiResponse<Clinique>> {
-    try {
-        const response = await fetch(`${API_URL}/api/cliniques/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-
-        return (await safeJson(response)) as ApiResponse<Clinique>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible de mettre à jour la clinique.",
-                retryable: true,
-            },
-        };
-    }
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/cliniques/${id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+                return (await safeJson(response)) as ApiResponse<Clinique>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de mettre à jour la clinique.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
 }
 
 /* ------------------------------------------------------------------ */
@@ -161,19 +171,22 @@ export async function updateClinique(
 export async function deleteClinique(
     id: string
 ): Promise<ApiResponse<Clinique>> {
-    try {
-        const response = await fetch(`${API_URL}/api/cliniques/${id}`, {
-            method: "DELETE",
-        });
-
-        return (await safeJson(response)) as ApiResponse<Clinique>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible de supprimer la clinique.",
-                retryable: true,
-            },
-        };
-    }
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/cliniques/${id}`, {
+                    method: "DELETE",
+                });
+                return (await safeJson(response)) as ApiResponse<Clinique>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de supprimer la clinique.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
 }

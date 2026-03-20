@@ -1,3 +1,4 @@
+import { withSecurityIncidentGuard } from "./securityIncidentGuard";
 import type { ApiResponse } from "../types/api";
 
 const API_URL = import.meta.env.VITE_API_URL as string;
@@ -25,27 +26,30 @@ export interface SecurityIncidentAcknowledgeResult {
 export async function acknowledgeSecurityIncident(
     payload: SecurityIncidentAcknowledgePayload
 ): Promise<ApiResponse<SecurityIncidentAcknowledgeResult>> {
-    try {
-        const response = await fetch(
-            `${API_URL}/api/security/incidents/acknowledge`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(payload),
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(
+                    `${API_URL}/api/security/incidents/acknowledge`,
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(payload),
+                    }
+                );
+                return (await response.json()) as ApiResponse<SecurityIncidentAcknowledgeResult>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message:
+                            "Impossible d'enregistrer l'acknowledgment de securite. Verifiez la connexion puis reessayez.",
+                        retryable: true,
+                    },
+                };
             }
-        );
-
-        return (await response.json()) as ApiResponse<SecurityIncidentAcknowledgeResult>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message:
-                    "Impossible d'enregistrer l'acknowledgment de securite. Verifiez la connexion puis reessayez.",
-                retryable: true,
-            },
-        };
-    }
+        })()
+    );
 }

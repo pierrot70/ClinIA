@@ -1,3 +1,4 @@
+import { withSecurityIncidentGuard } from "./securityIncidentGuard";
 import type { ApiResponse } from "../types/api";
 
 const API_URL = import.meta.env.VITE_API_URL as string;
@@ -83,84 +84,96 @@ export async function fetchSpecialistsPaginated(
     if (params.clinique_associer)
         query.set("clinique_associer", params.clinique_associer);
 
-    try {
-        const response = await fetch(
-            `${API_URL}/api/specialists?${query.toString()}`
-        );
-
-        return (await safeJson(response)) as ApiResponse<PaginatedSpecialists>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible de récupérer les spécialistes.",
-                retryable: true,
-            },
-        };
-    }
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(
+                    `${API_URL}/api/specialists?${query.toString()}`
+                );
+                return (await safeJson(response)) as ApiResponse<PaginatedSpecialists>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de récupérer les spécialistes.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
 }
 
 export async function createSpecialist(
     payload: SpecialistPayload
 ): Promise<ApiResponse<Specialist>> {
-    try {
-        const response = await fetch(`${API_URL}/api/specialists`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-
-        return (await safeJson(response)) as ApiResponse<Specialist>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible de créer le spécialiste.",
-                retryable: true,
-            },
-        };
-    }
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/specialists`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+                return (await safeJson(response)) as ApiResponse<Specialist>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de créer le spécialiste.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
 }
 
 export async function updateSpecialist(
     id: string,
     payload: SpecialistPayload
 ): Promise<ApiResponse<Specialist>> {
-    try {
-        const response = await fetch(`${API_URL}/api/specialists/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-
-        return (await safeJson(response)) as ApiResponse<Specialist>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible de mettre à jour le spécialiste.",
-                retryable: true,
-            },
-        };
-    }
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/specialists/${id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+                return (await safeJson(response)) as ApiResponse<Specialist>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de mettre à jour le spécialiste.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
 }
 
 export async function deleteSpecialist(
     id: string
 ): Promise<ApiResponse<Specialist>> {
-    try {
-        const response = await fetch(`${API_URL}/api/specialists/${id}`, {
-            method: "DELETE",
-        });
-
-        return (await safeJson(response)) as ApiResponse<Specialist>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible de supprimer le spécialiste.",
-                retryable: true,
-            },
-        };
-    }
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/specialists/${id}`, {
+                    method: "DELETE",
+                });
+                return (await safeJson(response)) as ApiResponse<Specialist>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de supprimer le spécialiste.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
 }

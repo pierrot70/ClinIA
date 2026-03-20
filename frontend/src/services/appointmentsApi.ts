@@ -1,4 +1,5 @@
 import type { ApiResponse } from "../types/api";
+import { withSecurityIncidentGuard } from "./securityIncidentGuard";
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 
@@ -98,21 +99,24 @@ export async function fetchAppointmentsPaginated(
         );
     }
 
-    try {
-        const response = await fetch(
-            `${API_URL}/api/appointments?${query.toString()}`
-        );
-
-        return (await safeJson(response)) as ApiResponse<PaginatedAppointments>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible de récupérer les rendez-vous.",
-                retryable: true,
-            },
-        };
-    }
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(
+                    `${API_URL}/api/appointments?${query.toString()}`
+                );
+                return (await safeJson(response)) as ApiResponse<PaginatedAppointments>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de récupérer les rendez-vous.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
 }
 
 /* ------------------------------------------------------------------ */
@@ -122,23 +126,26 @@ export async function fetchAppointmentsPaginated(
 export async function createAppointment(
     payload: CreateAppointmentPayload
 ): Promise<ApiResponse<Appointment>> {
-    try {
-        const response = await fetch(`${API_URL}/api/appointments`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-
-        return (await safeJson(response)) as ApiResponse<Appointment>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible de créer le rendez-vous.",
-                retryable: true,
-            },
-        };
-    }
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/appointments`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+                return (await safeJson(response)) as ApiResponse<Appointment>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de créer le rendez-vous.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
 }
 
 /* ------------------------------------------------------------------ */
@@ -149,23 +156,26 @@ export async function fetchAvailableSlots(
     specialist: string,
     date: string
 ): Promise<ApiResponse<string[]>> {
-    try {
-        const response = await fetch(
-            `${API_URL}/api/appointments/slots?specialist=${encodeURIComponent(
-                specialist
-            )}&date=${encodeURIComponent(date)}`
-        );
-
-        return (await safeJson(response)) as ApiResponse<string[]>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible de récupérer les créneaux.",
-                retryable: true,
-            },
-        };
-    }
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(
+                    `${API_URL}/api/appointments/slots?specialist=${encodeURIComponent(
+                        specialist
+                    )}&date=${encodeURIComponent(date)}`
+                );
+                return (await safeJson(response)) as ApiResponse<string[]>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de récupérer les créneaux.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
 }
 
 /* ------------------------------------------------------------------ */
@@ -175,22 +185,25 @@ export async function fetchAvailableSlots(
 export async function cancelAppointment(
     id: string
 ): Promise<ApiResponse<Appointment>> {
-    try {
-        const response = await fetch(
-            `${API_URL}/api/appointments/${id}`,
-            { method: "DELETE" }
-        );
-
-        return (await safeJson(response)) as ApiResponse<Appointment>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible d’annuler le rendez-vous.",
-                retryable: true,
-            },
-        };
-    }
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(
+                    `${API_URL}/api/appointments/${id}`,
+                    { method: "DELETE" }
+                );
+                return (await safeJson(response)) as ApiResponse<Appointment>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible d’annuler le rendez-vous.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
 }
 
 /* ------------------------------------------------------------------ */
@@ -201,26 +214,29 @@ export async function updateAppointmentStatus(
     id: string,
     status: AppointmentStatus
 ): Promise<ApiResponse<Appointment>> {
-    try {
-        const response = await fetch(
-            `${API_URL}/api/appointments/${id}/status`,
-            {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status }),
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(
+                    `${API_URL}/api/appointments/${id}/status`,
+                    {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ status }),
+                    }
+                );
+                return (await safeJson(response)) as ApiResponse<Appointment>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de mettre à jour le statut.",
+                        retryable: true,
+                    },
+                };
             }
-        );
-
-        return (await safeJson(response)) as ApiResponse<Appointment>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible de mettre à jour le statut.",
-                retryable: true,
-            },
-        };
-    }
+        })()
+    );
 }
 
 /* ------------------------------------------------------------------ */
@@ -231,25 +247,28 @@ export async function updateAppointmentSchedule(
     id: string,
     payload: { date: string; time: string }
 ): Promise<ApiResponse<Appointment>> {
-    try {
-        const response = await fetch(
-            `${API_URL}/api/appointments/${id}/schedule`,
-            {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(
+                    `${API_URL}/api/appointments/${id}/schedule`,
+                    {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload),
+                    }
+                );
+                return (await safeJson(response)) as ApiResponse<Appointment>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message:
+                            "Impossible de modifier l’horaire du rendez-vous.",
+                        retryable: true,
+                    },
+                };
             }
-        );
-
-        return (await safeJson(response)) as ApiResponse<Appointment>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message:
-                    "Impossible de modifier l’horaire du rendez-vous.",
-                retryable: true,
-            },
-        };
-    }
+        })()
+    );
 }

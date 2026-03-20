@@ -10,6 +10,9 @@ import PatientSummary from "./pages/PatientSummary";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { SecurityBlockingAlert } from "./components/system/SecurityBlockingAlert";
+import { useSecurityIncident } from "./contexts/SecurityIncidentContext";
+import { acknowledgeSecurityIncident, REQUIRED_ACK_ACTION } from "./services/securityIncidentApi";
 
 import MockStudio from "./pages/MockStudio";
 // 🆕 Import obligatoire pour que le bouton Admin fonctionne
@@ -32,6 +35,23 @@ const APP_STATUS_REFRESH_MS = 10_000;
 
 const App: React.FC = () => {
     const { status, isAuthenticated } = useAuth();
+    const { blockingIncident, setBlockingIncident } = useSecurityIncident();
+    const [acknowledging, setAcknowledging] = useState(false);
+        // Handler for acknowledgment
+        const handleAcknowledge = async () => {
+            if (!blockingIncident) return;
+            setAcknowledging(true);
+            try {
+                await acknowledgeSecurityIncident({
+                    incidentId: blockingIncident.incident.id,
+                    action: REQUIRED_ACK_ACTION,
+                    context: {},
+                });
+                setBlockingIncident(null);
+            } finally {
+                setAcknowledging(false);
+            }
+        };
     const [maintenanceActive, setMaintenanceActive] = useState(false);
 
     useEffect(() => {
@@ -79,6 +99,14 @@ const App: React.FC = () => {
     return (
         <div className="min-h-screen flex flex-col bg-background">
             <Header />
+            {blockingIncident && (
+                <SecurityBlockingAlert
+                    blocking={blockingIncident}
+                    actionableMessage={REQUIRED_ACK_ACTION}
+                    acknowledging={acknowledging}
+                    onAcknowledge={handleAcknowledge}
+                />
+            )}
             {maintenanceActive && (
                 <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">
                     Maintenance en cours. L'application est temporairement arretee pour les usagers non SUPERADMIN.

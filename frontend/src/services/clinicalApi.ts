@@ -1,3 +1,4 @@
+import { withSecurityIncidentGuard } from "./securityIncidentGuard";
 // src/services/clinicalApi.ts
 
 import type { ClinicalAnalysis, ClinicalPayload } from "../types/clinical";
@@ -61,61 +62,55 @@ function isApiSuccess<T>(obj: unknown): obj is ApiSuccess<T> {
 export async function analyzeClinicalCase(
     payload: AnalyzeClinicalPayload
 ): Promise<ApiResponse<ClinicalAnalysis>> {
+    return withSecurityIncidentGuard(
+        (async () => {
+            let response: Response;
+            try {
+                response = await fetch(`${API_URL}/api/ai/analyze`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(payload),
+                });
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: isDev
+                            ? `Impossible de contacter le backend. ${API_URL}`
+                            : "Impossible de contacter ClinIA",
+                        retryable: true,
+                    },
+                };
+            }
 
-    let response: Response;
+            let json: unknown;
+            try {
+                json = await response.json();
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Réponse serveur invalide.",
+                        retryable: true,
+                    },
+                };
+            }
 
-    /* ---------------- Réseau / fetch ---------------- */
-    try {
-        response = await fetch(`${API_URL}/api/ai/analyze`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-        });
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: isDev
-                    ? `Impossible de contacter le backend. ${API_URL}`
-                    : "Impossible de contacter ClinIA",
-                retryable: true,
-            },
-        };
-    }
-
-    /* ---------------- JSON parsing ---------------- */
-    let json: unknown;
-
-    try {
-        json = await response.json();
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Réponse serveur invalide.",
-                retryable: true,
-            },
-        };
-    }
-
-    /* ---------------- Erreur métier backend ---------------- */
-    if (isApiFailure(json)) {
-        return json;
-    }
-
-    /* ---------------- Succès ---------------- */
-    if (isApiSuccess<ClinicalAnalysis>(json)) {
-        return json;
-    }
-
-    /* ---------------- Cas impossible mais sécurisé ---------------- */
-    return {
-        error: {
-            code: "INTERNAL_ERROR",
-            message: "Format de réponse inconnu.",
-            retryable: false,
-        },
-    };
+            if (isApiFailure(json)) {
+                return json;
+            }
+            if (isApiSuccess<ClinicalAnalysis>(json)) {
+                return json;
+            }
+            return {
+                error: {
+                    code: "INTERNAL_ERROR",
+                    message: "Format de réponse inconnu.",
+                    retryable: false,
+                },
+            };
+        })()
+    );
 }

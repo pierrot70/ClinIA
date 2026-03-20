@@ -1,3 +1,4 @@
+import { withSecurityIncidentGuard } from "./securityIncidentGuard";
 import type { ApiResponse } from "../types/api";
 
 const API_URL = import.meta.env.VITE_API_URL as string;
@@ -105,21 +106,24 @@ export async function fetchPatientsPaginated(
         query.set("sortDir", params.sortDir);
     }
 
-    try {
-        const response = await fetch(
-            `${API_URL}/api/patients?${query.toString()}`
-        );
-
-        return (await safeJson(response)) as ApiResponse<PaginatedPatients>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible de récupérer les patients.",
-                retryable: true,
-            },
-        };
-    }
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(
+                    `${API_URL}/api/patients?${query.toString()}`
+                );
+                return (await safeJson(response)) as ApiResponse<PaginatedPatients>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de récupérer les patients.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
 }
 
 /* ------------------------------------------------------------------ */
@@ -129,23 +133,26 @@ export async function fetchPatientsPaginated(
 export async function createPatient(
     payload: PatientPayload
 ): Promise<ApiResponse<Patient>> {
-    try {
-        const response = await fetch(`${API_URL}/api/patients`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-
-        return (await safeJson(response)) as ApiResponse<Patient>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible de créer le patient.",
-                retryable: true,
-            },
-        };
-    }
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/patients`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+                return (await safeJson(response)) as ApiResponse<Patient>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de créer le patient.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
 }
 
 /* ------------------------------------------------------------------ */
@@ -156,23 +163,26 @@ export async function updatePatient(
     id: string,
     payload: PatientPayload
 ): Promise<ApiResponse<Patient>> {
-    try {
-        const response = await fetch(`${API_URL}/api/patients/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-
-        return (await safeJson(response)) as ApiResponse<Patient>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible de mettre à jour le patient.",
-                retryable: true,
-            },
-        };
-    }
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/patients/${id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+                return (await safeJson(response)) as ApiResponse<Patient>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de mettre à jour le patient.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
 }
 
 /* ------------------------------------------------------------------ */
@@ -182,19 +192,22 @@ export async function updatePatient(
 export async function deletePatient(
     id: string
 ): Promise<ApiResponse<Patient>> {
-    try {
-        const response = await fetch(`${API_URL}/api/patients/${id}`, {
-            method: "DELETE",
-        });
-
-        return (await safeJson(response)) as ApiResponse<Patient>;
-    } catch {
-        return {
-            error: {
-                code: "INTERNAL_ERROR",
-                message: "Impossible de supprimer le patient.",
-                retryable: true,
-            },
-        };
-    }
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/patients/${id}`, {
+                    method: "DELETE",
+                });
+                return (await safeJson(response)) as ApiResponse<Patient>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de supprimer le patient.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
 }
