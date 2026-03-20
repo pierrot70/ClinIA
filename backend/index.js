@@ -35,10 +35,12 @@ import cliniquesRouter from "./routes/cliniques.js";
 import specialistsRouter from "./routes/specialists.js";
 import securityIncidentsRouter from "./routes/securityIncidents.js";
 import authRouter from "./routes/auth.js";
+
 import { verifyJWT } from "./middleware/verifyJWT.js";
 import { requireRole } from "./middleware/requireRole.js";
 import { AUTH_ROLES } from "./auth/constants.js";
 import { initShutdownState } from "./services/appShutdown.js";
+import { clinicalDemoRateLimiter } from "./middleware/clinicalDemoRateLimiter.js";
 
 dotenv.config();
 
@@ -442,7 +444,13 @@ async function respondWithSecurityIncident({
 /* /api/ai/analyze                                                    */
 /* ================================================================== */
 
-app.post("/api/ai/analyze", async (req, res) => {
+// Appliquer le rate limiter uniquement si l'utilisateur n'est pas authentifié (ex: clinical-demo)
+app.post("/api/ai/analyze", (req, res, next) => {
+    if (!req.user) {
+        return clinicalDemoRateLimiter(req, res, next);
+    }
+    return next();
+}, async (req, res) => {
     try {
         const safeBody = sanitizeRequestPayload(req.body ?? {});
         const promptInjectionScan = detectPromptInjection(safeBody);
