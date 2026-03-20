@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext } from "react";
 import { ClinicalForm } from "../components/clinical/ClinicalForm";
 import { ClinicalResultPage } from "./ClinicalResultPage";
 import { analyzeClinicalCase } from "../services/clinicalApi";
@@ -7,6 +7,9 @@ import {
     REQUIRED_ACK_ACTION,
 } from "../services/securityIncidentApi";
 import { SecurityBlockingAlert } from "../components/system/SecurityBlockingAlert";
+
+import { useTranslation } from "../hooks/useTranslation";
+import { HomeI18nContext } from "../contexts/HomeI18nContext";
 
 import type { ClinicalPayload, ClinicalAnalysis } from "../types/clinical";
 import type {
@@ -40,6 +43,8 @@ type OpenAIModel = "gpt-4.1-mini" | "gpt-4-0613";
 /* ------------------------------------------------------------------ */
 
 export function ClinicalAnalyzePage() {
+    const i18n = useContext(HomeI18nContext) || { locale: "fr" };
+    const targetLang = i18n.locale;
     const isProd = !!import.meta.env.PROD;
     const [activeTab, setActiveTab] =
         useState<"patient" | "clinical">("patient");
@@ -249,7 +254,23 @@ export function ClinicalAnalyzePage() {
     /* Render                                                             */
     /* ------------------------------------------------------------------ */
 
-    return (
+    // Traductions dynamiques
+    const { translated: modelLabel, loading: loadingModel, error: errorModel } = useTranslation({ text: "Modèle OpenAI", targetLang });
+    const { translated: gptMiniLabel, loading: loadingMini, error: errorMini } = useTranslation({ text: "gpt-4.1-mini (JSON natif)", targetLang });
+    const { translated: gptLegacyLabel, loading: loadingLegacy, error: errorLegacy } = useTranslation({ text: "gpt-4-0613 (legacy)", targetLang });
+    const { translated: realIaLabel, loading: loadingReal, error: errorReal } = useTranslation({ text: "IA réelle activée", targetLang });
+    const { translated: simModeLabel, loading: loadingSim, error: errorSim } = useTranslation({ text: "Mode simulation", targetLang });
+    const { translated: backendErrorLabel, loading: loadingBackend, error: errorBackend } = useTranslation({ text: "Erreur backend brute (sans flafla)", targetLang });
+    const { translated: loadingLabel } = useTranslation({ text: "Chargement...", targetLang });
+
+        // Affichage loading/erreur pour la traduction dynamique
+        const renderLabel = (label: string, loading: boolean, error?: string) => {
+            if (loading) return <span style={{ opacity: 0.6 }}>{loadingLabel}</span>;
+            if (error) return <span style={{ color: 'red' }}>{error}</span>;
+            return label;
+        };
+
+        return (
         <div className="max-w-5xl mx-auto p-6 space-y-6">
             {blockingIncident && (
                 <SecurityBlockingAlert
@@ -263,7 +284,7 @@ export function ClinicalAnalyzePage() {
             {/* ❌ Erreur backend brute (sans flafla) */}
             {apiError && (
                 <div className="text-red-600 text-sm">
-                    {apiError.message}
+                    {backendErrorLabel}
                 </div>
             )}
 
@@ -276,7 +297,7 @@ export function ClinicalAnalyzePage() {
             {/* ⚙️ Sélection modèle */}
             <div className="flex items-center gap-3">
                 <label className="text-sm font-medium">
-                    Modèle OpenAI
+                    {renderLabel(modelLabel, loadingModel, errorModel ?? undefined)}
                 </label>
 
                 <select
@@ -289,10 +310,10 @@ export function ClinicalAnalyzePage() {
                     className="border rounded px-2 py-1 text-sm"
                 >
                     <option value="gpt-4.1-mini">
-                        gpt-4.1-mini (JSON natif)
+                        {renderLabel(gptMiniLabel, loadingMini, errorMini ?? undefined)}
                     </option>
                     <option value="gpt-4-0613">
-                        gpt-4-0613 (legacy)
+                        {renderLabel(gptLegacyLabel, loadingLegacy, errorLegacy ?? undefined)}
                     </option>
                 </select>
             </div>
@@ -317,9 +338,9 @@ export function ClinicalAnalyzePage() {
                         }
                         `}
                     >
-                        {forceReal
-                            ? "IA réelle activée"
-                            : "Mode simulation"}
+                                                {forceReal
+                                                    ? renderLabel(realIaLabel, loadingReal, errorReal ?? undefined)
+                                                    : renderLabel(simModeLabel, loadingSim, errorSim ?? undefined)}
                     </button>
                 </div>
             )}
@@ -338,6 +359,7 @@ export function ClinicalAnalyzePage() {
                 <ClinicalResultPage
                     data={result}
                     serviceMode={serviceMode}
+                    targetLang={targetLang}
                 />
             )}
         </div>

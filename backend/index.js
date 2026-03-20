@@ -35,6 +35,7 @@ import cliniquesRouter from "./routes/cliniques.js";
 import specialistsRouter from "./routes/specialists.js";
 import securityIncidentsRouter from "./routes/securityIncidents.js";
 import authRouter from "./routes/auth.js";
+import translationRouter from "./routes/translation.js";
 
 import { verifyJWT } from "./middleware/verifyJWT.js";
 import { requireRole } from "./middleware/requireRole.js";
@@ -1136,6 +1137,7 @@ app.use(
     loi25DataLeakGuard,
     authRouter
 );
+app.use("/translation", translationRouter);
 
 app.listen(4000, () =>
     console.log(

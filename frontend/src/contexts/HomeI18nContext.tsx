@@ -34,7 +34,7 @@ type HomeI18nContextValue = {
   setLocaleFromVoice: (target: Locale) => Promise<VoicePromptPayload>;
 };
 
-const HomeI18nContext = createContext<HomeI18nContextValue | null>(null);
+export const HomeI18nContext = createContext<HomeI18nContextValue | null>(null);
 const UI_LOCALE_STORAGE_KEY = "clinia_ui_locale_v1";
 
 const SUPPORTED_UI_LOCALES = [
