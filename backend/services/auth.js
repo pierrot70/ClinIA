@@ -240,7 +240,7 @@ function normalizeOptionalEmail(email) {
     }
 
     if (typeof email !== "string") {
-        throw createAuthError("INVALID_INPUT", "Email invalide.");
+        throw createAuthError("INVALID_INPUT", "Identifiant invalide.");
     }
 
     const normalized = email.trim().toLowerCase();
@@ -250,7 +250,7 @@ function normalizeOptionalEmail(email) {
         normalized.length > 254 ||
         !emailRegex.test(normalized)
     ) {
-        throw createAuthError("INVALID_INPUT", "Email invalide.");
+        throw createAuthError("INVALID_INPUT", "Identifiant invalide.");
     }
 
     return normalized;
@@ -600,7 +600,7 @@ export async function registerSelf({ email, password, role, req }) {
     const ip = getRequestIp(req);
     const normalizedEmail = normalizeOptionalEmail(email);
     if (!normalizedEmail) {
-        throw createAuthError("INVALID_INPUT", "Email invalide.");
+        throw createAuthError("INVALID_INPUT", "Identifiant invalide.");
     }
 
     const targetRole = AUTH_ROLE_VALUES.includes(role) ? role : "USER";
@@ -936,7 +936,7 @@ export async function updateUser({ userId, updates, authUser, req }) {
     if (typeof updates?.username === "string") {
         const username = normalizeUsername(updates.username);
         if (!/^[a-z0-9._%+\-@]{3,64}$/.test(username)) {
-            throw createAuthError("INVALID_INPUT", "Nom d'utilisateur invalide.");
+            throw createAuthError("INVALID_INPUT", "Identifiant invalide.");
         }
         next.username = username;
     }
@@ -973,7 +973,7 @@ export async function updateUser({ userId, updates, authUser, req }) {
             _id: { $ne: user._id },
         });
         if (existingByUsername) {
-            throw createAuthError("USER_EXISTS", "Nom d'utilisateur deja utilise.");
+            throw createAuthError("USER_EXISTS", "Identifiant deja utilise.");
         }
     }
 
@@ -984,7 +984,7 @@ export async function updateUser({ userId, updates, authUser, req }) {
                 _id: { $ne: user._id },
             });
             if (existingByEmail) {
-                throw createAuthError("USER_EXISTS", "Email deja utilise.");
+                throw createAuthError("USER_EXISTS", "Identifiant deja utilise.");
             }
         }
     }

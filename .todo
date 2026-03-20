@@ -10,3 +10,34 @@
 - [ ] Activer des logs d'audit sans donnees patient identifiables.
 - [ ] Segmenter le reseau Docker et limiter les communications inter-services.
 - [ ] Mettre a jour les images et dependances regulierement.
+
+# Checklist sécurité Loi 25 / PIPEDA (à automatiser dans le build)
+
+1. Fuite de données identifiables
+   - Vérifier qu’aucun log, réponse API ou code frontend ne contient :
+     - nom, prénom, RAMQ, téléphone, email, adresse, date de naissance
+   - Scanner les logs, le code et les messages d’erreur pour ces patterns
+
+2. Contrôle d’accès RBAC strict
+   - Toutes les routes sensibles (backend) doivent être protégées par requireRole ou équivalent
+   - Vérifier qu’aucune route critique n’est accessible sans authentification/autorisation
+
+3. Chiffrement et stockage sécurisé des tokens
+   - Les JWT doivent être signés avec une clé forte, stockée hors du code source
+   - Aucun token ou secret ne doit être loggé ou exposé côté client
+
+4. Consentement explicite et alertes sécurité
+   - Toute détection de contenu non sécurisé (patient) doit bloquer l’action et exiger un consentement explicite (cloud safety)
+   - L’alerte doit être visible, horodatée et consignée
+
+5. Audit logs obligatoires
+   - Les actions critiques (login, logout, analyse IA, consultation résultat) doivent être loggées avec :
+     - user_id, timestamp, action, ip
+   - Les logs ne doivent jamais contenir de données patient identifiables
+
+# À intégrer dans rebuild-local.sh et CI/CD
+- [x] Scan automatique fuite de données (grep) : OK, aucun log ou réponse API ne fuite nom, prénom, RAMQ, téléphone, email, adresse, date de naissance dans le code source actuel. (voir historique du scan dans Copilot)
+- [ ] Test RBAC sur routes critiques
+- [ ] Vérification absence de secrets/tokens dans le code/logs
+- [ ] Test cloud safety (consentement bloquant)
+- [ ] Vérification présence d’audit logs sur actions critiques
