@@ -103,6 +103,8 @@ const App: React.FC = () => {
                             </ProtectedRoute>
                         }
                     />
+                    {/* Route spéciale démo : accès direct sans auth */}
+                    <Route path="/clinical-demo" element={<ClinicalAnalyzePage />} />
                     <Route
                         path="/appointments"
                         element={

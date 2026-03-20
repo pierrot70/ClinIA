@@ -60,7 +60,7 @@ const DemoPage: React.FC = () => {
             Commencer la demo
           </Link>
           <Link
-            to="/clinical"
+            to="/clinical-demo"
             className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:text-slate-900"
           >
             Aller a l'analyse clinique
