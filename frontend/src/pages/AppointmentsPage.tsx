@@ -297,7 +297,10 @@ export function AppointmentsPage() {
         cliniques.forEach((clinique) => {
             if (
                 typeof clinique.lat !== "number" ||
-                typeof clinique.long !== "number"
+                typeof clinique.long !== "number" ||
+                !selectedPatient ||
+                typeof selectedPatient.lat !== "number" ||
+                typeof selectedPatient.long !== "number"
             ) {
                 return;
             }

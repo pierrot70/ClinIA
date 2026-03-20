@@ -41,6 +41,37 @@ headline() {
 }
 
 # -----------------------------
+# 0) Build/type-check frontend (strict)
+# -----------------------------
+headline "Vérification stricte du frontend (build/type-check)"
+pushd frontend > /dev/null
+
+echo "> npm ci --prefer-offline"
+npm ci --prefer-offline
+
+
+
+# Suppression automatique du dossier dist avant build (évite les problèmes de permissions)
+if [ -d dist ]; then
+  echo "> Suppression du dossier dist/ (clean build)"
+  rm -rf dist
+fi
+
+echo "> npx tsc --noEmit"
+npx tsc --noEmit
+
+echo "> npm run build"
+npm run build
+
+# Test E2E basique : vérifier <div id=\"root\">
+if ! grep -q '<div id="root">' dist/index.html; then
+  echo "❌ Erreur critique : <div id=\"root\"> absent de dist/index.html (build corrompu ou crash JS)"
+  exit 1
+fi
+
+popd > /dev/null
+
+# -----------------------------
 # Mode nucléaire (optionnel)
 # -----------------------------
 if [[ "$NUCLEAR" == "1" ]]; then
@@ -152,16 +183,40 @@ headline "Post-start sanity checks"
 echo "👉 Backend logs (important):"
 echo "docker compose -p \"$PROJECT_NAME\" -f \"$COMPOSE_FILE\" logs backend --tail=50"
 
+# Vérification accès frontend
+headline "Vérification accès frontend (localhost:5173)"
+
+
+# Retry loop (10x, 2s interval) for frontend endpoints
+for url in "http://localhost:5173" "http://localhost:5173/demo"; do
+  echo -n "Test $url ... "
+  success=0
+  for i in {1..10}; do
+    if curl -fs --max-time 5 "$url" > /dev/null; then
+      success=1
+      break
+    fi
+    sleep 2
+  done
+  if [[ "$success" == "1" ]]; then
+    echo "OK"
+  else
+    echo "ERREUR"
+    echo "❌ Impossible de joindre $url après 10 tentatives."
+    exit 1
+  fi
+done
+
 echo
 echo "👉 Test API (mock):"
-echo "curl -X POST http://localhost:4000/api/ai/analyze \\"
-echo "  -H \"Content-Type: application/json\" \\"
-echo "  -d '{\"symptoms\":[\"test\"]}'"
+echo "curl -X POST http://localhost:4000/api/ai/analyze \
+  -H \"Content-Type: application/json\" \
+  -d '{\"symptoms\":[\"test\"]}'"
 
 echo
 echo "👉 Test API (real, si activé):"
-echo "curl -X POST http://localhost:4000/api/ai/analyze \\"
-echo "  -H \"Content-Type: application/json\" \\"
-echo "  -d '{\"symptoms\":[\"test\"],\"forceReal\":true}'"
+echo "curl -X POST http://localhost:4000/api/ai/analyze \
+  -H \"Content-Type: application/json\" \
+  -d '{\"symptoms\":[\"test\"],\"forceReal\":true}'"
 
 headline "Rebuild terminé"

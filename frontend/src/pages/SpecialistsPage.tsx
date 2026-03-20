@@ -484,10 +484,16 @@ export function SpecialistsPage() {
     async function handleEdit(specialist: Specialist) {
         setViewMode("create");
         setEditingId(specialist._id);
-        const clinicId =
-            typeof specialist.clinique_associer === "string"
-                ? specialist.clinique_associer
-                : specialist.clinique_associer?.toString() ?? "";
+        // clinic_associer peut être string | null | undefined
+        let clinicId: string = "";
+        if (typeof specialist.clinique_associer === "string") {
+            clinicId = specialist.clinique_associer;
+        } else if (
+            specialist.clinique_associer !== null &&
+            specialist.clinique_associer !== undefined
+        ) {
+            clinicId = String(specialist.clinique_associer);
+        }
         const clinicContacts = getClinicContacts(clinicId || undefined);
         const telephoneValue =
             clinicContacts.telephone || specialist.telephone || "";
@@ -538,10 +544,7 @@ export function SpecialistsPage() {
             telephone: telephoneValue,
             email: emailValue,
             texto: Boolean(specialist.texto),
-            clinique_associer:
-                typeof specialist.clinique_associer === "string"
-                    ? specialist.clinique_associer
-                    : specialist.clinique_associer?.toString() ?? "",
+            clinique_associer: clinicId,
             specialite: specialist.specialite ?? "",
             disponibilites,
         });
