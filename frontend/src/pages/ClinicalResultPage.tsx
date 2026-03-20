@@ -6,7 +6,7 @@ type Props = {
 };
 
 import { useTranslation } from "../hooks/useTranslation";
-import { useContext } from "react";
+import { useContext, useState, useEffect } from "react";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 
 type PropsWithLang = Props & { targetLang?: string };
@@ -37,25 +37,50 @@ export function ClinicalResultPage({ data, serviceMode, targetLang }: PropsWithL
 
         const { translated: loadingLabel } = useTranslation({ text: "Chargement...", targetLang: lang });
 
-        const renderLabel = (label: string, loading: boolean, error?: string) => {
+        const [showTranslationError, setShowTranslationError] = useState<string | null>(null);
+        useEffect(() => {
+            if (errorDegradedTitle) setShowTranslationError(errorDegradedTitle);
+            else if (errorDegradedMsg) setShowTranslationError(errorDegradedMsg);
+            else if (errorClinicalResultTitle) setShowTranslationError(errorClinicalResultTitle);
+            else if (errorSuspectedDiagnosisLabel) setShowTranslationError(errorSuspectedDiagnosisLabel);
+            else if (errorPatientSummaryLabel) setShowTranslationError(errorPatientSummaryLabel);
+            else if (errorNoSummaryLabel) setShowTranslationError(errorNoSummaryLabel);
+            else if (errorTreatmentsLabel) setShowTranslationError(errorTreatmentsLabel);
+            else if (errorNoTreatmentsLabel) setShowTranslationError(errorNoTreatmentsLabel);
+            else if (errorModelLabel) setShowTranslationError(errorModelLabel);
+            else if (errorConfidenceLabel) setShowTranslationError(errorConfidenceLabel);
+            else setShowTranslationError(null);
+        }, [errorDegradedTitle, errorDegradedMsg, errorClinicalResultTitle, errorSuspectedDiagnosisLabel, errorPatientSummaryLabel, errorNoSummaryLabel, errorTreatmentsLabel, errorNoTreatmentsLabel, errorModelLabel, errorConfidenceLabel]);
+
+        const renderLabel = (label: string, loading: boolean) => {
             if (loading) return <span style={{ opacity: 0.6 }}>{loadingLabel}</span>;
-            if (error) return <span style={{ color: 'red' }}>{error}</span>;
             return label;
         };
 
     return (
         <div className="bg-white p-6 rounded border space-y-6">
+            {showTranslationError && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+                        <h2 className="text-lg font-semibold text-red-700 mb-2">Translation error</h2>
+                        <p className="text-sm text-gray-800 mb-4">{showTranslationError}</p>
+                        <button className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700" onClick={() => setShowTranslationError(null)}>
+                            Close
+                        </button>
+                    </div>
+                </div>
+            )}
             {serviceMode === "degraded" && (
                 <div className="border border-amber-300 bg-amber-50 text-amber-800 rounded p-4 text-sm">
-                    <strong>{renderLabel(degradedTitle, loadingDegradedTitle, errorDegradedTitle ?? undefined)}</strong>
-                    <p className="mt-1">{renderLabel(degradedMsg, loadingDegradedMsg, errorDegradedMsg ?? undefined)}</p>
+                    <strong>{renderLabel(degradedTitle, loadingDegradedTitle)}</strong>
+                    <p className="mt-1">{renderLabel(degradedMsg, loadingDegradedMsg)}</p>
                 </div>
             )}
 
-            <h2 className="text-xl font-semibold">{renderLabel(clinicalResultTitle, loadingClinicalResultTitle, errorClinicalResultTitle ?? undefined)}</h2>
+            <h2 className="text-xl font-semibold">{renderLabel(clinicalResultTitle, loadingClinicalResultTitle)}</h2>
 
             <section>
-                <h3 className="font-medium">{renderLabel(suspectedDiagnosisLabel, loadingSuspectedDiagnosisLabel, errorSuspectedDiagnosisLabel ?? undefined)}</h3>
+                <h3 className="font-medium">{renderLabel(suspectedDiagnosisLabel, loadingSuspectedDiagnosisLabel)}</h3>
                 <p>{data.diagnosis?.suspected ?? "—"}</p>
                 {data.diagnosis?.justification && (
                     <p className="text-sm text-gray-600">
@@ -65,14 +90,14 @@ export function ClinicalResultPage({ data, serviceMode, targetLang }: PropsWithL
             </section>
 
             <section>
-                <h3 className="font-medium">{renderLabel(patientSummaryLabel, loadingPatientSummaryLabel, errorPatientSummaryLabel ?? undefined)}</h3>
+                <h3 className="font-medium">{renderLabel(patientSummaryLabel, loadingPatientSummaryLabel)}</h3>
                 <p>
-                    {data.patient_summary?.plain_language ?? renderLabel(noSummaryLabel, loadingNoSummaryLabel, errorNoSummaryLabel ?? undefined)}
+                    {data.patient_summary?.plain_language ?? renderLabel(noSummaryLabel, loadingNoSummaryLabel)}
                 </p>
             </section>
 
             <section>
-                <h3 className="font-medium">{renderLabel(treatmentsLabel, loadingTreatmentsLabel, errorTreatmentsLabel ?? undefined)}</h3>
+                <h3 className="font-medium">{renderLabel(treatmentsLabel, loadingTreatmentsLabel)}</h3>
                 {Array.isArray(data.treatments) && data.treatments.length > 0 ? (
                     <ul className="list-disc ml-5">
                         {data.treatments.map((t, i) => (
@@ -81,15 +106,15 @@ export function ClinicalResultPage({ data, serviceMode, targetLang }: PropsWithL
                     </ul>
                 ) : (
                     <p className="text-sm text-gray-500">
-                        {renderLabel(noTreatmentsLabel, loadingNoTreatmentsLabel, errorNoTreatmentsLabel ?? undefined)}
+                        {renderLabel(noTreatmentsLabel, loadingNoTreatmentsLabel)}
                     </p>
                 )}
             </section>
 
             <section className="text-xs text-gray-500 pt-4 border-t">
-                <div>{renderLabel(modelLabel, loadingModelLabel, errorModelLabel ?? undefined)} : {data.meta?.model ?? "—"}</div>
+                <div>{renderLabel(modelLabel, loadingModelLabel)} : {data.meta?.model ?? "—"}</div>
                 <div>
-                    {renderLabel(confidenceLabel, loadingConfidenceLabel, errorConfidenceLabel ?? undefined)} :{" "}
+                    {renderLabel(confidenceLabel, loadingConfidenceLabel)} :{" "}
                     {typeof data.meta?.confidence_score === "number"
                         ? Math.round(data.meta.confidence_score * 100) + "%"
                         : "—"}

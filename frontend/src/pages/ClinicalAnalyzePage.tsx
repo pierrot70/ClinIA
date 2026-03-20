@@ -264,14 +264,35 @@ export function ClinicalAnalyzePage() {
     const { translated: loadingLabel } = useTranslation({ text: "Chargement...", targetLang });
 
         // Affichage loading/erreur pour la traduction dynamique
+        const [showTranslationError, setShowTranslationError] = useState<string | null>(null);
+        useEffect(() => {
+            if (errorModel) setShowTranslationError(errorModel);
+            else if (errorMini) setShowTranslationError(errorMini);
+            else if (errorLegacy) setShowTranslationError(errorLegacy);
+            else if (errorReal) setShowTranslationError(errorReal);
+            else if (errorSim) setShowTranslationError(errorSim);
+            else if (errorBackend) setShowTranslationError(errorBackend);
+            else setShowTranslationError(null);
+        }, [errorModel, errorMini, errorLegacy, errorReal, errorSim, errorBackend]);
+
         const renderLabel = (label: string, loading: boolean, error?: string) => {
             if (loading) return <span style={{ opacity: 0.6 }}>{loadingLabel}</span>;
-            if (error) return <span style={{ color: 'red' }}>{error}</span>;
             return label;
         };
 
         return (
         <div className="max-w-5xl mx-auto p-6 space-y-6">
+            {showTranslationError && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+                        <h2 className="text-lg font-semibold text-red-700 mb-2">Translation error</h2>
+                        <p className="text-sm text-gray-800 mb-4">{showTranslationError}</p>
+                        <button className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700" onClick={() => setShowTranslationError(null)}>
+                            Close
+                        </button>
+                    </div>
+                </div>
+            )}
             {blockingIncident && (
                 <SecurityBlockingAlert
                     blocking={blockingIncident}

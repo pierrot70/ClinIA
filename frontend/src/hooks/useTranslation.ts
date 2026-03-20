@@ -48,7 +48,8 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
           } else {
             setTranslated(text);
           }
-          setError("Erreur de traduction");
+          // Affiche l’erreur exacte dans le modal
+          setError(err?.message || String(err) || "Translation failed");
           setLoading(false);
         }
       });
