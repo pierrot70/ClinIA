@@ -11,6 +11,5 @@ COPY . .
 
 EXPOSE 4000
 
-# DEV: on suppose que tu as un script "dev" (nodemon/tsx/etc.)
-# Si tu n'as pas "dev", dis-moi ton package.json backend et je l'ajuste.
-CMD ["npm", "run", "dev"]
+# PROD: démarrage direct node index.js pour diagnostic
+CMD ["node", "-r", "dotenv/config", "index.js"]
