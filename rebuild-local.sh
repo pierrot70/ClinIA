@@ -210,7 +210,7 @@ headline "Vérification accès frontend (localhost:5173)"
 for url in "http://localhost:5173" "http://localhost:5173/demo"; do
   echo -n "Test $url ... "
   success=0
-  for i in {1..10}; do
+  for _ in {1..10}; do
     if curl -fs --max-time 5 "$url" > /dev/null; then
       success=1
       break
