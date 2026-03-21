@@ -11,7 +11,7 @@
     "SC1091"
   ]
   ,
-  "editor.fontSize": 20,
+  "editor.fontSize": 18,
   "editor.fontFamily": "Fira Code, JetBrains Mono, Consolas, 'Courier New', monospace",
   "window.zoomLevel": 1.5,
   "terminal.integrated.fontSize": 18,
