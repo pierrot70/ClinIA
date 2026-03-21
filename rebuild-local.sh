@@ -70,10 +70,19 @@ npm ci --prefer-offline
 
 
 
-# Suppression automatique du dossier dist avant build (évite les problèmes de permissions)
+
+# Correction automatique des permissions sur dist/ avant suppression (évite les erreurs de permission)
 if [ -d dist ]; then
+  echo "> Correction des permissions sur dist/ (chown $USER)"
+  chown -R "$USER:$USER" dist 2>/dev/null || true
   echo "> Suppression du dossier dist/ (clean build)"
-  rm -rf dist
+  rm -rf dist || {
+    echo "> Échec de rm -rf dist, tentative avec sudo..."
+    sudo rm -rf dist || {
+      echo "❌ Impossible de supprimer dist/ même avec sudo. Abandon."
+      exit 1
+    }
+  }
 fi
 
 echo "> npx tsc --noEmit"
@@ -146,6 +155,18 @@ ENV_CHECKSUM=$(printf "%s=%s\n" \
   | sha256sum | cut -d' ' -f1)
 
 echo "  ENV_CHECKSUM        = $ENV_CHECKSUM"
+
+# --------------------------------------------------
+#  Sécurité dépendances : blocage si package-lock.json ou package.json modifiés
+# --------------------------------------------------
+pushd frontend > /dev/null
+if ! git diff --exit-code package.json package-lock.json > /dev/null; then
+  echo "❌ ATTENTION : package.json ou package-lock.json modifié(s) localement."
+  echo "Le build est bloqué pour éviter toute modification non validée des librairies."
+  echo "Validez ou annulez ces changements avant de relancer."
+  exit 1
+fi
+popd > /dev/null
 
 # -----------------------------
 # 1) Down
