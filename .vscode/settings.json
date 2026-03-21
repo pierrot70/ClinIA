@@ -1,0 +1,24 @@
+{
+  "files.associations": {
+    "*.sh": "shellscript"
+  },
+  "[shellscript]": {
+    "editor.formatOnSave": false
+  },
+  "shellcheck.enable": true,
+  "shellcheck.run": "onType",
+  "shellcheck.exclude": [
+    "SC1091"
+  ]
+  ,
+  "editor.fontSize": 20,
+  "editor.fontFamily": "Fira Code, JetBrains Mono, Consolas, 'Courier New', monospace",
+  "window.zoomLevel": 1.5,
+  "terminal.integrated.fontSize": 18,
+  "workbench.fontAliasing": "antialiased",
+  "editor.lineHeight": 28,
+  "editor.cursorHeight": 1.2,
+  "editor.minimap.enabled": false,
+  "editor.smoothScrolling": true,
+  "editor.renderWhitespace": "all"
+}
