@@ -1,5 +1,5 @@
 import express from "express";
-import { getOrCreateTranslation } from "../services/translation";
+import { getOrCreateTranslation } from "../services/translationService";
 
 const router = express.Router();
 
