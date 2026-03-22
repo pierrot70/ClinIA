@@ -4,11 +4,32 @@ import { enFallback } from "../i18n/enFallback";
 
 // Fallbacks locaux pour les labels critiques (clé = texte source)
 const criticalLabelFallbacks: Record<string, Record<string, string>> = {
+    "Exemple de cas fictif : patient de 55 ans présentant de la fatigue, une polyurie et une polydipsie.": {
+      "en": "Example case: 55-year-old patient with fatigue, polyuria and polydipsia.",
+      "en-CA": "Example case: 55-year-old patient with fatigue, polyuria and polydipsia.",
+      "default": "Exemple de cas fictif : patient de 55 ans avec fatigue, polyurie et polydipsie."
+    },
+    "Exemple de cas fictif: patient de 55 ans avec fatigue, polyurie et polydipsie.": {
+      "en": "Example case: 55-year-old patient with fatigue, polyuria and polydipsia.",
+      "en-CA": "Example case: 55-year-old patient with fatigue, polyuria and polydipsia.",
+      "default": "Exemple de cas fictif: patient de 55 ans avec fatigue, polyurie et polydipsie."
+    },
+  // (doublons supprimés ci-dessous)
   "Modèle OpenAI": {
     "en-CA": "OpenAI Model",
     "en": "OpenAI Model",
-    "fr-CA": "Modèle OpenAI",
-    "fr": "Modèle OpenAI",
+    "fr-CA": "OpenAI Model",
+    "fr": "OpenAI Model",
+    "default": "OpenAI Model",
+  },
+  "OpenAIモデル": {
+    "default": "OpenAI Model",
+  },
+  "gpt-4.1-mini (JSON natif)": {
+    "default": "gpt-4.1-mini",
+  },
+  "gpt-4-0613 (legacy)": {
+    "default": "gpt-4-0613",
   },
   // Ajoutez ici d'autres labels critiques si besoin
 };
@@ -30,6 +51,24 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
   useEffect(() => {
     isMounted.current = true;
     setError(null);
+    // Fallback local prioritaire pour les labels critiques, même si la langue source et la langue cible sont identiques
+    const fallback =
+      criticalLabelFallbacks[text]?.[targetLang] ||
+      criticalLabelFallbacks[text]?.[targetLang.split("-")[0]] ||
+      criticalLabelFallbacks[text]?.["default"];
+    if (fallback) {
+      setTranslated(fallback);
+      setLoading(false);
+      // Sauvegarde explicite du fallback local dans la base
+      saveLocalTranslation({
+        text,
+        translated: fallback,
+        targetLang,
+        namespace,
+        sourceLocale,
+      }).catch(() => {});
+      return;
+    }
     if (targetLang === sourceLocale) {
       setTranslated(text);
       setLoading(false);
@@ -44,8 +83,12 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
     translateText({ text, targetLang, namespace, sourceLocale })
       .then((result) => {
         if (isMounted.current) {
-          translationCache.set(cacheKey, result);
-          setTranslated(result);
+          let clean = result;
+          if (typeof clean === "string" && clean.match(/^Le texte reste le m[êe]me/)) {
+            clean = text;
+          }
+          translationCache.set(cacheKey, clean);
+          setTranslated(clean);
           setLoading(false);
         }
       })
@@ -54,7 +97,8 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
           // Fallback local pour les labels critiques
           const fallback =
             criticalLabelFallbacks[text]?.[targetLang] ||
-            criticalLabelFallbacks[text]?.[targetLang.split("-")[0]];
+            criticalLabelFallbacks[text]?.[targetLang.split("-")[0]] ||
+            criticalLabelFallbacks[text]?.["default"];
           if (fallback) {
             setTranslated(fallback);
             // Sauvegarde explicite du fallback local dans la base

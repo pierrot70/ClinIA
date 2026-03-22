@@ -108,6 +108,7 @@ export function ClinicalForm({
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
 
+
     // Traductions dynamiques
     const { translated: clinicalDataLabel } = useTranslation({ text: "Données cliniques", targetLang });
     const { translated: incompleteDataLabel } = useTranslation({ text: "Données cliniques incomplètes", targetLang });
@@ -116,6 +117,12 @@ export function ClinicalForm({
     const { translated: symptomsLabel } = useTranslation({ text: "Symptomes principaux", targetLang });
     const { translated: medicalHistoryLabel } = useTranslation({ text: "Antecedents medicaux", targetLang });
     const { translated: medicationsLabel } = useTranslation({ text: "Medication actuelle", targetLang });
+    const { translated: exampleCaseLabel } = useTranslation({ text: "Exemple de cas fictif: patient de 55 ans avec fatigue, polyurie et polydipsie.", targetLang });
+    const { translated: weightHelpLabel } = useTranslation({ text: "Entrez une valeur numerique, exemple: 92", targetLang });
+    const { translated: heightHelpLabel } = useTranslation({ text: "Entrez une valeur numerique, exemple: 175", targetLang });
+    const { translated: symptomsHelpLabel } = useTranslation({ text: "Separez chaque symptome par une virgule, exemple: fatigue, polydipsie", targetLang });
+    const { translated: medicalHistoryHelpLabel } = useTranslation({ text: "Conditions ou diagnostics connus, separes par des virgules", targetLang });
+    const { translated: medicationsHelpLabel } = useTranslation({ text: "Noms des medicaments en cours, separes par des virgules", targetLang });
 
     return (
         <div className="bg-white p-6 rounded border space-y-6">
@@ -126,9 +133,10 @@ export function ClinicalForm({
                 </div>
             )}
 
+
             <h2 className="text-lg font-semibold">{clinicalDataLabel}</h2>
             <p className="text-sm text-blue-700 bg-blue-50 border border-blue-100 rounded px-3 py-2">
-                Exemple de cas fictif: patient de 55 ans avec fatigue, polyurie et polydipsie.
+                {exampleCaseLabel}
             </p>
 
             <Field highlight={isHighlighted("weight")}> 
@@ -137,7 +145,7 @@ export function ClinicalForm({
                         {weightLabel}
                     </label>
                     <p className="text-xs text-gray-500">
-                        Entrez une valeur numerique, exemple: 92
+                        {weightHelpLabel}
                     </p>
                     <input
                         id="clinical-weight"
@@ -161,7 +169,7 @@ export function ClinicalForm({
                         {heightLabel}
                     </label>
                     <p className="text-xs text-gray-500">
-                        Entrez une valeur numerique, exemple: 175
+                        {heightHelpLabel}
                     </p>
                     <input
                         id="clinical-height"
@@ -185,7 +193,7 @@ export function ClinicalForm({
                         {symptomsLabel}
                     </label>
                     <p className="text-xs text-gray-500">
-                        Separez chaque symptome par une virgule, exemple: fatigue, polydipsie
+                        {symptomsHelpLabel}
                     </p>
                     <input
                         id="clinical-symptoms"
@@ -199,18 +207,19 @@ export function ClinicalForm({
                 </div>
             </Field>
 
+
             <Field highlight={isHighlighted("medical_history")}> 
                 <div className="space-y-1">
                     <label htmlFor="clinical-medical-history" className="text-sm font-medium text-gray-700">
                         {medicalHistoryLabel}
                     </label>
                     <p className="text-xs text-gray-500">
-                        Conditions ou diagnostics connus, separes par des virgules
+                        {medicalHistoryHelpLabel}
                     </p>
                     <input
                         id="clinical-medical-history"
                         className="input w-full"
-                        placeholder="Ex: diabete type 2, HTA"
+                        placeholder="Ex: diabète, hypertension"
                         value={form.medical_history.join(", ")}
                         onChange={(e) =>
                             update("medical_history", parseList(e.target.value))
@@ -225,18 +234,15 @@ export function ClinicalForm({
                         {medicationsLabel}
                     </label>
                     <p className="text-xs text-gray-500">
-                        Noms des medicaments en cours, separes par des virgules
+                        {medicationsHelpLabel}
                     </p>
                     <input
                         id="clinical-current-medications"
                         className="input w-full"
-                        placeholder="Ex: metformine 500mg bid"
+                        placeholder="Ex: metformine, insuline"
                         value={form.current_medications.join(", ")}
                         onChange={(e) =>
-                            update(
-                                "current_medications",
-                                parseList(e.target.value)
-                            )
+                            update("current_medications", parseList(e.target.value))
                         }
                     />
                 </div>

@@ -11,7 +11,7 @@ import { SecurityBlockingAlert } from "../components/system/SecurityBlockingAler
 import { useTranslation } from "../hooks/useTranslation";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 
-import type { ClinicalPayload, ClinicalAnalysis } from "../types/clinical";
+import type { ClinicalPayload, ClinicalAnalysis, Sex } from "../types/clinical";
 import type {
     ApiResponse,
     ApiError,
@@ -22,19 +22,30 @@ import type {
 /* Preset clinique par défaut (JAMAIS invalide)                        */
 /* ------------------------------------------------------------------ */
 
-const DEFAULT_CLINICAL_PAYLOAD: ClinicalPayload = {
-    age: 55,
-    sex: "male",
-    weight: 92,
-    height: 175,
-    blood_pressure: {
-        systolic: 145,
-        diastolic: 92,
-    },
-    symptoms: ["Polyurie", "Polydipsie", "Fatigue"],
-    medical_history: ["Diabète de type 2"],
-    current_medications: ["Metformine"],
-};
+// Valeurs par défaut dynamiquement traduites
+import { useMemo } from "react";
+
+function useDefaultClinicalPayload(targetLang: string) {
+    const { translated: symptom1 } = useTranslation({ text: "Polyurie", targetLang });
+    const { translated: symptom2 } = useTranslation({ text: "Polydipsie", targetLang });
+    const { translated: symptom3 } = useTranslation({ text: "Fatigue", targetLang });
+    const { translated: history1 } = useTranslation({ text: "Diabète de type 2", targetLang });
+    const { translated: med1 } = useTranslation({ text: "Metformine", targetLang });
+
+    return useMemo(() => ({
+        age: 55,
+        sex: "male" as Sex,
+        weight: 92,
+        height: 175,
+        blood_pressure: {
+            systolic: 145,
+            diastolic: 92,
+        },
+        symptoms: [symptom1, symptom2, symptom3].filter(Boolean),
+        medical_history: [history1].filter(Boolean),
+        current_medications: [med1].filter(Boolean),
+    }), [symptom1, symptom2, symptom3, history1, med1]);
+}
 
 type OpenAIModel = "gpt-4.1-mini" | "gpt-4-0613";
 
@@ -44,12 +55,8 @@ type OpenAIModel = "gpt-4.1-mini" | "gpt-4-0613";
 
 export function ClinicalAnalyzePage() {
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
-    // Log debug pour la langue
-    useEffect(() => {
-        // eslint-disable-next-line no-console
-        console.log('[ClinicalAnalyzePage] i18n.locale:', i18n.locale);
-    }, [i18n.locale]);
     const targetLang = i18n.locale;
+    const DEFAULT_CLINICAL_PAYLOAD = useDefaultClinicalPayload(targetLang);
     const isProd = !!import.meta.env.PROD;
     const [activeTab, setActiveTab] =
         useState<"patient" | "clinical">("patient");
