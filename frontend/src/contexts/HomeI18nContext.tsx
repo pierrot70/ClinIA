@@ -292,16 +292,32 @@ export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
     let isMounted = true;
 
     const applyInitialLocale = async () => {
-      let initialLocale: SupportedUiLocale = "en-CA";
+      let initialLocale: SupportedUiLocale | null = null;
+      // 1. Try browser language
       try {
-        const stored = window.localStorage.getItem(UI_LOCALE_STORAGE_KEY);
-        if (stored) {
-          initialLocale = toSupportedUiLocale(stored);
-        } else {
-          initialLocale = detectBrowserUiLocale();
+        const browserLocale = detectBrowserUiLocale();
+        if (browserLocale) {
+          initialLocale = browserLocale;
         }
       } catch (e) {
-        initialLocale = detectBrowserUiLocale();
+        initialLocale = null;
+      }
+
+      // 2. Try localStorage if browser language not found
+      if (!initialLocale) {
+        try {
+          const stored = window.localStorage.getItem(UI_LOCALE_STORAGE_KEY);
+          if (stored) {
+            initialLocale = toSupportedUiLocale(stored);
+          }
+        } catch (e) {
+          initialLocale = null;
+        }
+      }
+
+      // 3. Fallback to English if neither found
+      if (!initialLocale) {
+        initialLocale = "en-CA";
       }
 
       if (!isMounted) return;
@@ -317,7 +333,12 @@ export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         await setLocaleFromVoice(initialLocale);
       } catch (e) {
-        // Keep default FR fallback.
+        // Fallback to English if all else fails
+        setLocaleState("en-CA");
+        setStrings(HOME_STRINGS_EN);
+        try {
+          window.localStorage.setItem(UI_LOCALE_STORAGE_KEY, "en-CA");
+        } catch (e) {}
       }
     };
 

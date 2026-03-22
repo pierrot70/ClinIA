@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext } from "react";
+import { useTranslation } from "../../hooks/useTranslation";
+import { HomeI18nContext } from "../../contexts/HomeI18nContext";
 import type { ClinicalPayload } from "../../types/clinical";
 
 const CACHE_KEY = "clinia_last_clinical_payload";
@@ -101,24 +103,38 @@ export function ClinicalForm({
         setForm(EMPTY_FORM);
     }
 
+
+    // Récupérer la langue courante
+    const i18n = useContext(HomeI18nContext) || { locale: "fr" };
+    const targetLang = i18n.locale;
+
+    // Traductions dynamiques
+    const { translated: clinicalDataLabel } = useTranslation({ text: "Données cliniques", targetLang });
+    const { translated: incompleteDataLabel } = useTranslation({ text: "Données cliniques incomplètes", targetLang });
+    const { translated: weightLabel } = useTranslation({ text: "Poids du patient (kg)", targetLang });
+    const { translated: heightLabel } = useTranslation({ text: "Taille du patient (cm)", targetLang });
+    const { translated: symptomsLabel } = useTranslation({ text: "Symptomes principaux", targetLang });
+    const { translated: medicalHistoryLabel } = useTranslation({ text: "Antecedents medicaux", targetLang });
+    const { translated: medicationsLabel } = useTranslation({ text: "Medication actuelle", targetLang });
+
     return (
         <div className="bg-white p-6 rounded border space-y-6">
             {warningMessage && (
                 <div className="border border-orange-300 bg-orange-50 p-4 rounded text-orange-800">
-                    <p className="font-medium">Données cliniques incomplètes</p>
+                    <p className="font-medium">{incompleteDataLabel}</p>
                     <p className="text-sm mt-1">{warningMessage}</p>
                 </div>
             )}
 
-            <h2 className="text-lg font-semibold">Données cliniques</h2>
+            <h2 className="text-lg font-semibold">{clinicalDataLabel}</h2>
             <p className="text-sm text-blue-700 bg-blue-50 border border-blue-100 rounded px-3 py-2">
                 Exemple de cas fictif: patient de 55 ans avec fatigue, polyurie et polydipsie.
             </p>
 
-            <Field highlight={isHighlighted("weight")}>
+            <Field highlight={isHighlighted("weight")}> 
                 <div className="space-y-1">
                     <label htmlFor="clinical-weight" className="text-sm font-medium text-gray-700">
-                        Poids du patient (kg)
+                        {weightLabel}
                     </label>
                     <p className="text-xs text-gray-500">
                         Entrez une valeur numerique, exemple: 92
@@ -139,10 +155,10 @@ export function ClinicalForm({
                 </div>
             </Field>
 
-            <Field highlight={isHighlighted("height")}>
+            <Field highlight={isHighlighted("height")}> 
                 <div className="space-y-1">
                     <label htmlFor="clinical-height" className="text-sm font-medium text-gray-700">
-                        Taille du patient (cm)
+                        {heightLabel}
                     </label>
                     <p className="text-xs text-gray-500">
                         Entrez une valeur numerique, exemple: 175
@@ -163,10 +179,10 @@ export function ClinicalForm({
                 </div>
             </Field>
 
-            <Field highlight={isHighlighted("symptoms")}>
+            <Field highlight={isHighlighted("symptoms")}> 
                 <div className="space-y-1">
                     <label htmlFor="clinical-symptoms" className="text-sm font-medium text-gray-700">
-                        Symptomes principaux
+                        {symptomsLabel}
                     </label>
                     <p className="text-xs text-gray-500">
                         Separez chaque symptome par une virgule, exemple: fatigue, polydipsie
@@ -183,10 +199,10 @@ export function ClinicalForm({
                 </div>
             </Field>
 
-            <Field highlight={isHighlighted("medical_history")}>
+            <Field highlight={isHighlighted("medical_history")}> 
                 <div className="space-y-1">
                     <label htmlFor="clinical-medical-history" className="text-sm font-medium text-gray-700">
-                        Antecedents medicaux
+                        {medicalHistoryLabel}
                     </label>
                     <p className="text-xs text-gray-500">
                         Conditions ou diagnostics connus, separes par des virgules
@@ -203,10 +219,10 @@ export function ClinicalForm({
                 </div>
             </Field>
 
-            <Field highlight={isHighlighted("current_medications")}>
+            <Field highlight={isHighlighted("current_medications")}> 
                 <div className="space-y-1">
                     <label htmlFor="clinical-current-medications" className="text-sm font-medium text-gray-700">
-                        Medication actuelle
+                        {medicationsLabel}
                     </label>
                     <p className="text-xs text-gray-500">
                         Noms des medicaments en cours, separes par des virgules

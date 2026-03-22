@@ -1,6 +1,17 @@
 import { useEffect, useState, useRef } from "react";
-import { translateText } from "../services/translationApi";
+import { translateText, saveLocalTranslation } from "../services/translationApi";
 import { enFallback } from "../i18n/enFallback";
+
+// Fallbacks locaux pour les labels critiques (clé = texte source)
+const criticalLabelFallbacks: Record<string, Record<string, string>> = {
+  "Modèle OpenAI": {
+    "en-CA": "OpenAI Model",
+    "en": "OpenAI Model",
+    "fr-CA": "Modèle OpenAI",
+    "fr": "Modèle OpenAI",
+  },
+  // Ajoutez ici d'autres labels critiques si besoin
+};
 
 const translationCache = new Map();
 
@@ -40,15 +51,27 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
       })
       .catch((err) => {
         if (isMounted.current) {
-          // Fallback anglais si la traduction échoue
-          if (targetLang.startsWith("en")) {
+          // Fallback local pour les labels critiques
+          const fallback =
+            criticalLabelFallbacks[text]?.[targetLang] ||
+            criticalLabelFallbacks[text]?.[targetLang.split("-")[0]];
+          if (fallback) {
+            setTranslated(fallback);
+            // Sauvegarde explicite du fallback local dans la base
+            saveLocalTranslation({
+              text,
+              translated: fallback,
+              targetLang,
+              namespace,
+              sourceLocale,
+            }).catch(() => {});
+          } else if (targetLang.startsWith("en")) {
             setTranslated(text);
           } else if (enFallback[text]) {
             setTranslated(enFallback[text]);
           } else {
             setTranslated(text);
           }
-          // Affiche l’erreur exacte dans le modal
           setError(err?.message || String(err) || "Translation failed");
           setLoading(false);
         }

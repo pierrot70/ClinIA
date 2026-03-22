@@ -44,6 +44,11 @@ type OpenAIModel = "gpt-4.1-mini" | "gpt-4-0613";
 
 export function ClinicalAnalyzePage() {
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
+    // Log debug pour la langue
+    useEffect(() => {
+        // eslint-disable-next-line no-console
+        console.log('[ClinicalAnalyzePage] i18n.locale:', i18n.locale);
+    }, [i18n.locale]);
     const targetLang = i18n.locale;
     const isProd = !!import.meta.env.PROD;
     const [activeTab, setActiveTab] =
@@ -378,6 +383,7 @@ export function ClinicalAnalyzePage() {
             {/* 📊 Résultat */}
             {activeTab === "clinical" && result && (
                 <ClinicalResultPage
+                    key={targetLang}
                     data={result}
                     serviceMode={serviceMode}
                     targetLang={targetLang}
