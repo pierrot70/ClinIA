@@ -2,6 +2,7 @@ import { useEffect, useState, useContext } from "react";
 import { ClinicalForm } from "../components/clinical/ClinicalForm";
 import { ClinicalResultPage } from "./ClinicalResultPage";
 import { analyzeClinicalCase } from "../services/clinicalApi";
+import { useSecurityIncident } from "../contexts/SecurityIncidentContext";
 import {
     acknowledgeSecurityIncident,
     REQUIRED_ACK_ACTION,
@@ -144,8 +145,7 @@ export function ClinicalAnalyzePage() {
         setApiError(null);
         setBlockingActionableMessage(null);
 
-        const response: ApiResponse<ClinicalAnalysis> =
-            await analyzeClinicalCase(payload);
+        const response: ApiResponse<ClinicalAnalysis> = await analyzeClinicalCase(payload);
 
         if ("error" in response) {
             setApiError(response.error);
