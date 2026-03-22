@@ -1137,7 +1137,7 @@ app.use(
     loi25DataLeakGuard,
     authRouter
 );
-app.use("/translation", translationRouter);
+app.use("/api/translation", translationRouter);
 
 app.listen(4000, () =>
     console.log(
