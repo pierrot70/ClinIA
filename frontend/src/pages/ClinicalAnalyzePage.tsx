@@ -77,8 +77,6 @@ export function ClinicalAnalyzePage() {
         useState<"real" | "mock" | "degraded" | null>(null);
 
     const [forceReal, setForceReal] = useState(false);
-    const [openaiModel, setOpenaiModel] =
-        useState<OpenAIModel>("gpt-4.1-mini");
 
     const [lastPayload, setLastPayload] =
         useState<ClinicalPayload | null>(null);
