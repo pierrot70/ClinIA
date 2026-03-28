@@ -82,7 +82,11 @@ export function ClinicalResultPage({ data, serviceMode, targetLang }: PropsWithL
 
             <section>
                 <h3 className="font-medium">{renderLabel(suspectedDiagnosisLabel, loadingSuspectedDiagnosisLabel)}</h3>
-                <p>{data.diagnosis?.suspected ?? "—"}</p>
+                <p>
+                    {data.diagnosis?.suspected === "Analyse clinique en cours"
+                        ? useTranslation({ text: "Analyse clinique en cours", targetLang: lang }).translated
+                        : data.diagnosis?.suspected ?? "—"}
+                </p>
                 {data.diagnosis?.justification && (
                     <p className="text-sm text-gray-600">
                         {useTranslation({ text: data.diagnosis.justification, targetLang: lang }).translated}
