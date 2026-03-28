@@ -6,7 +6,7 @@ const router = express.Router();
 // POST /translation
 router.post("/", async (req, res) => {
   try {
-    const { text, targetLang, namespace, sourceLocale, translated, forceSave } = req.body;
+    const { text, targetLang, namespace, sourceLocale, translated, forceSave, openaiModel } = req.body;
     if (!text || !targetLang) {
       return res.status(400).json({ error: "Missing text or targetLang" });
     }
@@ -38,6 +38,7 @@ router.post("/", async (req, res) => {
       targetLang,
       namespace: namespace || "clinical-demo",
       sourceLocale: sourceLocale || "fr",
+      openaiModel,
     });
     res.json({ translation: payload.text });
   } catch (err) {

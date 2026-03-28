@@ -13,6 +13,7 @@ export async function getOrCreateTranslation({
   sourceLocale = "fr",
   targetLang,
   text,
+  openaiModel,
 }) {
   const sourceHash = hashSourceText(text);
   let cache = await UiTranslationCache.findOne({
@@ -25,9 +26,10 @@ export async function getOrCreateTranslation({
     return cache.payload;
   }
   // Call OpenAI for translation
+  const model = openaiModel || process.env.OPENAI_MODEL || "gpt-4.1-mini";
   const prompt = `Traduire ce texte en ${targetLang}: ${text}`;
   const completion = await openai.chat.completions.create({
-    model: "gpt-4-0613",
+    model,
     messages: [
       { role: "system", content: `You are a professional medical translator.` },
       { role: "user", content: prompt },
