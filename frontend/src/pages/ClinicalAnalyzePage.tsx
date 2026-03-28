@@ -26,12 +26,12 @@ import type {
 // Valeurs par défaut dynamiquement traduites
 import { useMemo } from "react";
 
-function useDefaultClinicalPayload(targetLang: string) {
-    const { translated: symptom1 } = useTranslation({ text: "Polyurie", targetLang });
-    const { translated: symptom2 } = useTranslation({ text: "Polydipsie", targetLang });
-    const { translated: symptom3 } = useTranslation({ text: "Fatigue", targetLang });
-    const { translated: history1 } = useTranslation({ text: "Diabète de type 2", targetLang });
-    const { translated: med1 } = useTranslation({ text: "Metformine", targetLang });
+function useDefaultClinicalPayload(targetLang: string, openaiModel: string) {
+    const { translated: symptom1 } = useTranslation({ text: "Polyurie", targetLang, openaiModel });
+    const { translated: symptom2 } = useTranslation({ text: "Polydipsie", targetLang, openaiModel });
+    const { translated: symptom3 } = useTranslation({ text: "Fatigue", targetLang, openaiModel });
+    const { translated: history1 } = useTranslation({ text: "Diabète de type 2", targetLang, openaiModel });
+    const { translated: med1 } = useTranslation({ text: "Metformine", targetLang, openaiModel });
 
     return useMemo(() => ({
         age: 55,
@@ -57,7 +57,8 @@ type OpenAIModel = "gpt-4.1-mini" | "gpt-4-0613";
 export function ClinicalAnalyzePage() {
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
-    const DEFAULT_CLINICAL_PAYLOAD = useDefaultClinicalPayload(targetLang);
+    const [openaiModel, setOpenaiModel] = useState<OpenAIModel>("gpt-4.1-mini");
+    const DEFAULT_CLINICAL_PAYLOAD = useDefaultClinicalPayload(targetLang, openaiModel);
     const isProd = !!import.meta.env.PROD;
     const [activeTab, setActiveTab] =
         useState<"patient" | "clinical">("patient");
@@ -267,13 +268,13 @@ export function ClinicalAnalyzePage() {
     /* ------------------------------------------------------------------ */
 
     // Traductions dynamiques
-    const { translated: modelLabel, loading: loadingModel, error: errorModel } = useTranslation({ text: "Modèle OpenAI", targetLang });
-    const { translated: gptMiniLabel, loading: loadingMini, error: errorMini } = useTranslation({ text: "gpt-4.1-mini (JSON natif)", targetLang });
-    const { translated: gptLegacyLabel, loading: loadingLegacy, error: errorLegacy } = useTranslation({ text: "gpt-4-0613 (legacy)", targetLang });
-    const { translated: realIaLabel, loading: loadingReal, error: errorReal } = useTranslation({ text: "IA réelle activée", targetLang });
-    const { translated: simModeLabel, loading: loadingSim, error: errorSim } = useTranslation({ text: "Mode simulation", targetLang });
-    const { translated: backendErrorLabel, loading: loadingBackend, error: errorBackend } = useTranslation({ text: "Erreur backend brute (sans flafla)", targetLang });
-    const { translated: loadingLabel } = useTranslation({ text: "Chargement...", targetLang });
+    const { translated: modelLabel, loading: loadingModel, error: errorModel } = useTranslation({ text: "Modèle OpenAI", targetLang, openaiModel });
+    const { translated: gptMiniLabel, loading: loadingMini, error: errorMini } = useTranslation({ text: "gpt-4.1-mini (JSON natif)", targetLang, openaiModel });
+    const { translated: gptLegacyLabel, loading: loadingLegacy, error: errorLegacy } = useTranslation({ text: "gpt-4-0613 (legacy)", targetLang, openaiModel });
+    const { translated: realIaLabel, loading: loadingReal, error: errorReal } = useTranslation({ text: "IA réelle activée", targetLang, openaiModel });
+    const { translated: simModeLabel, loading: loadingSim, error: errorSim } = useTranslation({ text: "Mode simulation", targetLang, openaiModel });
+    const { translated: backendErrorLabel, loading: loadingBackend, error: errorBackend } = useTranslation({ text: "Erreur backend brute (sans flafla)", targetLang, openaiModel });
+    const { translated: loadingLabel } = useTranslation({ text: "Chargement...", targetLang, openaiModel });
 
         // Affichage loading/erreur pour la traduction dynamique
         const [showTranslationError, setShowTranslationError] = useState<string | null>(null);

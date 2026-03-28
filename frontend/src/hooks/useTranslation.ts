@@ -36,11 +36,12 @@ const criticalLabelFallbacks: Record<string, Record<string, string>> = {
 
 const translationCache = new Map();
 
-export function useTranslation({ text, targetLang, namespace = "clinical-demo", sourceLocale = "fr" }: {
+export function useTranslation({ text, targetLang, namespace = "clinical-demo", sourceLocale = "fr", openaiModel }: {
   text: string;
   targetLang: string;
   namespace?: string;
   sourceLocale?: string;
+  openaiModel?: string;
 }) {
   const [error, setError] = useState<string | null>(null);
   const cacheKey = `${namespace}|${sourceLocale}|${targetLang}|${text}`;
@@ -80,7 +81,7 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
       return;
     }
     setLoading(true);
-    translateText({ text, targetLang, namespace, sourceLocale })
+    translateText({ text, targetLang, namespace, sourceLocale, openaiModel })
       .then((result) => {
         if (isMounted.current) {
           let clean = result;
