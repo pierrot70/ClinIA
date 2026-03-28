@@ -7,7 +7,7 @@ export async function translateText({ text, targetLang, namespace = "clinical-de
   namespace?: string;
   sourceLocale?: string;
 }) {
-  const response = await fetch(`${API_URL}/translation`, {
+  const response = await fetch(`${API_URL}/api/translation`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, targetLang, namespace, sourceLocale }),
@@ -28,7 +28,7 @@ export async function saveLocalTranslation({ text, translated, targetLang, names
   sourceLocale?: string;
 }) {
   // On utilise un endpoint spécial ou une option 'forceSave' à ajouter côté backend si besoin
-  const response = await fetch(`${API_URL}/translation`, {
+  const response = await fetch(`${API_URL}/api/translation`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, targetLang, namespace, sourceLocale, translated, forceSave: true }),
