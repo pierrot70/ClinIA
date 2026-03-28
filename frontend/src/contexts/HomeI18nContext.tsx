@@ -141,8 +141,19 @@ const LOCAL_HOME_STRINGS_BY_BASE: Record<string, HomeStrings> = {
   vi: HOME_STRINGS_VI,
 };
 
-const getLocalHomeStrings = (baseLang: string): HomeStrings =>
-  LOCAL_HOME_STRINGS_BY_BASE[baseLang] || HOME_STRINGS_EN;
+const getLocalHomeStrings = (baseLang: string): HomeStrings => {
+  // Normalise les variantes (en-CA → en, fr-CA → fr)
+  const normalized = baseLang.toLowerCase();
+  if (normalized.startsWith("fr")) return HOME_STRINGS_FR;
+  if (normalized.startsWith("en")) return HOME_STRINGS_EN;
+  if (normalized.startsWith("ja")) return HOME_STRINGS_JA;
+  if (normalized.startsWith("zh")) return HOME_STRINGS_ZH;
+  if (normalized.startsWith("he") || normalized.startsWith("iw")) return HOME_STRINGS_HE;
+  if (normalized.startsWith("es")) return HOME_STRINGS_ES;
+  if (normalized.startsWith("ko")) return HOME_STRINGS_KO;
+  if (normalized.startsWith("vi")) return HOME_STRINGS_VI;
+  return HOME_STRINGS_EN;
+};
 
 const LOCAL_SCRIPT_LOCK_LANGS = new Set(["he", "ja", "ko"]);
 

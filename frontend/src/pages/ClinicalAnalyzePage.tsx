@@ -58,10 +58,7 @@ export function ClinicalAnalyzePage() {
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
     const [openaiModel, setOpenaiModel] = useState<OpenAIModel>("gpt-4.1-mini");
-    const DEFAULT_CLINICAL_PAYLOAD = useMemo(
-        () => useDefaultClinicalPayload(targetLang, openaiModel),
-        [targetLang, openaiModel]
-    );
+    const DEFAULT_CLINICAL_PAYLOAD = useDefaultClinicalPayload(targetLang, openaiModel);
     const isProd = !!import.meta.env.PROD;
     const [activeTab, setActiveTab] =
         useState<"patient" | "clinical">("patient");
@@ -383,6 +380,7 @@ export function ClinicalAnalyzePage() {
             {/* 🧑‍⚕️ Formulaire */}
             {activeTab === "patient" && !result && (
                 <ClinicalForm
+                    key={targetLang + openaiModel}
                     onSubmit={handleSubmit}
                     loading={loading}
                     initialData={DEFAULT_CLINICAL_PAYLOAD}

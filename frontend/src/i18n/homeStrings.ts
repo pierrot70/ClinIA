@@ -10,6 +10,19 @@ export type HomeStrings = {
     cardQuestionsTitle: string;
     cardQuestionsBody: string;
   };
+  demo: {
+    pageTitle: string;
+    pageSubtitle: string;
+    startDemo: string;
+    goToClinical: string;
+    presenterChecklist: string;
+    steps: Array<{
+      minute: string;
+      title: string;
+      detail: string;
+    }>;
+    checklist: string[];
+  };
   search: {
     secureModeHint: string;
     objectiveLabel: string;
@@ -62,6 +75,46 @@ export const HOME_STRINGS_FR: HomeStrings = {
     cardQuestionsTitle: "Questions anticipées",
     cardQuestionsBody:
       "L'interface suggère des questions fréquentes et affiche des réponses structurées, pour réduire la charge cognitive.",
+  },
+  demo: {
+    pageTitle: "Démo ClinIA en moins de 5 minutes",
+    pageSubtitle: "Cette page sert de fil conducteur pour une démonstration courte, claire et orientée valeur clinique. L'objectif est de montrer l'utilité de ClinIA sans compromis sur la sécurité des données.",
+    startDemo: "Commencer la démo",
+    goToClinical: "Aller à l'analyse clinique",
+    presenterChecklist: "Checklist animateur",
+    steps: [
+      {
+        minute: "00:00 - 00:45",
+        title: "Contexte ClinIA",
+        detail: "Expliquer que ClinIA assiste le médecin avec des options thérapeutiques structurées. ClinIA ne pose pas de diagnostic final et ne prescrit pas.",
+      },
+      {
+        minute: "00:45 - 01:45",
+        title: "Connexion et rôles",
+        detail: "Montrer la connexion, puis le contrôle des rôles (MEDECIN, ADMIN, SUPERADMIN) pour les sections sensibles.",
+      },
+      {
+        minute: "01:45 - 03:00",
+        title: "Analyse clinique",
+        detail: "Soumettre un cas de démonstration fictif, afficher hypothèse clinique, options thérapeutiques, justification et contre-indications.",
+      },
+      {
+        minute: "03:00 - 04:00",
+        title: "Trajectoire patient",
+        detail: "Naviguer vers les pages rendez-vous/patients pour montrer le flux de travail clinique sans exposer de données identifiables.",
+      },
+      {
+        minute: "04:00 - 05:00",
+        title: "Sécurité et conformité",
+        detail: "Conclure avec les garde-fous Loi 25 / PIPEDA: minimisation des données, audit logs, contrôle d'accès et supervision clinique humaine.",
+      },
+    ],
+    checklist: [
+      "Utiliser uniquement des données fictives durant la démo.",
+      "Éviter toute information patient identifiable dans les prompts IA.",
+      "Montrer un message clair : l'IA assiste, le médecin décide.",
+      "Terminer avec une invitation aux questions et prochaines étapes.",
+    ],
   },
   search: {
     secureModeHint:
@@ -151,6 +204,46 @@ export const HOME_STRINGS_EN: HomeStrings = {
     cardQuestionsBody:
       "The interface suggests frequent questions and displays structured answers to reduce cognitive load.",
   },
+  demo: {
+    pageTitle: "ClinIA Demo in under 5 minutes",
+    pageSubtitle: "This page is a guide for a short, clear, value-oriented demo. The goal is to show ClinIA's utility without compromising data security.",
+    startDemo: "Start the demo",
+    goToClinical: "Go to clinical analysis",
+    presenterChecklist: "Presenter checklist",
+    steps: [
+      {
+        minute: "00:00 - 00:45",
+        title: "ClinIA Context",
+        detail: "Explain that ClinIA assists the physician with structured therapeutic options. ClinIA does not make a final diagnosis and does not prescribe.",
+      },
+      {
+        minute: "00:45 - 01:45",
+        title: "Login and roles",
+        detail: "Show login, then role control (MEDECIN, ADMIN, SUPERADMIN) for sensitive sections.",
+      },
+      {
+        minute: "01:45 - 03:00",
+        title: "Clinical analysis",
+        detail: "Submit a fictitious demo case, display clinical hypothesis, therapeutic options, justification, and contraindications.",
+      },
+      {
+        minute: "03:00 - 04:00",
+        title: "Patient journey",
+        detail: "Navigate to appointments/patients pages to show the clinical workflow without exposing identifiable data.",
+      },
+      {
+        minute: "04:00 - 05:00",
+        title: "Security and compliance",
+        detail: "Conclude with Loi 25 / PIPEDA safeguards: data minimization, audit logs, access control, and human clinical supervision.",
+      },
+    ],
+    checklist: [
+      "Use only fictitious data during the demo.",
+      "Avoid any patient-identifiable information in AI prompts.",
+      "Show a clear message: AI assists, the physician decides.",
+      "End with an invitation for questions and next steps.",
+    ],
+  },
   search: {
     secureModeHint:
       "Quick mode: anonymized clinical input only. Advanced settings remain optional.",
@@ -234,6 +327,7 @@ export const HOME_STRINGS_ZH: HomeStrings = {
     cardQuestionsBody:
       "界面会建议常见问题并给出结构化答案，降低认知负担。",
   },
+  demo: HOME_STRINGS_EN.demo,
   search: {
     secureModeHint:
       "快速模式：仅输入匿名临床信息。高级参数为可选。",
@@ -317,6 +411,7 @@ export const HOME_STRINGS_ES: HomeStrings = {
     notesLabel: "Notas clinicas",
     launchSecure: "Ejecutar consulta segura",
   },
+  demo: HOME_STRINGS_EN.demo,
 };
 
 export const HOME_STRINGS_JA: HomeStrings = {
@@ -336,6 +431,7 @@ export const HOME_STRINGS_JA: HomeStrings = {
     cardQuestionsBody:
       "よくある質問を提示し、構造化された回答で認知負荷を軽減します。",
   },
+  demo: HOME_STRINGS_EN.demo,
   search: {
     secureModeHint:
       "クイックモード: 匿名化された臨床情報のみ入力します。詳細設定は任意です。",
@@ -407,6 +503,7 @@ export const HOME_STRINGS_HE: HomeStrings = {
     cardQuestionsBody:
       "הממשק מציע שאלות נפוצות ומציג תשובות מובנות להפחתת העומס הקוגניטיבי.",
   },
+  demo: HOME_STRINGS_EN.demo,
   search: {
     secureModeHint:
       "מצב מהיר: קלט קליני אנונימי בלבד. הגדרות מתקדמות הן אופציונליות.",
@@ -478,6 +575,7 @@ export const HOME_STRINGS_KO: HomeStrings = {
     cardQuestionsBody:
       "자주 묻는 질문을 제안하고 구조화된 답변을 제공해 인지 부담을 줄입니다.",
   },
+  demo: HOME_STRINGS_EN.demo,
   search: {
     secureModeHint:
       "빠른 모드: 익명화된 임상 정보만 입력합니다. 고급 설정은 선택 사항입니다.",
@@ -542,6 +640,7 @@ export const HOME_STRINGS_VI: HomeStrings = {
     cardQuestionsBody:
       "Giao dien goi y cau hoi thuong gap va hien thi cau tra loi co cau truc de giam tai nhan thuc.",
   },
+  demo: HOME_STRINGS_EN.demo,
   search: {
     secureModeHint:
       "Che do nhanh: chi nhap du lieu lam sang da an danh. Cac tuy chon nang cao la tuy chon.",
