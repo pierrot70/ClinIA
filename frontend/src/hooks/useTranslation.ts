@@ -7,12 +7,12 @@ const criticalLabelFallbacks: Record<string, Record<string, string>> = {
     "Exemple de cas fictif : patient de 55 ans présentant de la fatigue, une polyurie et une polydipsie.": {
       "en": "Example case: 55-year-old patient with fatigue, polyuria and polydipsia.",
       "en-CA": "Example case: 55-year-old patient with fatigue, polyuria and polydipsia.",
-      "default": "Exemple de cas fictif : patient de 55 ans avec fatigue, polyurie et polydipsie."
+      "default": "Example case: 55-year-old patient with fatigue, polyuria and polydipsia."
     },
     "Exemple de cas fictif: patient de 55 ans avec fatigue, polyurie et polydipsie.": {
       "en": "Example case: 55-year-old patient with fatigue, polyuria and polydipsia.",
       "en-CA": "Example case: 55-year-old patient with fatigue, polyuria and polydipsia.",
-      "default": "Exemple de cas fictif: patient de 55 ans avec fatigue, polyurie et polydipsie."
+      "default": "Example case: 55-year-old patient with fatigue, polyuria and polydipsia."
     },
   // (doublons supprimés ci-dessous)
   "Modèle OpenAI": {
