@@ -287,14 +287,14 @@ const Header: React.FC = () => {
     );
 
     const languageOptions = [
-        { value: "fr-CA", label: "Français (Canada)" },
-        { value: "en-CA", label: "English (Canada)" },
-        { value: "ko-KR", label: "한국어 (대한민국)" },
-        { value: "vi", label: "Tiếng Việt" },
-        { value: "ja", label: "日本語" },
-        { value: "zh", label: "中文（普通话）" },
-        { value: "he", label: "עברית" },
-        { value: "es", label: "Español" },
+        { value: "fr-CA", label: "FRA - Français (Canada)" },
+        { value: "en-CA", label: "ENG - English (Canada)" },
+        { value: "es", label: "SPA - Español" },
+        { value: "ko-KR", label: "KOR - 한국어 (대한민국)" },
+        { value: "vi", label: "VIE - Tiếng Việt" },
+        { value: "ja", label: "JPN - 日本語" },
+        { value: "zh", label: "ZHO - 中文（普通话）" },
+        { value: "he", label: "HEB - עברית" },
     ];
 
     const onLanguageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
