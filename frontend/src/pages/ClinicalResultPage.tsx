@@ -79,12 +79,13 @@ export function ClinicalResultPage({ data, serviceMode, targetLang }: PropsWithL
 
             <h2 className="text-xl font-semibold">{renderLabel(clinicalResultTitle, loadingClinicalResultTitle)}</h2>
 
+
             <section>
                 <h3 className="font-medium">{renderLabel(suspectedDiagnosisLabel, loadingSuspectedDiagnosisLabel)}</h3>
                 <p>{data.diagnosis?.suspected ?? "—"}</p>
                 {data.diagnosis?.justification && (
                     <p className="text-sm text-gray-600">
-                        {data.diagnosis.justification}
+                        {useTranslation({ text: data.diagnosis.justification, targetLang: lang }).translated}
                     </p>
                 )}
             </section>
@@ -92,7 +93,9 @@ export function ClinicalResultPage({ data, serviceMode, targetLang }: PropsWithL
             <section>
                 <h3 className="font-medium">{renderLabel(patientSummaryLabel, loadingPatientSummaryLabel)}</h3>
                 <p>
-                    {data.patient_summary?.plain_language ?? renderLabel(noSummaryLabel, loadingNoSummaryLabel)}
+                    {data.patient_summary?.plain_language
+                        ? useTranslation({ text: data.patient_summary.plain_language, targetLang: lang }).translated
+                        : renderLabel(noSummaryLabel, loadingNoSummaryLabel)}
                 </p>
             </section>
 
