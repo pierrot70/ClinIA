@@ -55,25 +55,40 @@ const DEMO_STRINGS = {
 
 const DemoPage: React.FC = () => {
   const { locale } = useHomeI18n();
-  // Traductions dynamiques pour chaque champ
+
+  // Hooks pour chaque champ statique
   const { translated: pageTitle } = useTranslation({ text: DEMO_STRINGS.pageTitle, targetLang: locale });
   const { translated: pageSubtitle } = useTranslation({ text: DEMO_STRINGS.pageSubtitle, targetLang: locale });
   const { translated: startDemo } = useTranslation({ text: DEMO_STRINGS.startDemo, targetLang: locale });
   const { translated: goToClinical } = useTranslation({ text: DEMO_STRINGS.goToClinical, targetLang: locale });
   const { translated: presenterChecklist } = useTranslation({ text: DEMO_STRINGS.presenterChecklist, targetLang: locale });
 
-  // Traduction dynamique pour chaque étape
-  const steps = DEMO_STRINGS.steps.map((step) => {
-    const { translated: title } = useTranslation({ text: step.title, targetLang: locale });
-    const { translated: detail } = useTranslation({ text: step.detail, targetLang: locale });
-    return { ...step, title, detail };
-  });
+  // Hooks pour chaque étape (ordre fixe)
+  const { translated: stepTitle0 } = useTranslation({ text: DEMO_STRINGS.steps[0].title, targetLang: locale });
+  const { translated: stepDetail0 } = useTranslation({ text: DEMO_STRINGS.steps[0].detail, targetLang: locale });
+  const { translated: stepTitle1 } = useTranslation({ text: DEMO_STRINGS.steps[1].title, targetLang: locale });
+  const { translated: stepDetail1 } = useTranslation({ text: DEMO_STRINGS.steps[1].detail, targetLang: locale });
+  const { translated: stepTitle2 } = useTranslation({ text: DEMO_STRINGS.steps[2].title, targetLang: locale });
+  const { translated: stepDetail2 } = useTranslation({ text: DEMO_STRINGS.steps[2].detail, targetLang: locale });
+  const { translated: stepTitle3 } = useTranslation({ text: DEMO_STRINGS.steps[3].title, targetLang: locale });
+  const { translated: stepDetail3 } = useTranslation({ text: DEMO_STRINGS.steps[3].detail, targetLang: locale });
+  const { translated: stepTitle4 } = useTranslation({ text: DEMO_STRINGS.steps[4].title, targetLang: locale });
+  const { translated: stepDetail4 } = useTranslation({ text: DEMO_STRINGS.steps[4].detail, targetLang: locale });
 
-  // Traduction dynamique pour chaque item de checklist
-  const checklist = DEMO_STRINGS.checklist.map((item) => {
-    const { translated } = useTranslation({ text: item, targetLang: locale });
-    return translated;
-  });
+  const steps = [
+    { minute: DEMO_STRINGS.steps[0].minute, title: stepTitle0, detail: stepDetail0 },
+    { minute: DEMO_STRINGS.steps[1].minute, title: stepTitle1, detail: stepDetail1 },
+    { minute: DEMO_STRINGS.steps[2].minute, title: stepTitle2, detail: stepDetail2 },
+    { minute: DEMO_STRINGS.steps[3].minute, title: stepTitle3, detail: stepDetail3 },
+    { minute: DEMO_STRINGS.steps[4].minute, title: stepTitle4, detail: stepDetail4 },
+  ];
+
+  // Hooks pour chaque item de checklist (ordre fixe)
+  const { translated: checklist0 } = useTranslation({ text: DEMO_STRINGS.checklist[0], targetLang: locale });
+  const { translated: checklist1 } = useTranslation({ text: DEMO_STRINGS.checklist[1], targetLang: locale });
+  const { translated: checklist2 } = useTranslation({ text: DEMO_STRINGS.checklist[2], targetLang: locale });
+  const { translated: checklist3 } = useTranslation({ text: DEMO_STRINGS.checklist[3], targetLang: locale });
+  const checklist = [checklist0, checklist1, checklist2, checklist3];
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
