@@ -1,6 +1,7 @@
 import { useEffect, useState, useContext } from "react";
 import { ClinicalForm } from "../components/clinical/ClinicalForm";
-import { ClinicalResultPage } from "./ClinicalResultPage";
+// import { ClinicalResultPage } from "./ClinicalResultPage";
+import ClinicalDemoResult from "../components/ClinicalDemoResult";
 import { useClinicalAnalysis } from "../hooks/useClinicalAnalysis";
 import { useSecurityIncident } from "../contexts/SecurityIncidentContext";
 import {
@@ -10,6 +11,7 @@ import {
 import { SecurityBlockingAlert } from "../components/system/SecurityBlockingAlert";
 
 import { useTranslation } from "../hooks/useTranslation";
+import { hypertensionTreatments, anticipatedQuestions } from "../data/hypertension";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 
 import type { ClinicalPayload, ClinicalAnalysis, Sex } from "../types/clinical";
@@ -337,7 +339,7 @@ export function ClinicalAnalyzePage() {
                 </div>
             )}
 
-            {/* 🧑‍⚕️ Formulaire */}
+            {/* 👨‍⚕️ Formulaire */}
             {activeTab === "patient" && !result && (
                 <ClinicalForm
                     key={targetLang + openaiModel}
@@ -347,13 +349,16 @@ export function ClinicalAnalyzePage() {
                 />
             )}
 
-            {/* 📊 Résultat */}
-            {activeTab === "clinical" && result && (
-                <ClinicalResultPage
-                    key={targetLang}
-                    data={result}
-                    serviceMode={serviceMode}
-                    targetLang={targetLang}
+            {/* 📊 Résultat enrichi partagé */}
+            {activeTab === "clinical" && (
+                <ClinicalDemoResult
+                    demoData={{
+                        treatments: hypertensionTreatments,
+                        questions: anticipatedQuestions,
+                        summary: result?.patient_summary?.plain_language || undefined,
+                    }}
+                    sourceMode={serviceMode || undefined}
+                    realAI={forceReal}
                 />
             )}
         </div>

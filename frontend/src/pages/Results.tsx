@@ -10,10 +10,7 @@ import { SecurityBlockingAlert } from "../components/system/SecurityBlockingAler
 import type { SecurityIncidentBlockingData } from "../types/api";
 
 import AICard from "../components/AICard";
-import AITreatmentTable from "../components/AITreatmentTable";
-import TreatmentCard from "../components/TreatmentCard";
-import ChartCard from "../components/ChartCard";
-import QuestionCard from "../components/QuestionCard";
+import ClinicalDemoResult from "../components/ClinicalDemoResult";
 
 import { hypertensionTreatments, anticipatedQuestions } from "../data/hypertension";
 
@@ -25,9 +22,14 @@ const Results: React.FC = () => {
     const query = useQuery();
     const q = query.get("q") || "Hypertension essentielle";
 
-    const top = hypertensionTreatments[0];
-
     const { result: analysis, loading: loadingAI, error: errorMessage, analyze } = useClinicalAnalysis();
+
+    // Préparer les données de démo pour ClinicalDemoResult
+    const demoData = {
+        treatments: hypertensionTreatments,
+        questions: anticipatedQuestions,
+        summary: analysis?.patient_summary?.plain_language || undefined,
+    };
     const [sourceMode, setSourceMode] = useState<
         "mock" | "real" | "degraded" | "unknown"
     >("unknown");
@@ -136,7 +138,6 @@ const Results: React.FC = () => {
 
     return (
         <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-
             {blockingIncident && (
                 <SecurityBlockingAlert
                     blocking={blockingIncident}
@@ -151,10 +152,8 @@ const Results: React.FC = () => {
                 <p className="text-xs text-gray-500 uppercase tracking-wide">
                     {locale === "en" ? "Search Term" : "Terme recherché"}
                 </p>
-
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <h1 className="text-2xl font-semibold text-gray-900">{q}</h1>
-
                     {!isProd && (
                         <div className="flex items-center gap-2">
                             <button
@@ -187,7 +186,6 @@ const Results: React.FC = () => {
                         </div>
                     )}
                 </div>
-
                 <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-2 max-w-2xl">
                     Source: {sourceMode}
                 </p>
@@ -218,59 +216,10 @@ const Results: React.FC = () => {
                     error={!!errorMessage}
                     text={errorMessage ?? analysis?.patient_summary?.plain_language}
                 />
-
-                {Array.isArray(analysis?.treatments) && analysis.treatments.length > 0 && (
-                    <AITreatmentTable treatments={analysis.treatments.map(t => ({
-                        name: t.name,
-                        justification: t.indication || "-",
-                        contraindications: t.contraindications || [],
-                        efficacy: 0 // Champ non fourni par l'API IA, valeur neutre
-                    }))} />
-                )}
             </section>
 
-            {/* CONTENU DEMO */}
-            <section className="bg-white border rounded-xl p-4 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-start">
-                <div>
-                    <h2 className="text-sm font-semibold text-gray-800 mb-1">
-                        Traitement suggéré (simulation)
-                    </h2>
-                    <p className="text-sm text-gray-700">
-                        <span className="font-semibold">{top.name}</span> est proposé comme
-                        agent de première ligne.
-                    </p>
-                </div>
-                <div className="text-right text-sm">
-                    <div className="text-xs text-gray-500">Efficacité simulée</div>
-                    <div className="text-3xl font-semibold text-primary">
-                        {Math.round(top.efficacy * 100)}%
-                    </div>
-                    <Link to="/quick" className="mt-2 inline-block text-xs text-primary hover:underline">
-                        Voir le mode résumé →
-                    </Link>
-                </div>
-            </section>
-
-            <section className="grid md:grid-cols-3 gap-4">
-                {hypertensionTreatments.map(t => (
-                    <TreatmentCard key={t.id} treatment={t} />
-                ))}
-            </section>
-
-            <section>
-                <ChartCard treatments={hypertensionTreatments} />
-            </section>
-
-            <section className="space-y-3">
-                <h2 className="text-sm font-semibold text-gray-800">
-                    Questions fréquentes (simulation)
-                </h2>
-                <div className="space-y-2">
-                    {anticipatedQuestions.map(qa => (
-                        <QuestionCard key={qa.question} {...qa} />
-                    ))}
-                </div>
-            </section>
+            {/* Rendu enrichi partagé */}
+            <ClinicalDemoResult demoData={demoData} sourceMode={sourceMode} realAI={realAI} />
         </div>
     );
 };
