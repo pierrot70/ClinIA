@@ -1,5 +1,8 @@
 // Fallback anglais pour les textes statiques cliniques
 export const enFallback: Record<string, string> = {
+  "Entrez une valeur numerique, exemple: 92": "Enter a numeric value, example: 92",
+  "Entrez une valeur numerique, exemple: 175": "Enter a numeric value, example: 175",
+    "Separez chaque symptome par une virgule, exemple: fatigue, polydipsie": "Separate each symptom with a comma, for example: fatigue, polydipsia.",
   "Modèle OpenAI": "OpenAI Model",
   "gpt-4.1-mini (JSON natif)": "gpt-4.1-mini (native JSON)",
   "gpt-4-0613 (legacy)": "gpt-4-0613 (legacy)",
