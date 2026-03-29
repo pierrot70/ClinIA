@@ -1,7 +1,7 @@
 import { useEffect, useState, useContext } from "react";
 import { ClinicalForm } from "../components/clinical/ClinicalForm";
 import { ClinicalResultPage } from "./ClinicalResultPage";
-import { analyzeClinicalCase } from "../services/clinicalApi";
+import { useClinicalAnalysis } from "../hooks/useClinicalAnalysis";
 import { useSecurityIncident } from "../contexts/SecurityIncidentContext";
 import {
     acknowledgeSecurityIncident,
@@ -63,8 +63,7 @@ export function ClinicalAnalyzePage() {
     const [activeTab, setActiveTab] =
         useState<"patient" | "clinical">("patient");
 
-    const [result, setResult] = useState<ClinicalAnalysis | null>(null);
-    const [loading, setLoading] = useState(false);
+    const { result, loading, error, analyze } = useClinicalAnalysis();
 
     const [apiError, setApiError] = useState<ApiError | null>(null);
     const [blockingIncident, setBlockingIncident] =
@@ -123,7 +122,6 @@ export function ClinicalAnalyzePage() {
         setOpenaiModel(model);
 
         // RESET UI volontaire et explicite
-        setResult(null);
         setApiError(null);
         setServiceMode(null);
         setLastPayload(null);
@@ -134,46 +132,7 @@ export function ClinicalAnalyzePage() {
     /* Analyse centrale                                                   */
     /* ------------------------------------------------------------------ */
 
-    async function runAnalysis(
-        payload: ClinicalPayload & {
-            forceReal?: boolean;
-            openaiModel?: OpenAIModel;
-        }
-    ) {
-        setLoading(true);
-        setApiError(null);
-        setBlockingActionableMessage(null);
-
-        const response: ApiResponse<ClinicalAnalysis> = await analyzeClinicalCase(payload);
-
-        if ("error" in response) {
-            setApiError(response.error);
-
-            if (
-                response.error.code === "SECURITY_INCIDENT_BLOCKING" &&
-                response.blocking
-            ) {
-                setBlockingIncident(response.blocking);
-                setBlockingActionableMessage(
-                    "Contenu non securise detecte. Cliquez sur 'J'ai lu et compris' pour enregistrer la confirmation obligatoire."
-                );
-            } else {
-                setBlockingIncident(null);
-            }
-
-            setResult(null);
-            setServiceMode(null);
-            setActiveTab("patient");
-            setLoading(false);
-            return;
-        }
-
-        setBlockingIncident(null);
-        setResult(response.data);
-        setServiceMode(response.meta.source);
-        setActiveTab("clinical");
-        setLoading(false);
-    }
+    // runAnalysis remplacé par le hook useClinicalAnalysis
 
     async function handleAcknowledgeBlockingIncident() {
         if (!blockingIncident) {
@@ -231,9 +190,9 @@ export function ClinicalAnalyzePage() {
             forceReal: isProd ? false : forceReal,
             openaiModel,
         };
-
         setLastPayload(safePayload);
-        await runAnalysis(safePayload);
+        await analyze(safePayload);
+        setActiveTab("clinical");
     }
 
     /* ------------------------------------------------------------------ */
@@ -242,11 +201,12 @@ export function ClinicalAnalyzePage() {
 
     function retry() {
         if (lastPayload) {
-            runAnalysis({
+            analyze({
                 ...lastPayload,
                 forceReal,
                 openaiModel,
             });
+            setActiveTab("clinical");
         }
     }
 

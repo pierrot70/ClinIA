@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useClinicalAnalysis } from "../hooks/useClinicalAnalysis";
 import { useLocation, Link } from "react-router-dom";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import {
@@ -26,9 +27,7 @@ const Results: React.FC = () => {
 
     const top = hypertensionTreatments[0];
 
-    const [analysis, setAnalysis] = useState<any>(null);
-    const [loadingAI, setLoadingAI] = useState(true);
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const { result: analysis, loading: loadingAI, error: errorMessage, analyze } = useClinicalAnalysis();
     const [sourceMode, setSourceMode] = useState<
         "mock" | "real" | "degraded" | "unknown"
     >("unknown");
@@ -51,82 +50,7 @@ const Results: React.FC = () => {
 
     const AI_ENDPOINT = "/api/ai/analyze";
 
-    const fetchAI = async (incidentAckId?: string) => {
-        const requestId = ++requestIdRef.current;
-        setLoadingAI(true);
-        setErrorMessage(null);
-        setAnalysis(null);
-        if (!incidentAckId) {
-            setNeutralizedMessage(null);
-        }
-
-        try {
-            const res = await fetch(AI_ENDPOINT, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    age: 55,
-                    sex: "male",
-                    symptoms: [q],
-                    medical_history: [],
-                    current_medications: [],
-                    forceReal: realAIRef.current,
-                    incidentAckId,
-                }),
-            });
-
-            const json = await res.json();
-
-            if (requestId !== requestIdRef.current) {
-                return;
-            }
-
-            if (json?.error) {
-                if (
-                    json?.error?.code === "SECURITY_INCIDENT_BLOCKING" &&
-                    json?.blocking
-                ) {
-                    setBlockingIncident(json.blocking as SecurityIncidentBlockingData);
-                    setBlockingActionableMessage(
-                        "Contenu sensible detecte. Cliquez sur 'J'ai lu et compris' pour neutraliser puis continuer."
-                    );
-                    setSourceMode("unknown");
-                    return;
-                }
-
-                setErrorMessage(json.error.message || "Erreur lors de l’analyse.");
-                setSourceMode("unknown");
-                return;
-            }
-
-            setBlockingIncident(null);
-            setAnalysis(json?.data ?? json);
-            const metaSource = json?.meta?.source;
-            if (metaSource === "mock" || metaSource === "real" || metaSource === "degraded") {
-                setSourceMode(metaSource);
-            } else {
-                setSourceMode("unknown");
-            }
-
-            if (json?.meta?.neutralized) {
-                setNeutralizedMessage(
-                    json?.meta?.message ||
-                        "Une requete a dejoue les gardes de securite et a ete neutralisee avant traitement cloud."
-                );
-            }
-        } catch (err) {
-            if (requestId !== requestIdRef.current) {
-                return;
-            }
-            console.error("Erreur IA:", err);
-            setErrorMessage("Erreur réseau ou serveur.");
-            setSourceMode("unknown");
-        } finally {
-            if (requestId === requestIdRef.current) {
-                setLoadingAI(false);
-            }
-        }
-    };
+    // fetchAI remplacé par useClinicalAnalysis
 
     useEffect(() => {
         if (isProd) {
@@ -160,7 +84,14 @@ const Results: React.FC = () => {
     }, [isProd]);
 
     useEffect(() => {
-        fetchAI();
+        analyze({
+            age: 55,
+            sex: "male",
+            symptoms: [q],
+            medical_history: [],
+            current_medications: [],
+            forceReal: realAIRef.current,
+        });
     }, [q]);
 
     async function handleAcknowledgeBlockingIncident() {
@@ -192,7 +123,15 @@ const Results: React.FC = () => {
 
         setBlockingIncident(null);
         setAcknowledgingIncident(false);
-        await fetchAI(ackResponse.data.incidentId);
+        // Relancer l'analyse après acknowledge
+        analyze({
+            age: 55,
+            sex: "male",
+            symptoms: [q],
+            medical_history: [],
+            current_medications: [],
+            forceReal: realAIRef.current,
+        });
     }
 
     return (
@@ -280,8 +219,13 @@ const Results: React.FC = () => {
                     text={errorMessage ?? analysis?.patient_summary?.plain_language}
                 />
 
-                {analysis?.treatments?.length > 0 && (
-                    <AITreatmentTable treatments={analysis.treatments} />
+                {Array.isArray(analysis?.treatments) && analysis.treatments.length > 0 && (
+                    <AITreatmentTable treatments={analysis.treatments.map(t => ({
+                        name: t.name,
+                        justification: t.indication || "-",
+                        contraindications: t.contraindications || [],
+                        efficacy: 0 // Champ non fourni par l'API IA, valeur neutre
+                    }))} />
                 )}
             </section>
 

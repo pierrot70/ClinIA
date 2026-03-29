@@ -23,6 +23,10 @@ export interface ClinicalPayload {
     symptoms: string[];
     medical_history: string[];
     current_medications: string[];
+
+    // Champs frontend pour pilotage IA
+    forceReal?: boolean;
+    openaiModel?: string;
 }
 
 /* ------------------------------------------------------------------ */

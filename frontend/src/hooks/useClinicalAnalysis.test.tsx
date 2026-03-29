@@ -1,0 +1,62 @@
+import { describe, it, expect, afterEach, vi } from 'vitest';
+/// <reference types="vitest" />
+import { renderHook, act } from '@testing-library/react';
+import { useClinicalAnalysis } from './useClinicalAnalysis';
+
+// Mock fetch globally
+const mockFetch = vi.fn();
+window.fetch = mockFetch;
+
+describe('useClinicalAnalysis', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should fetch and set result on success', async () => {
+    const mockResult = { data: {
+      hypothesis: 'Hypertension',
+      treatments: [
+        {
+          name: 'Traitement B',
+          justification: 'Justification B',
+          contraindications: ['CI2'],
+          efficacy: 90
+        }
+      ]
+    } };
+    mockFetch.mockResolvedValueOnce({
+      json: async () => mockResult,
+    });
+    const { result } = renderHook(() => useClinicalAnalysis());
+    await act(async () => {
+      await result.current.analyze({ age: 55, sex: 'male', symptoms: ['Hypertension'], medical_history: [], current_medications: [] });
+    });
+    expect(result.current.result).toEqual(mockResult.data);
+    expect(result.current.error).toBeNull();
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('should set error on API error', async () => {
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({ error: { message: 'Erreur API' } }),
+    });
+    const { result } = renderHook(() => useClinicalAnalysis());
+    await act(async () => {
+      await result.current.analyze({ age: 55, sex: 'male', symptoms: ['Hypertension'], medical_history: [], current_medications: [] });
+    });
+    expect(result.current.result).toBeNull();
+    expect(result.current.error).toBe('Erreur API');
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('should set error on network error', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('Network error'));
+    const { result } = renderHook(() => useClinicalAnalysis());
+    await act(async () => {
+      await result.current.analyze({ age: 55, sex: 'male', symptoms: ['Hypertension'], medical_history: [], current_medications: [] });
+    });
+    expect(result.current.result).toBeNull();
+    expect(result.current.error).toBe('Erreur réseau ou serveur.');
+    expect(result.current.loading).toBe(false);
+  });
+});
