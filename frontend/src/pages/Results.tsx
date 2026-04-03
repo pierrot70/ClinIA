@@ -24,11 +24,30 @@ const Results: React.FC = () => {
 
     const { result: analysis, loading: loadingAI, error: errorMessage, analyze } = useClinicalAnalysis();
 
-    // Préparer les données de démo pour ClinicalDemoResult
+    // Détecter si on a une réponse IA pertinente (cancer, etc.)
+    const hasRealAIContent =
+        !!(
+            analysis?.clinical_summary ||
+            analysis?.initial_evaluation_recommendations ||
+            analysis?.treatment_options ||
+            analysis?.follow_up_and_monitoring
+        );
+
     const demoData = {
-        treatments: hypertensionTreatments,
+        treatments:
+            Array.isArray(analysis?.treatments) && analysis.treatments.length > 0
+                ? analysis.treatments
+                : hasRealAIContent
+                ? []
+                : hypertensionTreatments,
         questions: anticipatedQuestions,
         summary: analysis?.patient_summary?.plain_language || undefined,
+        error: errorMessage || undefined,
+        clinical_summary: analysis?.clinical_summary,
+        recommendations: analysis?.recommendations,
+        initial_evaluation_recommendations: analysis?.initial_evaluation_recommendations,
+        treatment_options: analysis?.treatment_options,
+        follow_up_and_monitoring: analysis?.follow_up_and_monitoring,
     };
     const [sourceMode, setSourceMode] = useState<
         "mock" | "real" | "degraded" | "unknown"
@@ -219,7 +238,7 @@ const Results: React.FC = () => {
             </section>
 
             {/* Rendu enrichi partagé */}
-            <ClinicalDemoResult demoData={demoData} sourceMode={sourceMode} realAI={realAI} />
+            <ClinicalDemoResult demoData={demoData as any} sourceMode={sourceMode} realAI={realAI} />
         </div>
     );
 };

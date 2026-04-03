@@ -46,6 +46,9 @@ import { loi25DataLeakGuard } from "./middleware/loi25DataLeakGuard.js";
 
 dotenv.config();
 
+// Log explicite de la valeur CLINIA_MOCK_AI au tout début du backend
+console.log("[BOOT] CLINIA_MOCK_AI (raw env):", process.env.CLINIA_MOCK_AI);
+
 mongoose.set("bufferCommands", false);
 
 /* ------------------------------------------------------------------ */
@@ -140,10 +143,16 @@ function supportsJsonResponseFormat(model = "") {
 }
 
 function normalizeClinicalAnalysis(raw) {
-    const pa = raw?.patient_analysis ?? raw ?? {};
+    // Fusionne tous les champs de patient_analysis ET de la racine
+    const pa = raw?.patient_analysis ?? {};
+    const root = { ...raw };
+    delete root.patient_analysis;
 
-    const treatments = Array.isArray(pa.treatments)
-        ? pa.treatments.map((t) => ({
+    // On fusionne pa et root (root écrase pa en cas de doublon, mais pa est prioritaire pour les champs standards)
+    const merged = { ...root, ...pa };
+
+    const treatments = Array.isArray(merged.treatments)
+        ? merged.treatments.map((t) => ({
             name: t?.name ?? "Traitement non spécifié",
             indication: t?.indication ?? "",
             dosage: t?.dosage ?? "",
@@ -158,40 +167,85 @@ function normalizeClinicalAnalysis(raw) {
         }))
         : [];
 
-    return {
+    // Champs standards
+    const base = {
         diagnosis: {
             suspected:
-                pa.diagnosis?.suspected ??
+                merged.diagnosis?.suspected ??
                 "Analyse clinique en cours",
             certainty_level:
-                pa.diagnosis?.certainty_level ?? "moderate",
+                merged.diagnosis?.certainty_level ?? "moderate",
             justification:
-                pa.diagnosis?.justification ??
+                merged.diagnosis?.justification ??
                 "Analyse basée sur données cliniques disponibles.",
         },
         treatments,
-        alternatives: Array.isArray(pa.alternatives)
-            ? pa.alternatives
+        alternatives: Array.isArray(merged.alternatives)
+            ? merged.alternatives
             : [],
-        red_flags: Array.isArray(pa.red_flags)
-            ? pa.red_flags
+        red_flags: Array.isArray(merged.red_flags)
+            ? merged.red_flags
             : [],
         patient_summary: {
             plain_language:
-                pa.patient_summary?.plain_language ??
+                merged.patient_summary?.plain_language ??
                 "Résumé patient généré par ClinIA.",
             clinical_language:
-                pa.patient_summary?.clinical_language ??
+                merged.patient_summary?.clinical_language ??
                 "Analyse clinique structurée.",
         },
         meta: {
             model: process.env.OPENAI_MODEL ?? "fallback",
             confidence_score:
-                typeof pa.confidence_score === "number"
-                    ? pa.confidence_score
+                typeof merged.confidence_score === "number"
+                    ? merged.confidence_score
                     : 0.6,
         },
     };
+
+    // Champs IA avancés dynamiques (hors standards)
+    const standardKeys = new Set([
+        "diagnosis",
+        "treatments",
+        "alternatives",
+        "red_flags",
+        "patient_summary",
+        "meta",
+    ]);
+
+    // On ajoute explicitement les champs connus IA avancés
+    const knownAIFields = [
+        "clinical_summary",
+        "recommendations",
+        "initial_evaluation_recommendations",
+        "treatment_options",
+        "follow_up_and_monitoring",
+        "supportive_care",
+        "follow_up_and_supportive_care",
+    ];
+    // Toujours inclure tous les champs IA avancés présents dans merged
+    for (const key of knownAIFields) {
+        if (Object.prototype.hasOwnProperty.call(merged, key)) {
+            base[key] = merged[key];
+        }
+    }
+
+    // On regroupe tous les autres champs IA non standards dans 'other_ai_fields'
+    const otherAIFields = {};
+    for (const [key, value] of Object.entries(merged)) {
+        if (!standardKeys.has(key) && !knownAIFields.includes(key) && value !== undefined) {
+            otherAIFields[key] = value;
+        }
+    }
+    if (Object.keys(otherAIFields).length > 0) {
+        base.other_ai_fields = otherAIFields;
+    }
+
+    // Ajout d'un log pour debug
+    console.log("[normalizeClinicalAnalysis] merged:", JSON.stringify(merged, null, 2));
+    console.log("[normalizeClinicalAnalysis] base:", JSON.stringify(base, null, 2));
+
+    return base;
 }
 
 function hasHomeI18nShape(obj) {
@@ -602,11 +656,12 @@ app.post("/api/ai/analyze", (req, res, next) => {
                 {
                     role: "system",
                     content:
-                        "You are ClinIA. Return valid JSON only.",
+                        "You are ClinIA, a clinical decision support AI. ONLY provide therapeutic options, recommendations, and clinical summary for the specific cancer diagnosis provided by the user (e.g., stomach cancer). Ignore all other diagnoses and comorbidities. Return valid JSON only.",
                 },
                 {
                     role: "user",
-                    content: JSON.stringify(patient),
+                    content:
+                        `The patient has a specific cancer diagnosis: ${diagnosis}. ONLY provide evidence-based treatment options, recommendations, and clinical summary for this specific cancer (e.g., stomach cancer). Do NOT mention or propose treatments for hypertension or any other diagnosis.\nFull patient data: ${JSON.stringify(patient)}`,
                 },
             ],
             temperature: 0.1,
@@ -630,6 +685,9 @@ app.post("/api/ai/analyze", (req, res, next) => {
 
             rawContent =
                 completion?.choices?.[0]?.message?.content || "";
+
+            // Ajout : log de la réponse brute OpenAI
+            console.log("=== RAW OpenAI RESPONSE ===\n", rawContent, "\n===========================");
 
             const postCloudScan = detectNonSecureContent(rawContent);
             if (postCloudScan.hasMatches) {
@@ -684,14 +742,17 @@ app.post("/api/ai/analyze", (req, res, next) => {
         if (!persist.ok)
             return res.status(500).json({ error: persist.error });
 
-        return res.json({
-            data: persist.doc.output,
-            meta: {
-                source: "real",
-                model,
-                ...neutralizationMeta,
-            },
-        });
+            // Log explicite de la réponse envoyée au frontend
+            const responsePayload = {
+                data: persist.doc.output,
+                meta: {
+                    source: "real",
+                    model,
+                    ...neutralizationMeta,
+                },
+            };
+            console.log("=== RESPONSE TO FRONTEND ===\n", JSON.stringify(responsePayload, null, 2), "\n============================");
+            return res.json(responsePayload);
     } catch (err) {
         console.error("🔥 FATAL /api/ai/analyze ERROR", err);
         return res.status(500).json({

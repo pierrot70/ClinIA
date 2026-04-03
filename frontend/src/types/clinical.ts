@@ -65,10 +65,21 @@ export interface ClinicalAnalysis {
         clinical_language: string;
     };
 
+    clinical_summary?: any;
+    recommendations?: any;
+
     meta: {
         model: string;
         confidence_score: number;
         source?: AIServiceSource; // 👈 AJOUT
     };
+
+    // Champs IA avancés (cancer, etc.)
+    initial_evaluation_recommendations?: any;
+    treatment_options?: any;
+    follow_up_and_monitoring?: any;
+
+    // Champs IA inconnus dynamiques
+    other_ai_fields?: Record<string, unknown>;
 
 }

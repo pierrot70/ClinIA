@@ -353,7 +353,9 @@ export function ClinicalAnalyzePage() {
             {activeTab === "clinical" && (
                 <ClinicalDemoResult
                     demoData={{
-                        treatments: hypertensionTreatments,
+                        treatments: Array.isArray(result?.treatments) && result.treatments.length > 0
+                                ? (result.treatments as any[])
+                            : hypertensionTreatments,
                         questions: anticipatedQuestions,
                         summary: result?.patient_summary?.plain_language || undefined,
                     }}

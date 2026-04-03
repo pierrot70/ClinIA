@@ -56,6 +56,7 @@ const SearchBar: React.FC = () => {
   const [ageGroup, setAgeGroup] = useState(ageGroups[0]);
   const [objective, setObjective] = useState(objectives[0]);
   const [symptomProfile, setSymptomProfile] = useState(symptomProfiles[0]);
+  const [cancerType, setCancerType] = useState("");
   const [duration, setDuration] = useState(durations[0]);
   const [severity, setSeverity] = useState(severityLevels[0]);
   const [redFlagStatus, setRedFlagStatus] = useState(redFlagStatuses[0]);
@@ -90,11 +91,15 @@ const SearchBar: React.FC = () => {
     }
 
     setInputWarning(null);
+    let mainSymptom = symptomProfile;
+    if (symptomProfile === "Cancer" && cancerType.trim()) {
+      mainSymptom = cancerType.trim();
+    }
     const notesSection = clinicalNotes.trim()
       ? ` | ${strings.search.notesLabel}: ${clinicalNotes.trim()}`
       : "";
     const q =
-      `${strings.search.symptomLabel}: ${symptomProfile}` +
+      `${strings.search.symptomLabel}: ${mainSymptom}` +
       ` | ${strings.search.durationLabel}: ${duration}` +
       ` | ${strings.search.severityLabel}: ${severity}` +
       ` | ${strings.search.redFlagsLabel}: ${redFlagStatus}` +
@@ -116,6 +121,7 @@ const SearchBar: React.FC = () => {
     redFlagStatus,
     severity,
     symptomProfile,
+    cancerType,
     strings.search.blockedSensitive,
     strings.search.comorbidityLabel,
     strings.search.durationLabel,
@@ -348,7 +354,10 @@ const SearchBar: React.FC = () => {
             {strings.search.symptomLabel}
             <select
               value={symptomProfile}
-              onChange={(e) => setSymptomProfile(e.target.value)}
+              onChange={(e) => {
+                setSymptomProfile(e.target.value);
+                if (e.target.value !== "Cancer") setCancerType("");
+              }}
               className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
             >
               {symptomProfiles.map((option) => (
@@ -357,6 +366,19 @@ const SearchBar: React.FC = () => {
                 </option>
               ))}
             </select>
+            {symptomProfile === "Cancer" && (
+              <select
+                className="mt-2 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary animate-fadein"
+                value={cancerType}
+                onChange={e => setCancerType(e.target.value)}
+              >
+                <option value="">Select cancer type…</option>
+                <option value="Stomach cancer">Stomach cancer</option>
+                <option value="Breast cancer">Breast cancer</option>
+                <option value="Lung cancer">Lung cancer</option>
+                <option value="Colorectal cancer">Colorectal cancer</option>
+              </select>
+            )}
           </label>
 
           <label className="text-xs text-gray-600">

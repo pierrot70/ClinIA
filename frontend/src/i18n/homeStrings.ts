@@ -161,6 +161,7 @@ export const HOME_STRINGS_FR: HomeStrings = {
       "Neurologie",
       "Psychiatrie",
       "Gériatrie",
+      "Oncologie",
     ],
     ageGroups: ["Adulte", "Pédiatrique", "Gériatrique", "Grossesse"],
     symptomProfiles: [
@@ -170,6 +171,7 @@ export const HOME_STRINGS_FR: HomeStrings = {
       "Anxiété",
       "Insomnie",
       "Infection respiratoire",
+      "Cancer",
     ],
     durations: ["< 24h", "1-7 jours", "1-4 semaines", "> 1 mois"],
     severityLevels: ["Légère", "Modérée", "Sévère"],
@@ -288,6 +290,7 @@ export const HOME_STRINGS_EN: HomeStrings = {
       "Neurology",
       "Psychiatry",
       "Geriatrics",
+      "Oncology",
     ],
     ageGroups: ["Adult", "Pediatric", "Geriatric", "Pregnancy"],
     symptomProfiles: [
@@ -297,6 +300,8 @@ export const HOME_STRINGS_EN: HomeStrings = {
       "Anxiety",
       "Insomnia",
       "Respiratory infection",
+      "Cancer",
+      "Cancer",
     ],
     durations: ["< 24h", "1-7 days", "1-4 weeks", "> 1 month"],
     severityLevels: ["Mild", "Moderate", "Severe"],
