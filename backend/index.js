@@ -274,12 +274,27 @@ function normalizeClinicalAnalysis(raw) {
 }
 
 function hasHomeI18nShape(obj) {
+    const requiredOptionKeys = [
+        "objectives",
+        "clinicalScopes",
+        "ageGroups",
+        "symptomProfiles",
+        "durations",
+        "severityLevels",
+        "redFlagStatuses",
+        "comorbidityContexts",
+    ];
+
+    const hasStringArray = (value) =>
+        Array.isArray(value) && value.every((entry) => typeof entry === "string");
+
     return (
         obj &&
         typeof obj === "object" &&
         obj.home &&
         obj.search &&
-        obj.options
+        obj.options &&
+        requiredOptionKeys.every((key) => hasStringArray(obj.options[key]))
     );
 }
 
@@ -877,7 +892,14 @@ app.post("/api/i18n/home-translate", async (req, res) => {
 
         const inMemory = translationMemoryCache.get(memoryKey);
         if (inMemory?.payload) {
-            if (isUntranslatedPayload(target, inMemory.payload, sourceStrings)) {
+            if (!hasHomeI18nShape(inMemory.payload)) {
+                translationMemoryCache.delete(memoryKey);
+                console.warn("⚠️ I18N invalid memory cache invalidated", {
+                    namespace,
+                    target,
+                    sourceHash,
+                });
+            } else if (isUntranslatedPayload(target, inMemory.payload, sourceStrings)) {
                 translationMemoryCache.delete(memoryKey);
                 console.warn("⚠️ I18N stale memory cache invalidated", {
                     namespace,
@@ -915,7 +937,14 @@ app.post("/api/i18n/home-translate", async (req, res) => {
             }).lean();
 
             if (cached?.payload) {
-                if (isUntranslatedPayload(target, cached.payload, sourceStrings)) {
+                if (!hasHomeI18nShape(cached.payload)) {
+                    console.warn("⚠️ I18N invalid DB cache invalidated", {
+                        namespace,
+                        target,
+                        sourceHash,
+                    });
+                    await UiTranslationCache.deleteOne({ _id: cached._id });
+                } else if (isUntranslatedPayload(target, cached.payload, sourceStrings)) {
                     console.warn("⚠️ I18N stale DB cache invalidated", {
                         namespace,
                         target,

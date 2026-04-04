@@ -7,6 +7,7 @@ import {
   HOME_STRINGS_KO,
   HOME_STRINGS_VI,
   HOME_STRINGS_ZH,
+  hasValidHomeStringsShape,
   type HomeStrings,
 } from "../i18n/homeStrings";
 
@@ -116,9 +117,9 @@ export async function translateHomeStrings(
 
       if (response.ok) {
         const json = await response.json();
-        if (json?.data) {
+        if (hasValidHomeStringsShape(json?.data)) {
           return {
-            strings: json.data as HomeStrings,
+            strings: json.data,
             voiceAck:
               typeof json?.meta?.voiceAck === "string"
                 ? json.meta.voiceAck
@@ -161,7 +162,7 @@ export async function translateHomeStrings(
     }
 
     const json = await response.json();
-    if (!json?.data) {
+    if (!hasValidHomeStringsShape(json?.data)) {
       return buildFallbackResult(normalizedTarget);
     }
 
@@ -177,7 +178,7 @@ export async function translateHomeStrings(
     }
 
     return {
-      strings: json.data as HomeStrings,
+      strings: json.data,
       voiceAck:
         typeof json?.meta?.voiceAck === "string"
           ? json.meta.voiceAck

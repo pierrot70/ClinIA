@@ -15,6 +15,7 @@ import {
   HOME_STRINGS_KO,
   HOME_STRINGS_VI,
   HOME_STRINGS_ZH,
+  hasValidHomeStringsShape,
   type HomeStrings,
 } from "../i18n/homeStrings";
 import { translateHomeStrings } from "../services/i18nApi";
@@ -35,7 +36,7 @@ type HomeI18nContextValue = {
 };
 
 export const HomeI18nContext = createContext<HomeI18nContextValue | null>(null);
-const UI_LOCALE_STORAGE_KEY = "clinia_ui_locale_v1";
+const UI_LOCALE_STORAGE_KEY = "clinia_ui_locale_v2";
 
 const SUPPORTED_UI_LOCALES = [
   "fr-CA",
@@ -85,7 +86,7 @@ const detectBrowserUiLocale = (): SupportedUiLocale => {
 };
 
 const cacheKeyForLocale = (locale: string) =>
-  `clinia_home_i18n_${locale}_v1`;
+  `clinia_home_i18n_${locale}_v2`;
 
 const VOICE_ACK_LABELS: Record<string, string> = {
   en: "english",
@@ -230,8 +231,11 @@ export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
         const isFallbackEnglishUnderNonEnglishTarget =
           targetBase !== "en" &&
           JSON.stringify(cachedStrings) === JSON.stringify(HOME_STRINGS_EN);
+        const hasInvalidCachedShape =
+          !hasValidHomeStringsShape(cachedStrings);
 
         if (
+          hasInvalidCachedShape ||
           (cachedBase && cachedBase !== targetBase) ||
           isFallbackEnglishUnderNonEnglishTarget
         ) {

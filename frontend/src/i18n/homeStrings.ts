@@ -59,6 +59,42 @@ export type HomeStrings = {
   };
 };
 
+const REQUIRED_OPTION_KEYS = [
+  "objectives",
+  "clinicalScopes",
+  "ageGroups",
+  "symptomProfiles",
+  "durations",
+  "severityLevels",
+  "redFlagStatuses",
+  "comorbidityContexts",
+] as const;
+
+function isStringRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
+export function hasValidHomeStringsShape(value: unknown): value is HomeStrings {
+  if (!isStringRecord(value)) {
+    return false;
+  }
+
+  if (
+    !isStringRecord(value.home) ||
+    !isStringRecord(value.demo) ||
+    !isStringRecord(value.search) ||
+    !isStringRecord(value.options)
+  ) {
+    return false;
+  }
+
+  return REQUIRED_OPTION_KEYS.every((key) => isStringArray(value.options[key]));
+}
+
 export const HOME_STRINGS_FR: HomeStrings = {
   home: {
     title: "Gagnez du temps après chaque diagnostic.",
