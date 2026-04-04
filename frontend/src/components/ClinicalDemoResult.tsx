@@ -224,6 +224,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
     shortName: t.shortName ?? t.name ?? "IA",
     class: t.class ?? "",
     efficacy: typeof t.efficacy === "number" ? Math.round(t.efficacy * 100) : 0,
+    flags: Array.isArray(t.flags) ? t.flags : [],
     indication: t.indication ?? t.justification ?? "",
     dosage: t.dosage ?? "",
     duration: t.duration ?? "",

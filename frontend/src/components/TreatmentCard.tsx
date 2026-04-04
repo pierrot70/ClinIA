@@ -8,6 +8,8 @@ interface Props {
 }
 
 const TreatmentCard: React.FC<Props> = ({ treatment }) => {
+  const flags = Array.isArray(treatment.flags) ? treatment.flags : [];
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -31,12 +33,12 @@ const TreatmentCard: React.FC<Props> = ({ treatment }) => {
         <span className="px-2 py-1 rounded-full bg-green-50 text-green-700 border border-green-100">
           1ère ligne
         </span>
-        {treatment.flags.includes("wellTolerated") && (
+        {flags.includes("wellTolerated") && (
           <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
             Bien toléré
           </span>
         )}
-        {treatment.flags.includes("monitoring") && (
+        {flags.includes("monitoring") && (
           <span className="px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
             Surveillance requise
           </span>

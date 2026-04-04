@@ -7,6 +7,7 @@ const TreatmentDetails: React.FC = () => {
   const treatment = hypertensionTreatments.find(
     (t) => t.id === decodeURIComponent(id || "")
   );
+  const flags = Array.isArray(treatment?.flags) ? treatment.flags : [];
 
   if (!treatment) {
     return (
@@ -52,10 +53,10 @@ const TreatmentDetails: React.FC = () => {
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
           <div className="text-xs text-gray-500">Remarques</div>
           <ul className="text-xs text-gray-700 list-disc ml-4 mt-1">
-            {treatment.flags.includes("wellTolerated") && (
+            {flags.includes("wellTolerated") && (
               <li>Profil de tolérance globalement favorable.</li>
             )}
-            {treatment.flags.includes("monitoring") && (
+            {flags.includes("monitoring") && (
               <li>Surveillance de la fonction rénale ou électrolytique.</li>
             )}
           </ul>
