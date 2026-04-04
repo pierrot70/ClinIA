@@ -483,6 +483,15 @@ async function persistOrReuseDiagnosis(payload) {
     }
 }
 
+async function findPersistedDiagnosisByFingerprint(fingerprint) {
+    try {
+        return await DiagnosisResult.findOne({ fingerprint }).lean();
+    } catch (err) {
+        console.error("❌ Mongo lookup error:", err.message);
+        return null;
+    }
+}
+
 async function respondWithSecurityIncident({
     res,
     phase,
@@ -633,6 +642,27 @@ app.post("/api/ai/analyze", (req, res, next) => {
 
             // Replace unsafe payload with sanitized payload for cloud call.
             Object.assign(patient, sanitizedPatient);
+        }
+
+        const cachedDiagnosis = await findPersistedDiagnosisByFingerprint(
+            fingerprint
+        );
+        if (cachedDiagnosis?.output) {
+            console.log("AI_CACHE_HIT", {
+                fingerprint,
+                mode: cachedDiagnosis.mode,
+                model: cachedDiagnosis.model,
+            });
+
+            return res.json({
+                data: cachedDiagnosis.output,
+                meta: {
+                    source: cachedDiagnosis.mode,
+                    model: cachedDiagnosis.model ?? model ?? "cache",
+                    cacheHit: true,
+                    ...neutralizationMeta,
+                },
+            });
         }
 
         /* ---------------- MOCK ---------------- */
