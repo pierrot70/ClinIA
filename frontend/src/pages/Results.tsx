@@ -16,6 +16,26 @@ import { hypertensionTreatments, anticipatedQuestions } from "../data/hypertensi
 
 const useQuery = () => new URLSearchParams(useLocation().search);
 
+function hasRenderableValue(value: unknown): boolean {
+    if (value == null) {
+        return false;
+    }
+
+    if (typeof value === "string") {
+        return value.trim().length > 0;
+    }
+
+    if (Array.isArray(value)) {
+        return value.length > 0;
+    }
+
+    if (typeof value === "object") {
+        return Object.keys(value).length > 0;
+    }
+
+    return true;
+}
+
 const Results: React.FC = () => {
     const { locale } = useHomeI18n();
     const isProd = !!import.meta.env.PROD;
@@ -25,13 +45,14 @@ const Results: React.FC = () => {
     const { result: analysis, loading: loadingAI, error: errorMessage, analyze } = useClinicalAnalysis();
 
     // Détecter si on a une réponse IA pertinente (cancer, etc.)
-    const hasRealAIContent =
-        !!(
-            analysis?.clinical_summary ||
-            analysis?.initial_evaluation_recommendations ||
-            analysis?.treatment_options ||
-            analysis?.follow_up_and_monitoring
-        );
+    const hasRealAIContent = [
+        analysis?.clinical_summary,
+        analysis?.recommendations,
+        analysis?.initial_evaluation_recommendations,
+        analysis?.treatment_options,
+        analysis?.follow_up_and_monitoring,
+        analysis?.other_ai_fields,
+    ].some(hasRenderableValue);
 
     const demoData = {
         treatments:
@@ -48,6 +69,7 @@ const Results: React.FC = () => {
         initial_evaluation_recommendations: analysis?.initial_evaluation_recommendations,
         treatment_options: analysis?.treatment_options,
         follow_up_and_monitoring: analysis?.follow_up_and_monitoring,
+        other_ai_fields: analysis?.other_ai_fields,
     };
     const [sourceMode, setSourceMode] = useState<
         "mock" | "real" | "degraded" | "unknown"

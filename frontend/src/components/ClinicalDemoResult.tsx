@@ -21,6 +21,26 @@ interface ClinicalDemoResultProps {
   realAI?: boolean;
 }
 
+function hasRenderableValue(value: unknown): boolean {
+  if (value == null) {
+    return false;
+  }
+
+  if (typeof value === "string") {
+    return value.trim().length > 0;
+  }
+
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+
+  if (typeof value === "object") {
+    return Object.keys(value).length > 0;
+  }
+
+  return true;
+}
+
 const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({ demoData, sourceMode, realAI }) => {
   const {
     treatments,
@@ -48,7 +68,14 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({ demoData, sourc
   }
 
   // Détecter si on a des détails IA même sans traitements
-  const hasIADetails = clinical_summary || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring;
+  const hasIADetails = [
+    clinical_summary,
+    recommendations,
+    initial_evaluation_recommendations,
+    treatment_options,
+    follow_up_and_monitoring,
+    other_ai_fields,
+  ].some(hasRenderableValue);
 
   // Si aucun traitement mais on a des détails IA, afficher les sections IA avancées
   if ((!treatments || treatments.length === 0) && hasIADetails) {
@@ -207,9 +234,27 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({ demoData, sourc
       </section>
 
       {/* Recommandations IA détaillées */}
-      {(initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring) && (
+        {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring) && (
         <section className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-sm mb-4">
           <h2 className="text-md font-semibold text-emerald-900 mb-2">Recommandations IA</h2>
+          {recommendations && (
+            <div className="mb-2">
+              <h3 className="font-semibold text-sm mb-1">Recommandations</h3>
+              {typeof recommendations === 'string' && (
+                <div className="text-xs text-gray-800 mb-1">{recommendations}</div>
+              )}
+              {Array.isArray(recommendations) && (
+                <ul className="list-disc pl-5 text-xs text-gray-800">
+                  {recommendations.map((item: any, i: number) => (
+                    <li key={i}>{typeof item === 'string' ? item : JSON.stringify(item)}</li>
+                  ))}
+                </ul>
+              )}
+              {typeof recommendations === 'object' && !Array.isArray(recommendations) && recommendations !== null && (
+                <pre className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(recommendations, null, 2)}</pre>
+              )}
+            </div>
+          )}
           {initial_evaluation_recommendations && (
             <div className="mb-2">
               <h3 className="font-semibold text-sm mb-1">Évaluation initiale</h3>

@@ -77,6 +77,7 @@ app.use((req, res, next) => {
     res.setHeader("Referrer-Policy", "no-referrer");
     res.setHeader("Permissions-Policy", "geolocation=(), microphone=()");
 
+
     const isProd = process.env.NODE_ENV === "production";
     const forwardedProto = req.headers["x-forwarded-proto"];
     const hostHeader = String(req.headers.host || "").toLowerCase();
@@ -90,7 +91,31 @@ app.use((req, res, next) => {
         (typeof forwardedProto === "string" &&
             forwardedProto.toLowerCase().includes("https"));
 
+    // DEBUG LOG
+    console.log("[HTTPS DEBUG]", {
+        NODE_ENV: process.env.NODE_ENV,
+        isProd,
+        isSecure,
+        hostHeader,
+        hostname,
+        isLocalHostRequest,
+        forwardedProto,
+        url: req.url,
+        method: req.method,
+    });
+
     if (isProd && !isSecure && !isLocalHostRequest) {
+        console.warn("[HTTPS BLOCKED]", {
+            NODE_ENV: process.env.NODE_ENV,
+            isProd,
+            isSecure,
+            hostHeader,
+            hostname,
+            isLocalHostRequest,
+            forwardedProto,
+            url: req.url,
+            method: req.method,
+        });
         return res.status(400).json({
             error: {
                 code: "HTTPS_REQUIRED",
