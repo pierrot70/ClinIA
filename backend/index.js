@@ -600,16 +600,16 @@ app.post("/api/ai/analyze", (req, res, next) => {
         let neutralizationMeta = null;
         const fingerprint = makeFingerprint({ diagnosis, patient });
 
-        const isProd =
-            process.env.NODE_ENV === "production" ||
-            process.env.CLINIA_FORCE_MOCK === "true";
-        const forceRealSafe = !isProd && forceReal === true;
-        if (isProd && forceReal === true) {
-            console.warn("⚠️ forceReal ignored in production");
+        const isProd = process.env.NODE_ENV === "production";
+        const forceMock = process.env.CLINIA_FORCE_MOCK === "true";
+        const mockEnabled = process.env.CLINIA_MOCK_AI === "true";
+        const forceRealSafe = !forceMock && forceReal === true;
+
+        if (forceMock && forceReal === true) {
+            console.warn("⚠️ forceReal ignored because CLINIA_FORCE_MOCK=true");
         }
-        const useMock =
-            (process.env.CLINIA_MOCK_AI === "true" || isProd) &&
-            !forceRealSafe;
+
+        const useMock = (forceMock || mockEnabled) && !forceRealSafe;
 
         const model =
             openaiModel || process.env.OPENAI_MODEL;
