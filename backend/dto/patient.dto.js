@@ -12,6 +12,30 @@ function normalizeBoolean(value) {
     return false;
 }
 
+function normalizeSecureRequestProfile(value) {
+    if (!value || typeof value !== "object") {
+        return undefined;
+    }
+
+    return {
+        objective: value.objective?.trim() ?? "",
+        clinicalScope: value.clinicalScope?.trim() ?? "",
+        ageGroup: value.ageGroup?.trim() ?? "",
+        symptomProfile: value.symptomProfile?.trim() ?? "",
+        cancerType: value.cancerType?.trim() ?? "",
+        duration: value.duration?.trim() ?? "",
+        severity: value.severity?.trim() ?? "",
+        redFlagStatus: value.redFlagStatus?.trim() ?? "",
+        comorbidityContext: value.comorbidityContext?.trim() ?? "",
+        clinicalNotes: value.clinicalNotes?.trim() ?? "",
+        privacyAttestation: normalizeBoolean(value.privacyAttestation),
+        lastRequestedAt:
+            value.lastRequestedAt !== undefined
+                ? new Date(value.lastRequestedAt)
+                : undefined,
+    };
+}
+
 /**
  * Transforme un req.body brut en DTO contrôlé
  * - supprime les champs inconnus
@@ -31,9 +55,14 @@ export function toCreatePatientDTO(body) {
                 ? telephoneRaw
                 : undefined,
         courriel: body.courriel?.trim() ?? "",
+        created_by_reference:
+            body.created_by_reference?.trim() ?? "",
         texto: normalizeBoolean(body.texto),
         lat: typeof body.lat === "number" ? body.lat : undefined,
         long: typeof body.long === "number" ? body.long : undefined,
+        secure_request_profile: normalizeSecureRequestProfile(
+            body.secure_request_profile
+        ),
     };
 }
 
@@ -56,6 +85,10 @@ export function toUpdatePatientDTO(body) {
     }
     if (body.courriel !== undefined)
         dto.courriel = body.courriel?.trim() ?? "";
+    if (body.created_by_reference !== undefined) {
+        dto.created_by_reference =
+            body.created_by_reference?.trim() ?? "";
+    }
     if (body.texto !== undefined)
         dto.texto = normalizeBoolean(body.texto);
     if (body.lat !== undefined)
@@ -64,6 +97,11 @@ export function toUpdatePatientDTO(body) {
     if (body.long !== undefined)
         dto.long =
             typeof body.long === "number" ? body.long : undefined;
+    if (body.secure_request_profile !== undefined) {
+        dto.secure_request_profile = normalizeSecureRequestProfile(
+            body.secure_request_profile
+        );
+    }
 
     return dto;
 }

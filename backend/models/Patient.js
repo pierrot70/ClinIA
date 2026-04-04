@@ -4,6 +4,71 @@ import mongoose from "mongoose";
 /* Patient Schema                                                      */
 /* ------------------------------------------------------------------ */
 
+const SecureRequestProfileSchema = new mongoose.Schema(
+    {
+        objective: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+        clinicalScope: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+        ageGroup: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+        symptomProfile: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+        cancerType: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+        duration: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+        severity: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+        redFlagStatus: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+        comorbidityContext: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+        clinicalNotes: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+        privacyAttestation: {
+            type: Boolean,
+            default: false,
+        },
+        lastRequestedAt: {
+            type: Date,
+        },
+    },
+    {
+        _id: false,
+    }
+);
+
 const PatientSchema = new mongoose.Schema(
     {
         nom: {
@@ -41,6 +106,11 @@ const PatientSchema = new mongoose.Schema(
             trim: true,
             lowercase: true,
         },
+        created_by_reference: {
+            type: String,
+            default: "",
+            trim: true,
+        },
         texto: {
             type: Boolean,
             default: false,
@@ -50,6 +120,10 @@ const PatientSchema = new mongoose.Schema(
         },
         long: {
             type: Number,
+        },
+        secure_request_profile: {
+            type: SecureRequestProfileSchema,
+            default: undefined,
         },
     },
     {

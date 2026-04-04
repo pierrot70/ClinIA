@@ -16,6 +16,10 @@ import { hypertensionTreatments, anticipatedQuestions } from "../data/hypertensi
 
 const useQuery = () => new URLSearchParams(useLocation().search);
 
+type ResultsLocationState = {
+    patientDisplayName?: string;
+};
+
 function hasRenderableValue(value: unknown): boolean {
     if (value == null) {
         return false;
@@ -39,8 +43,12 @@ function hasRenderableValue(value: unknown): boolean {
 const Results: React.FC = () => {
     const { locale } = useHomeI18n();
     const isProd = !!import.meta.env.PROD;
+    const location = useLocation();
     const query = useQuery();
     const q = query.get("q") || "Hypertension essentielle";
+    const patientDisplayName =
+        (location.state as ResultsLocationState | null)?.patientDisplayName?.trim() ||
+        undefined;
 
     const { result: analysis, loading: loadingAI, error: errorMessage, analyze } = useClinicalAnalysis();
 
@@ -252,7 +260,12 @@ const Results: React.FC = () => {
             </section>
 
             {/* Rendu enrichi partagé */}
-            <ClinicalDemoResult demoData={demoData as any} sourceMode={sourceMode} realAI={realAI} />
+            <ClinicalDemoResult
+                demoData={demoData as any}
+                sourceMode={sourceMode}
+                realAI={realAI}
+                patientDisplayName={patientDisplayName}
+            />
         </div>
     );
 };

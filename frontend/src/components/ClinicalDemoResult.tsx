@@ -19,6 +19,15 @@ interface ClinicalDemoResultProps {
   demoData: ClinicalDemoResultData;
   sourceMode?: string;
   realAI?: boolean;
+  patientDisplayName?: string;
+}
+
+function buildPatientSummaryLabel(patientDisplayName?: string) {
+  if (!patientDisplayName) {
+    return "Résumé patient généré par ClinIA.";
+  }
+
+  return `Résumé patient (${patientDisplayName}) généré par ClinIA.`;
 }
 
 function hasRenderableValue(value: unknown): boolean {
@@ -41,7 +50,12 @@ function hasRenderableValue(value: unknown): boolean {
   return true;
 }
 
-const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({ demoData, sourceMode, realAI }) => {
+const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
+  demoData,
+  sourceMode,
+  realAI,
+  patientDisplayName,
+}) => {
   const {
     treatments,
     questions,
@@ -55,6 +69,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({ demoData, sourc
     other_ai_fields,
   } = demoData || {};
   const top = treatments && treatments[0];
+  const patientSummaryLabel = buildPatientSummaryLabel(patientDisplayName);
 
   // Gestion des erreurs IA
   if (error) {
@@ -83,8 +98,8 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({ demoData, sourc
       <div className="space-y-6">
         {/* Résumé patient */}
         <section>
-          <h2 className="text-lg font-semibold mb-2">Résumé patient généré par ClinIA.</h2>
-          <p className="text-gray-700 text-sm mb-4">{summary || "Résumé patient généré par ClinIA."}</p>
+          <h2 className="text-lg font-semibold mb-2">{patientSummaryLabel}</h2>
+          <p className="text-gray-700 text-sm mb-4">{summary || patientSummaryLabel}</p>
           {clinical_summary && (
             <div className="bg-gray-50 border rounded-lg p-3 mb-2">
               <h3 className="font-semibold text-sm mb-1">Résumé clinique IA</h3>
@@ -223,8 +238,8 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({ demoData, sourc
     <div className="space-y-6">
       {/* Résumé patient */}
       <section>
-        <h2 className="text-lg font-semibold mb-2">Résumé patient généré par ClinIA.</h2>
-        <p className="text-gray-700 text-sm mb-4">{summary || "Résumé patient généré par ClinIA."}</p>
+        <h2 className="text-lg font-semibold mb-2">{patientSummaryLabel}</h2>
+        <p className="text-gray-700 text-sm mb-4">{summary || patientSummaryLabel}</p>
         {clinical_summary && (
           <div className="bg-gray-50 border rounded-lg p-3 mb-2">
             <h3 className="font-semibold text-sm mb-1">Résumé clinique IA</h3>

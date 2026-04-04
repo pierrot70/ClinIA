@@ -1,7 +1,39 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
+import {
+  createPatient,
+  fetchPatientsPaginated,
+  updatePatient,
+  type Patient,
+} from "../services/patientsApi";
+
+const CREATE_PATIENT_OPTION = "__create_patient__";
+
+function splitPatientName(fullName: string) {
+  const parts = fullName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return { prenom: "", nom: "" };
+  }
+
+  if (parts.length === 1) {
+    return {
+      prenom: "Patient",
+      nom: parts[0],
+    };
+  }
+
+  return {
+    prenom: parts[0],
+    nom: parts.slice(1).join(" "),
+  };
+}
 
 const getSensitiveInputReason = (value: string): string | null => {
   const text = value.trim();
@@ -62,13 +94,25 @@ const SearchBar: React.FC = () => {
   const [redFlagStatus, setRedFlagStatus] = useState(redFlagStatuses[0]);
   const [comorbidityContext, setComorbidityContext] = useState(comorbidityContexts[0]);
   const [clinicalNotes, setClinicalNotes] = useState("");
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [patientsLoading, setPatientsLoading] = useState(false);
+  const [patientsError, setPatientsError] = useState<string | null>(null);
+  const [selectedPatientId, setSelectedPatientId] = useState("");
+  const [patientNameDraft, setPatientNameDraft] = useState("");
+  const [creatingPatient, setCreatingPatient] = useState(false);
+  const [createPatientError, setCreatePatientError] = useState<string | null>(null);
   const [inputWarning, setInputWarning] = useState<string | null>(null);
   const [privacyAttestation, setPrivacyAttestation] = useState(false);
   const [sensitiveReason, setSensitiveReason] = useState<string | null>(null);
   const [sensitiveAcknowledged, setSensitiveAcknowledged] =
     useState(false);
+  const { user } = useAuth();
   const navigate = useNavigate();
   const lastInsertRef = useRef<{ text: string; at: number } | null>(null);
+
+  const selectedPatient =
+    patients.find((patient) => patient._id === selectedPatientId) || null;
+  const isCreatingPatient = selectedPatientId === CREATE_PATIENT_OPTION;
 
   const clearVoiceWaitingState = useCallback(() => {
     setIsWaitingDictation(false);
@@ -77,7 +121,64 @@ const SearchBar: React.FC = () => {
     } catch (e) {}
   }, []);
 
-  const handleSearch = useCallback(() => {
+  const handleCreatePatient = useCallback(async () => {
+    const trimmedName = patientNameDraft.trim();
+    const creatorReference = user?.id || user?.email || "";
+
+    if (!trimmedName) {
+      setCreatePatientError(
+        "Le nom du patient est requis."
+      );
+      return;
+    }
+
+    if (!creatorReference) {
+      setCreatePatientError(
+        "Aucun usager authentifie n'est disponible pour creer ce patient."
+      );
+      return;
+    }
+
+    const { prenom, nom } = splitPatientName(trimmedName);
+    if (!prenom || !nom) {
+      setCreatePatientError("Impossible d'interpreter le nom du patient.");
+      return;
+    }
+
+    setCreatingPatient(true);
+    setCreatePatientError(null);
+
+    const response = await createPatient({
+      prenom,
+      nom,
+      created_by_reference: creatorReference,
+    });
+
+    setCreatingPatient(false);
+
+    if ("error" in response) {
+      setCreatePatientError(
+        response.error.message || "Impossible de creer le patient."
+      );
+      return;
+    }
+
+    setPatients((prev) => [...prev, response.data].sort((a, b) => {
+      const lastNameCompare = a.nom.localeCompare(b.nom, "fr", {
+        sensitivity: "base",
+      });
+      if (lastNameCompare !== 0) {
+        return lastNameCompare;
+      }
+      return a.prenom.localeCompare(b.prenom, "fr", {
+        sensitivity: "base",
+      });
+    }));
+    setSelectedPatientId(response.data._id);
+    setPatientNameDraft("");
+  }, [patientNameDraft, user?.email, user?.id]);
+
+  const handleSearch = useCallback(async () => {
     if (!privacyAttestation) {
       setInputWarning(strings.search.privacyConfirmRequired);
       return;
@@ -108,9 +209,52 @@ const SearchBar: React.FC = () => {
       ` | ${strings.search.ageGroupLabel}: ${ageGroup}` +
       ` | ${strings.search.objectiveLabel}: ${objective}` +
       notesSection;
-    navigate(`/results?q=${encodeURIComponent(q)}`);
+
+    if (selectedPatientId && selectedPatientId !== CREATE_PATIENT_OPTION && selectedPatient) {
+      const saveResponse = await updatePatient(selectedPatientId, {
+        nom: selectedPatient?.nom || "",
+        prenom: selectedPatient?.prenom || "",
+        secure_request_profile: {
+          objective,
+          clinicalScope,
+          ageGroup,
+          symptomProfile,
+          cancerType,
+          duration,
+          severity,
+          redFlagStatus,
+          comorbidityContext,
+          clinicalNotes,
+          privacyAttestation,
+          lastRequestedAt: new Date().toISOString(),
+        },
+      });
+
+      if ("error" in saveResponse) {
+        setInputWarning(
+          saveResponse.error.message ||
+            "Impossible de sauvegarder les parametres du patient."
+        );
+        return;
+      }
+
+      setPatients((prev) =>
+        prev.map((patient) =>
+          patient._id === selectedPatientId ? saveResponse.data : patient
+        )
+      );
+    }
+
+    navigate(`/results?q=${encodeURIComponent(q)}`, {
+      state: {
+        patientDisplayName: selectedPatient
+          ? `${selectedPatient.prenom} ${selectedPatient.nom}`.trim()
+          : undefined,
+      },
+    });
   }, [
     ageGroup,
+    cancerType,
     clinicalNotes,
     clinicalScope,
     comorbidityContext,
@@ -119,9 +263,11 @@ const SearchBar: React.FC = () => {
     objective,
     privacyAttestation,
     redFlagStatus,
+    selectedPatient?.nom,
+    selectedPatient?.prenom,
+    selectedPatientId,
     severity,
     symptomProfile,
-    cancerType,
     strings.search.blockedSensitive,
     strings.search.comorbidityLabel,
     strings.search.durationLabel,
@@ -133,6 +279,106 @@ const SearchBar: React.FC = () => {
     strings.search.scopeLabel,
     strings.search.severityLabel,
     strings.search.symptomLabel,
+    selectedPatient,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPatients() {
+      setPatientsLoading(true);
+      setPatientsError(null);
+
+      const response = await fetchPatientsPaginated({
+        page: 1,
+        limit: 50,
+        sortBy: "nom",
+        sortDir: "asc",
+      });
+
+      if (cancelled) {
+        return;
+      }
+
+      if ("error" in response) {
+        setPatientsError(response.error.message);
+        setPatients([]);
+        setPatientsLoading(false);
+        return;
+      }
+
+      setPatients(response.data.data);
+      if (response.data.data.length === 0) {
+        setSelectedPatientId(CREATE_PATIENT_OPTION);
+      }
+      setPatientsLoading(false);
+    }
+
+    loadPatients();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const profile = selectedPatient?.secure_request_profile;
+    if (!profile) {
+      return;
+    }
+
+    if (profile.objective && objectives.includes(profile.objective)) {
+      setObjective(profile.objective);
+    }
+    if (
+      profile.clinicalScope &&
+      clinicalScopes.includes(profile.clinicalScope)
+    ) {
+      setClinicalScope(profile.clinicalScope);
+    }
+    if (profile.ageGroup && ageGroups.includes(profile.ageGroup)) {
+      setAgeGroup(profile.ageGroup);
+    }
+    if (
+      profile.symptomProfile &&
+      symptomProfiles.includes(profile.symptomProfile)
+    ) {
+      setSymptomProfile(profile.symptomProfile);
+    }
+    setCancerType(profile.cancerType || "");
+    if (profile.duration && durations.includes(profile.duration)) {
+      setDuration(profile.duration);
+    }
+    if (profile.severity && severityLevels.includes(profile.severity)) {
+      setSeverity(profile.severity);
+    }
+    if (
+      profile.redFlagStatus &&
+      redFlagStatuses.includes(profile.redFlagStatus)
+    ) {
+      setRedFlagStatus(profile.redFlagStatus);
+    }
+    if (
+      profile.comorbidityContext &&
+      comorbidityContexts.includes(profile.comorbidityContext)
+    ) {
+      setComorbidityContext(profile.comorbidityContext);
+    }
+    setClinicalNotes(profile.clinicalNotes || "");
+    setPrivacyAttestation(Boolean(profile.privacyAttestation));
+    setInputWarning(null);
+    setSensitiveReason(getSensitiveInputReason(profile.clinicalNotes || ""));
+    setSensitiveAcknowledged(false);
+  }, [
+    ageGroups,
+    clinicalScopes,
+    comorbidityContexts,
+    durations,
+    objectives,
+    redFlagStatuses,
+    selectedPatient,
+    severityLevels,
+    symptomProfiles,
   ]);
 
   useEffect(() => {
@@ -285,6 +531,94 @@ const SearchBar: React.FC = () => {
 
   return (
     <div className="w-full max-w-2xl space-y-3">
+      <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-left shadow-sm">
+        <label className="text-xs text-gray-600 block">
+          Patient
+          <select
+            value={selectedPatientId}
+            onChange={(e) => {
+              setSelectedPatientId(e.target.value);
+              setCreatePatientError(null);
+            }}
+            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-primary"
+          >
+            <option value="">
+              {patientsLoading
+                ? "Chargement des patients..."
+                : "Selectionner un patient"}
+            </option>
+            <option value={CREATE_PATIENT_OPTION}>
+              Creer un patient...
+            </option>
+            {patients.map((patient) => (
+              <option key={patient._id} value={patient._id}>
+                {patient.prenom} {patient.nom} - {patient.num_assurance_maladie}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {isCreatingPatient && (
+          <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 space-y-3">
+            <label className="block text-xs text-gray-700">
+              Nom du patient
+              <input
+                value={patientNameDraft}
+                onChange={(e) => setPatientNameDraft(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-primary"
+                placeholder="Ex: Jean Tremblay"
+              />
+            </label>
+
+            <p className="text-xs text-emerald-800">
+              Cree par: {user?.email || user?.id || "Usager inconnu"}
+            </p>
+
+            <button
+              type="button"
+              onClick={handleCreatePatient}
+              disabled={creatingPatient}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {creatingPatient ? "Creation..." : "Creer le patient"}
+            </button>
+
+            {createPatientError && (
+              <p className="text-xs text-red-700">{createPatientError}</p>
+            )}
+          </div>
+        )}
+
+        {patientsError && (
+          <p className="mt-2 text-xs text-amber-700">{patientsError}</p>
+        )}
+
+        {selectedPatient && (
+          <div className="mt-3 rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+            <div className="font-semibold">
+              {selectedPatient.prenom} {selectedPatient.nom}
+            </div>
+            <div>RAMQ: {selectedPatient.num_assurance_maladie}</div>
+            {selectedPatient.telephone && (
+              <div>Telephone: {selectedPatient.telephone}</div>
+            )}
+            {selectedPatient.addresse && (
+              <div>Addresse: {selectedPatient.addresse}</div>
+            )}
+            {selectedPatient.created_by_reference && (
+              <div>Cree par: {selectedPatient.created_by_reference}</div>
+            )}
+            {selectedPatient.secure_request_profile?.lastRequestedAt && (
+              <div>
+                Derniere requete: {new Date(
+                  selectedPatient.secure_request_profile.lastRequestedAt
+                ).toLocaleString()}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="text-xs text-sky-800 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2 text-left">
         {strings.search.secureModeHint}
       </div>

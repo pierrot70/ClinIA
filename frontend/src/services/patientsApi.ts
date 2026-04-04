@@ -1,4 +1,5 @@
 import { withSecurityIncidentGuard } from "./securityIncidentGuard";
+import { authFetch } from "./authService";
 import type { ApiResponse } from "../types/api";
 
 const API_URL = import.meta.env.VITE_API_URL as string;
@@ -19,9 +20,24 @@ export interface Patient {
     addresse?: string;
     telephone?: string;
     courriel?: string;
+    created_by_reference?: string;
     texto?: boolean;
     lat?: number;
     long?: number;
+    secure_request_profile?: {
+        objective?: string;
+        clinicalScope?: string;
+        ageGroup?: string;
+        symptomProfile?: string;
+        cancerType?: string;
+        duration?: string;
+        severity?: string;
+        redFlagStatus?: string;
+        comorbidityContext?: string;
+        clinicalNotes?: string;
+        privacyAttestation?: boolean;
+        lastRequestedAt?: string;
+    };
 }
 
 export interface PaginatedPatients {
@@ -43,9 +59,24 @@ export interface PatientPayload {
     addresse?: string;
     telephone?: string;
     courriel?: string;
+    created_by_reference?: string;
     texto?: boolean;
     lat?: number;
     long?: number;
+    secure_request_profile?: {
+        objective?: string;
+        clinicalScope?: string;
+        ageGroup?: string;
+        symptomProfile?: string;
+        cancerType?: string;
+        duration?: string;
+        severity?: string;
+        redFlagStatus?: string;
+        comorbidityContext?: string;
+        clinicalNotes?: string;
+        privacyAttestation?: boolean;
+        lastRequestedAt?: string;
+    };
 }
 
 /* ------------------------------------------------------------------ */
@@ -109,8 +140,8 @@ export async function fetchPatientsPaginated(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(
-                    `${API_URL}/api/patients?${query.toString()}`
+                const response = await authFetch(
+                    `/api/patients?${query.toString()}`
                 );
                 return (await safeJson(response)) as ApiResponse<PaginatedPatients>;
             } catch {
@@ -136,7 +167,7 @@ export async function createPatient(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(`${API_URL}/api/patients`, {
+                const response = await authFetch(`/api/patients`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
@@ -166,7 +197,7 @@ export async function updatePatient(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(`${API_URL}/api/patients/${id}`, {
+                const response = await authFetch(`/api/patients/${id}`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
@@ -195,7 +226,7 @@ export async function deletePatient(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(`${API_URL}/api/patients/${id}`, {
+                const response = await authFetch(`/api/patients/${id}`, {
                     method: "DELETE",
                 });
                 return (await safeJson(response)) as ApiResponse<Patient>;

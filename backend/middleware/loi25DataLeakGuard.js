@@ -1,7 +1,23 @@
 import { detectNonSecureContent, buildBlockingIncidentResponse } from "../utils/securityIncident.js";
 
-// Middleware global Loi 25 : bloque la fuite de données identifiables dans les requêtes et réponses API
+function shouldEnforceCloudSafety(req) {
+    return Boolean(req?.cliniaCloudSafety?.enforce === true);
+}
+
+function buildIncidentContext(req) {
+    return {
+        route: req.originalUrl,
+        method: req.method,
+        ...(req?.cliniaCloudSafety?.context || {}),
+    };
+}
+
+// Middleware Loi 25 opt-in : réservé aux flux explicitement marqués comme transmission cloud.
 export function loi25DataLeakGuard(req, res, next) {
+    if (!shouldEnforceCloudSafety(req)) {
+        return next();
+    }
+
     // Scan du body entrant (requête)
     if (req.body && typeof req.body === "object") {
         const scan = detectNonSecureContent(req.body);
@@ -9,10 +25,12 @@ export function loi25DataLeakGuard(req, res, next) {
             // Bloque la requête et retourne une alerte sécurité
             return res.status(422).json(
                 buildBlockingIncidentResponse({
-                    phase: "pre_api",
-                    reason: "Identifiants patients détectés dans la requête API.",
+                    phase: req?.cliniaCloudSafety?.prePhase || "pre_cloud",
+                    reason:
+                        req?.cliniaCloudSafety?.preReason ||
+                        "Identifiants patients detectes avant transmission cloud.",
                     matches: scan.matches,
-                    context: { route: req.originalUrl, method: req.method },
+                    context: buildIncidentContext(req),
                 })
             );
         }
@@ -26,10 +44,12 @@ export function loi25DataLeakGuard(req, res, next) {
             if (scan.hasMatches) {
                 return res.status(422).json(
                     buildBlockingIncidentResponse({
-                        phase: "post_api",
-                        reason: "Identifiants patients détectés dans la réponse API.",
+                        phase: req?.cliniaCloudSafety?.postPhase || "post_cloud",
+                        reason:
+                            req?.cliniaCloudSafety?.postReason ||
+                            "Identifiants patients detectes apres transmission cloud.",
                         matches: scan.matches,
-                        context: { route: req.originalUrl, method: req.method },
+                        context: buildIncidentContext(req),
                     })
                 );
             }
