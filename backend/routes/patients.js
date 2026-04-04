@@ -1,7 +1,10 @@
 import express from "express";
+import { requireRole } from "../middleware/requireRole.js";
+import { AUTH_ROLES } from "../auth/constants.js";
 import {
     createPatient,
     listPatients,
+    listPatientAuditLogs,
     getPatientById,
     updatePatient,
     deletePatient,
@@ -10,8 +13,37 @@ import {
     toCreatePatientDTO,
     toUpdatePatientDTO,
 } from "../dto/patient.dto.js";
+import { recordPatientAuditEvent } from "../audit/patientAudit.js";
 
 const router = express.Router();
+
+function getRequestIp(req) {
+    const forwardedFor = req.headers?.["x-forwarded-for"];
+
+    if (typeof forwardedFor === "string" && forwardedFor.trim()) {
+        return forwardedFor.split(",")[0].trim();
+    }
+
+    return req.ip || null;
+}
+
+async function recordPatientMutationAudit(req, {
+    action,
+    patientId,
+    changedFields = [],
+}) {
+    await recordPatientAuditEvent({
+        action,
+        outcome: "SUCCESS",
+        actorUserId: req.auth?.userId ?? null,
+        actorUsername: req.auth?.username ?? null,
+        actorRole: req.auth?.role ?? null,
+        ip: getRequestIp(req),
+        patientId,
+        changedFields,
+        requestPath: req.originalUrl || req.path || null,
+    });
+}
 
 /* ------------------------------------------------------------------ */
 /* POST /api/patients                                                  */
@@ -33,6 +65,12 @@ router.post("/", async (req, res) => {
 
     try {
         const patient = await createPatient(dto);
+
+        await recordPatientMutationAudit(req, {
+            action: "PATIENT_CREATE",
+            patientId: patient?._id ?? null,
+            changedFields: Object.keys(dto),
+        });
 
         return res.status(201).json({
             data: patient,
@@ -128,6 +166,68 @@ router.get("/", async (req, res) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* GET /api/patients/audit-logs                                        */
+/* ------------------------------------------------------------------ */
+
+router.get(
+    "/audit-logs",
+    requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+    async (req, res) => {
+        try {
+            const data = await listPatientAuditLogs({
+                authUser: req.auth,
+                page: req.query.page,
+                limit: req.query.limit,
+                action: req.query.action,
+                patientId: req.query.patientId,
+                actorUserId: req.query.actorUserId,
+                startDate: req.query.startDate,
+                endDate: req.query.endDate,
+            });
+
+            return res.status(200).json({
+                data,
+                meta: {
+                    source: "real",
+                    model: "mongo",
+                },
+            });
+        } catch (err) {
+            if (err.code === "FORBIDDEN") {
+                return res.status(403).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            if (err.code === "INVALID_INPUT") {
+                return res.status(400).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            console.error("❌ Patient audit list error:", err);
+
+            return res.status(500).json({
+                error: {
+                    code: "PERSISTENCE_FAILED",
+                    message:
+                        "Impossible de recuperer les audits patient.",
+                    retryable: true,
+                },
+            });
+        }
+    }
+);
+
+/* ------------------------------------------------------------------ */
 /* GET /api/patients/:id                                               */
 /* ------------------------------------------------------------------ */
 
@@ -197,6 +297,12 @@ router.patch("/:id", async (req, res) => {
     try {
         const patient = await updatePatient(req.params.id, dto);
 
+        await recordPatientMutationAudit(req, {
+            action: "PATIENT_UPDATE",
+            patientId: patient?._id ?? req.params.id,
+            changedFields: Object.keys(dto),
+        });
+
         return res.status(200).json({
             data: patient,
             meta: {
@@ -259,6 +365,12 @@ router.patch("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
     try {
         const deleted = await deletePatient(req.params.id);
+
+        await recordPatientMutationAudit(req, {
+            action: "PATIENT_DELETE",
+            patientId: deleted?._id ?? req.params.id,
+            changedFields: [],
+        });
 
         return res.status(200).json({
             data: deleted,

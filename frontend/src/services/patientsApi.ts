@@ -79,6 +79,30 @@ export interface PatientPayload {
     };
 }
 
+export interface PatientAuditLog {
+    id: string;
+    action: "PATIENT_CREATE" | "PATIENT_UPDATE" | "PATIENT_DELETE";
+    outcome: "SUCCESS" | "FAILED";
+    actorUserId: string | null;
+    actorUsernameMasked: string;
+    actorRole: string | null;
+    ip: string | null;
+    patientId: string | null;
+    changedFields: string[];
+    requestPath: string | null;
+    timestamp: string;
+}
+
+export interface PaginatedPatientAuditLogs {
+    logs: PatientAuditLog[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+    };
+}
+
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
@@ -235,6 +259,49 @@ export async function deletePatient(
                     error: {
                         code: "INTERNAL_ERROR",
                         message: "Impossible de supprimer le patient.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/* GET patient audit logs                                              */
+/* ------------------------------------------------------------------ */
+
+export async function fetchPatientAuditLogs(params: {
+    page?: number;
+    limit?: number;
+    action?: "PATIENT_CREATE" | "PATIENT_UPDATE" | "PATIENT_DELETE" | "";
+    patientId?: string;
+    actorUserId?: string;
+    startDate?: string;
+    endDate?: string;
+}): Promise<ApiResponse<PaginatedPatientAuditLogs>> {
+    const query = new URLSearchParams();
+
+    if (params.page) query.set("page", String(params.page));
+    if (params.limit) query.set("limit", String(params.limit));
+    if (params.action) query.set("action", params.action);
+    if (params.patientId) query.set("patientId", params.patientId);
+    if (params.actorUserId) query.set("actorUserId", params.actorUserId);
+    if (params.startDate) query.set("startDate", params.startDate);
+    if (params.endDate) query.set("endDate", params.endDate);
+
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await authFetch(
+                    `/api/patients/audit-logs?${query.toString()}`
+                );
+                return (await safeJson(response)) as ApiResponse<PaginatedPatientAuditLogs>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de récupérer les audits patient.",
                         retryable: true,
                     },
                 };

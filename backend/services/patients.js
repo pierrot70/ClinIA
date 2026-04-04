@@ -1,10 +1,27 @@
 import mongoose from "mongoose";
 import { Patient } from "../models/Patient.js";
+import { PatientAuditLog } from "../models/PatientAuditLog.js";
 import { geocodeFreeAddress } from "../utils/geocode.js";
 
 /* ------------------------------------------------------------------ */
 /* Service Patient                                                     */
 /* ------------------------------------------------------------------ */
+
+function createPatientError(code, message) {
+    return { code, message };
+}
+
+function assertPatientAuditAccess(authUser) {
+    if (
+        !authUser?.role ||
+        !["ADMIN", "SUPERADMIN"].includes(authUser.role)
+    ) {
+        throw createPatientError(
+            "FORBIDDEN",
+            "Action reservee aux administrateurs."
+        );
+    }
+}
 
 function randomDigits(length) {
     let out = "";
@@ -124,6 +141,132 @@ export async function listPatients(filters = {}, opts = {}) {
             limit,
             total,
             totalPages: Math.ceil(total / limit),
+        },
+    };
+}
+
+export async function listPatientAuditLogs({
+    authUser,
+    page,
+    limit,
+    action,
+    patientId,
+    actorUserId,
+    startDate,
+    endDate,
+}) {
+    assertPatientAuditAccess(authUser);
+
+    const parsedPage = Number.parseInt(page, 10) || 1;
+    const parsedLimit = Number.parseInt(limit, 10) || 20;
+
+    if (parsedPage < 1 || parsedLimit < 1 || parsedLimit > 100) {
+        throw createPatientError("INVALID_INPUT", "Pagination invalide.");
+    }
+
+    const allowedActions = new Set([
+        "PATIENT_CREATE",
+        "PATIENT_UPDATE",
+        "PATIENT_DELETE",
+    ]);
+
+    const query = {};
+    const andClauses = [];
+
+    if (startDate || endDate) {
+        const dateQuery = {};
+
+        if (startDate) {
+            const parsedStart = new Date(`${startDate}T00:00:00.000`);
+            if (Number.isNaN(parsedStart.getTime())) {
+                throw createPatientError(
+                    "INVALID_INPUT",
+                    "Date de debut invalide."
+                );
+            }
+            dateQuery.$gte = parsedStart;
+        }
+
+        if (endDate) {
+            const parsedEnd = new Date(`${endDate}T23:59:59.999`);
+            if (Number.isNaN(parsedEnd.getTime())) {
+                throw createPatientError(
+                    "INVALID_INPUT",
+                    "Date de fin invalide."
+                );
+            }
+            dateQuery.$lte = parsedEnd;
+        }
+
+        andClauses.push({ timestamp: dateQuery });
+    }
+
+    if (typeof action === "string" && action.trim()) {
+        const normalizedAction = action.trim().toUpperCase();
+        if (!allowedActions.has(normalizedAction)) {
+            throw createPatientError("INVALID_INPUT", "Action invalide.");
+        }
+        andClauses.push({ action: normalizedAction });
+    }
+
+    if (typeof patientId === "string" && patientId.trim()) {
+        if (!mongoose.Types.ObjectId.isValid(patientId.trim())) {
+            throw createPatientError(
+                "INVALID_INPUT",
+                "Identifiant patient invalide."
+            );
+        }
+        andClauses.push({ patientId: patientId.trim() });
+    }
+
+    if (typeof actorUserId === "string" && actorUserId.trim()) {
+        if (!mongoose.Types.ObjectId.isValid(actorUserId.trim())) {
+            throw createPatientError(
+                "INVALID_INPUT",
+                "Identifiant utilisateur invalide."
+            );
+        }
+        andClauses.push({ actorUserId: actorUserId.trim() });
+    }
+
+    if (andClauses.length > 0) {
+        query.$and = andClauses;
+    }
+
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    const [total, logs] = await Promise.all([
+        PatientAuditLog.countDocuments(query),
+        PatientAuditLog.find(query)
+            .sort({ timestamp: -1 })
+            .skip(skip)
+            .limit(parsedLimit)
+            .lean(),
+    ]);
+
+    return {
+        logs: logs.map((log) => ({
+            id: String(log._id),
+            action: log.action,
+            outcome: log.outcome,
+            actorUserId: log.actorUserId
+                ? String(log.actorUserId)
+                : null,
+            actorUsernameMasked: log.actorUsernameMasked,
+            actorRole: log.actorRole,
+            ip: log.ip,
+            patientId: log.patientId ? String(log.patientId) : null,
+            changedFields: Array.isArray(log.changedFields)
+                ? log.changedFields
+                : [],
+            requestPath: log.requestPath,
+            timestamp: log.timestamp,
+        })),
+        pagination: {
+            page: parsedPage,
+            limit: parsedLimit,
+            total,
+            totalPages: Math.max(1, Math.ceil(total / parsedLimit)),
         },
     };
 }

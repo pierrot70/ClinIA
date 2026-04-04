@@ -1023,6 +1023,20 @@ const Header: React.FC = () => {
                         </Link>
                     )}
 
+                    {canAccessAdmin && (
+                        <Link
+                            to="/admin/patient-audits"
+                            className={
+                                "hover:text-blue-600 transition-colors " +
+                                (location.pathname === "/admin/patient-audits"
+                                    ? "text-blue-600 font-medium"
+                                    : "text-gray-600")
+                            }
+                        >
+                            Audits patient
+                        </Link>
+                    )}
+
                     {canAccessAdmin && user?.role === "SUPERADMIN" && (
                         <Link
                             to="/admin/users/manage"
@@ -1139,6 +1153,10 @@ const Header: React.FC = () => {
 
                             {canAccessAdmin && (
                                 <Link to="/mock-studio" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Mock Studio</Link>
+                            )}
+
+                            {canAccessAdmin && (
+                                <Link to="/admin/patient-audits" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Audits patient</Link>
                             )}
 
                             {canAccessAdmin && user?.role === "SUPERADMIN" && (
