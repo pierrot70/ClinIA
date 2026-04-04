@@ -244,14 +244,6 @@ const Results: React.FC = () => {
 
             {/* ANALYSE IA */}
             <section className="space-y-4">
-                {!isProd && realAI && loadingAI && (
-                    <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-6">
-                        <div className="h-14 w-14 animate-spin rounded-full border-4 border-gray-200 border-t-primary" />
-                        <div className="text-sm text-gray-700">
-                            Requete OpenAI en cours...
-                        </div>
-                    </div>
-                )}
                 <AICard
                     loading={loadingAI}
                     error={!!errorMessage}

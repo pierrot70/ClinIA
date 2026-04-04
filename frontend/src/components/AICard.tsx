@@ -7,8 +7,11 @@ type Props = {
 export default function AICard({ loading, error, text }: Props) {
     if (loading) {
         return (
-            <div className="bg-gray-50 border rounded-lg p-4 text-sm text-gray-600">
-                Analyse en cours…
+            <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-lime-200 bg-lime-50/80 p-8 text-center">
+                <div className="clinia-neon-loader" aria-hidden="true" />
+                <div className="clinia-neon-text text-sm font-semibold uppercase tracking-[0.2em]">
+                    Analyse en cours...
+                </div>
             </div>
         );
     }

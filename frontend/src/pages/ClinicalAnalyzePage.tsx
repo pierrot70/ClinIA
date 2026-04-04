@@ -222,8 +222,8 @@ export function ClinicalAnalyzePage() {
             openaiModel,
         };
         setLastPayload(safePayload);
-        await analyze(safePayload);
         setActiveTab("clinical");
+        await analyze(safePayload);
     }
 
     /* ------------------------------------------------------------------ */
@@ -379,7 +379,16 @@ export function ClinicalAnalyzePage() {
             )}
 
             {/* 📊 Résultat enrichi partagé */}
-            {activeTab === "clinical" && (
+            {activeTab === "clinical" && loading && (
+                <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-lime-200 bg-lime-50/80 p-10 text-center">
+                    <div className="clinia-neon-loader" aria-hidden="true" />
+                    <div className="clinia-neon-text text-sm font-semibold uppercase tracking-[0.2em]">
+                        Requete OpenAI en cours...
+                    </div>
+                </div>
+            )}
+
+            {activeTab === "clinical" && !loading && (
                 <ClinicalDemoResult
                     demoData={{
                         treatments:
@@ -390,6 +399,7 @@ export function ClinicalAnalyzePage() {
                                   : hypertensionTreatments,
                         questions: anticipatedQuestions,
                         summary: result?.patient_summary?.plain_language || undefined,
+                        error: error || undefined,
                         clinical_summary: result?.clinical_summary,
                         recommendations: result?.recommendations,
                         initial_evaluation_recommendations:
