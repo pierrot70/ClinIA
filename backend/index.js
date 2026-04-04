@@ -481,8 +481,20 @@ async function persistOrReuseDiagnosis(payload) {
         if (err.code === 11000) {
             const existing = await DiagnosisResult.findOne({
                 fingerprint: payload.fingerprint,
-            }).lean();
-            if (existing) return { ok: true, doc: existing };
+            });
+
+            if (existing) {
+                if (payload.mode === "real" && existing.mode === "mock") {
+                    existing.input = payload.input;
+                    existing.output = payload.output;
+                    existing.mode = payload.mode;
+                    existing.model = payload.model;
+                    await existing.save();
+                    return { ok: true, doc: existing.toObject() };
+                }
+
+                return { ok: true, doc: existing.toObject() };
+            }
         }
 
         console.error("❌ Mongo persist error:", err.message);
@@ -662,7 +674,11 @@ app.post("/api/ai/analyze", (req, res, next) => {
         const cachedDiagnosis = await findPersistedDiagnosisByFingerprint(
             fingerprint
         );
-        if (cachedDiagnosis?.output) {
+        const canReuseCachedDiagnosis =
+            cachedDiagnosis?.output &&
+            (cachedDiagnosis.mode !== "mock" || useMock);
+
+        if (canReuseCachedDiagnosis) {
             console.log("AI_CACHE_HIT", {
                 fingerprint,
                 mode: cachedDiagnosis.mode,
@@ -677,6 +693,14 @@ app.post("/api/ai/analyze", (req, res, next) => {
                     cacheHit: true,
                     ...neutralizationMeta,
                 },
+            });
+        }
+
+        if (cachedDiagnosis?.mode === "mock" && !useMock) {
+            console.log("AI_CACHE_SKIP_MOCK", {
+                fingerprint,
+                cachedMode: cachedDiagnosis.mode,
+                requestedMode: "real",
             });
         }
 
