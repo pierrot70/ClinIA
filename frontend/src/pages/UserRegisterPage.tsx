@@ -4,8 +4,15 @@ import { useAuth } from "../hooks/useAuth";
 import { SessionExpiredError } from "../services/authService";
 
 const ROLE_OPTIONS = ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
+const USER_ROLE_FILTER_OPTIONS = ["ALL", ...ROLE_OPTIONS] as const;
 
 type NewUserRole = (typeof ROLE_OPTIONS)[number];
+type UserRoleFilter = (typeof USER_ROLE_FILTER_OPTIONS)[number];
+
+type AppliedUsersFilters = {
+    search: string;
+    role: UserRoleFilter;
+};
 
 type RegisterResponse = {
     data?: {
@@ -35,6 +42,12 @@ type ManagedUser = {
 type UsersListResponse = {
     data?: {
         users?: ManagedUser[];
+        pagination?: {
+            page?: number;
+            limit?: number;
+            total?: number;
+            totalPages?: number;
+        };
     };
     error?: {
         code?: string;
@@ -53,6 +66,13 @@ const UserRegisterPage: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [users, setUsers] = useState<ManagedUser[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
+    const [usersPage, setUsersPage] = useState(1);
+    const [usersTotalPages, setUsersTotalPages] = useState(1);
+    const [usersTotal, setUsersTotal] = useState(0);
+    const [usersSearchInput, setUsersSearchInput] = useState("");
+    const [usersRoleFilter, setUsersRoleFilter] = useState<UserRoleFilter>("ALL");
+    const [appliedUsersSearch, setAppliedUsersSearch] = useState("");
+    const [appliedUsersRoleFilter, setAppliedUsersRoleFilter] = useState<UserRoleFilter>("ALL");
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
     const [editUsername, setEditUsername] = useState("");
     const [editEmail, setEditEmail] = useState("");
@@ -63,12 +83,35 @@ const UserRegisterPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
-    const loadUsers = async () => {
+    const USERS_PAGE_SIZE = 10;
+
+    const loadUsers = async (
+        page = usersPage,
+        filters: AppliedUsersFilters = {
+            search: appliedUsersSearch,
+            role: appliedUsersRoleFilter,
+        }
+    ) => {
         setLoadingUsers(true);
         setError(null);
 
         try {
-            const response = await authFetch("/api/auth/users");
+            const params = new URLSearchParams({
+                page: String(page),
+                limit: String(USERS_PAGE_SIZE),
+            });
+
+            if (filters.search.trim()) {
+                params.set("search", filters.search.trim());
+            }
+
+            if (filters.role !== "ALL") {
+                params.set("role", filters.role);
+            }
+
+            const response = await authFetch(
+                `/api/auth/users?${params.toString()}`
+            );
             const payload = (await response.json().catch(() => ({}))) as UsersListResponse;
 
             if (!response.ok) {
@@ -77,6 +120,9 @@ const UserRegisterPage: React.FC = () => {
             }
 
             setUsers(payload?.data?.users || []);
+            setUsersPage(payload?.data?.pagination?.page || page);
+            setUsersTotalPages(payload?.data?.pagination?.totalPages || 1);
+            setUsersTotal(payload?.data?.pagination?.total || 0);
         } catch (err) {
             if (err instanceof SessionExpiredError) {
                 navigate("/admin/login", { replace: true });
@@ -89,8 +135,49 @@ const UserRegisterPage: React.FC = () => {
     };
 
     useEffect(() => {
-        void loadUsers();
-    }, []);
+        void loadUsers(usersPage);
+    }, [usersPage]);
+
+    const applyUsersFilters = () => {
+        setSelectedUserId(null);
+
+        const nextSearch = usersSearchInput.trim();
+        const nextRole = usersRoleFilter;
+        const nextFilters = {
+            search: nextSearch,
+            role: nextRole,
+        };
+
+        setAppliedUsersSearch(nextSearch);
+        setAppliedUsersRoleFilter(nextRole);
+
+        if (usersPage === 1) {
+            void loadUsers(1, nextFilters);
+            return;
+        }
+
+        setUsersPage(1);
+    };
+
+    const resetUsersFilters = () => {
+        const resetFilters = {
+            search: "",
+            role: "ALL" as UserRoleFilter,
+        };
+
+        setUsersSearchInput("");
+        setUsersRoleFilter("ALL");
+        setAppliedUsersSearch(resetFilters.search);
+        setAppliedUsersRoleFilter(resetFilters.role);
+        setSelectedUserId(null);
+
+        if (usersPage === 1) {
+            void loadUsers(1, resetFilters);
+            return;
+        }
+
+        setUsersPage(1);
+    };
 
     useEffect(() => {
         if (!error && !success) {
@@ -176,7 +263,7 @@ const UserRegisterPage: React.FC = () => {
             setEditUsername("");
             setEditEmail("");
             setEditRole("MEDECIN");
-            await loadUsers();
+            await loadUsers(usersPage);
         } catch (err) {
             if (err instanceof SessionExpiredError) {
                 navigate("/admin/login", { replace: true });
@@ -217,7 +304,7 @@ const UserRegisterPage: React.FC = () => {
                     ? "Utilisateur active."
                     : "Utilisateur rendu inactif."
             );
-            await loadUsers();
+            await loadUsers(usersPage);
         } catch (err) {
             if (err instanceof SessionExpiredError) {
                 navigate("/admin/login", { replace: true });
@@ -292,7 +379,7 @@ const UserRegisterPage: React.FC = () => {
             if (selectedUserId === managedUser.id) {
                 setSelectedUserId(null);
             }
-            await loadUsers();
+            await loadUsers(usersPage);
         } catch (err) {
             if (err instanceof SessionExpiredError) {
                 navigate("/admin/login", { replace: true });
@@ -341,7 +428,7 @@ const UserRegisterPage: React.FC = () => {
             setEmail("");
             setPassword("");
             setRole("MEDECIN");
-            await loadUsers();
+            await loadUsers(1);
         } catch (err) {
             if (err instanceof SessionExpiredError) {
                 navigate("/admin/login", { replace: true });
@@ -468,13 +555,73 @@ const UserRegisterPage: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => {
-                            void loadUsers();
+                            void loadUsers(usersPage);
                         }}
                         className="rounded bg-gray-100 px-3 py-1 text-xs text-gray-700 hover:bg-gray-200"
                     >
                         Rafraichir
                     </button>
                 </div>
+
+                <div className="mb-3 flex items-center justify-between gap-3 text-xs text-gray-500">
+                    <span>{usersTotal} utilisateur{usersTotal > 1 ? "s" : ""}</span>
+                    <span>Page {usersPage} / {Math.max(1, usersTotalPages)}</span>
+                </div>
+
+                <form
+                    className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto_auto]"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        applyUsersFilters();
+                    }}
+                >
+                    <div>
+                        <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="users-search">
+                            Filtrer les utilisateurs
+                        </label>
+                        <input
+                            id="users-search"
+                            type="text"
+                            value={usersSearchInput}
+                            onChange={(event) => setUsersSearchInput(event.target.value)}
+                            placeholder="Nom d'utilisateur ou courriel"
+                            className="w-full rounded-lg border px-3 py-2 text-sm"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="users-role-filter">
+                            Role
+                        </label>
+                        <select
+                            id="users-role-filter"
+                            value={usersRoleFilter}
+                            onChange={(event) => setUsersRoleFilter(event.target.value as UserRoleFilter)}
+                            className="w-full rounded-lg border px-3 py-2 text-sm"
+                        >
+                            {USER_ROLE_FILTER_OPTIONS.map((value) => (
+                                <option key={value} value={value}>
+                                    {value === "ALL" ? "Tous les roles" : value}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <button
+                        type="submit"
+                        className="self-end rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                    >
+                        Filtrer
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={resetUsersFilters}
+                        className="self-end rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                        Reinitialiser
+                    </button>
+                </form>
 
                 {editSaveStatus !== "idle" && (
                     <div
@@ -566,6 +713,27 @@ const UserRegisterPage: React.FC = () => {
                                 </div>
                             </div>
                         ))}
+
+                        <div className="flex items-center justify-end gap-2 border-t border-gray-100 pt-3">
+                            <button
+                                type="button"
+                                onClick={() => setUsersPage((current) => Math.max(current - 1, 1))}
+                                disabled={loadingUsers || usersPage <= 1}
+                                className="rounded border border-gray-300 px-3 py-1 text-xs text-gray-700 disabled:opacity-50"
+                            >
+                                Precedent
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setUsersPage((current) => Math.min(current + 1, Math.max(1, usersTotalPages)))
+                                }
+                                disabled={loadingUsers || usersPage >= usersTotalPages}
+                                className="rounded border border-gray-300 px-3 py-1 text-xs text-gray-700 disabled:opacity-50"
+                            >
+                                Suivant
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

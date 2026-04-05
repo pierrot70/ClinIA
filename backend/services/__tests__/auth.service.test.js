@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockFindOne = vi.fn();
 const mockFindById = vi.fn();
 const mockCreate = vi.fn();
+const mockFind = vi.fn();
+const mockCountDocuments = vi.fn();
 
 const recordAuthAuditEvent = vi.fn();
 
@@ -11,6 +13,8 @@ vi.mock("../../models/AdminUser.js", () => ({
         findOne: mockFindOne,
         findById: mockFindById,
         create: mockCreate,
+        find: mockFind,
+        countDocuments: mockCountDocuments,
     },
 }));
 
@@ -36,7 +40,7 @@ vi.mock("jsonwebtoken", () => ({
     },
 }));
 
-const { login, logout, refresh, hashPassword, register, registerSelf } = await import("../auth.js");
+const { login, logout, refresh, hashPassword, register, registerSelf, listUsers } = await import("../auth.js");
 
 function buildUser(overrides = {}) {
     return {
@@ -368,5 +372,99 @@ describe("auth service", () => {
         });
 
         expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it("lists users with pagination metadata", async () => {
+        mockCountDocuments.mockResolvedValue(23);
+        mockFind.mockReturnValue({
+            select: vi.fn().mockReturnValue({
+                sort: vi.fn().mockReturnValue({
+                    skip: vi.fn().mockReturnValue({
+                        limit: vi.fn().mockReturnValue({
+                            lean: vi.fn().mockResolvedValue([
+                                {
+                                    _id: "507f1f77bcf86cd799439015",
+                                    username: "newdoctor",
+                                    email: "newdoctor@clinia.local",
+                                    role: "MEDECIN",
+                                    isActive: true,
+                                    createdAt: new Date("2026-04-04T10:00:00.000Z"),
+                                    lastLoginAt: null,
+                                    lastLogoutAt: null,
+                                },
+                            ]),
+                        }),
+                    }),
+                }),
+            }),
+        });
+
+        const result = await listUsers({
+            authUser: { role: "SUPERADMIN" },
+            page: 2,
+            limit: 10,
+        });
+
+        expect(mockCountDocuments).toHaveBeenCalledWith({});
+        expect(result.users).toHaveLength(1);
+        expect(result.pagination).toEqual({
+            page: 2,
+            limit: 10,
+            total: 23,
+            totalPages: 3,
+        });
+    });
+
+    it("applies search and role filters to paginated user listing", async () => {
+        mockCountDocuments.mockResolvedValue(1);
+        mockFind.mockReturnValue({
+            select: vi.fn().mockReturnValue({
+                sort: vi.fn().mockReturnValue({
+                    skip: vi.fn().mockReturnValue({
+                        limit: vi.fn().mockReturnValue({
+                            lean: vi.fn().mockResolvedValue([
+                                {
+                                    _id: "507f1f77bcf86cd799439099",
+                                    username: "doctor.house",
+                                    email: "doctor.house@clinia.local",
+                                    role: "MEDECIN",
+                                    isActive: true,
+                                    createdAt: new Date("2026-04-05T08:00:00.000Z"),
+                                    lastLoginAt: null,
+                                    lastLogoutAt: null,
+                                },
+                            ]),
+                        }),
+                    }),
+                }),
+            }),
+        });
+
+        const result = await listUsers({
+            authUser: { role: "SUPERADMIN" },
+            page: 1,
+            limit: 10,
+            search: "doctor.house",
+            role: "medecin",
+        });
+
+        expect(mockCountDocuments).toHaveBeenCalledWith({
+            $or: [
+                { username: { $regex: "doctor\\.house", $options: "i" } },
+                { email: { $regex: "doctor\\.house", $options: "i" } },
+            ],
+            role: "MEDECIN",
+        });
+        expect(mockFind).toHaveBeenCalledWith({
+            $or: [
+                { username: { $regex: "doctor\\.house", $options: "i" } },
+                { email: { $regex: "doctor\\.house", $options: "i" } },
+            ],
+            role: "MEDECIN",
+        });
+        expect(result.filters).toEqual({
+            search: "doctor.house",
+            role: "MEDECIN",
+        });
     });
 });

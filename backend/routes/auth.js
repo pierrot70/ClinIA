@@ -475,7 +475,13 @@ router.get(
     requireRole(AUTH_ROLES.SUPERADMIN),
     async (req, res) => {
         try {
-            const data = await listUsers({ authUser: req.auth });
+            const data = await listUsers({
+                authUser: req.auth,
+                page: req.query.page,
+                limit: req.query.limit,
+                search: req.query.search,
+                role: req.query.role,
+            });
             return res.status(200).json({
                 data,
                 meta: {
@@ -484,6 +490,16 @@ router.get(
                 },
             });
         } catch (err) {
+            if (err.code === "INVALID_INPUT") {
+                return res.status(400).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
             console.error("❌ Auth users list error:", err?.code || err?.message);
             return res.status(500).json({
                 error: {

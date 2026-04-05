@@ -256,6 +256,10 @@ function normalizeOptionalEmail(email) {
     return normalized;
 }
 
+function escapeRegex(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function assertRegisterInput({ username, password, role }) {
     const identifierRegex = /^[a-z0-9._%+\-@]+$/;
     const normalizedUsername = normalizeUsername(username);
@@ -663,16 +667,79 @@ export async function registerSelf({ email, password, role, req }) {
     };
 }
 
-export async function listUsers({ authUser }) {
+export async function listUsers({
+    authUser,
+    page = 1,
+    limit = 10,
+    search = "",
+    role,
+}) {
     assertSuperAdmin(authUser);
 
-    const users = await AdminUser.find({})
-        .select("username email role isActive createdAt lastLoginAt lastLogoutAt")
-        .sort({ createdAt: -1 })
-        .lean();
+    const parsedPage = Number(page);
+    const parsedLimit = Number(limit);
+    const normalizedSearch = String(search || "").trim();
+    const normalizedRole =
+        typeof role === "string" && role.trim()
+            ? role.trim().toUpperCase()
+            : "";
+
+    if (
+        !Number.isFinite(parsedPage) ||
+        parsedPage < 1 ||
+        !Number.isFinite(parsedLimit) ||
+        parsedLimit < 1 ||
+        parsedLimit > 100
+    ) {
+        throw createAuthError("INVALID_INPUT", "Pagination invalide.");
+    }
+
+    if (normalizedSearch.length > 100) {
+        throw createAuthError("INVALID_INPUT", "Filtre de recherche invalide.");
+    }
+
+    if (normalizedRole && !AUTH_ROLE_VALUES.includes(normalizedRole)) {
+        throw createAuthError("INVALID_INPUT", "Role de filtre invalide.");
+    }
+
+    const query = {};
+
+    if (normalizedSearch) {
+        const safePattern = escapeRegex(normalizedSearch);
+        query.$or = [
+            { username: { $regex: safePattern, $options: "i" } },
+            { email: { $regex: safePattern, $options: "i" } },
+        ];
+    }
+
+    if (normalizedRole) {
+        query.role = normalizedRole;
+    }
+
+    const total = await AdminUser.countDocuments(query);
+    const totalPages = Math.max(1, Math.ceil(total / parsedLimit));
+    const effectivePage = Math.min(parsedPage, totalPages);
+    const skip = (effectivePage - 1) * parsedLimit;
+
+    const users = await AdminUser.find(query)
+            .select("username email role isActive createdAt lastLoginAt lastLogoutAt")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parsedLimit)
+            .lean();
 
     return {
         users: users.map(mapPublicUser),
+        pagination: {
+            page: effectivePage,
+            limit: parsedLimit,
+            total,
+            totalPages,
+        },
+        filters: {
+            search: normalizedSearch,
+            role: normalizedRole || null,
+        },
     };
 }
 

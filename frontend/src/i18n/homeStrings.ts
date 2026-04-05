@@ -92,7 +92,9 @@ export function hasValidHomeStringsShape(value: unknown): value is HomeStrings {
     return false;
   }
 
-  return REQUIRED_OPTION_KEYS.every((key) => isStringArray(value.options[key]));
+  const options = value.options as Record<string, unknown>;
+
+  return REQUIRED_OPTION_KEYS.every((key) => isStringArray(options[key]));
 }
 
 export const HOME_STRINGS_FR: HomeStrings = {
