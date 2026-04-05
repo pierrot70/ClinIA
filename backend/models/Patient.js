@@ -26,6 +26,10 @@ const SecureRequestProfileSchema = new mongoose.Schema(
             default: "",
             trim: true,
         },
+        selected_document_ids: {
+            type: [String],
+            default: [],
+        },
         clinicalScope: {
             type: String,
             default: "",
@@ -84,6 +88,33 @@ const SecureRequestProfileSchema = new mongoose.Schema(
     }
 );
 
+const PatientDocumentSchema = new mongoose.Schema(
+    {
+        title: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        type: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+        storageKey: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+        uploadedAt: {
+            type: Date,
+            default: Date.now,
+        },
+    },
+    {
+        _id: true,
+    }
+);
+
 const PatientSchema = new mongoose.Schema(
     {
         nom: {
@@ -139,6 +170,10 @@ const PatientSchema = new mongoose.Schema(
         secure_request_profile: {
             type: SecureRequestProfileSchema,
             default: undefined,
+        },
+        documents: {
+            type: [PatientDocumentSchema],
+            default: [],
         },
     },
     {

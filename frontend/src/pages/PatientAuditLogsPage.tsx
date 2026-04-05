@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+    fetchPatientsPaginated,
     fetchPatientAuditLogs,
+    type Patient,
     type PatientAuditLog,
 } from "../services/patientsApi";
 import type { ApiError } from "../types/api";
@@ -29,9 +31,35 @@ function formatAction(action: PatientAuditLog["action"]) {
     return action;
 }
 
+function formatAuditContext(log: PatientAuditLog) {
+    const secureRequest = log.context?.secureRequest;
+
+    if (!secureRequest) {
+        return "-";
+    }
+
+    const parts = [];
+
+    if (secureRequest.clinicalScope) {
+        parts.push(`Specialite: ${secureRequest.clinicalScope}`);
+    }
+
+    if (secureRequest.objective) {
+        parts.push(`Objectif: ${secureRequest.objective}`);
+    }
+
+    if ((secureRequest.selectedDocumentCount || 0) > 0) {
+        parts.push(`Documents: ${secureRequest.selectedDocumentCount}`);
+    }
+
+    return parts.length > 0 ? parts.join(" | ") : "-";
+}
+
 export function PatientAuditLogsPage() {
     const [logs, setLogs] = useState<PatientAuditLog[]>([]);
+    const [patientOptions, setPatientOptions] = useState<Patient[]>([]);
     const [loading, setLoading] = useState(false);
+    const [patientsLoading, setPatientsLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
 
     const [page, setPage] = useState(1);
@@ -42,10 +70,12 @@ export function PatientAuditLogsPage() {
     const [action, setAction] = useState<
         "" | "PATIENT_CREATE" | "PATIENT_UPDATE" | "PATIENT_DELETE"
     >("");
+    const [patientSearch, setPatientSearch] = useState("");
     const [patientId, setPatientId] = useState("");
     const [actorUserId, setActorUserId] = useState("");
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
+    const debouncedPatientSearch = useDebounce(patientSearch, 300);
 
     const rawFilters = useMemo(
         () => ({
@@ -64,6 +94,11 @@ export function PatientAuditLogsPage() {
         void loadAuditLogs();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters, page]);
+
+    useEffect(() => {
+        void loadPatients();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [debouncedPatientSearch]);
 
     async function loadAuditLogs() {
         setLoading(true);
@@ -93,8 +128,45 @@ export function PatientAuditLogsPage() {
         setLoading(false);
     }
 
+    async function loadPatients() {
+        setPatientsLoading(true);
+
+        const search = debouncedPatientSearch.trim();
+        let response = await fetchPatientsPaginated({
+            page: 1,
+            limit: 50,
+            sortBy: "nom",
+            sortDir: "asc",
+            ...(search ? { nom: search } : {}),
+        });
+
+        if (
+            !("error" in response) &&
+            search &&
+            response.data.data.length === 0
+        ) {
+            response = await fetchPatientsPaginated({
+                page: 1,
+                limit: 50,
+                sortBy: "nom",
+                sortDir: "asc",
+                prenom: search,
+            });
+        }
+
+        if ("error" in response) {
+            setPatientOptions([]);
+            setPatientsLoading(false);
+            return;
+        }
+
+        setPatientOptions(response.data.data);
+        setPatientsLoading(false);
+    }
+
     function resetFilters() {
         setAction("");
+        setPatientSearch("");
         setPatientId("");
         setActorUserId("");
         setStartDate("");
@@ -110,7 +182,7 @@ export function PatientAuditLogsPage() {
                 </h1>
                 <p className="text-sm text-gray-600 max-w-3xl">
                     Consultez les créations, modifications et suppressions de patients avec l’acteur,
-                    l’IP, les champs touchés et l’horodatage.
+                    l’IP, les champs touchés, le contexte de requête et l’horodatage.
                 </p>
             </header>
 
@@ -141,16 +213,39 @@ export function PatientAuditLogsPage() {
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Patient ID
+                        Rechercher patient
                         <input
+                            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                            value={patientSearch}
+                            onChange={(event) => {
+                                setPage(1);
+                                setPatientSearch(event.target.value);
+                            }}
+                            placeholder="Ex: Pierrot"
+                        />
+                    </label>
+
+                    <label className="text-sm text-gray-700">
+                        Patient
+                        <select
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={patientId}
                             onChange={(event) => {
                                 setPage(1);
                                 setPatientId(event.target.value);
                             }}
-                            placeholder="507f..."
-                        />
+                        >
+                            <option value="">
+                                {patientsLoading
+                                    ? "Chargement des patients..."
+                                    : "Tous les patients"}
+                            </option>
+                            {patientOptions.map((patient) => (
+                                <option key={patient._id} value={patient._id}>
+                                    {patient.prenom} {patient.nom}
+                                </option>
+                            ))}
+                        </select>
                     </label>
 
                     <label className="text-sm text-gray-700">
@@ -195,6 +290,12 @@ export function PatientAuditLogsPage() {
                     </label>
                 </div>
 
+                {patientId && (
+                    <div className="rounded border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+                        Patient ID sélectionné: {patientId}
+                    </div>
+                )}
+
                 <div className="flex flex-wrap items-center gap-3 text-sm">
                     <button
                         type="button"
@@ -235,13 +336,14 @@ export function PatientAuditLogsPage() {
                                 <th className="px-4 py-3">Patient</th>
                                 <th className="px-4 py-3">IP</th>
                                 <th className="px-4 py-3">Champs</th>
+                                <th className="px-4 py-3">Contexte</th>
                                 <th className="px-4 py-3">Route</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading && (
                                 <tr>
-                                    <td className="px-4 py-6 text-gray-500" colSpan={7}>
+                                    <td className="px-4 py-6 text-gray-500" colSpan={8}>
                                         Chargement des audits patient...
                                     </td>
                                 </tr>
@@ -249,7 +351,7 @@ export function PatientAuditLogsPage() {
 
                             {!loading && logs.length === 0 && (
                                 <tr>
-                                    <td className="px-4 py-6 text-gray-500" colSpan={7}>
+                                    <td className="px-4 py-6 text-gray-500" colSpan={8}>
                                         Aucun audit patient trouvé.
                                     </td>
                                 </tr>
@@ -292,6 +394,9 @@ export function PatientAuditLogsPage() {
                                             ) : (
                                                 <span className="text-gray-400">-</span>
                                             )}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-700">
+                                            {formatAuditContext(log)}
                                         </td>
                                         <td className="px-4 py-3 text-gray-700 break-all">
                                             {log.requestPath || "-"}

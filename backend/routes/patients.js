@@ -5,6 +5,7 @@ import {
     createPatient,
     listPatients,
     listPatientAuditLogs,
+    listPatientSecureRequestDocuments,
     getPatientById,
     updatePatient,
     deletePatient,
@@ -31,6 +32,7 @@ async function recordPatientMutationAudit(req, {
     action,
     patientId,
     changedFields = [],
+    context = null,
 }) {
     await recordPatientAuditEvent({
         action,
@@ -42,7 +44,28 @@ async function recordPatientMutationAudit(req, {
         patientId,
         changedFields,
         requestPath: req.originalUrl || req.path || null,
+        context,
     });
+}
+
+function buildPatientAuditContext(dto) {
+    const secureRequestProfile = dto?.secure_request_profile;
+
+    if (!secureRequestProfile) {
+        return null;
+    }
+
+    return {
+        secureRequest: {
+            objective: secureRequestProfile.objective ?? "",
+            clinicalScope: secureRequestProfile.clinicalScope ?? "",
+            selectedDocumentIds: Array.isArray(
+                secureRequestProfile.selected_document_ids
+            )
+                ? secureRequestProfile.selected_document_ids
+                : [],
+        },
+    };
 }
 
 /* ------------------------------------------------------------------ */
@@ -228,6 +251,57 @@ router.get(
 );
 
 /* ------------------------------------------------------------------ */
+/* GET /api/patients/:id/secure-request-documents                      */
+/* ------------------------------------------------------------------ */
+
+router.get("/:id/secure-request-documents", async (req, res) => {
+    try {
+        const documents = await listPatientSecureRequestDocuments(
+            req.params.id
+        );
+
+        return res.status(200).json({
+            data: documents,
+            meta: {
+                source: "real",
+                model: "mongo",
+            },
+        });
+    } catch (err) {
+        if (err.code === "INVALID_ID") {
+            return res.status(400).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        if (err.code === "NOT_FOUND") {
+            return res.status(404).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        console.error("❌ Patient secure request documents error:", err);
+
+        return res.status(500).json({
+            error: {
+                code: "PERSISTENCE_FAILED",
+                message:
+                    "Impossible de recuperer les documents de requete securisee du patient.",
+                retryable: true,
+            },
+        });
+    }
+});
+
+/* ------------------------------------------------------------------ */
 /* GET /api/patients/:id                                               */
 /* ------------------------------------------------------------------ */
 
@@ -301,6 +375,7 @@ router.patch("/:id", async (req, res) => {
             action: "PATIENT_UPDATE",
             patientId: patient?._id ?? req.params.id,
             changedFields: Object.keys(dto),
+            context: buildPatientAuditContext(dto),
         });
 
         return res.status(200).json({

@@ -47,6 +47,10 @@ const PatientAuditLogSchema = new mongoose.Schema(
             type: String,
             default: null,
         },
+        context: {
+            type: mongoose.Schema.Types.Mixed,
+            default: null,
+        },
         timestamp: {
             type: Date,
             required: true,

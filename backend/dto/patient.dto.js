@@ -12,6 +12,20 @@ function normalizeBoolean(value) {
     return false;
 }
 
+function normalizeStringArray(value) {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return Array.from(
+        new Set(
+            value
+                .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+                .filter(Boolean)
+        )
+    );
+}
+
 function normalizeSecureRequestProfile(value) {
     if (!value || typeof value !== "object") {
         return undefined;
@@ -22,6 +36,9 @@ function normalizeSecureRequestProfile(value) {
         sex: value.sex?.trim() ?? "",
         age: value.age?.trim() ?? "",
         current_medications: value.current_medications?.trim() ?? "",
+        selected_document_ids: normalizeStringArray(
+            value.selected_document_ids
+        ),
         clinicalScope: value.clinicalScope?.trim() ?? "",
         ageGroup: value.ageGroup?.trim() ?? "",
         symptomProfile: value.symptomProfile?.trim() ?? "",

@@ -24,11 +24,13 @@ export interface Patient {
     texto?: boolean;
     lat?: number;
     long?: number;
+    documents?: PatientDocument[];
     secure_request_profile?: {
         objective?: string;
         sex?: string;
         age?: string;
         current_medications?: string;
+        selected_document_ids?: string[];
         clinicalScope?: string;
         ageGroup?: string;
         symptomProfile?: string;
@@ -41,6 +43,25 @@ export interface Patient {
         privacyAttestation?: boolean;
         lastRequestedAt?: string;
     };
+}
+
+export interface PatientDocument {
+    _id?: string;
+    title: string;
+    type?: string;
+    storageKey?: string;
+    uploadedAt?: string;
+}
+
+export interface PatientSecureRequestDocument {
+    id: string;
+    title: string;
+    type: string;
+    uploadedAt?: string;
+    sourceAuditLogId: string;
+    clinicalScope: string;
+    objective?: string;
+    selectedDocumentIds: string[];
 }
 
 export interface PaginatedPatients {
@@ -71,6 +92,7 @@ export interface PatientPayload {
         sex?: string;
         age?: string;
         current_medications?: string;
+        selected_document_ids?: string[];
         clinicalScope?: string;
         ageGroup?: string;
         symptomProfile?: string;
@@ -96,6 +118,14 @@ export interface PatientAuditLog {
     patientId: string | null;
     changedFields: string[];
     requestPath: string | null;
+    context: {
+        secureRequest?: {
+            objective?: string;
+            clinicalScope?: string;
+            selectedDocumentIds?: string[];
+            selectedDocumentCount?: number;
+        };
+    } | null;
     timestamp: string;
 }
 
@@ -107,6 +137,10 @@ export interface PaginatedPatientAuditLogs {
         total: number;
         totalPages: number;
     };
+}
+
+export interface PatientSecureRequestDocumentsResponse {
+    data: PatientSecureRequestDocument[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -308,6 +342,32 @@ export async function fetchPatientAuditLogs(params: {
                     error: {
                         code: "INTERNAL_ERROR",
                         message: "Impossible de récupérer les audits patient.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
+}
+
+export async function fetchPatientSecureRequestDocuments(
+    patientId: string
+): Promise<ApiResponse<PatientSecureRequestDocument[]>> {
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await authFetch(
+                    `/api/patients/${patientId}/secure-request-documents`
+                );
+                return (await safeJson(response)) as ApiResponse<
+                    PatientSecureRequestDocument[]
+                >;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message:
+                            "Impossible de récupérer les documents de requête sécurisée du patient.",
                         retryable: true,
                     },
                 };

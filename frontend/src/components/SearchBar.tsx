@@ -5,8 +5,10 @@ import { useAuth } from "../hooks/useAuth";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import {
   createPatient,
+  fetchPatientSecureRequestDocuments,
   fetchPatientsPaginated,
   updatePatient,
+  type PatientSecureRequestDocument,
   type Patient,
 } from "../services/patientsApi";
 import type { ClinicalPayload, Sex } from "../types/clinical";
@@ -111,6 +113,37 @@ const splitListField = (value: string): string[] =>
     .map((entry) => entry.trim())
     .filter(Boolean);
 
+const getPatientDocumentId = (document: PatientSecureRequestDocument): string =>
+  String(document.id).trim();
+
+const formatDocumentTimestamp = (value?: string): string => {
+  if (!value) {
+    return "date inconnue";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString("fr-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+};
+
+const formatSecureRequestDocumentLabel = (
+  document: PatientSecureRequestDocument
+): string => {
+  return `${document.clinicalScope} - derniere requete du ${formatDocumentTimestamp(
+    document.uploadedAt
+  )}`;
+};
+
 const SearchBar: React.FC = () => {
   const { strings } = useHomeI18n();
   const {
@@ -143,6 +176,10 @@ const SearchBar: React.FC = () => {
   const [patientsLoading, setPatientsLoading] = useState(false);
   const [patientsError, setPatientsError] = useState<string | null>(null);
   const [selectedPatientId, setSelectedPatientId] = useState("");
+  const [availablePatientDocuments, setAvailablePatientDocuments] = useState<PatientSecureRequestDocument[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+  const [isDocumentsModalOpen, setIsDocumentsModalOpen] = useState(false);
   const [patientNameDraft, setPatientNameDraft] = useState("");
   const [creatingPatient, setCreatingPatient] = useState(false);
   const [createPatientError, setCreatePatientError] = useState<string | null>(null);
@@ -220,6 +257,7 @@ const SearchBar: React.FC = () => {
       });
     }));
     setSelectedPatientId(response.data._id);
+    setSelectedDocumentIds([]);
     setPatientNameDraft("");
   }, [patientNameDraft, user?.email, user?.id]);
 
@@ -299,6 +337,7 @@ const SearchBar: React.FC = () => {
           sex: normalizedSex,
           age: normalizedAge,
           current_medications: normalizedCurrentMedications,
+          selected_document_ids: selectedDocumentIds,
           clinicalScope,
           ageGroup,
           symptomProfile,
@@ -352,6 +391,7 @@ const SearchBar: React.FC = () => {
     selectedPatient?.nom,
     selectedPatient?.prenom,
     selectedPatientId,
+    selectedDocumentIds,
     severity,
     sex,
     symptomProfile,
@@ -412,6 +452,47 @@ const SearchBar: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadSecureRequestDocuments() {
+      if (!selectedPatientId || selectedPatientId === CREATE_PATIENT_OPTION) {
+        setAvailablePatientDocuments([]);
+        setSelectedDocumentIds([]);
+        setDocumentsLoading(false);
+        return;
+      }
+
+      setDocumentsLoading(true);
+
+      const response = await fetchPatientSecureRequestDocuments(selectedPatientId);
+
+      if (cancelled) {
+        return;
+      }
+
+      if ("error" in response) {
+        setAvailablePatientDocuments([]);
+        setSelectedDocumentIds([]);
+        setDocumentsLoading(false);
+        return;
+      }
+
+      setAvailablePatientDocuments(response.data);
+      setSelectedDocumentIds((current) => {
+        const allowedIds = new Set(response.data.map((document) => document.id));
+        return current.filter((entry) => allowedIds.has(entry));
+      });
+      setDocumentsLoading(false);
+    }
+
+    void loadSecureRequestDocuments();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPatientId]);
+
+  useEffect(() => {
     const profile = selectedPatient?.secure_request_profile;
     if (!profile) {
       return;
@@ -424,6 +505,11 @@ const SearchBar: React.FC = () => {
     setAge(formatOptionalAdvancedFieldForEdit(profile.age));
     setCurrentMedications(
       formatOptionalAdvancedFieldForEdit(profile.current_medications)
+    );
+    setSelectedDocumentIds(
+      Array.isArray(profile.selected_document_ids)
+        ? profile.selected_document_ids
+        : []
     );
     if (
       profile.clinicalScope &&
@@ -632,7 +718,13 @@ const SearchBar: React.FC = () => {
           <select
             value={selectedPatientId}
             onChange={(e) => {
-              setSelectedPatientId(e.target.value);
+              const nextPatientId = e.target.value;
+              const nextPatient =
+                patients.find((patient) => patient._id === nextPatientId) || null;
+
+              setSelectedPatientId(nextPatientId);
+              setSelectedDocumentIds([]);
+              setIsDocumentsModalOpen(Boolean(nextPatient));
               setCreatePatientError(null);
             }}
             className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-primary"
@@ -703,6 +795,12 @@ const SearchBar: React.FC = () => {
             {selectedPatient.created_by_reference && (
               <div>Cree par: {selectedPatient.created_by_reference}</div>
             )}
+            <div>
+              Documents selectionnes: {selectedDocumentIds.length}
+              {availablePatientDocuments.length > 0
+                ? ` / ${availablePatientDocuments.length}`
+                : ""}
+            </div>
             {selectedPatient.secure_request_profile?.lastRequestedAt && (
               <div>
                 Derniere requete: {new Date(
@@ -799,6 +897,28 @@ const SearchBar: React.FC = () => {
               ))}
             </select>
           </label>
+
+          {selectedPatient && (
+            <div className="text-xs text-gray-600 sm:col-span-3">
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
+                <div>
+                  <div className="font-medium text-gray-700">Documents du patient</div>
+                  <div className="text-gray-500">
+                    {documentsLoading
+                      ? "Chargement des dernieres requetes..."
+                      : `${selectedDocumentIds.length} document(s) selectionne(s)`}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDocumentsModalOpen(true)}
+                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-gray-400"
+                >
+                  Choisir les documents
+                </button>
+              </div>
+            </div>
+          )}
 
           <label className="text-xs text-gray-600">
             {strings.search.ageGroupLabel}
@@ -995,6 +1115,102 @@ const SearchBar: React.FC = () => {
           >
             J'ai lu et compris
           </button>
+        </div>
+      )}
+      {isDocumentsModalOpen && selectedPatient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
+            <div className="border-b border-gray-200 px-5 py-4">
+              <h2 className="text-base font-semibold text-gray-900">
+                Documents du patient
+              </h2>
+              <p className="mt-1 text-sm text-gray-600">
+                Selectionnez un ou plusieurs documents pour la requete securisee de {selectedPatient.prenom} {selectedPatient.nom}.
+              </p>
+            </div>
+
+            <div className="max-h-[50vh] overflow-y-auto px-5 py-4">
+              {documentsLoading ? (
+                <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-sm text-gray-500">
+                  Chargement des dernieres requetes securisees...
+                </div>
+              ) : availablePatientDocuments.length > 0 ? (
+                <div className="space-y-3">
+                  {availablePatientDocuments.map((document) => {
+                    const documentId = getPatientDocumentId(document);
+                    const isChecked = selectedDocumentIds.includes(documentId);
+
+                    return (
+                      <label
+                        key={documentId}
+                        className="flex items-start gap-3 rounded-xl border border-gray-200 px-3 py-3 text-sm text-gray-700"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(event) => {
+                            setSelectedDocumentIds((current) => {
+                              if (event.target.checked) {
+                                return Array.from(new Set([...current, documentId]));
+                              }
+
+                              return current.filter((entry) => entry !== documentId);
+                            });
+                          }}
+                          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <span className="flex-1">
+                          <span className="block font-medium text-gray-900">
+                            {formatSecureRequestDocumentLabel(document)}
+                          </span>
+                          <span className="block text-xs text-gray-500">
+                            {document.type || "Type inconnu"}
+                            {document.objective ? ` | ${document.objective}` : ""}
+                            {document.uploadedAt
+                              ? ` | ${formatDocumentTimestamp(document.uploadedAt)}`
+                              : ""}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-sm text-gray-500">
+                  Aucune requete securisee precedente disponible pour ce patient.
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-gray-200 px-5 py-4">
+              <button
+                type="button"
+                onClick={() => {
+                  const allDocumentIds = availablePatientDocuments.map(getPatientDocumentId);
+                  setSelectedDocumentIds(allDocumentIds);
+                }}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:border-gray-400"
+              >
+                Tout selectionner
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDocumentsModalOpen(false)}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:border-gray-400"
+                >
+                  Fermer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsDocumentsModalOpen(false)}
+                  className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary/90"
+                >
+                  Confirmer
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
       <div className="text-xs text-gray-500">

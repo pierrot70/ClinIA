@@ -103,6 +103,7 @@ describe("patients routes audit", () => {
             patientId: "patient-1",
             changedFields: ["nom", "prenom"],
             requestPath: "/api/patients",
+            context: null,
         });
         expect(res.status).toHaveBeenCalledWith(201);
     });
@@ -112,7 +113,11 @@ describe("patients routes audit", () => {
         const dto = {
             nom: "Doe",
             prenom: "Janet",
-            secure_request_profile: { objective: "Traitement initial" },
+            secure_request_profile: {
+                objective: "Traitement initial",
+                clinicalScope: "Oncologie",
+                selected_document_ids: ["doc-1", "doc-2"],
+            },
         };
 
         toUpdatePatientDTO.mockReturnValue(dto);
@@ -150,6 +155,13 @@ describe("patients routes audit", () => {
                 "secure_request_profile",
             ],
             requestPath: "/api/patients/patient-2",
+            context: {
+                secureRequest: {
+                    objective: "Traitement initial",
+                    clinicalScope: "Oncologie",
+                    selectedDocumentIds: ["doc-1", "doc-2"],
+                },
+            },
         });
         expect(res.status).toHaveBeenCalledWith(200);
     });
@@ -184,6 +196,7 @@ describe("patients routes audit", () => {
             patientId: "patient-3",
             changedFields: [],
             requestPath: "/api/patients/patient-3",
+            context: null,
         });
         expect(res.status).toHaveBeenCalledWith(200);
     });

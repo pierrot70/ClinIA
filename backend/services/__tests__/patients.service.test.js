@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const patientFind = vi.fn();
 const patientCountDocuments = vi.fn();
+const patientFindById = vi.fn();
 const auditCountDocuments = vi.fn();
 const auditFind = vi.fn();
 
@@ -10,7 +11,7 @@ vi.mock("../../models/Patient.js", () => ({
         find: patientFind,
         countDocuments: patientCountDocuments,
         findOne: vi.fn(),
-        findById: vi.fn(),
+        findById: patientFindById,
         findByIdAndUpdate: vi.fn(),
         findByIdAndDelete: vi.fn(),
         create: vi.fn(),
@@ -28,7 +29,10 @@ vi.mock("../../utils/geocode.js", () => ({
     geocodeFreeAddress: vi.fn(),
 }));
 
-const { listPatientAuditLogs } = await import("../patients.js");
+const {
+    listPatientAuditLogs,
+    listPatientSecureRequestDocuments,
+} = await import("../patients.js");
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -98,5 +102,106 @@ describe("patients service audit logs", () => {
             code: "FORBIDDEN",
             message: "Action reservee aux administrateurs.",
         });
+    });
+
+    it("returns the latest secure request document for each specialty", async () => {
+        patientFindById.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                _id: "507f1f77bcf86cd799439012",
+                prenom: "Patient",
+                nom: "Pierrot",
+            }),
+        });
+        auditFind.mockReturnValue({
+            sort: vi.fn().mockReturnValue({
+                lean: vi.fn().mockResolvedValue([
+                    {
+                        _id: "audit-oncology-new",
+                        action: "PATIENT_UPDATE",
+                        changedFields: ["secure_request_profile"],
+                        timestamp: new Date("2026-04-05T10:30:00.000Z"),
+                        context: {
+                            secureRequest: {
+                                clinicalScope: "Oncology",
+                                objective: "Therapeutic adjustment",
+                                selectedDocumentIds: ["doc-1"],
+                            },
+                        },
+                    },
+                    {
+                        _id: "audit-oncology-old",
+                        action: "PATIENT_UPDATE",
+                        changedFields: ["secure_request_profile"],
+                        timestamp: new Date("2026-04-05T09:00:00.000Z"),
+                        context: {
+                            secureRequest: {
+                                clinicalScope: "Oncology",
+                                objective: "Earlier request",
+                                selectedDocumentIds: [],
+                            },
+                        },
+                    },
+                    {
+                        _id: "audit-general",
+                        action: "PATIENT_UPDATE",
+                        changedFields: ["secure_request_profile"],
+                        timestamp: new Date("2026-04-05T08:00:00.000Z"),
+                        context: {
+                            secureRequest: {
+                                clinicalScope: "General medicine",
+                                objective: "Initial therapy",
+                                selectedDocumentIds: ["doc-2", "doc-3"],
+                            },
+                        },
+                    },
+                    {
+                        _id: "audit-empty-scope",
+                        action: "PATIENT_UPDATE",
+                        changedFields: ["secure_request_profile"],
+                        timestamp: new Date("2026-04-05T07:00:00.000Z"),
+                        context: {
+                            secureRequest: {
+                                clinicalScope: "",
+                            },
+                        },
+                    },
+                ]),
+            }),
+        });
+
+        const result = await listPatientSecureRequestDocuments(
+            "507f1f77bcf86cd799439012"
+        );
+
+        expect(patientFindById).toHaveBeenCalledWith(
+            "507f1f77bcf86cd799439012"
+        );
+        expect(auditFind).toHaveBeenCalledWith({
+            patientId: "507f1f77bcf86cd799439012",
+            action: "PATIENT_UPDATE",
+            changedFields: "secure_request_profile",
+        });
+        expect(result).toEqual([
+            {
+                id: "secure-request-log:audit-oncology-new",
+                title: "Oncology",
+                type: "Derniere requete securisee",
+                uploadedAt: new Date("2026-04-05T10:30:00.000Z"),
+                sourceAuditLogId: "audit-oncology-new",
+                clinicalScope: "Oncology",
+                objective: "Therapeutic adjustment",
+                selectedDocumentIds: ["doc-1"],
+            },
+            {
+                id: "secure-request-log:audit-general",
+                title: "General medicine",
+                type: "Derniere requete securisee",
+                uploadedAt: new Date("2026-04-05T08:00:00.000Z"),
+                sourceAuditLogId: "audit-general",
+                clinicalScope: "General medicine",
+                objective: "Initial therapy",
+                selectedDocumentIds: ["doc-2", "doc-3"],
+            },
+        ]);
     });
 });

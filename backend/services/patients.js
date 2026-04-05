@@ -260,6 +260,10 @@ export async function listPatientAuditLogs({
                 ? log.changedFields
                 : [],
             requestPath: log.requestPath,
+            context:
+                log.context && typeof log.context === "object"
+                    ? log.context
+                    : null,
             timestamp: log.timestamp,
         })),
         pagination: {
@@ -269,6 +273,76 @@ export async function listPatientAuditLogs({
             totalPages: Math.max(1, Math.ceil(total / parsedLimit)),
         },
     };
+}
+
+export async function listPatientSecureRequestDocuments(patientId) {
+    if (!mongoose.Types.ObjectId.isValid(patientId)) {
+        throw {
+            code: "INVALID_ID",
+            message: "Identifiant patient invalide.",
+        };
+    }
+
+    const patient = await Patient.findById(patientId).lean();
+
+    if (!patient) {
+        throw {
+            code: "NOT_FOUND",
+            message: "Patient introuvable.",
+        };
+    }
+
+    const logs = await PatientAuditLog.find({
+        patientId,
+        action: "PATIENT_UPDATE",
+        changedFields: "secure_request_profile",
+    })
+        .sort({ timestamp: -1 })
+        .lean();
+
+    const latestBySpecialty = new Map();
+
+    for (const log of logs) {
+        const secureRequest =
+            log?.context && typeof log.context === "object"
+                ? log.context.secureRequest
+                : null;
+
+        const clinicalScope =
+            typeof secureRequest?.clinicalScope === "string"
+                ? secureRequest.clinicalScope.trim()
+                : "";
+
+        if (!clinicalScope) {
+            continue;
+        }
+
+        const specialtyKey = clinicalScope.toLowerCase();
+
+        if (latestBySpecialty.has(specialtyKey)) {
+            continue;
+        }
+
+        latestBySpecialty.set(specialtyKey, {
+            id: `secure-request-log:${String(log._id)}`,
+            title: clinicalScope,
+            type: "Derniere requete securisee",
+            uploadedAt: log.timestamp,
+            sourceAuditLogId: String(log._id),
+            clinicalScope,
+            objective:
+                typeof secureRequest?.objective === "string"
+                    ? secureRequest.objective.trim()
+                    : "",
+            selectedDocumentIds: Array.isArray(secureRequest?.selectedDocumentIds)
+                ? secureRequest.selectedDocumentIds.filter(
+                    (entry) => typeof entry === "string" && entry.trim()
+                )
+                : [],
+        });
+    }
+
+    return Array.from(latestBySpecialty.values());
 }
 
 export async function getPatientById(id) {
