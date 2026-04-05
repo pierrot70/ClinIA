@@ -11,6 +11,21 @@ const SecureRequestProfileSchema = new mongoose.Schema(
             default: "",
             trim: true,
         },
+        sex: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+        age: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+        current_medications: {
+            type: String,
+            default: "",
+            trim: true,
+        },
         clinicalScope: {
             type: String,
             default: "",

@@ -26,6 +26,9 @@ export interface Patient {
     long?: number;
     secure_request_profile?: {
         objective?: string;
+        sex?: string;
+        age?: string;
+        current_medications?: string;
         clinicalScope?: string;
         ageGroup?: string;
         symptomProfile?: string;
@@ -65,6 +68,9 @@ export interface PatientPayload {
     long?: number;
     secure_request_profile?: {
         objective?: string;
+        sex?: string;
+        age?: string;
+        current_medications?: string;
         clinicalScope?: string;
         ageGroup?: string;
         symptomProfile?: string;

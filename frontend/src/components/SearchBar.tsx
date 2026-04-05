@@ -9,8 +9,11 @@ import {
   updatePatient,
   type Patient,
 } from "../services/patientsApi";
+import type { ClinicalPayload, Sex } from "../types/clinical";
 
 const CREATE_PATIENT_OPTION = "__create_patient__";
+const UNDEFINED_FIELD_DISPLAY = "undefined";
+const RESULTS_PAYLOAD_STORAGE_KEY = "clinia_results_payload";
 
 function splitPatientName(fullName: string) {
   const parts = fullName
@@ -69,6 +72,45 @@ const getSensitiveInputReason = (value: string): string | null => {
   return match ? match.reason : null;
 };
 
+const normalizeOptionalAdvancedField = (value: string): string => {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  return trimmed.toLowerCase() === UNDEFINED_FIELD_DISPLAY ? "" : trimmed;
+};
+
+const formatOptionalAdvancedFieldForEdit = (value?: string): string => {
+  const trimmed = String(value || "").trim();
+  return trimmed || UNDEFINED_FIELD_DISPLAY;
+};
+
+const normalizeSexForAnalysis = (value: string): Sex => {
+  const normalized = normalizeOptionalAdvancedField(value).toLowerCase();
+
+  if (["male", "m", "man", "homme", "masculin"].includes(normalized)) {
+    return "male";
+  }
+
+  if (["female", "f", "woman", "femme", "feminin", "féminin"].includes(normalized)) {
+    return "female";
+  }
+
+  return "other";
+};
+
+const normalizeAgeForAnalysis = (value: string): number => {
+  const parsed = Number.parseInt(normalizeOptionalAdvancedField(value), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 55;
+};
+
+const splitListField = (value: string): string[] =>
+  normalizeOptionalAdvancedField(value)
+    .split(/[\n,;]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
 const SearchBar: React.FC = () => {
   const { strings } = useHomeI18n();
   const {
@@ -87,6 +129,9 @@ const SearchBar: React.FC = () => {
   const [clinicalScope, setClinicalScope] = useState(clinicalScopes[0]);
   const [ageGroup, setAgeGroup] = useState(ageGroups[0]);
   const [objective, setObjective] = useState(objectives[0]);
+  const [sex, setSex] = useState("");
+  const [age, setAge] = useState("");
+  const [currentMedications, setCurrentMedications] = useState("");
   const [symptomProfile, setSymptomProfile] = useState(symptomProfiles[0]);
   const [cancerType, setCancerType] = useState("");
   const [duration, setDuration] = useState(durations[0]);
@@ -192,12 +237,24 @@ const SearchBar: React.FC = () => {
     }
 
     setInputWarning(null);
+    const normalizedSex = normalizeOptionalAdvancedField(sex);
+    const normalizedAge = normalizeOptionalAdvancedField(age);
+    const normalizedCurrentMedications = normalizeOptionalAdvancedField(currentMedications);
     let mainSymptom = symptomProfile;
     if (symptomProfile === "Cancer" && cancerType.trim()) {
       mainSymptom = cancerType.trim();
     }
     const notesSection = clinicalNotes.trim()
       ? ` | ${strings.search.notesLabel}: ${clinicalNotes.trim()}`
+      : "";
+    const sexSection = normalizedSex
+      ? ` | ${strings.search.sexLabel}: ${normalizedSex}`
+      : "";
+    const ageSection = normalizedAge
+      ? ` | ${strings.search.ageLabel}: ${normalizedAge}`
+      : "";
+    const currentMedicationsSection = normalizedCurrentMedications
+      ? ` | ${strings.search.currentMedicationsLabel}: ${normalizedCurrentMedications}`
       : "";
     const q =
       `${strings.search.symptomLabel}: ${mainSymptom}` +
@@ -208,7 +265,30 @@ const SearchBar: React.FC = () => {
       ` | ${strings.search.scopeLabel}: ${clinicalScope}` +
       ` | ${strings.search.ageGroupLabel}: ${ageGroup}` +
       ` | ${strings.search.objectiveLabel}: ${objective}` +
+      sexSection +
+      ageSection +
+      currentMedicationsSection +
       notesSection;
+    const analysisPayload: ClinicalPayload = {
+      age: normalizeAgeForAnalysis(age),
+      sex: normalizeSexForAnalysis(sex),
+      symptoms: [q],
+      medical_history: [],
+      current_medications: splitListField(currentMedications),
+    };
+
+    try {
+      window.sessionStorage.setItem(
+        RESULTS_PAYLOAD_STORAGE_KEY,
+        JSON.stringify({
+          q,
+          payload: analysisPayload,
+          patientDisplayName: selectedPatient
+            ? `${selectedPatient.prenom} ${selectedPatient.nom}`.trim()
+            : undefined,
+        })
+      );
+    } catch (error) {}
 
     if (selectedPatientId && selectedPatientId !== CREATE_PATIENT_OPTION && selectedPatient) {
       const saveResponse = await updatePatient(selectedPatientId, {
@@ -216,6 +296,9 @@ const SearchBar: React.FC = () => {
         prenom: selectedPatient?.prenom || "",
         secure_request_profile: {
           objective,
+          sex: normalizedSex,
+          age: normalizedAge,
+          current_medications: normalizedCurrentMedications,
           clinicalScope,
           ageGroup,
           symptomProfile,
@@ -250,6 +333,7 @@ const SearchBar: React.FC = () => {
         patientDisplayName: selectedPatient
           ? `${selectedPatient.prenom} ${selectedPatient.nom}`.trim()
           : undefined,
+        analysisPayload,
       },
     });
   }, [
@@ -258,18 +342,23 @@ const SearchBar: React.FC = () => {
     clinicalNotes,
     clinicalScope,
     comorbidityContext,
+    currentMedications,
     duration,
     navigate,
     objective,
+    age,
     privacyAttestation,
     redFlagStatus,
     selectedPatient?.nom,
     selectedPatient?.prenom,
     selectedPatientId,
     severity,
+    sex,
     symptomProfile,
+    strings.search.ageLabel,
     strings.search.blockedSensitive,
     strings.search.comorbidityLabel,
+    strings.search.currentMedicationsLabel,
     strings.search.durationLabel,
     strings.search.ageGroupLabel,
     strings.search.notesLabel,
@@ -278,6 +367,7 @@ const SearchBar: React.FC = () => {
     strings.search.redFlagsLabel,
     strings.search.scopeLabel,
     strings.search.severityLabel,
+    strings.search.sexLabel,
     strings.search.symptomLabel,
     selectedPatient,
   ]);
@@ -330,6 +420,11 @@ const SearchBar: React.FC = () => {
     if (profile.objective && objectives.includes(profile.objective)) {
       setObjective(profile.objective);
     }
+    setSex(formatOptionalAdvancedFieldForEdit(profile.sex));
+    setAge(formatOptionalAdvancedFieldForEdit(profile.age));
+    setCurrentMedications(
+      formatOptionalAdvancedFieldForEdit(profile.current_medications)
+    );
     if (
       profile.clinicalScope &&
       clinicalScopes.includes(profile.clinicalScope)
@@ -624,21 +719,7 @@ const SearchBar: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
-        <label className="text-xs text-gray-600">
-          {strings.search.objectiveLabel}
-          <select
-            value={objective}
-            onChange={(e) => setObjective(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
-          >
-            {objectives.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
-
+        <div />
         <div className="flex items-end justify-start sm:justify-end">
           <button
             type="button"
@@ -653,7 +734,57 @@ const SearchBar: React.FC = () => {
       </div>
 
       {showAdvanced && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-left rounded-xl border border-gray-200 bg-gray-50 p-3">
+        <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-left">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <label className="text-xs text-gray-600">
+            {strings.search.objectiveLabel}
+            <select
+              value={objective}
+              onChange={(e) => setObjective(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+            >
+              {objectives.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="text-xs text-gray-600">
+            {strings.search.sexLabel}
+            <input
+              value={sex}
+              onChange={(e) => setSex(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+              placeholder="Ex: Female"
+            />
+          </label>
+
+          <label className="text-xs text-gray-600">
+            {strings.search.ageLabel}
+            <input
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+              placeholder="Ex: 54"
+            />
+          </label>
+
+          </div>
+
+          <label className="block text-xs text-gray-600">
+            {strings.search.currentMedicationsLabel}
+            <textarea
+              value={currentMedications}
+              onChange={(e) => setCurrentMedications(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary resize-none min-h-[72px]"
+              placeholder={strings.search.currentMedicationsPlaceholder}
+            />
+          </label>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+
           <label className="text-xs text-gray-600">
             {strings.search.scopeLabel}
             <select
@@ -774,6 +905,7 @@ const SearchBar: React.FC = () => {
               ))}
             </select>
           </label>
+          </div>
         </div>
       )}
 

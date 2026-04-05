@@ -19,6 +19,9 @@ function normalizeSecureRequestProfile(value) {
 
     return {
         objective: value.objective?.trim() ?? "",
+        sex: value.sex?.trim() ?? "",
+        age: value.age?.trim() ?? "",
+        current_medications: value.current_medications?.trim() ?? "",
         clinicalScope: value.clinicalScope?.trim() ?? "",
         ageGroup: value.ageGroup?.trim() ?? "",
         symptomProfile: value.symptomProfile?.trim() ?? "",

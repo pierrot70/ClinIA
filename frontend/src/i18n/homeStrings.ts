@@ -28,6 +28,10 @@ export type HomeStrings = {
     objectiveLabel: string;
     showAdvanced: string;
     hideAdvanced: string;
+    sexLabel: string;
+    ageLabel: string;
+    currentMedicationsLabel: string;
+    currentMedicationsPlaceholder: string;
     scopeLabel: string;
     ageGroupLabel: string;
     symptomLabel: string;
@@ -70,6 +74,35 @@ const REQUIRED_OPTION_KEYS = [
   "comorbidityContexts",
 ] as const;
 
+const REQUIRED_SEARCH_KEYS = [
+  "secureModeHint",
+  "objectiveLabel",
+  "showAdvanced",
+  "hideAdvanced",
+  "sexLabel",
+  "ageLabel",
+  "currentMedicationsLabel",
+  "currentMedicationsPlaceholder",
+  "scopeLabel",
+  "ageGroupLabel",
+  "symptomLabel",
+  "durationLabel",
+  "severityLabel",
+  "redFlagsLabel",
+  "comorbidityLabel",
+  "notesLabel",
+  "notesPlaceholder",
+  "launchSecure",
+  "checkAttestation",
+  "attestationRequiredHint",
+  "attestationText",
+  "privacyFooter",
+  "privacyConfirmRequired",
+  "sensitiveDetected",
+  "voiceSensitiveDetected",
+  "blockedSensitive",
+] as const;
+
 function isStringRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -92,9 +125,13 @@ export function hasValidHomeStringsShape(value: unknown): value is HomeStrings {
     return false;
   }
 
+  const search = value.search as Record<string, unknown>;
   const options = value.options as Record<string, unknown>;
 
-  return REQUIRED_OPTION_KEYS.every((key) => isStringArray(options[key]));
+  return (
+    REQUIRED_SEARCH_KEYS.every((key) => typeof search[key] === "string") &&
+    REQUIRED_OPTION_KEYS.every((key) => isStringArray(options[key]))
+  );
 }
 
 export const HOME_STRINGS_FR: HomeStrings = {
@@ -160,6 +197,10 @@ export const HOME_STRINGS_FR: HomeStrings = {
     objectiveLabel: "Objectif",
     showAdvanced: "Afficher paramètres avancés",
     hideAdvanced: "Masquer paramètres avancés",
+    sexLabel: "Sexe",
+    ageLabel: "Age",
+    currentMedicationsLabel: "Médication actuelle",
+    currentMedicationsPlaceholder: "Ex: pantoprazole, ondansetron",
     scopeLabel: "Spécialité",
     ageGroupLabel: "Groupe patient",
     symptomLabel: "Symptôme principal",
@@ -290,6 +331,10 @@ export const HOME_STRINGS_EN: HomeStrings = {
     objectiveLabel: "Objective",
     showAdvanced: "Show advanced settings",
     hideAdvanced: "Hide advanced settings",
+    sexLabel: "Sex",
+    ageLabel: "Age",
+    currentMedicationsLabel: "Current medications",
+    currentMedicationsPlaceholder: "E.g. pantoprazole, ondansetron",
     scopeLabel: "Specialty",
     ageGroupLabel: "Patient group",
     symptomLabel: "Main symptom",
@@ -377,6 +422,10 @@ export const HOME_STRINGS_ZH: HomeStrings = {
     objectiveLabel: "目标",
     showAdvanced: "显示高级参数",
     hideAdvanced: "隐藏高级参数",
+    sexLabel: "性别",
+    ageLabel: "年龄",
+    currentMedicationsLabel: "当前用药",
+    currentMedicationsPlaceholder: "例如：泮托拉唑，昂丹司琼",
     scopeLabel: "专科",
     ageGroupLabel: "患者分组",
     symptomLabel: "主要症状",
@@ -481,6 +530,10 @@ export const HOME_STRINGS_JA: HomeStrings = {
     objectiveLabel: "目的",
     showAdvanced: "詳細設定を表示",
     hideAdvanced: "詳細設定を非表示",
+    sexLabel: "性別",
+    ageLabel: "年齢",
+    currentMedicationsLabel: "現在の内服薬",
+    currentMedicationsPlaceholder: "例: パントプラゾール、オンダンセトロン",
     scopeLabel: "診療科",
     ageGroupLabel: "患者グループ",
     symptomLabel: "主症状",
@@ -553,6 +606,10 @@ export const HOME_STRINGS_HE: HomeStrings = {
     objectiveLabel: "מטרה",
     showAdvanced: "הצג הגדרות מתקדמות",
     hideAdvanced: "הסתר הגדרות מתקדמות",
+    sexLabel: "מין",
+    ageLabel: "גיל",
+    currentMedicationsLabel: "תרופות נוכחיות",
+    currentMedicationsPlaceholder: "לדוגמה: pantoprazole, ondansetron",
     scopeLabel: "תחום התמחות",
     ageGroupLabel: "קבוצת מטופל",
     symptomLabel: "תסמין עיקרי",
@@ -625,6 +682,10 @@ export const HOME_STRINGS_KO: HomeStrings = {
     objectiveLabel: "목표",
     showAdvanced: "고급 설정 표시",
     hideAdvanced: "고급 설정 숨기기",
+    sexLabel: "성별",
+    ageLabel: "나이",
+    currentMedicationsLabel: "현재 복용 약물",
+    currentMedicationsPlaceholder: "예: pantoprazole, ondansetron",
     scopeLabel: "전문 분야",
     ageGroupLabel: "환자 그룹",
     symptomLabel: "주요 증상",
@@ -690,6 +751,10 @@ export const HOME_STRINGS_VI: HomeStrings = {
     objectiveLabel: "Muc tieu",
     showAdvanced: "Hien thi tuy chon nang cao",
     hideAdvanced: "An tuy chon nang cao",
+    sexLabel: "Gioi tinh",
+    ageLabel: "Tuoi",
+    currentMedicationsLabel: "Thuoc dang dung",
+    currentMedicationsPlaceholder: "Vi du: pantoprazole, ondansetron",
     scopeLabel: "Chuyen khoa",
     ageGroupLabel: "Nhom benh nhan",
     symptomLabel: "Trieu chung chinh",

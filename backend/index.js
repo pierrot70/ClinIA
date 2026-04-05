@@ -6,6 +6,11 @@ import crypto from "crypto";
 import OpenAI from "openai";
 
 import { safeParseMedicalAI } from "./utils/aiParser.js";
+import {
+    extractPrimaryClinicalConcern,
+    isPlaceholderClinicalAnalysis,
+    normalizeClinicalAnalysis,
+} from "./utils/clinicalAnalysis.js";
 import { getMockForDiagnosis } from "./utils/mockLoader.js";
 import { DiagnosisResult } from "./models/DiagnosisResult.js";
 import { UiTranslationCache } from "./models/UiTranslationCache.js";
@@ -165,112 +170,6 @@ const JSON_MODELS = new Set([
 
 function supportsJsonResponseFormat(model = "") {
     return JSON_MODELS.has(model);
-}
-
-function normalizeClinicalAnalysis(raw) {
-    // Fusionne tous les champs de patient_analysis ET de la racine
-    const pa = raw?.patient_analysis ?? {};
-    const root = { ...raw };
-    delete root.patient_analysis;
-
-    // On fusionne pa et root (root écrase pa en cas de doublon, mais pa est prioritaire pour les champs standards)
-    const merged = { ...root, ...pa };
-
-    const treatments = Array.isArray(merged.treatments)
-        ? merged.treatments.map((t) => ({
-            name: t?.name ?? "Traitement non spécifié",
-            indication: t?.indication ?? "",
-            dosage: t?.dosage ?? "",
-            duration: t?.duration ?? "",
-            contraindications: Array.isArray(t?.contraindications)
-                ? t.contraindications
-                : [],
-            monitoring: Array.isArray(t?.monitoring)
-                ? t.monitoring
-                : [],
-            evidence_level: t?.evidence_level ?? "C",
-        }))
-        : [];
-
-    // Champs standards
-    const base = {
-        diagnosis: {
-            suspected:
-                merged.diagnosis?.suspected ??
-                "Analyse clinique en cours",
-            certainty_level:
-                merged.diagnosis?.certainty_level ?? "moderate",
-            justification:
-                merged.diagnosis?.justification ??
-                "Analyse basée sur données cliniques disponibles.",
-        },
-        treatments,
-        alternatives: Array.isArray(merged.alternatives)
-            ? merged.alternatives
-            : [],
-        red_flags: Array.isArray(merged.red_flags)
-            ? merged.red_flags
-            : [],
-        patient_summary: {
-            plain_language:
-                merged.patient_summary?.plain_language ??
-                "Résumé patient généré par ClinIA.",
-            clinical_language:
-                merged.patient_summary?.clinical_language ??
-                "Analyse clinique structurée.",
-        },
-        meta: {
-            model: process.env.OPENAI_MODEL ?? "fallback",
-            confidence_score:
-                typeof merged.confidence_score === "number"
-                    ? merged.confidence_score
-                    : 0.6,
-        },
-    };
-
-    // Champs IA avancés dynamiques (hors standards)
-    const standardKeys = new Set([
-        "diagnosis",
-        "treatments",
-        "alternatives",
-        "red_flags",
-        "patient_summary",
-        "meta",
-    ]);
-
-    // On ajoute explicitement les champs connus IA avancés
-    const knownAIFields = [
-        "clinical_summary",
-        "recommendations",
-        "initial_evaluation_recommendations",
-        "treatment_options",
-        "follow_up_and_monitoring",
-        "supportive_care",
-        "follow_up_and_supportive_care",
-    ];
-    // Toujours inclure tous les champs IA avancés présents dans merged
-    for (const key of knownAIFields) {
-        if (Object.prototype.hasOwnProperty.call(merged, key)) {
-            base[key] = merged[key];
-        }
-    }
-
-    // On regroupe tous les autres champs IA non standards dans 'other_ai_fields'
-    const otherAIFields = {};
-    for (const [key, value] of Object.entries(merged)) {
-        if (!standardKeys.has(key) && !knownAIFields.includes(key) && value !== undefined) {
-            otherAIFields[key] = value;
-        }
-    }
-    if (Object.keys(otherAIFields).length > 0) {
-        base.other_ai_fields = otherAIFields;
-    }
-
-    // Ajout d'un log pour debug
-    console.log("[normalizeClinicalAnalysis] merged:", JSON.stringify(merged, null, 2));
-    console.log("[normalizeClinicalAnalysis] base:", JSON.stringify(base, null, 2));
-
-    return base;
 }
 
 function hasHomeI18nShape(obj) {
@@ -484,7 +383,22 @@ async function persistOrReuseDiagnosis(payload) {
             });
 
             if (existing) {
-                if (payload.mode === "real" && existing.mode === "mock") {
+                const existingIsPlaceholderReal =
+                    existing.mode === "real" &&
+                    isPlaceholderClinicalAnalysis(existing.output);
+                const incomingIsMeaningfulReal =
+                    payload.mode === "real" &&
+                    !isPlaceholderClinicalAnalysis(payload.output);
+                const shouldReplaceExistingReal =
+                    payload.mode === "real" &&
+                    existing.mode === "real" &&
+                    payload.replaceExisting === true;
+
+                if (
+                    (payload.mode === "real" && existing.mode === "mock") ||
+                    (existingIsPlaceholderReal && incomingIsMeaningfulReal) ||
+                    shouldReplaceExistingReal
+                ) {
                     existing.input = payload.input;
                     existing.output = payload.output;
                     existing.mode = payload.mode;
@@ -603,11 +517,14 @@ app.post("/api/ai/analyze", (req, res, next) => {
         const diagnosisSeed = Array.isArray(symptoms)
             ? symptoms.join(" ")
             : "";
-        const diagnosis =
+        const diagnosis = extractPrimaryClinicalConcern({
+            diagnosis:
             typeof req.body?.diagnosis === "string" &&
             req.body.diagnosis.trim()
                 ? req.body.diagnosis.trim()
-                : diagnosisSeed || "To be determined by ClinIA";
+                : "",
+            symptoms,
+        }) || diagnosisSeed || "To be determined by ClinIA";
         const patient = safeBody;
         let neutralizationMeta = null;
         const fingerprint = makeFingerprint({ diagnosis, patient });
@@ -674,11 +591,54 @@ app.post("/api/ai/analyze", (req, res, next) => {
         const cachedDiagnosis = await findPersistedDiagnosisByFingerprint(
             fingerprint
         );
+        const cachedPrimaryConcern = extractPrimaryClinicalConcern({
+            diagnosis: cachedDiagnosis?.input?.diagnosis,
+            symptoms: cachedDiagnosis?.input?.symptoms,
+        });
+        const normalizedCachedOutput = cachedDiagnosis?.output
+            ? normalizeClinicalAnalysis(cachedDiagnosis.output, {
+                model: cachedDiagnosis.model ?? model ?? "cache",
+                primaryConcern: cachedPrimaryConcern,
+            })
+            : null;
+        const cachedDiagnosisIsPlaceholderReal =
+            cachedDiagnosis?.mode === "real" &&
+            isPlaceholderClinicalAnalysis(normalizedCachedOutput);
         const canReuseCachedDiagnosis =
-            cachedDiagnosis?.output &&
+            normalizedCachedOutput &&
+            !cachedDiagnosisIsPlaceholderReal &&
+            !(forceRealSafe && cachedDiagnosis?.mode === "real") &&
             (cachedDiagnosis.mode !== "mock" || useMock);
 
+        if (cachedDiagnosisIsPlaceholderReal) {
+            console.log("AI_CACHE_SKIP_PLACEHOLDER_REAL", {
+                fingerprint,
+                cachedMode: cachedDiagnosis.mode,
+                requestedMode: useMock ? "mock" : "real",
+            });
+        }
+
+        if (forceRealSafe && cachedDiagnosis?.mode === "real") {
+            console.log("AI_CACHE_SKIP_FORCE_REAL", {
+                fingerprint,
+                cachedMode: cachedDiagnosis.mode,
+            });
+        }
+
         if (canReuseCachedDiagnosis) {
+            const cacheNeedsUpgrade =
+                JSON.stringify(cachedDiagnosis.output) !==
+                JSON.stringify(normalizedCachedOutput);
+
+            if (cacheNeedsUpgrade) {
+                DiagnosisResult.updateOne(
+                    { fingerprint },
+                    { $set: { output: normalizedCachedOutput } }
+                ).catch((err) => {
+                    console.warn("⚠️ AI cache upgrade failed", err?.message);
+                });
+            }
+
             console.log("AI_CACHE_HIT", {
                 fingerprint,
                 mode: cachedDiagnosis.mode,
@@ -686,7 +646,7 @@ app.post("/api/ai/analyze", (req, res, next) => {
             });
 
             return res.json({
-                data: cachedDiagnosis.output,
+                data: normalizedCachedOutput,
                 meta: {
                     source: cachedDiagnosis.mode,
                     model: cachedDiagnosis.model ?? model ?? "cache",
@@ -707,7 +667,10 @@ app.post("/api/ai/analyze", (req, res, next) => {
         /* ---------------- MOCK ---------------- */
         if (useMock) {
             const mock = getMockForDiagnosis(diagnosisSeed || diagnosis);
-            const analysis = normalizeClinicalAnalysis(mock);
+            const analysis = normalizeClinicalAnalysis(mock, {
+                model: "mock",
+                primaryConcern: diagnosis,
+            });
 
             const persist = await persistOrReuseDiagnosis({
                 fingerprint,
@@ -732,7 +695,10 @@ app.post("/api/ai/analyze", (req, res, next) => {
 
         /* ---------------- CIRCUIT BREAKER ---------------- */
         if (!canCallOpenAI() && !forceRealSafe) {
-            const degraded = normalizeClinicalAnalysis({});
+            const degraded = normalizeClinicalAnalysis({}, {
+                model: "fallback",
+                primaryConcern: diagnosis,
+            });
             return res.json({
                 data: degraded,
                 meta: {
@@ -750,12 +716,12 @@ app.post("/api/ai/analyze", (req, res, next) => {
                 {
                     role: "system",
                     content:
-                        "You are ClinIA, a clinical decision support AI. ONLY provide therapeutic options, recommendations, and clinical summary for the specific cancer diagnosis provided by the user (e.g., stomach cancer). Ignore all other diagnoses and comorbidities. Return valid JSON only.",
+                        "You are ClinIA, a clinical decision support AI. Provide structured therapeutic options, monitoring, red flags, and a clinician-facing summary for the primary clinical concern or confirmed diagnosis supplied by the user. Do not issue a final diagnosis, do not prescribe autonomously, and return valid JSON only.",
                 },
                 {
                     role: "user",
                     content:
-                        `The patient has a specific cancer diagnosis: ${diagnosis}. ONLY provide evidence-based treatment options, recommendations, and clinical summary for this specific cancer (e.g., stomach cancer). Do NOT mention or propose treatments for hypertension or any other diagnosis.\nFull patient data: ${JSON.stringify(patient)}`,
+                        `Primary clinical concern or confirmed diagnosis: ${diagnosis}. Provide evidence-based therapeutic options, monitoring considerations, contraindications, red flags, and a concise patient summary for this clinical context only. The final medical decision remains with the clinician.\nFull patient data: ${JSON.stringify(patient)}`,
                 },
             ],
             temperature: 0.1,
@@ -803,7 +769,28 @@ app.post("/api/ai/analyze", (req, res, next) => {
                 rawContent
             );
 
-            normalized = normalizeClinicalAnalysis(parsed);
+            normalized = normalizeClinicalAnalysis(parsed, {
+                model,
+                primaryConcern: diagnosis,
+            });
+
+            if (isPlaceholderClinicalAnalysis(normalized)) {
+                console.error("❌ OpenAI returned an unusable clinical payload", {
+                    model,
+                    diagnosis,
+                    rawContentLength: rawContent.length,
+                });
+
+                return res.status(502).json({
+                    error: {
+                        code: "OPENAI_INVALID_RESPONSE",
+                        message:
+                            "Le service OpenAI a retourne une reponse clinique inutilisable. Reessayez plus tard.",
+                        retryable: true,
+                    },
+                });
+            }
+
             recordOpenAISuccess();
         } catch (err) {
             console.error("❌ OpenAI error:", err.message);
@@ -825,6 +812,7 @@ app.post("/api/ai/analyze", (req, res, next) => {
             output: normalized,
             mode: "real",
             model: model ?? "unknown",
+            replaceExisting: forceRealSafe,
         });
 
         console.log("AI_RESPONSE From OpenAI", {

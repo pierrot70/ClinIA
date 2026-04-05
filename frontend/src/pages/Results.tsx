@@ -8,6 +8,7 @@ import {
 } from "../services/securityIncidentApi";
 import { SecurityBlockingAlert } from "../components/system/SecurityBlockingAlert";
 import type { SecurityIncidentBlockingData } from "../types/api";
+import type { ClinicalPayload } from "../types/clinical";
 
 import AICard from "../components/AICard";
 import ClinicalDemoResult from "../components/ClinicalDemoResult";
@@ -15,10 +16,22 @@ import ClinicalDemoResult from "../components/ClinicalDemoResult";
 import { hypertensionTreatments, anticipatedQuestions } from "../data/hypertension";
 
 const useQuery = () => new URLSearchParams(useLocation().search);
+const RESULTS_PAYLOAD_STORAGE_KEY = "clinia_results_payload";
 
 type ResultsLocationState = {
     patientDisplayName?: string;
+    analysisPayload?: ClinicalPayload;
 };
+
+function buildFallbackPayload(q: string): ClinicalPayload {
+    return {
+        age: 55,
+        sex: "male",
+        symptoms: [q],
+        medical_history: [],
+        current_medications: [],
+    };
+}
 
 function hasRenderableValue(value: unknown): boolean {
     if (value == null) {
@@ -46,9 +59,41 @@ const Results: React.FC = () => {
     const location = useLocation();
     const query = useQuery();
     const q = query.get("q") || "Hypertension essentielle";
+    const locationState = location.state as ResultsLocationState | null;
     const patientDisplayName =
-        (location.state as ResultsLocationState | null)?.patientDisplayName?.trim() ||
+        locationState?.patientDisplayName?.trim() ||
         undefined;
+    const baseAnalysisPayload = useMemo(() => {
+        if (locationState?.analysisPayload) {
+            return {
+                ...locationState.analysisPayload,
+                symptoms:
+                    Array.isArray(locationState.analysisPayload.symptoms) &&
+                    locationState.analysisPayload.symptoms.length > 0
+                        ? locationState.analysisPayload.symptoms
+                        : [q],
+            } satisfies ClinicalPayload;
+        }
+
+        if (typeof window !== "undefined") {
+            try {
+                const raw = window.sessionStorage.getItem(
+                    RESULTS_PAYLOAD_STORAGE_KEY
+                );
+                if (raw) {
+                    const parsed = JSON.parse(raw) as {
+                        q?: string;
+                        payload?: ClinicalPayload;
+                    };
+                    if (parsed.q === q && parsed.payload) {
+                        return parsed.payload;
+                    }
+                }
+            } catch (error) {}
+        }
+
+        return buildFallbackPayload(q);
+    }, [locationState, q]);
 
     const { result: analysis, loading: loadingAI, error: errorMessage, analyze } = useClinicalAnalysis();
 
@@ -136,14 +181,10 @@ const Results: React.FC = () => {
 
     useEffect(() => {
         analyze({
-            age: 55,
-            sex: "male",
-            symptoms: [q],
-            medical_history: [],
-            current_medications: [],
+            ...baseAnalysisPayload,
             forceReal: realAIRef.current,
         });
-    }, [q]);
+    }, [analyze, baseAnalysisPayload]);
 
     async function handleAcknowledgeBlockingIncident() {
         if (!blockingIncident) {
@@ -176,11 +217,7 @@ const Results: React.FC = () => {
         setAcknowledgingIncident(false);
         // Relancer l'analyse après acknowledge
         analyze({
-            age: 55,
-            sex: "male",
-            symptoms: [q],
-            medical_history: [],
-            current_medications: [],
+            ...baseAnalysisPayload,
             forceReal: realAIRef.current,
         });
     }

@@ -36,7 +36,7 @@ type HomeI18nContextValue = {
 };
 
 export const HomeI18nContext = createContext<HomeI18nContextValue | null>(null);
-const UI_LOCALE_STORAGE_KEY = "clinia_ui_locale_v2";
+const UI_LOCALE_STORAGE_KEY = "clinia_ui_locale_v3";
 
 const SUPPORTED_UI_LOCALES = [
   "fr-CA",
@@ -86,7 +86,7 @@ const detectBrowserUiLocale = (): SupportedUiLocale => {
 };
 
 const cacheKeyForLocale = (locale: string) =>
-  `clinia_home_i18n_${locale}_v2`;
+  `clinia_home_i18n_${locale}_v3`;
 
 const VOICE_ACK_LABELS: Record<string, string> = {
   en: "english",
