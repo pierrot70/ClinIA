@@ -9,7 +9,7 @@ export default {
       colors: {
         primary: "#2563eb",
         secondary: "#10b981",
-        background: "#f9fafb"
+        background: "#9ca3af"
       },
       keyframes: {
         "time-flash": {
