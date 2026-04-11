@@ -3,10 +3,18 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useClinicalAnalysis } from '../hooks/useClinicalAnalysis';
 
+const { mockAuthFetch } = vi.hoisted(() => ({
+  mockAuthFetch: vi.fn(),
+}));
+
+vi.mock('../services/authService', () => ({
+  authFetch: mockAuthFetch,
+}));
+
 describe('useClinicalAnalysis integration', () => {
   it('should call analyze and set result', async () => {
     // Ici on mocke fetch pour simuler une réponse IA
-    window.fetch = vi.fn().mockResolvedValue({
+    mockAuthFetch.mockResolvedValue({
       json: async () => ({ data: { hypothesis: 'Test', options: ['A'] } })
     });
     const { result } = renderHook(() => useClinicalAnalysis());

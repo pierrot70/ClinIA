@@ -1,4 +1,5 @@
 import { withSecurityIncidentGuard } from "./securityIncidentGuard";
+import { authFetch } from "./authService";
 // src/services/clinicalApi.ts
 
 import type { ClinicalAnalysis, ClinicalPayload } from "../types/clinical";
@@ -66,7 +67,7 @@ export async function analyzeClinicalCase(
         (async () => {
             let response: Response;
             try {
-                response = await fetch(`${API_URL}/api/ai/analyze`, {
+                response = await authFetch(`${API_URL}/api/ai/analyze`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",

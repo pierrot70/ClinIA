@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import VoiceNavButton from "./VoiceNavButton";
+import { OpenAILogsModal } from "./OpenAILogsModal";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { useAuth } from "../hooks/useAuth";
 import { isAdminRole } from "../auth/roles";
@@ -221,6 +222,7 @@ const Header: React.FC = () => {
     const [activeUsersError, setActiveUsersError] = useState<string | null>(null);
     const [showAuthLogsModal, setShowAuthLogsModal] = useState(false);
     const [showAuthGraphsModal, setShowAuthGraphsModal] = useState(false);
+    const [showOpenAILogsModal, setShowOpenAILogsModal] = useState(false);
     const [authGraphType, setAuthGraphType] = useState<AuthGraphType>("xy");
     const [authLogs, setAuthLogs] = useState<AuthLogEntry[]>([]);
     const [loadingAuthLogs, setLoadingAuthLogs] = useState(false);
@@ -683,6 +685,14 @@ const Header: React.FC = () => {
         }
     };
 
+    const openOpenAILogsModal = () => {
+        setShowOpenAILogsModal(true);
+    };
+
+    const closeOpenAILogsModal = () => {
+        setShowOpenAILogsModal(false);
+    };
+
     const formatAuthLogTimestamp = (value: string) => {
         if (!value) {
             return "Inconnu";
@@ -873,6 +883,15 @@ const Header: React.FC = () => {
                                     {item.label}
                                 </Link>
                             ))}
+                            {canAccessAdmin && (
+                                <button
+                                    type="button"
+                                    onClick={openOpenAILogsModal}
+                                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
+                                >
+                                    OpenAI logs
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -1119,6 +1138,18 @@ const Header: React.FC = () => {
                             <Link to="/patients" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Patients</Link>
                             <Link to="/cliniques" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Cliniques</Link>
                             <Link to="/specialists" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Spécialistes</Link>
+                            {canAccessAdmin && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        openOpenAILogsModal();
+                                        setIsMobileMenuOpen(false);
+                                    }}
+                                    className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                    OpenAI logs
+                                </button>
+                            )}
                             <Link to="/quick" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Mode rapide</Link>
                             <Link to="/patient-summary" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Résumé patient</Link>
                         </div>
@@ -1579,6 +1610,13 @@ const Header: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            <OpenAILogsModal
+                isOpen={showOpenAILogsModal}
+                onClose={closeOpenAILogsModal}
+                authFetch={authFetch}
+                onSessionExpired={logout}
+            />
         </header>
     );
 };

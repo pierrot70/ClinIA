@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import type { ClinicalPayload, ClinicalAnalysis } from "../types/clinical";
+import { authFetch } from "../services/authService";
 
 export function useClinicalAnalysis() {
   const [result, setResult] = useState<ClinicalAnalysis | null>(null);
@@ -11,7 +12,7 @@ export function useClinicalAnalysis() {
     setError(null);
     setResult(null);
     try {
-      const res = await fetch("/api/ai/analyze", {
+      const res = await authFetch("/api/ai/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

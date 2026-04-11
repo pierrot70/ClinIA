@@ -39,15 +39,21 @@ import patientsRouter from "./routes/patients.js";
 import cliniquesRouter from "./routes/cliniques.js";
 import specialistsRouter from "./routes/specialists.js";
 import securityIncidentsRouter from "./routes/securityIncidents.js";
+import openaiLogsRouter from "./routes/openaiLogs.js";
 import authRouter from "./routes/auth.js";
 import translationRouter from "./routes/translation.js";
 
 import { verifyJWT } from "./middleware/verifyJWT.js";
+import { attachOptionalAuth } from "./middleware/attachOptionalAuth.js";
 import { requireRole } from "./middleware/requireRole.js";
 import { AUTH_ROLES } from "./auth/constants.js";
 import { initShutdownState } from "./services/appShutdown.js";
 import { clinicalDemoRateLimiter } from "./middleware/clinicalDemoRateLimiter.js";
 import { loi25DataLeakGuard } from "./middleware/loi25DataLeakGuard.js";
+import {
+    finalizeOpenAIRequestAuditEvent,
+    recordOpenAIRequestAuditEvent,
+} from "./audit/openaiRequestAudit.js";
 
 dotenv.config();
 
@@ -160,6 +166,16 @@ function makeSourceHash(sourceStrings) {
         .createHash("sha256")
         .update(JSON.stringify(sourceStrings))
         .digest("hex");
+}
+
+function getRequestIp(req) {
+    const forwardedFor = req.headers?.["x-forwarded-for"];
+
+    if (typeof forwardedFor === "string" && forwardedFor.trim()) {
+        return forwardedFor.split(",")[0].trim();
+    }
+
+    return req.ip || null;
 }
 
 const JSON_MODELS = new Set([
@@ -476,8 +492,8 @@ async function respondWithSecurityIncident({
 /* ================================================================== */
 
 // Appliquer le rate limiter uniquement si l'utilisateur n'est pas authentifié (ex: clinical-demo)
-app.post("/api/ai/analyze", (req, res, next) => {
-    if (!req.user) {
+app.post("/api/ai/analyze", attachOptionalAuth, (req, res, next) => {
+    if (!req.auth) {
         return clinicalDemoRateLimiter(req, res, next);
     }
     return next();
@@ -736,8 +752,43 @@ app.post("/api/ai/analyze", (req, res, next) => {
 
         let normalized;
         let rawContent = "";
+        let openAIRequestAudit = null;
 
         try {
+            const requestPayloadText = JSON.stringify(request);
+            openAIRequestAudit = await recordOpenAIRequestAuditEvent({
+                action: "AI_ANALYZE_REQUEST",
+                outcome: "SENT",
+                actorUserId: req.auth?.userId ?? null,
+                actorUsername: req.auth?.username ?? null,
+                actorRole: req.auth?.role ?? null,
+                ip: getRequestIp(req),
+                requestPath: "/api/ai/analyze",
+                model,
+                payloadHash: makeSourceHash(request),
+                payloadSizeBytes: Buffer.byteLength(requestPayloadText, "utf8"),
+                requestContext: {
+                    fingerprint,
+                    diagnosisHash: makeSourceHash({ diagnosis }),
+                    symptomCount: Array.isArray(symptoms)
+                        ? symptoms.length
+                        : 0,
+                    medicalHistoryCount: Array.isArray(patient.medical_history)
+                        ? patient.medical_history.length
+                        : 0,
+                    currentMedicationCount: Array.isArray(
+                        patient.current_medications
+                    )
+                        ? patient.current_medications.length
+                        : 0,
+                    forceReal: forceRealSafe,
+                    neutralized: neutralizationMeta?.neutralized === true,
+                },
+                acknowledgmentIncidentId:
+                    neutralizationMeta?.acknowledgmentIncidentId ?? null,
+                neutralized: neutralizationMeta?.neutralized === true,
+            });
+
             const completion =
                 await openai.chat.completions.create(
                     request
@@ -751,6 +802,14 @@ app.post("/api/ai/analyze", (req, res, next) => {
 
             const postCloudScan = detectNonSecureContent(rawContent);
             if (postCloudScan.hasMatches) {
+                await finalizeOpenAIRequestAuditEvent(
+                    openAIRequestAudit?._id,
+                    {
+                        outcome: "FAILED",
+                        upstreamRequestId: completion?.id || null,
+                        errorCode: "POST_CLOUD_IDENTIFIER_DETECTED",
+                    }
+                );
                 return respondWithSecurityIncident({
                     res,
                     phase: "post_cloud",
@@ -775,6 +834,14 @@ app.post("/api/ai/analyze", (req, res, next) => {
             });
 
             if (isPlaceholderClinicalAnalysis(normalized)) {
+                await finalizeOpenAIRequestAuditEvent(
+                    openAIRequestAudit?._id,
+                    {
+                        outcome: "FAILED",
+                        upstreamRequestId: completion?.id || null,
+                        errorCode: "OPENAI_INVALID_RESPONSE",
+                    }
+                );
                 console.error("❌ OpenAI returned an unusable clinical payload", {
                     model,
                     diagnosis,
@@ -792,7 +859,21 @@ app.post("/api/ai/analyze", (req, res, next) => {
             }
 
             recordOpenAISuccess();
+            await finalizeOpenAIRequestAuditEvent(
+                openAIRequestAudit?._id,
+                {
+                    outcome: "SUCCESS",
+                    upstreamRequestId: completion?.id || null,
+                }
+            );
         } catch (err) {
+            await finalizeOpenAIRequestAuditEvent(
+                openAIRequestAudit?._id,
+                {
+                    outcome: "FAILED",
+                    errorCode: "OPENAI_UPSTREAM_FAILED",
+                }
+            );
             console.error("❌ OpenAI error:", err.message);
             recordOpenAIFailure();
 
@@ -1288,6 +1369,13 @@ app.use(
     requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
     loi25DataLeakGuard,
     securityIncidentsRouter
+);
+app.use(
+    "/api/openai-logs",
+    verifyJWT,
+    requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+    loi25DataLeakGuard,
+    openaiLogsRouter
 );
 app.use(
     "/api/auth",
