@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { SessionExpiredError } from "../services/authService";
 
 type OpenAILogEntry = {
@@ -232,6 +233,13 @@ export function OpenAILogsModal({
                             <p className="text-xs text-gray-500">
                                 Consultation en lecture seule des envois anonymises vers OpenAI.
                             </p>
+                            <Link
+                                to="/admin/openai-logs"
+                                onClick={onClose}
+                                className="mt-2 inline-flex text-xs font-medium text-sky-700 hover:text-sky-800"
+                            >
+                                Ouvrir la page dediee
+                            </Link>
                         </div>
                         <div className="flex items-center gap-3">
                             {queryDurationMs !== null && (

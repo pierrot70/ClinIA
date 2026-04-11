@@ -1,6 +1,10 @@
 import mongoose from "mongoose";
 import { OpenAIRequestAuditLog } from "../models/OpenAIRequestAuditLog.js";
 
+const DEFAULT_PAGE_LIMIT = 20;
+const MAX_PAGE_LIMIT = 100;
+const MAX_EXPORT_ROWS = 10000;
+
 function createOpenAILogError(code, message) {
     return { code, message };
 }
@@ -22,10 +26,36 @@ function buildContainsRegex(value) {
     return new RegExp(escapeRegex(value.trim()), "i");
 }
 
-export async function listOpenAILogs({
-    authUser,
-    page,
-    limit,
+function normalizeOpenAILog(log) {
+    return {
+        id: String(log._id),
+        action: log.action,
+        outcome: log.outcome,
+        actorUserId: log.actorUserId ? String(log.actorUserId) : null,
+        actorUsernameMasked: log.actorUsernameMasked,
+        actorRole: log.actorRole,
+        ip: log.ip,
+        requestPath: log.requestPath,
+        transport: log.transport,
+        model: log.model,
+        payloadHash: log.payloadHash,
+        payloadSizeBytes: Number(log.payloadSizeBytes || 0),
+        dataClassification: log.dataClassification,
+        acknowledgmentIncidentId: log.acknowledgmentIncidentId
+            ? String(log.acknowledgmentIncidentId)
+            : null,
+        neutralized: log.neutralized === true,
+        upstreamRequestId: log.upstreamRequestId,
+        errorCode: log.errorCode,
+        requestContext:
+            log.requestContext && typeof log.requestContext === "object"
+                ? log.requestContext
+                : null,
+        timestamp: log.timestamp,
+    };
+}
+
+function buildOpenAILogsQuery({
     startDate,
     endDate,
     action,
@@ -45,15 +75,6 @@ export async function listOpenAILogs({
     upstreamRequestId,
     errorCode,
 }) {
-    assertOpenAILogAccess(authUser);
-
-    const parsedPage = Number.parseInt(page, 10) || 1;
-    const parsedLimit = Number.parseInt(limit, 10) || 20;
-
-    if (parsedPage < 1 || parsedLimit < 1 || parsedLimit > 100) {
-        throw createOpenAILogError("INVALID_INPUT", "Pagination invalide.");
-    }
-
     const allowedActions = new Set(["AI_ANALYZE_REQUEST"]);
     const allowedOutcomes = new Set(["SENT", "SUCCESS", "FAILED"]);
     const allowedRoles = new Set(["USER", "MEDECIN", "ADMIN", "SUPERADMIN"]);
@@ -151,7 +172,11 @@ export async function listOpenAILogs({
         andClauses.push({ payloadHash: buildContainsRegex(payloadHash) });
     }
 
-    if (payloadSizeBytes !== undefined && payloadSizeBytes !== null && `${payloadSizeBytes}`.trim()) {
+    if (
+        payloadSizeBytes !== undefined &&
+        payloadSizeBytes !== null &&
+        `${payloadSizeBytes}`.trim()
+    ) {
         const parsedPayloadSizeBytes = Number.parseInt(`${payloadSizeBytes}`, 10);
         if (!Number.isFinite(parsedPayloadSizeBytes) || parsedPayloadSizeBytes < 0) {
             throw createOpenAILogError(
@@ -210,6 +235,131 @@ export async function listOpenAILogs({
         query.$and = andClauses;
     }
 
+    return query;
+}
+
+function escapeCsvValue(value) {
+    if (value == null) {
+        return "";
+    }
+
+    const normalized = String(value);
+    if (
+        normalized.includes(",") ||
+        normalized.includes("\n") ||
+        normalized.includes("\r") ||
+        normalized.includes('"')
+    ) {
+        return `"${normalized.replace(/"/g, '""')}"`;
+    }
+
+    return normalized;
+}
+
+function toCsvRow(values) {
+    return values.map((value) => escapeCsvValue(value)).join(",");
+}
+
+export function serializeOpenAILogsCsv(logs) {
+    const header = [
+        "timestamp",
+        "action",
+        "outcome",
+        "actorUserId",
+        "actorUsernameMasked",
+        "actorRole",
+        "ip",
+        "requestPath",
+        "transport",
+        "model",
+        "payloadHash",
+        "payloadSizeBytes",
+        "dataClassification",
+        "acknowledgmentIncidentId",
+        "neutralized",
+        "upstreamRequestId",
+        "errorCode",
+        "requestContext",
+    ];
+
+    const rows = logs.map((log) =>
+        toCsvRow([
+            log.timestamp instanceof Date ? log.timestamp.toISOString() : log.timestamp,
+            log.action,
+            log.outcome,
+            log.actorUserId,
+            log.actorUsernameMasked,
+            log.actorRole,
+            log.ip,
+            log.requestPath,
+            log.transport,
+            log.model,
+            log.payloadHash,
+            log.payloadSizeBytes,
+            log.dataClassification,
+            log.acknowledgmentIncidentId,
+            log.neutralized,
+            log.upstreamRequestId,
+            log.errorCode,
+            log.requestContext ? JSON.stringify(log.requestContext) : "",
+        ])
+    );
+
+    return [toCsvRow(header), ...rows].join("\n");
+}
+
+export async function listOpenAILogs({
+    authUser,
+    page,
+    limit,
+    startDate,
+    endDate,
+    action,
+    outcome,
+    actorUserId,
+    actorUsernameMasked,
+    actorRole,
+    ip,
+    requestPath,
+    transport,
+    model,
+    payloadHash,
+    payloadSizeBytes,
+    dataClassification,
+    acknowledgmentIncidentId,
+    neutralized,
+    upstreamRequestId,
+    errorCode,
+}) {
+    assertOpenAILogAccess(authUser);
+
+    const parsedPage = Number.parseInt(page, 10) || 1;
+    const parsedLimit = Number.parseInt(limit, 10) || DEFAULT_PAGE_LIMIT;
+
+    if (parsedPage < 1 || parsedLimit < 1 || parsedLimit > MAX_PAGE_LIMIT) {
+        throw createOpenAILogError("INVALID_INPUT", "Pagination invalide.");
+    }
+    const query = buildOpenAILogsQuery({
+        startDate,
+        endDate,
+        action,
+        outcome,
+        actorUserId,
+        actorUsernameMasked,
+        actorRole,
+        ip,
+        requestPath,
+        transport,
+        model,
+        payloadHash,
+        payloadSizeBytes,
+        dataClassification,
+        acknowledgmentIncidentId,
+        neutralized,
+        upstreamRequestId,
+        errorCode,
+    });
+
     const skip = (parsedPage - 1) * parsedLimit;
 
     const [total, logs] = await Promise.all([
@@ -222,37 +372,30 @@ export async function listOpenAILogs({
     ]);
 
     return {
-        logs: logs.map((log) => ({
-            id: String(log._id),
-            action: log.action,
-            outcome: log.outcome,
-            actorUserId: log.actorUserId ? String(log.actorUserId) : null,
-            actorUsernameMasked: log.actorUsernameMasked,
-            actorRole: log.actorRole,
-            ip: log.ip,
-            requestPath: log.requestPath,
-            transport: log.transport,
-            model: log.model,
-            payloadHash: log.payloadHash,
-            payloadSizeBytes: Number(log.payloadSizeBytes || 0),
-            dataClassification: log.dataClassification,
-            acknowledgmentIncidentId: log.acknowledgmentIncidentId
-                ? String(log.acknowledgmentIncidentId)
-                : null,
-            neutralized: log.neutralized === true,
-            upstreamRequestId: log.upstreamRequestId,
-            errorCode: log.errorCode,
-            requestContext:
-                log.requestContext && typeof log.requestContext === "object"
-                    ? log.requestContext
-                    : null,
-            timestamp: log.timestamp,
-        })),
+        logs: logs.map((log) => normalizeOpenAILog(log)),
         pagination: {
             page: parsedPage,
             limit: parsedLimit,
             total,
             totalPages: Math.max(1, Math.ceil(total / parsedLimit)),
         },
+    };
+}
+
+export async function exportOpenAILogsCsv({ authUser, ...filters }) {
+    assertOpenAILogAccess(authUser);
+
+    const query = buildOpenAILogsQuery(filters);
+    const logs = await OpenAIRequestAuditLog.find(query)
+        .sort({ timestamp: -1 })
+        .limit(MAX_EXPORT_ROWS)
+        .lean();
+
+    const normalizedLogs = logs.map((log) => normalizeOpenAILog(log));
+
+    return {
+        csv: serializeOpenAILogsCsv(normalizedLogs),
+        count: normalizedLogs.length,
+        truncated: logs.length >= MAX_EXPORT_ROWS,
     };
 }

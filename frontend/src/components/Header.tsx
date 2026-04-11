@@ -1056,6 +1056,20 @@ const Header: React.FC = () => {
                         </Link>
                     )}
 
+                    {canAccessAdmin && (
+                        <Link
+                            to="/admin/openai-logs"
+                            className={
+                                "hover:text-blue-600 transition-colors " +
+                                (location.pathname === "/admin/openai-logs"
+                                    ? "text-blue-600 font-medium"
+                                    : "text-gray-600")
+                            }
+                        >
+                            Audits OpenAI
+                        </Link>
+                    )}
+
                     {canAccessAdmin && user?.role === "SUPERADMIN" && (
                         <Link
                             to="/admin/users/manage"
@@ -1188,6 +1202,10 @@ const Header: React.FC = () => {
 
                             {canAccessAdmin && (
                                 <Link to="/admin/patient-audits" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Audits patient</Link>
+                            )}
+
+                            {canAccessAdmin && (
+                                <Link to="/admin/openai-logs" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Audits OpenAI</Link>
                             )}
 
                             {canAccessAdmin && user?.role === "SUPERADMIN" && (

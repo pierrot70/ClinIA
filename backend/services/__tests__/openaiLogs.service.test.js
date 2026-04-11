@@ -10,7 +10,7 @@ vi.mock("../../models/OpenAIRequestAuditLog.js", () => ({
     },
 }));
 
-const { listOpenAILogs } = await import("../openaiLogs.js");
+const { exportOpenAILogsCsv, listOpenAILogs } = await import("../openaiLogs.js");
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -109,5 +109,47 @@ describe("openai logs service", () => {
             code: "FORBIDDEN",
             message: "Action reservee aux administrateurs.",
         });
+    });
+
+    it("exports filtered OpenAI logs as CSV", async () => {
+        openAILogFind.mockReturnValue({
+            sort: vi.fn().mockReturnValue({
+                limit: vi.fn().mockReturnValue({
+                    lean: vi.fn().mockResolvedValue([
+                        {
+                            _id: "507f1f77bcf86cd799439031",
+                            action: "AI_ANALYZE_REQUEST",
+                            outcome: "FAILED",
+                            actorUserId: "507f1f77bcf86cd799439011",
+                            actorUsernameMasked: "ad***",
+                            actorRole: "ADMIN",
+                            ip: "203.0.113.20",
+                            requestPath: "/api/ai/analyze",
+                            transport: "openai_chat_completions",
+                            model: "gpt-4.1-mini",
+                            payloadHash: "abc123",
+                            payloadSizeBytes: 512,
+                            dataClassification: "ANONYMIZED_MEDICAL",
+                            acknowledgmentIncidentId: null,
+                            neutralized: false,
+                            upstreamRequestId: "req_123",
+                            errorCode: "OPENAI_UPSTREAM_FAILED",
+                            requestContext: { symptomCount: 2 },
+                            timestamp: new Date("2026-04-11T10:00:00.000Z"),
+                        },
+                    ]),
+                }),
+            }),
+        });
+
+        const result = await exportOpenAILogsCsv({
+            authUser: { role: "SUPERADMIN" },
+            outcome: "FAILED",
+        });
+
+        expect(result.truncated).toBe(false);
+        expect(result.csv).toContain("timestamp,action,outcome");
+        expect(result.csv).toContain("AI_ANALYZE_REQUEST");
+        expect(result.csv).toContain("OPENAI_UPSTREAM_FAILED");
     });
 });
