@@ -14,41 +14,12 @@ import { useTranslation } from "../hooks/useTranslation";
 import { hypertensionTreatments, anticipatedQuestions } from "../data/hypertension";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 
-import type { ClinicalPayload, ClinicalAnalysis, Sex } from "../types/clinical";
+import type { ClinicalPayload, ClinicalAnalysis } from "../types/clinical";
 import type {
     ApiResponse,
     ApiError,
     SecurityIncidentBlockingData,
 } from "../types/api";
-
-/* ------------------------------------------------------------------ */
-/* Preset clinique par défaut (JAMAIS invalide)                        */
-/* ------------------------------------------------------------------ */
-
-// Valeurs par défaut dynamiquement traduites
-import { useMemo } from "react";
-
-function useDefaultClinicalPayload(targetLang: string, openaiModel: string) {
-    const { translated: symptom1 } = useTranslation({ text: "Polyurie", targetLang, openaiModel });
-    const { translated: symptom2 } = useTranslation({ text: "Polydipsie", targetLang, openaiModel });
-    const { translated: symptom3 } = useTranslation({ text: "Fatigue", targetLang, openaiModel });
-    const { translated: history1 } = useTranslation({ text: "Diabète de type 2", targetLang, openaiModel });
-    const { translated: med1 } = useTranslation({ text: "Metformine", targetLang, openaiModel });
-
-    return useMemo(() => ({
-        age: 55,
-        sex: "male" as Sex,
-        weight: 92,
-        height: 175,
-        blood_pressure: {
-            systolic: 145,
-            diastolic: 92,
-        },
-        symptoms: [symptom1, symptom2, symptom3].filter(Boolean),
-        medical_history: [history1].filter(Boolean),
-        current_medications: [med1].filter(Boolean),
-    }), [symptom1, symptom2, symptom3, history1, med1]);
-}
 
 type OpenAIModel = "gpt-4.1-mini" | "gpt-4-0613";
 
@@ -80,7 +51,6 @@ export function ClinicalAnalyzePage() {
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
     const [openaiModel, setOpenaiModel] = useState<OpenAIModel>("gpt-4.1-mini");
-    const DEFAULT_CLINICAL_PAYLOAD = useDefaultClinicalPayload(targetLang, openaiModel);
     const isProd = !!import.meta.env.PROD;
     const [activeTab, setActiveTab] =
         useState<"patient" | "clinical">("patient");
@@ -214,10 +184,6 @@ export function ClinicalAnalyzePage() {
     async function handleSubmit(payload: ClinicalPayload) {
         const safePayload = {
             ...payload,
-            symptoms:
-                payload.symptoms.length > 0
-                    ? payload.symptoms
-                    : DEFAULT_CLINICAL_PAYLOAD.symptoms,
             forceReal: isProd ? false : forceReal,
             openaiModel,
         };
@@ -374,7 +340,6 @@ export function ClinicalAnalyzePage() {
                     key={targetLang + openaiModel}
                     onSubmit={handleSubmit}
                     loading={loading}
-                    initialData={DEFAULT_CLINICAL_PAYLOAD}
                 />
             )}
 

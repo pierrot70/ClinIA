@@ -11,6 +11,7 @@ export type AIServiceSource = "real" | "mock" | "degraded";
 export interface ClinicalPayload {
     age: number;
     sex: Sex;
+    diagnosis?: string;
 
     weight?: number;
     height?: number;

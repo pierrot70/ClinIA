@@ -519,12 +519,20 @@ app.post("/api/ai/analyze", attachOptionalAuth, (req, res, next) => {
             incidentAckId,
         } = safeBody;
 
-        if (!Array.isArray(symptoms) || symptoms.length === 0) {
+        const diagnosisInput =
+            typeof safeBody.diagnosis === "string"
+                ? safeBody.diagnosis.trim()
+                : "";
+
+        if (
+            (!Array.isArray(symptoms) || symptoms.length === 0) &&
+            !diagnosisInput
+        ) {
             return res.json({
                 error: {
                     code: "INVALID_INPUT",
                     message:
-                        "Données cliniques insuffisantes pour l’analyse.",
+                        "Entrez au moins un symptome ou un diagnostic / motif clinique principal.",
                     retryable: false,
                 },
             });
@@ -534,11 +542,7 @@ app.post("/api/ai/analyze", attachOptionalAuth, (req, res, next) => {
             ? symptoms.join(" ")
             : "";
         const diagnosis = extractPrimaryClinicalConcern({
-            diagnosis:
-            typeof req.body?.diagnosis === "string" &&
-            req.body.diagnosis.trim()
-                ? req.body.diagnosis.trim()
-                : "",
+            diagnosis: diagnosisInput,
             symptoms,
         }) || diagnosisSeed || "To be determined by ClinIA";
         const patient = safeBody;
