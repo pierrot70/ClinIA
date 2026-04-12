@@ -85,6 +85,20 @@ const OUTCOME_OPTIONS = ["", "SENT", "SUCCESS", "FAILED"];
 const ROLE_OPTIONS = ["", "USER", "MEDECIN", "ADMIN", "SUPERADMIN"];
 const CLASSIFICATION_OPTIONS = ["", "ANONYMIZED_MEDICAL"];
 const NEUTRALIZED_OPTIONS = ["", "true", "false"];
+const ERROR_CODE_OPTIONS = [
+    "",
+    "PRE_CLOUD_IDENTIFIER_DETECTED",
+    "POST_CLOUD_IDENTIFIER_DETECTED",
+    "OPENAI_UPSTREAM_FAILED",
+    "OPENAI_INVALID_RESPONSE",
+    "SECURITY_IDENTIFIER_DETECTED",
+];
+
+function getLocalDateInputValue() {
+    const now = new Date();
+    const timezoneOffsetMs = now.getTimezoneOffset() * 60 * 1000;
+    return new Date(now.getTime() - timezoneOffsetMs).toISOString().slice(0, 10);
+}
 
 function formatTimestamp(value: string) {
     if (!value) {
@@ -218,6 +232,22 @@ export function OpenAILogsModal({
 
         void loadLogs(1, true);
     }, [isOpen]);
+
+    function applyRecentClinicalErrorsPreset() {
+        const today = getLocalDateInputValue();
+        const nextFilters = {
+            ...filters,
+            startDate: today,
+            endDate: today,
+            action: "AI_ANALYZE_REQUEST",
+            outcome: "FAILED",
+            requestPath: "/api/ai/analyze",
+        };
+
+        setFilters(nextFilters);
+        setPage(1);
+        void loadLogs(1, true, nextFilters);
+    }
 
     if (!isOpen) {
         return null;
@@ -492,15 +522,20 @@ export function OpenAILogsModal({
                         </label>
                         <label className="text-sm text-gray-700">
                             Error code
-                            <input
-                                type="text"
+                            <select
                                 value={filters.errorCode}
                                 onChange={(event) => setFilters((current) => ({
                                     ...current,
                                     errorCode: event.target.value,
                                 }))}
-                                className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                            />
+                                className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
+                            >
+                                {ERROR_CODE_OPTIONS.map((option) => (
+                                    <option key={option || "ALL_ERROR_CODES"} value={option}>
+                                        {option || "Tous"}
+                                    </option>
+                                ))}
+                            </select>
                         </label>
                     </div>
 
@@ -513,6 +548,13 @@ export function OpenAILogsModal({
                             className="rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
                         >
                             Rechercher
+                        </button>
+                        <button
+                            type="button"
+                            onClick={applyRecentClinicalErrorsPreset}
+                            className="rounded border border-amber-300 bg-amber-50 px-3 py-1 text-sm text-amber-900 hover:bg-amber-100"
+                        >
+                            Afficher seulement les erreurs cliniques recentes
                         </button>
                         <button
                             type="button"

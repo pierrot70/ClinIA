@@ -12,7 +12,21 @@ const OUTCOME_OPTIONS = ["", "SENT", "SUCCESS", "FAILED"] as const;
 const ROLE_OPTIONS = ["", "USER", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
 const CLASSIFICATION_OPTIONS = ["", "ANONYMIZED_MEDICAL"] as const;
 const NEUTRALIZED_OPTIONS = ["", "true", "false"] as const;
+const ERROR_CODE_OPTIONS = [
+    "",
+    "PRE_CLOUD_IDENTIFIER_DETECTED",
+    "POST_CLOUD_IDENTIFIER_DETECTED",
+    "OPENAI_UPSTREAM_FAILED",
+    "OPENAI_INVALID_RESPONSE",
+    "SECURITY_IDENTIFIER_DETECTED",
+] as const;
 const PAGE_LIMIT = 20;
+
+function getLocalDateInputValue() {
+    const now = new Date();
+    const timezoneOffsetMs = now.getTimezoneOffset() * 60 * 1000;
+    return new Date(now.getTime() - timezoneOffsetMs).toISOString().slice(0, 10);
+}
 
 function formatTimestamp(value: string) {
     const date = new Date(value);
@@ -156,6 +170,35 @@ export function OpenAILogsPage() {
         const next = new URLSearchParams();
 
         Object.entries(draftFilters).forEach(([key, value]) => {
+            if (key === "page" || key === "limit") {
+                return;
+            }
+
+            const normalized = String(value ?? "").trim();
+            if (normalized) {
+                next.set(key, normalized);
+            }
+        });
+
+        next.set("page", "1");
+        setSearchParams(next);
+    }
+
+    function applyRecentClinicalErrorsPreset() {
+        const today = getLocalDateInputValue();
+        const nextFilters = {
+            ...draftFilters,
+            startDate: today,
+            endDate: today,
+            action: "AI_ANALYZE_REQUEST",
+            outcome: "FAILED",
+            requestPath: "/api/ai/analyze",
+        };
+
+        setDraftFilters(nextFilters);
+
+        const next = new URLSearchParams();
+        Object.entries(nextFilters).forEach(([key, value]) => {
             if (key === "page" || key === "limit") {
                 return;
             }
@@ -379,12 +422,17 @@ export function OpenAILogsPage() {
 
                     <label className="text-sm text-gray-700">
                         Error code
-                        <input
+                        <select
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={draftFilters.errorCode}
                             onChange={(event) => updateDraftFilter("errorCode", event.target.value)}
-                            placeholder="OPENAI_UPSTREAM_FAILED"
-                        />
+                        >
+                            {ERROR_CODE_OPTIONS.map((option) => (
+                                <option key={option || "all-error-codes"} value={option}>
+                                    {option || "Tous"}
+                                </option>
+                            ))}
+                        </select>
                     </label>
 
                     <label className="text-sm text-gray-700">
@@ -417,6 +465,13 @@ export function OpenAILogsPage() {
                         className="rounded bg-gray-900 px-4 py-2 font-medium text-white hover:bg-gray-800"
                     >
                         Rechercher
+                    </button>
+                    <button
+                        type="button"
+                        onClick={applyRecentClinicalErrorsPreset}
+                        className="rounded border border-amber-300 bg-amber-50 px-4 py-2 font-medium text-amber-900 hover:bg-amber-100"
+                    >
+                        Afficher seulement les erreurs cliniques recentes
                     </button>
                     <button
                         type="button"

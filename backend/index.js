@@ -456,6 +456,7 @@ async function respondWithSecurityIncident({
     requestPath,
     matches,
     context = {},
+    auditEvent = null,
 }) {
     try {
         const incident = await createSecurityIncident({
@@ -466,6 +467,46 @@ async function respondWithSecurityIncident({
             context,
             transport: "openai_chat_completions",
         });
+
+        if (auditEvent && typeof auditEvent === "object") {
+            const incidentErrorCode =
+                phase === "pre_cloud"
+                    ? "PRE_CLOUD_IDENTIFIER_DETECTED"
+                    : phase === "post_cloud"
+                      ? "POST_CLOUD_IDENTIFIER_DETECTED"
+                      : "SECURITY_IDENTIFIER_DETECTED";
+
+            await recordOpenAIRequestAuditEvent({
+                action: "AI_ANALYZE_REQUEST",
+                outcome: "FAILED",
+                errorCode: incidentErrorCode,
+                actorUserId: auditEvent.actorUserId ?? null,
+                actorUsername: auditEvent.actorUsername ?? null,
+                actorRole: auditEvent.actorRole ?? null,
+                ip: auditEvent.ip ?? null,
+                requestPath,
+                model: auditEvent.model || "unknown",
+                payloadHash: auditEvent.payloadHash || makeSourceHash({
+                    requestPath,
+                    phase,
+                    reason,
+                }),
+                payloadSizeBytes: auditEvent.payloadSizeBytes ?? 0,
+                requestContext: {
+                    ...(auditEvent.requestContext || {}),
+                    securityIncidentPhase: phase,
+                    blockedBeforeCloud: phase === "pre_cloud",
+                    detectedIdentifierCount: Array.isArray(matches)
+                        ? matches.length
+                        : 0,
+                    detectedIdentifierTypes: Array.isArray(matches)
+                        ? [...new Set(matches.map((match) => match?.type).filter(Boolean))]
+                        : [],
+                },
+                acknowledgmentIncidentId: String(incident?._id || ""),
+                neutralized: false,
+            });
+        }
 
         return res.status(422).json(buildBlockingIncidentResponse(incident));
     } catch (err) {
@@ -591,6 +632,37 @@ app.post("/api/ai/analyze", attachOptionalAuth, (req, res, next) => {
                     context: {
                         model,
                         direction: "request",
+                    },
+                    auditEvent: {
+                        actorUserId: req.auth?.userId ?? null,
+                        actorUsername: req.auth?.username ?? null,
+                        actorRole: req.auth?.role ?? null,
+                        ip: getRequestIp(req),
+                        model,
+                        payloadHash: makeSourceHash(patient),
+                        payloadSizeBytes: Buffer.byteLength(
+                            JSON.stringify(patient),
+                            "utf8"
+                        ),
+                        requestContext: {
+                            fingerprint,
+                            diagnosisHash: makeSourceHash({ diagnosis }),
+                            symptomCount: Array.isArray(symptoms)
+                                ? symptoms.length
+                                : 0,
+                            medicalHistoryCount: Array.isArray(
+                                patient.medical_history
+                            )
+                                ? patient.medical_history.length
+                                : 0,
+                            currentMedicationCount: Array.isArray(
+                                patient.current_medications
+                            )
+                                ? patient.current_medications.length
+                                : 0,
+                            forceReal: forceRealSafe,
+                            direction: "request",
+                        },
                     },
                 });
             }

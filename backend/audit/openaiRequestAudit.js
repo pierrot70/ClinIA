@@ -40,6 +40,7 @@ function normalizeRequestContext(context) {
 export async function recordOpenAIRequestAuditEvent({
     action = "AI_ANALYZE_REQUEST",
     outcome = "SENT",
+    errorCode = null,
     actorUserId = null,
     actorUsername = null,
     actorRole = null,
@@ -74,6 +75,7 @@ export async function recordOpenAIRequestAuditEvent({
                     ? acknowledgmentIncidentId
                     : null,
             neutralized: neutralized === true,
+            errorCode,
             timestamp: new Date(),
         });
 
