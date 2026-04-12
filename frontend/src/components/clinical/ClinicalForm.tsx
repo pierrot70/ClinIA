@@ -49,6 +49,26 @@ const EXAMPLE_CASES: Record<string, ClinicalPayload> = {
         medical_history: [],
         current_medications: ["Aucune"],
     },
+    cataract72: {
+        age: 72,
+        sex: "female",
+        diagnosis: "Cataracte",
+        weight: 68,
+        height: 162,
+        symptoms: ["Vision floue progressive", "Eblouissements", "Baisse de l'acuite visuelle"],
+        medical_history: ["Diabete de type 2"],
+        current_medications: ["Metformine"],
+    },
+    majorDepression42: {
+        age: 42,
+        sex: "male",
+        diagnosis: "Trouble depressif majeur",
+        weight: 81,
+        height: 178,
+        symptoms: ["Humeur depressive", "Insomnie", "Perte d'interet", "Fatigue"],
+        medical_history: ["Anxiete generalisee"],
+        current_medications: ["Aucune"],
+    },
 };
 
 function clonePayload(payload: ClinicalPayload): ClinicalPayload {
@@ -214,9 +234,11 @@ export function ClinicalForm({
     const { translated: incompleteDataLabel } = useTranslation({ text: "Données cliniques incomplètes", targetLang });
     const { translated: exampleCaseFieldLabel } = useTranslation({ text: "Cas exemple", targetLang });
     const { translated: noExampleCaseLabel } = useTranslation({ text: "Aucun", targetLang });
-    const { translated: patient1Label } = useTranslation({ text: "Patient no 1 - 55 ans, hypertension", targetLang });
-    const { translated: patient2Label } = useTranslation({ text: "Patient no 2 - femme de 59 ans, cancer de l'estomac", targetLang });
-    const { translated: patient3Label } = useTranslation({ text: "Patient no 3 - femme de 35 ans, mononucleose", targetLang });
+    const { translated: patient1Label } = useTranslation({ text: "Hypertension", targetLang });
+    const { translated: patient2Label } = useTranslation({ text: "Cancer de l'estomac", targetLang });
+    const { translated: patient3Label } = useTranslation({ text: "Mononucleose", targetLang });
+    const { translated: patient4Label } = useTranslation({ text: "Cataracte", targetLang });
+    const { translated: patient5Label } = useTranslation({ text: "Trouble depressif majeur", targetLang });
     const { translated: ageLabel } = useTranslation({ text: "Age du patient", targetLang });
     const { translated: sexLabel } = useTranslation({ text: "Sexe", targetLang });
     const { translated: maleLabel } = useTranslation({ text: "Homme", targetLang });
@@ -269,6 +291,8 @@ export function ClinicalForm({
                         <option value="hypertension55">{patient1Label}</option>
                         <option value="gastricCancer59">{patient2Label}</option>
                         <option value="mononucleosis35">{patient3Label}</option>
+                        <option value="cataract72">{patient4Label}</option>
+                        <option value="majorDepression42">{patient5Label}</option>
                     </select>
                 </div>
             </div>

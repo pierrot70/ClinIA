@@ -32,5 +32,11 @@ export function useClinicalAnalysis() {
     }
   }, []);
 
-  return { result, loading, error, analyze };
+  const resetAnalysis = useCallback(() => {
+    setResult(null);
+    setError(null);
+    setLoading(false);
+  }, []);
+
+  return { result, loading, error, analyze, resetAnalysis };
 }

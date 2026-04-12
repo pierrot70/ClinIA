@@ -55,7 +55,7 @@ export function ClinicalAnalyzePage() {
     const [activeTab, setActiveTab] =
         useState<"patient" | "clinical">("patient");
 
-    const { result, loading, error, analyze } = useClinicalAnalysis();
+    const { result, loading, error, analyze, resetAnalysis } = useClinicalAnalysis();
 
     const [apiError, setApiError] = useState<ApiError | null>(null);
     const [blockingIncident, setBlockingIncident] =
@@ -207,6 +207,15 @@ export function ClinicalAnalyzePage() {
         }
     }
 
+    function handleBackToClinicalDemo() {
+        resetAnalysis();
+        setApiError(null);
+        setBlockingIncident(null);
+        setBlockingActionableMessage(null);
+        setServiceMode(null);
+        setActiveTab("patient");
+    }
+
     const toggleForceReal = () => {
         const next = !forceReal;
         setForceReal(next);
@@ -345,37 +354,59 @@ export function ClinicalAnalyzePage() {
 
             {/* 📊 Résultat enrichi partagé */}
             {activeTab === "clinical" && loading && (
-                <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-lime-200 bg-lime-50/80 p-10 text-center">
-                    <div className="clinia-neon-loader" aria-hidden="true" />
-                    <div className="clinia-neon-text text-sm font-semibold uppercase tracking-[0.2em]">
-                        Requete OpenAI en cours...
+                <div className="space-y-4">
+                    <div className="flex justify-start">
+                        <button
+                            type="button"
+                            onClick={handleBackToClinicalDemo}
+                            className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                        >
+                            Retour a /clinical-demo
+                        </button>
+                    </div>
+                    <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-lime-200 bg-lime-50/80 p-10 text-center">
+                        <div className="clinia-neon-loader" aria-hidden="true" />
+                        <div className="clinia-neon-text text-sm font-semibold uppercase tracking-[0.2em]">
+                            Requete OpenAI en cours...
+                        </div>
                     </div>
                 </div>
             )}
 
             {activeTab === "clinical" && !loading && (
-                <ClinicalDemoResult
-                    demoData={{
-                        treatments:
-                            Array.isArray(result?.treatments) && result.treatments.length > 0
-                                ? (result.treatments as any[])
-                                : hasRealAIContent
-                                  ? []
-                                  : hypertensionTreatments,
-                        questions: anticipatedQuestions,
-                        summary: result?.patient_summary?.plain_language || undefined,
-                        error: error || undefined,
-                        clinical_summary: result?.clinical_summary,
-                        recommendations: result?.recommendations,
-                        initial_evaluation_recommendations:
-                            result?.initial_evaluation_recommendations,
-                        treatment_options: result?.treatment_options,
-                        follow_up_and_monitoring: result?.follow_up_and_monitoring,
-                        other_ai_fields: result?.other_ai_fields,
-                    }}
-                    sourceMode={serviceMode || undefined}
-                    realAI={forceReal}
-                />
+                <div className="space-y-4">
+                    <div className="flex justify-start">
+                        <button
+                            type="button"
+                            onClick={handleBackToClinicalDemo}
+                            className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                        >
+                            Retour a /clinical-demo
+                        </button>
+                    </div>
+                    <ClinicalDemoResult
+                        demoData={{
+                            treatments:
+                                Array.isArray(result?.treatments) && result.treatments.length > 0
+                                    ? (result.treatments as any[])
+                                    : hasRealAIContent
+                                      ? []
+                                      : hypertensionTreatments,
+                            questions: anticipatedQuestions,
+                            summary: result?.patient_summary?.plain_language || undefined,
+                            error: error || undefined,
+                            clinical_summary: result?.clinical_summary,
+                            recommendations: result?.recommendations,
+                            initial_evaluation_recommendations:
+                                result?.initial_evaluation_recommendations,
+                            treatment_options: result?.treatment_options,
+                            follow_up_and_monitoring: result?.follow_up_and_monitoring,
+                            other_ai_fields: result?.other_ai_fields,
+                        }}
+                        sourceMode={serviceMode || undefined}
+                        realAI={forceReal}
+                    />
+                </div>
             )}
         </div>
     );
