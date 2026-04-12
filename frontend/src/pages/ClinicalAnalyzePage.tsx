@@ -11,10 +11,10 @@ import {
 import { SecurityBlockingAlert } from "../components/system/SecurityBlockingAlert";
 
 import { useTranslation } from "../hooks/useTranslation";
-import { hypertensionTreatments, anticipatedQuestions } from "../data/hypertension";
+import { getClinicalDemoScenario } from "../data/clinicalDemoScenarios";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 
-import type { ClinicalPayload, ClinicalAnalysis } from "../types/clinical";
+import type { ClinicalPayload } from "../types/clinical";
 import type {
     ApiResponse,
     ApiError,
@@ -22,26 +22,6 @@ import type {
 } from "../types/api";
 
 type OpenAIModel = "gpt-4.1-mini" | "gpt-4-0613";
-
-function hasRenderableValue(value: unknown): boolean {
-    if (value == null) {
-        return false;
-    }
-
-    if (typeof value === "string") {
-        return value.trim().length > 0;
-    }
-
-    if (Array.isArray(value)) {
-        return value.length > 0;
-    }
-
-    if (typeof value === "object") {
-        return Object.keys(value).length > 0;
-    }
-
-    return true;
-}
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -71,15 +51,7 @@ export function ClinicalAnalyzePage() {
 
     const [lastPayload, setLastPayload] =
         useState<ClinicalPayload | null>(null);
-
-    const hasRealAIContent = [
-        result?.clinical_summary,
-        result?.recommendations,
-        result?.initial_evaluation_recommendations,
-        result?.treatment_options,
-        result?.follow_up_and_monitoring,
-        result?.other_ai_fields,
-    ].some(hasRenderableValue);
+    const demoScenario = getClinicalDemoScenario(lastPayload);
 
     /* ------------------------------------------------------------------ */
     /* Nettoyage cache à l’entrée (1 seule fois)                          */
@@ -389,10 +361,8 @@ export function ClinicalAnalyzePage() {
                             treatments:
                                 Array.isArray(result?.treatments) && result.treatments.length > 0
                                     ? (result.treatments as any[])
-                                    : hasRealAIContent
-                                      ? []
-                                      : hypertensionTreatments,
-                            questions: anticipatedQuestions,
+                                    : demoScenario.treatments,
+                            questions: demoScenario.questions,
                             summary: result?.patient_summary?.plain_language || undefined,
                             error: error || undefined,
                             clinical_summary: result?.clinical_summary,

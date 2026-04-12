@@ -13,7 +13,7 @@ import type { ClinicalPayload } from "../types/clinical";
 import AICard from "../components/AICard";
 import ClinicalDemoResult from "../components/ClinicalDemoResult";
 
-import { hypertensionTreatments, anticipatedQuestions } from "../data/hypertension";
+import { getClinicalDemoScenario } from "../data/clinicalDemoScenarios";
 
 const useQuery = () => new URLSearchParams(useLocation().search);
 const RESULTS_PAYLOAD_STORAGE_KEY = "clinia_results_payload";
@@ -31,26 +31,6 @@ function buildFallbackPayload(q: string): ClinicalPayload {
         medical_history: [],
         current_medications: [],
     };
-}
-
-function hasRenderableValue(value: unknown): boolean {
-    if (value == null) {
-        return false;
-    }
-
-    if (typeof value === "string") {
-        return value.trim().length > 0;
-    }
-
-    if (Array.isArray(value)) {
-        return value.length > 0;
-    }
-
-    if (typeof value === "object") {
-        return Object.keys(value).length > 0;
-    }
-
-    return true;
 }
 
 const Results: React.FC = () => {
@@ -97,24 +77,14 @@ const Results: React.FC = () => {
 
     const { result: analysis, loading: loadingAI, error: errorMessage, analyze } = useClinicalAnalysis();
 
-    // Détecter si on a une réponse IA pertinente (cancer, etc.)
-    const hasRealAIContent = [
-        analysis?.clinical_summary,
-        analysis?.recommendations,
-        analysis?.initial_evaluation_recommendations,
-        analysis?.treatment_options,
-        analysis?.follow_up_and_monitoring,
-        analysis?.other_ai_fields,
-    ].some(hasRenderableValue);
+    const demoScenario = getClinicalDemoScenario(baseAnalysisPayload);
 
     const demoData = {
         treatments:
             Array.isArray(analysis?.treatments) && analysis.treatments.length > 0
                 ? analysis.treatments
-                : hasRealAIContent
-                ? []
-                : hypertensionTreatments,
-        questions: anticipatedQuestions,
+                : demoScenario.treatments,
+        questions: demoScenario.questions,
         summary: analysis?.patient_summary?.plain_language || undefined,
         error: errorMessage || undefined,
         clinical_summary: analysis?.clinical_summary,
