@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
-import Home from "./pages/Home";
 import DemoPage from "./pages/DemoPage";
 import Results from "./pages/Results";
 import TreatmentDetails from "./pages/TreatmentDetails";
@@ -27,7 +26,6 @@ import { PatientAuditLogsPage } from "./pages/PatientAuditLogsPage";
 import { OpenAILogsPage } from "./pages/OpenAILogsPage";
 import { CliniquesPage } from "./pages/CliniquesPage";
 import { SpecialistsPage } from "./pages/SpecialistsPage";
-import { useAuth } from "./hooks/useAuth";
 
 const CLINICAL_ROLES = ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
 const ADMIN_ROLES = ["ADMIN", "SUPERADMIN"] as const;
@@ -36,7 +34,6 @@ const API_URL = import.meta.env.VITE_API_URL as string;
 const APP_STATUS_REFRESH_MS = 10_000;
 
 const App: React.FC = () => {
-    const { status, isAuthenticated } = useAuth();
     const { blockingIncident, setBlockingIncident } = useSecurityIncident();
     const [acknowledging, setAcknowledging] = useState(false);
         // Handler for acknowledgment
@@ -87,17 +84,6 @@ const App: React.FC = () => {
         };
     }, []);
 
-    const homeEntry =
-        status === "loading" ? (
-            <div className="max-w-6xl mx-auto px-4 py-8">
-                <p className="text-sm text-gray-500">Validation de session...</p>
-            </div>
-        ) : isAuthenticated ? (
-            <Home />
-        ) : (
-            <Navigate to="/login" replace />
-        );
-
     return (
         <div className="min-h-screen flex flex-col bg-background">
             <Header />
@@ -116,7 +102,7 @@ const App: React.FC = () => {
             )}
             <main className="flex-1">
                 <Routes>
-                    <Route path="/" element={homeEntry} />
+                    <Route path="/" element={<Navigate to="/clinical-demo" replace />} />
                     <Route path="/demo" element={<DemoPage />} />
                     <Route path="/results" element={<Results />} />
                     <Route path="/treatment/:id" element={<TreatmentDetails />} />
