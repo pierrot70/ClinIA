@@ -49,6 +49,7 @@ import { requireRole } from "./middleware/requireRole.js";
 import { AUTH_ROLES } from "./auth/constants.js";
 import { initShutdownState } from "./services/appShutdown.js";
 import { clinicalDemoRateLimiter } from "./middleware/clinicalDemoRateLimiter.js";
+import { openAIAnalyzeQuotaGuard } from "./middleware/openaiAnalyzeQuotaGuard.js";
 import { loi25DataLeakGuard } from "./middleware/loi25DataLeakGuard.js";
 import {
     finalizeOpenAIRequestAuditEvent,
@@ -533,7 +534,7 @@ async function respondWithSecurityIncident({
 /* ================================================================== */
 
 // Appliquer le rate limiter uniquement si l'utilisateur n'est pas authentifié (ex: clinical-demo)
-app.post("/api/ai/analyze", attachOptionalAuth, (req, res, next) => {
+app.post("/api/ai/analyze", attachOptionalAuth, openAIAnalyzeQuotaGuard, (req, res, next) => {
     if (!req.auth) {
         return clinicalDemoRateLimiter(req, res, next);
     }
