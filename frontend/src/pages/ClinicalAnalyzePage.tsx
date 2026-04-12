@@ -35,7 +35,7 @@ export function ClinicalAnalyzePage() {
     const [activeTab, setActiveTab] =
         useState<"patient" | "clinical">("patient");
 
-    const { result, loading, error, analyze, resetAnalysis } = useClinicalAnalysis();
+    const { result, loading, error, errorCode, analyze, resetAnalysis } = useClinicalAnalysis();
 
     const [apiError, setApiError] = useState<ApiError | null>(null);
     const [blockingIncident, setBlockingIncident] =
@@ -365,6 +365,7 @@ export function ClinicalAnalyzePage() {
                             questions: demoScenario.questions,
                             summary: result?.patient_summary?.plain_language || undefined,
                             error: error || undefined,
+                            errorCode: errorCode || undefined,
                             clinical_summary: result?.clinical_summary,
                             recommendations: result?.recommendations,
                             initial_evaluation_recommendations:

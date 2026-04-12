@@ -6,10 +6,12 @@ export function useClinicalAnalysis() {
   const [result, setResult] = useState<ClinicalAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
 
   const analyze = useCallback(async (payload: ClinicalPayload) => {
     setLoading(true);
     setError(null);
+    setErrorCode(null);
     setResult(null);
     try {
       const res = await authFetch("/api/ai/analyze", {
@@ -20,6 +22,7 @@ export function useClinicalAnalysis() {
       const json = await res.json();
       if (json?.error) {
         setError(json.error.message || "Erreur lors de l’analyse.");
+        setErrorCode(json.error.code || null);
         setResult(null);
       } else {
         setResult(json?.data ?? json);
@@ -35,8 +38,9 @@ export function useClinicalAnalysis() {
   const resetAnalysis = useCallback(() => {
     setResult(null);
     setError(null);
+    setErrorCode(null);
     setLoading(false);
   }, []);
 
-  return { result, loading, error, analyze, resetAnalysis };
+  return { result, loading, error, errorCode, analyze, resetAnalysis };
 }

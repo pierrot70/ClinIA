@@ -13,6 +13,7 @@ type ClinicalDemoResultData = Partial<ClinicalAnalysis> & {
   questions?: any[];
   summary?: string;
   error?: string;
+  errorCode?: string;
 };
 
 interface ClinicalDemoResultProps {
@@ -61,6 +62,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
     questions,
     summary,
     error,
+    errorCode,
     clinical_summary,
     recommendations,
     initial_evaluation_recommendations,
@@ -73,11 +75,16 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
 
   // Gestion des erreurs IA
   if (error) {
+    const helpMessage =
+      errorCode === "OPENAI_ANALYZE_SATURATED"
+        ? "Le service est temporairement sature. Reessayez plus tard ou contactez un administrateur."
+        : "Merci de verifier les donnees cliniques et reessayer.";
+
     return (
       <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-6 rounded-xl text-center">
         <h2 className="text-lg font-semibold mb-2">Erreur d'analyse IA</h2>
         <p className="mb-2">{error}</p>
-        <p>Merci de vérifier les données cliniques et réessayer.</p>
+        <p>{helpMessage}</p>
       </div>
     );
   }
