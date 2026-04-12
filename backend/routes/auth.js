@@ -132,6 +132,17 @@ router.post("/login", loginRateLimiter, async (req, res) => {
 });
 
 router.post("/register-self", loginRateLimiter, async (req, res) => {
+    if (process.env.NODE_ENV === "production") {
+        return res.status(403).json({
+            error: {
+                code: "SELF_REGISTER_DISABLED",
+                message:
+                    "L'inscription libre est desactivee en production. Contactez un administrateur.",
+                retryable: false,
+            },
+        });
+    }
+
     const { email, password, role } = req.body ?? {};
 
     try {
