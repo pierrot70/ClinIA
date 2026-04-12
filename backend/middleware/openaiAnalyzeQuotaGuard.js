@@ -17,7 +17,7 @@ function buildLockedResponse(res) {
         error: {
             code: "OPENAI_ANALYZE_SATURATED",
             message:
-                "Coolify est sature pour l'analyse clinique. Reessayez plus tard.",
+                "clinique-ai.ca est sature pour l'analyse clinique. Reessayez plus tard.",
             retryable: true,
         },
     });
