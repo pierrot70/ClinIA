@@ -258,6 +258,9 @@ export function ClinicalForm({
     const { translated: symptomsHelpLabel } = useTranslation({ text: "Separez chaque symptome par une virgule, exemple: fatigue, polydipsie", targetLang });
     const { translated: medicalHistoryHelpLabel } = useTranslation({ text: "Conditions ou diagnostics connus, separes par des virgules", targetLang });
     const { translated: medicationsHelpLabel } = useTranslation({ text: "Noms des medicaments en cours, separes par des virgules", targetLang });
+    const { translated: analyzeButtonLabel } = useTranslation({ text: "Analyser", targetLang });
+    const { translated: analyzingButtonLabel } = useTranslation({ text: "Analyse…", targetLang });
+    const { translated: clearPatientDataLabel } = useTranslation({ text: "Effacer les donnees patient", targetLang });
 
     const sexOptions: Array<{ value: Sex; label: string }> = [
         { value: "male", label: maleLabel },
@@ -481,7 +484,7 @@ export function ClinicalForm({
                     onClick={() => onSubmit(form)}
                     className="flex-1 bg-blue-600 text-white py-2 rounded disabled:opacity-50"
                 >
-                    {loading ? "Analyse…" : "Analyser"}
+                    {loading ? analyzingButtonLabel : analyzeButtonLabel}
                 </button>
 
                 <button
@@ -489,7 +492,7 @@ export function ClinicalForm({
                     onClick={resetPatient}
                     className="flex-1 bg-gray-100 text-gray-800 py-2 rounded border hover:bg-gray-200"
                 >
-                    Effacer les données patient
+                    {clearPatientDataLabel}
                 </button>
             </div>
         </div>
