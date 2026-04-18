@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, Link } from "react-router-dom";
 
 import DemoPage from "./pages/DemoPage";
 import Results from "./pages/Results";
@@ -33,9 +33,65 @@ const SUPERADMIN_ROLES = ["SUPERADMIN"] as const;
 const API_URL = import.meta.env.VITE_API_URL as string;
 const APP_STATUS_REFRESH_MS = 10_000;
 
+function CoolifyLandingPage() {
+    return (
+        <section className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-12">
+            <div className="space-y-3 text-center">
+                <h1 className="text-3xl font-semibold text-gray-900">
+                    ClinIA
+                </h1>
+                <p className="mx-auto max-w-2xl text-sm text-gray-600">
+                    Choisissez votre point d'entree. La demo clinique est accessible
+                    sans connexion. Les acces medecin et admin utilisent les pages
+                    de connexion dediees.
+                </p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+                <Link
+                    to="/clinical-demo"
+                    className="rounded-xl border border-sky-200 bg-sky-50 p-5 shadow-sm transition hover:border-sky-300 hover:bg-sky-100"
+                >
+                    <div className="text-lg font-semibold text-sky-950">
+                        Demo clinique
+                    </div>
+                    <p className="mt-2 text-sm text-sky-900">
+                        Acceder directement a la demonstration ClinIA.
+                    </p>
+                </Link>
+
+                <Link
+                    to="/login"
+                    className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-gray-300 hover:bg-gray-50"
+                >
+                    <div className="text-lg font-semibold text-gray-900">
+                        Connexion medecin
+                    </div>
+                    <p className="mt-2 text-sm text-gray-600">
+                        Ouvrir la page de connexion utilisateur.
+                    </p>
+                </Link>
+
+                <Link
+                    to="/admin/login"
+                    className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm transition hover:border-amber-300 hover:bg-amber-100"
+                >
+                    <div className="text-lg font-semibold text-amber-950">
+                        Connexion admin
+                    </div>
+                    <p className="mt-2 text-sm text-amber-900">
+                        Ouvrir la page de connexion administrateur.
+                    </p>
+                </Link>
+            </div>
+        </section>
+    );
+}
+
 const App: React.FC = () => {
     const { blockingIncident, setBlockingIncident } = useSecurityIncident();
     const [acknowledging, setAcknowledging] = useState(false);
+    const showCoolifyLanding = !!import.meta.env.PROD;
         // Handler for acknowledgment
         const handleAcknowledge = async () => {
             if (!blockingIncident) return;
@@ -102,7 +158,16 @@ const App: React.FC = () => {
             )}
             <main className="flex-1">
                 <Routes>
-                    <Route path="/" element={<Navigate to="/clinical-demo" replace />} />
+                    <Route
+                        path="/"
+                        element={
+                            showCoolifyLanding ? (
+                                <CoolifyLandingPage />
+                            ) : (
+                                <Navigate to="/clinical-demo" replace />
+                            )
+                        }
+                    />
                     <Route path="/demo" element={<DemoPage />} />
                     <Route path="/results" element={<Results />} />
                     <Route path="/treatment/:id" element={<TreatmentDetails />} />
