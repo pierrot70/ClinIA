@@ -23,6 +23,23 @@ function buildLockedResponse(res) {
     });
 }
 
+export function getOpenAIAnalyzeQuotaStatus() {
+    return {
+        enabled: isProduction(),
+        state: quotaState.locked ? "locked" : "open",
+        locked: quotaState.locked,
+        requestCount: quotaState.requestCount,
+        maxRequestsPerWindow: MAX_REQUESTS_PER_WINDOW,
+        windowMs: WINDOW_MS,
+        windowStartedAt: quotaState.windowStartedAt
+            ? new Date(quotaState.windowStartedAt).toISOString()
+            : null,
+        lockedAt: quotaState.lockedAt
+            ? new Date(quotaState.lockedAt).toISOString()
+            : null,
+    };
+}
+
 export function openAIAnalyzeQuotaGuard(req, res, next) {
     if (!isProduction()) {
         return next();
@@ -67,4 +84,3 @@ export function resetOpenAIAnalyzeQuotaGuardForTests() {
     quotaState.locked = false;
     quotaState.lockedAt = 0;
 }
-

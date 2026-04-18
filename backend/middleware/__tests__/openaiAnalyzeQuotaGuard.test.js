@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+    getOpenAIAnalyzeQuotaStatus,
     openAIAnalyzeQuotaGuard,
     resetOpenAIAnalyzeQuotaGuardForTests,
 } from "../openaiAnalyzeQuotaGuard.js";
@@ -66,6 +67,16 @@ describe("openAIAnalyzeQuotaGuard", () => {
 
         expect(lockedRes.status).toHaveBeenCalledWith(503);
         expect(next).toHaveBeenCalledTimes(5);
+
+        expect(getOpenAIAnalyzeQuotaStatus()).toEqual({
+            enabled: true,
+            state: "locked",
+            locked: true,
+            requestCount: 6,
+            maxRequestsPerWindow: 5,
+            windowMs: 60_000,
+            windowStartedAt: "1970-01-01T00:00:01.000Z",
+            lockedAt: "1970-01-01T00:00:01.000Z",
+        });
     });
 });
-
