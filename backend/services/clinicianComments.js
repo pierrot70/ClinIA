@@ -10,6 +10,12 @@ const DEFAULT_PAGE_LIMIT = 20;
 const MAX_PAGE_LIMIT = 100;
 const MAX_COMMENT_LENGTH = 500;
 const TRACKING_CODE_REGEX = /^[A-Z0-9]{8}$/;
+const COMMENT_CATEGORY_VALUES = [
+    "BUG",
+    "SUGGESTION",
+    "URGENT",
+    "INCOMPREHENSION",
+];
 
 function createClinicianCommentError(code, message) {
     return { code, message };
@@ -88,12 +94,25 @@ function hashTrackingCode(value) {
     return crypto.createHash("sha256").update(value).digest("hex");
 }
 
+function normalizeCommentCategory(category) {
+    const normalized = String(category || "").trim().toUpperCase();
+    if (!COMMENT_CATEGORY_VALUES.includes(normalized)) {
+        throw createClinicianCommentError(
+            "INVALID_INPUT",
+            "Le type de commentaire est invalide."
+        );
+    }
+
+    return normalized;
+}
+
 function normalizeComment(entry) {
     return {
         id: String(entry._id),
         actorUserId: entry.actorUserId ? String(entry.actorUserId) : null,
         actorUsername: entry.actorUsername,
         actorRole: entry.actorRole,
+        category: entry.category,
         comment: entry.comment,
         redactionCount: Number(entry.redactionCount || 0),
         redactionTypes: Array.isArray(entry.redactionTypes) ? entry.redactionTypes : [],
@@ -128,6 +147,7 @@ function normalizePublicComment(entry) {
         actorUserId: entry.actorUserId ? String(entry.actorUserId) : null,
         actorUsername: entry.actorUsername,
         actorRole: entry.actorRole,
+        category: entry.category,
         comment: entry.comment,
         redactionCount: Number(entry.redactionCount || 0),
         redactionTypes: Array.isArray(entry.redactionTypes) ? entry.redactionTypes : [],
@@ -143,6 +163,7 @@ export async function createClinicianComment({
     comment,
     guestDisplayName,
     trackingCode,
+    category,
 }) {
     assertCommentAccess(authUser);
 
@@ -186,6 +207,7 @@ export async function createClinicianComment({
         );
     }
 
+    const normalizedCategory = normalizeCommentCategory(category);
     const resolvedTrackingCode = normalizeTrackingCode(trackingCode) || generateTrackingCode();
     validateTrackingCode(resolvedTrackingCode);
     const trackingCodeHash = hashTrackingCode(resolvedTrackingCode);
@@ -195,6 +217,7 @@ export async function createClinicianComment({
         actorUsername: resolvedUsername,
         actorRole: authUser?.role || "ANONYMOUS",
         trackingCodeHash,
+        category: normalizedCategory,
         comment: obfuscated.sanitized,
         redactionCount: obfuscated.redactionCount,
         redactionTypes: obfuscated.redactionTypes,

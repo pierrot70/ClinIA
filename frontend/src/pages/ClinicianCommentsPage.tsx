@@ -8,11 +8,29 @@ import {
 } from "../services/clinicianCommentsApi";
 
 const CLINICIAN_COMMENT_STORAGE_KEY = "clinia_comment_tracking";
+const COMMENT_CATEGORY_OPTIONS: Array<{
+    value: ClinicianComment["category"];
+    label: string;
+}> = [
+    { value: "BUG", label: "Bug" },
+    { value: "SUGGESTION", label: "Suggestion" },
+    { value: "URGENT", label: "Urgence" },
+    { value: "INCOMPREHENSION", label: "Incomprehension" },
+];
+
+function getCategoryLabel(category: ClinicianComment["category"]) {
+    return (
+        COMMENT_CATEGORY_OPTIONS.find((option) => option.value === category)?.label ||
+        category
+    );
+}
 
 export function ClinicianCommentsPage() {
     const { user, isAuthenticated, status } = useAuth();
     const canReviewAll = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
     const [scope, setScope] = useState<"own" | "all">("own");
+    const [category, setCategory] =
+        useState<ClinicianComment["category"]>("BUG");
     const [comment, setComment] = useState("");
     const [guestDisplayName, setGuestDisplayName] = useState("");
     const [trackingCode, setTrackingCode] = useState("");
@@ -110,6 +128,7 @@ export function ClinicianCommentsPage() {
 
         const response = await createClinicianComment(
             comment,
+            category,
             isAuthenticated ? undefined : guestDisplayName,
             isAuthenticated ? undefined : trackingCode
         );
@@ -250,6 +269,30 @@ export function ClinicianCommentsPage() {
                             </div>
                         </div>
                     )}
+                    <div className="mb-3">
+                        <label
+                            htmlFor="clinician-comment-category"
+                            className="mb-2 block text-sm font-medium text-gray-800"
+                        >
+                            Type de commentaire
+                        </label>
+                        <select
+                            id="clinician-comment-category"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                            value={category}
+                            onChange={(event) =>
+                                setCategory(
+                                    event.target.value as ClinicianComment["category"]
+                                )
+                            }
+                        >
+                            {COMMENT_CATEGORY_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                     <textarea
                         id="clinician-comment"
                         className="min-h-[220px] w-full rounded-lg border border-gray-300 px-3 py-3 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
@@ -355,7 +398,7 @@ export function ClinicianCommentsPage() {
                                         >
                                             {items.map((item) => (
                                                 <option key={item.id} value={item.id}>
-                                                    {item.actorUsername} — {new Date(item.createdAt).toLocaleString("fr-CA")}
+                                                    {item.actorUsername} — {getCategoryLabel(item.category)} — {new Date(item.createdAt).toLocaleString("fr-CA")}
                                                 </option>
                                             ))}
                                         </select>
@@ -397,6 +440,9 @@ export function ClinicianCommentsPage() {
                                             {item.actorUsername}
                                         </span>
                                         <span>{item.actorRole}</span>
+                                        <span className="rounded-full bg-sky-100 px-2 py-1 text-sky-800">
+                                            {getCategoryLabel(item.category)}
+                                        </span>
                                         <span>
                                             {new Date(item.createdAt).toLocaleString("fr-CA")}
                                         </span>

@@ -5,6 +5,7 @@ export type ClinicianComment = {
     actorUserId: string | null;
     actorUsername: string;
     actorRole: string;
+    category: "BUG" | "SUGGESTION" | "URGENT" | "INCOMPREHENSION";
     comment: string;
     redactionCount: number;
     redactionTypes: string[];
@@ -77,6 +78,7 @@ export async function listClinicianComments(
 
 export async function createClinicianComment(
     comment: string,
+    category: ClinicianComment["category"],
     guestDisplayName?: string,
     trackingCode?: string
 ) {
@@ -85,7 +87,7 @@ export async function createClinicianComment(
         headers: {
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({ comment, guestDisplayName, trackingCode }),
+        body: JSON.stringify({ comment, category, guestDisplayName, trackingCode }),
     });
 
     const payload = await toJson(response);

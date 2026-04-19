@@ -113,6 +113,7 @@ router.post("/", clinicianCommentRateLimiter, async (req, res) => {
             comment: req.body?.comment,
             guestDisplayName: req.body?.guestDisplayName,
             trackingCode: req.body?.trackingCode,
+            category: req.body?.category,
         });
 
         return res.status(201).json({

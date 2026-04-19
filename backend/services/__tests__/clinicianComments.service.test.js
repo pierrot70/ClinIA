@@ -1,16 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const findMock = vi.fn();
+const createMock = vi.fn();
 
 vi.mock("../../models/ClinicianComment.js", () => ({
     ClinicianComment: {
         find: findMock,
+        create: createMock,
     },
 }));
 
-describe("lookupClinicianReplies", () => {
+describe("clinicianComments service", () => {
     beforeEach(() => {
         findMock.mockReset();
+        createMock.mockReset();
     });
 
     it("returns a neutral responder label for public reply lookups", async () => {
@@ -49,5 +52,24 @@ describe("lookupClinicianReplies", () => {
         expect(findMock).toHaveBeenCalled();
         expect(result.items[0].replies[0].responderUsername).toBe("Equipe ClinIA");
         expect(result.items[0].replies[0].message).toBe("Ceci est une reponse");
+    });
+
+    it("rejects an invalid clinician comment category", async () => {
+        const { createClinicianComment } = await import("../clinicianComments.js");
+
+        await expect(
+            createClinicianComment({
+                authUser: null,
+                comment: "Commentaire valide",
+                guestDisplayName: "dr lasante",
+                trackingCode: "TY677EJK",
+                category: "AUTRE",
+            })
+        ).rejects.toMatchObject({
+            code: "INVALID_INPUT",
+            message: "Le type de commentaire est invalide.",
+        });
+
+        expect(createMock).not.toHaveBeenCalled();
     });
 });
