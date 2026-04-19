@@ -1,5 +1,8 @@
 import { ClinicianComment } from "../models/ClinicianComment.js";
-import { obfuscateClinicianComment } from "../utils/clinicianCommentPrivacy.js";
+import {
+    detectDirectContactInfo,
+    obfuscateClinicianComment,
+} from "../utils/clinicianCommentPrivacy.js";
 import mongoose from "mongoose";
 import crypto from "crypto";
 
@@ -104,6 +107,33 @@ function normalizeComment(entry) {
                 message: reply.message,
                 createdAt: reply.createdAt,
             }))
+            : [],
+    };
+}
+
+function normalizePublicReply(reply) {
+    return {
+        id: String(reply._id),
+        responderUserId: String(reply.responderUserId),
+        responderUsername: "Equipe ClinIA",
+        responderRole: reply.responderRole,
+        message: reply.message,
+        createdAt: reply.createdAt,
+    };
+}
+
+function normalizePublicComment(entry) {
+    return {
+        id: String(entry._id),
+        actorUserId: entry.actorUserId ? String(entry.actorUserId) : null,
+        actorUsername: entry.actorUsername,
+        actorRole: entry.actorRole,
+        comment: entry.comment,
+        redactionCount: Number(entry.redactionCount || 0),
+        redactionTypes: Array.isArray(entry.redactionTypes) ? entry.redactionTypes : [],
+        createdAt: entry.createdAt,
+        replies: Array.isArray(entry.replies)
+            ? entry.replies.map(normalizePublicReply)
             : [],
     };
 }
@@ -268,6 +298,14 @@ export async function replyToClinicianComment({
         );
     }
 
+    const directContactTypes = detectDirectContactInfo(trimmedMessage);
+    if (directContactTypes.length > 0) {
+        throw createClinicianCommentError(
+            "REPLY_CONTACT_INFO_BLOCKED",
+            "La reponse ne peut pas contenir d'adresse courriel, de numero de telephone ou de lien direct."
+        );
+    }
+
     const obfuscated = obfuscateClinicianComment(trimmedMessage);
 
     const updated = await ClinicianComment.findByIdAndUpdate(
@@ -321,6 +359,6 @@ export async function lookupClinicianReplies({
 
     return {
         actorUsername: normalizedActorUsername,
-        items: items.map(normalizeComment),
+        items: items.map(normalizePublicComment),
     };
 }

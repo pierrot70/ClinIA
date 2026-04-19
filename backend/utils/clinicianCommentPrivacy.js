@@ -44,6 +44,21 @@ const GENERIC_PATTERNS = [
     },
 ];
 
+const CONTACT_INFO_PATTERNS = [
+    {
+        type: "EMAIL",
+        regex: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
+    },
+    {
+        type: "PHONE",
+        regex: /(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}\b/,
+    },
+    {
+        type: "URL",
+        regex: /\b(?:https?:\/\/|www\.)[^\s]+/i,
+    },
+];
+
 function obfuscateNamePart(value) {
     const token = String(value || "").trim();
     if (token.length <= 2) {
@@ -106,4 +121,12 @@ export function obfuscateClinicianComment(input) {
         redactionCount: redactions.length,
         redactionTypes: Array.from(new Set(redactions.map((entry) => entry.type))),
     };
+}
+
+export function detectDirectContactInfo(input) {
+    const source = String(input || "");
+
+    return CONTACT_INFO_PATTERNS.filter((pattern) => pattern.regex.test(source)).map(
+        (pattern) => pattern.type
+    );
 }

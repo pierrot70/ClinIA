@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { obfuscateClinicianComment } from "../clinicianCommentPrivacy.js";
+import {
+    detectDirectContactInfo,
+    obfuscateClinicianComment,
+} from "../clinicianCommentPrivacy.js";
 
 describe("obfuscateClinicianComment", () => {
     it("obfuscates direct identifiers and labeled values", () => {
@@ -33,5 +36,19 @@ describe("obfuscateClinicianComment", () => {
 
         expect(result.sanitized).toContain("Disons bonjour a P***e L***e");
         expect(result.redactionTypes).toContain("PERSON_NAME");
+    });
+
+    it("detects direct contact channels in admin replies", () => {
+        expect(
+            detectDirectContactInfo(
+                "Ecrivez-moi a pierre@example.com ou appelez au 514-555-1234."
+            )
+        ).toEqual(["EMAIL", "PHONE"]);
+
+        expect(
+            detectDirectContactInfo(
+                "Vous pouvez aussi consulter https://clinique-ai.ca/support"
+            )
+        ).toEqual(["URL"]);
     });
 });
