@@ -1,5 +1,9 @@
 import { useEffect, useState, useContext } from "react";
 import { Link } from "react-router-dom";
+import {
+    lookupClinicianReplies,
+    type ClinicianComment,
+} from "../services/clinicianCommentsApi";
 import { ClinicalForm } from "../components/clinical/ClinicalForm";
 // import { ClinicalResultPage } from "./ClinicalResultPage";
 import ClinicalDemoResult from "../components/ClinicalDemoResult";
@@ -29,6 +33,7 @@ type OpenAIModel = "gpt-4.1-mini" | "gpt-4-0613";
 /* ------------------------------------------------------------------ */
 
 export function ClinicalAnalyzePage() {
+    const COMMENT_TRACKING_STORAGE_KEY = "clinia_comment_tracking";
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
     const [openaiModel, setOpenaiModel] = useState<OpenAIModel>("gpt-4.1-mini");
@@ -52,6 +57,11 @@ export function ClinicalAnalyzePage() {
 
     const [lastPayload, setLastPayload] =
         useState<ClinicalPayload | null>(null);
+    const [replyLookupName, setReplyLookupName] = useState("");
+    const [replyLookupCode, setReplyLookupCode] = useState("");
+    const [replyLookupLoading, setReplyLookupLoading] = useState(false);
+    const [replyLookupError, setReplyLookupError] = useState("");
+    const [replyLookupItems, setReplyLookupItems] = useState<ClinicianComment[]>([]);
     const demoScenario = getClinicalDemoScenario(lastPayload);
 
     /* ------------------------------------------------------------------ */
@@ -60,6 +70,26 @@ export function ClinicalAnalyzePage() {
 
     useEffect(() => {
         localStorage.removeItem("clinia_last_clinical_payload");
+    }, []);
+    useEffect(() => {
+        try {
+            const raw = window.localStorage.getItem(COMMENT_TRACKING_STORAGE_KEY);
+            if (!raw) {
+                return;
+            }
+            const parsed = JSON.parse(raw) as {
+                guestDisplayName?: string;
+                trackingCode?: string;
+            };
+            if (parsed.guestDisplayName) {
+                setReplyLookupName(parsed.guestDisplayName);
+            }
+            if (parsed.trackingCode) {
+                setReplyLookupCode(parsed.trackingCode);
+            }
+        } catch {
+            // Ignore local storage errors.
+        }
     }, []);
     useEffect(() => {
         if (isProd) {
@@ -189,6 +219,26 @@ export function ClinicalAnalyzePage() {
         setActiveTab("patient");
     }
 
+    async function handleLookupReplies(event: React.FormEvent) {
+        event.preventDefault();
+        setReplyLookupLoading(true);
+        setReplyLookupError("");
+
+        const response = await lookupClinicianReplies(replyLookupName, replyLookupCode);
+        setReplyLookupLoading(false);
+
+        if (!response.ok) {
+            setReplyLookupItems([]);
+            setReplyLookupError(response.error.message);
+            return;
+        }
+
+        setReplyLookupItems(response.data.items || []);
+        if ((response.data.items || []).length === 0) {
+            setReplyLookupError("Aucune reponse trouvee pour ces informations de suivi.");
+        }
+    }
+
     const toggleForceReal = () => {
         const next = !forceReal;
         setForceReal(next);
@@ -267,6 +317,73 @@ export function ClinicalAnalyzePage() {
                     Laisser un commentaire
                 </Link>
             </div>
+
+            <section className="rounded-xl border border-amber-200 bg-amber-50 p-5">
+                <div className="mb-3">
+                    <h2 className="text-lg font-semibold text-amber-950">
+                        Voir les reponses a mes commentaires
+                    </h2>
+                    <p className="mt-1 text-sm text-amber-900">
+                        Entrez exactement le nom ou pseudonyme utilise lors du commentaire,
+                        ainsi que votre code de suivi. Si votre navigateur a conserve ces
+                        informations, elles sont pre-remplies automatiquement.
+                    </p>
+                </div>
+                <form onSubmit={handleLookupReplies} className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
+                    <input
+                        className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                        placeholder="Nom ou pseudonyme"
+                        value={replyLookupName}
+                        onChange={(event) => setReplyLookupName(event.target.value)}
+                    />
+                    <input
+                        className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm uppercase outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                        placeholder="Code de suivi"
+                        value={replyLookupCode}
+                        onChange={(event) => setReplyLookupCode(event.target.value.toUpperCase())}
+                        maxLength={8}
+                    />
+                    <button
+                        type="submit"
+                        disabled={replyLookupLoading}
+                        className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {replyLookupLoading ? "Recherche..." : "Voir mes reponses"}
+                    </button>
+                </form>
+                {replyLookupError && (
+                    <div className="mt-3 rounded-lg bg-white/80 px-3 py-2 text-sm text-amber-900">
+                        {replyLookupError}
+                    </div>
+                )}
+                {replyLookupItems.length > 0 && (
+                    <div className="mt-4 space-y-3">
+                        {replyLookupItems.map((item) => (
+                            <article key={item.id} className="rounded-lg border border-amber-100 bg-white p-4">
+                                <div className="mb-2 text-xs text-gray-500">
+                                    Commentaire du {new Date(item.createdAt).toLocaleString("fr-CA")}
+                                </div>
+                                <p className="whitespace-pre-wrap text-sm text-gray-800">
+                                    {item.comment}
+                                </p>
+                                <div className="mt-3 space-y-2 border-t border-gray-200 pt-3">
+                                    {item.replies.map((reply) => (
+                                        <div key={reply.id} className="rounded-lg bg-amber-50 p-3">
+                                            <div className="mb-1 text-xs text-gray-500">
+                                                Reponse de {reply.responderUsername} le{" "}
+                                                {new Date(reply.createdAt).toLocaleString("fr-CA")}
+                                            </div>
+                                            <p className="whitespace-pre-wrap text-sm text-gray-800">
+                                                {reply.message}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                )}
+            </section>
 
             {!blockingIncident && blockingActionableMessage && (
                 <div className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">

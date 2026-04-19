@@ -17,6 +17,7 @@ export type ClinicianComment = {
         message: string;
         createdAt: string;
     }>;
+    trackingCode?: string;
 };
 
 type ClinicianCommentsResponse = {
@@ -74,13 +75,17 @@ export async function listClinicianComments(
     };
 }
 
-export async function createClinicianComment(comment: string, guestDisplayName?: string) {
+export async function createClinicianComment(
+    comment: string,
+    guestDisplayName?: string,
+    trackingCode?: string
+) {
     const response = await authFetch("/api/clinician-comments", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({ comment, guestDisplayName }),
+        body: JSON.stringify({ comment, guestDisplayName, trackingCode }),
     });
 
     const payload = await toJson(response);
@@ -98,6 +103,36 @@ export async function createClinicianComment(comment: string, guestDisplayName?:
     return {
         ok: true as const,
         data: payload.data as ClinicianComment,
+    };
+}
+
+export async function lookupClinicianReplies(
+    actorUsername: string,
+    trackingCode: string
+) {
+    const query = new URLSearchParams({
+        actorUsername: actorUsername.trim().toLowerCase(),
+        trackingCode: trackingCode.trim().toUpperCase(),
+    });
+    const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/clinician-comments/lookup-replies?${query.toString()}`
+    );
+    const payload = await toJson(response);
+
+    if (!response.ok || !payload.data) {
+        return {
+            ok: false as const,
+            error: {
+                message:
+                    payload?.error?.message ||
+                    "Impossible de recuperer les reponses.",
+            },
+        };
+    }
+
+    return {
+        ok: true as const,
+        data: payload.data,
     };
 }
 

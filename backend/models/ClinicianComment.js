@@ -52,6 +52,11 @@ const ClinicianCommentSchema = new mongoose.Schema(
             required: true,
             index: true,
         },
+        trackingCodeHash: {
+            type: String,
+            required: true,
+            index: true,
+        },
         comment: {
             type: String,
             required: true,
@@ -78,6 +83,7 @@ const ClinicianCommentSchema = new mongoose.Schema(
 );
 
 ClinicianCommentSchema.index({ createdAt: -1 });
+ClinicianCommentSchema.index({ actorUsername: 1, trackingCodeHash: 1 });
 
 export const ClinicianComment =
     mongoose.models.ClinicianComment ||

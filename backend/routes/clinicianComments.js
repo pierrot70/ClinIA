@@ -2,6 +2,7 @@ import express from "express";
 import {
     createClinicianComment,
     listClinicianComments,
+    lookupClinicianReplies,
     replyToClinicianComment,
 } from "../services/clinicianComments.js";
 import { verifyJWT } from "../middleware/verifyJWT.js";
@@ -10,6 +11,42 @@ import { AUTH_ROLES } from "../auth/constants.js";
 import { clinicianCommentRateLimiter } from "../middleware/clinicianCommentRateLimiter.js";
 
 const router = express.Router();
+
+router.get("/lookup-replies", async (req, res) => {
+    try {
+        const data = await lookupClinicianReplies({
+            actorUsername: req.query.actorUsername,
+            trackingCode: req.query.trackingCode,
+        });
+
+        return res.status(200).json({
+            data,
+            meta: {
+                source: "real",
+                model: "mongo",
+            },
+        });
+    } catch (err) {
+        if (err.code === "INVALID_INPUT") {
+            return res.status(400).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        console.error("❌ Clinician replies lookup error:", err);
+        return res.status(500).json({
+            error: {
+                code: "PERSISTENCE_FAILED",
+                message: "Impossible de recuperer les reponses.",
+                retryable: true,
+            },
+        });
+    }
+});
 
 router.get(
     "/",
@@ -75,6 +112,7 @@ router.post("/", clinicianCommentRateLimiter, async (req, res) => {
             authUser: req.auth,
             comment: req.body?.comment,
             guestDisplayName: req.body?.guestDisplayName,
+            trackingCode: req.body?.trackingCode,
         });
 
         return res.status(201).json({

@@ -1,10 +1,12 @@
 import { ClinicianComment } from "../models/ClinicianComment.js";
 import { obfuscateClinicianComment } from "../utils/clinicianCommentPrivacy.js";
 import mongoose from "mongoose";
+import crypto from "crypto";
 
 const DEFAULT_PAGE_LIMIT = 20;
 const MAX_PAGE_LIMIT = 100;
 const MAX_COMMENT_LENGTH = 500;
+const TRACKING_CODE_REGEX = /^[A-Z0-9]{8}$/;
 
 function createClinicianCommentError(code, message) {
     return { code, message };
@@ -62,6 +64,27 @@ function normalizeScope(scope) {
     return normalized;
 }
 
+function generateTrackingCode() {
+    return crypto.randomBytes(6).toString("base64url").replace(/[^A-Za-z0-9]/g, "").slice(0, 8).toUpperCase();
+}
+
+function normalizeTrackingCode(value) {
+    return String(value || "").trim().toUpperCase();
+}
+
+function validateTrackingCode(value) {
+    if (!TRACKING_CODE_REGEX.test(value)) {
+        throw createClinicianCommentError(
+            "INVALID_INPUT",
+            "Le code de suivi est invalide."
+        );
+    }
+}
+
+function hashTrackingCode(value) {
+    return crypto.createHash("sha256").update(value).digest("hex");
+}
+
 function normalizeComment(entry) {
     return {
         id: String(entry._id),
@@ -85,7 +108,12 @@ function normalizeComment(entry) {
     };
 }
 
-export async function createClinicianComment({ authUser, comment, guestDisplayName }) {
+export async function createClinicianComment({
+    authUser,
+    comment,
+    guestDisplayName,
+    trackingCode,
+}) {
     assertCommentAccess(authUser);
 
     const trimmedComment = String(comment || "").trim();
@@ -128,16 +156,24 @@ export async function createClinicianComment({ authUser, comment, guestDisplayNa
         );
     }
 
+    const resolvedTrackingCode = normalizeTrackingCode(trackingCode) || generateTrackingCode();
+    validateTrackingCode(resolvedTrackingCode);
+    const trackingCodeHash = hashTrackingCode(resolvedTrackingCode);
+
     const created = await ClinicianComment.create({
         actorUserId: authUser?.userId || null,
         actorUsername: resolvedUsername,
         actorRole: authUser?.role || "ANONYMOUS",
+        trackingCodeHash,
         comment: obfuscated.sanitized,
         redactionCount: obfuscated.redactionCount,
         redactionTypes: obfuscated.redactionTypes,
     });
 
-    return normalizeComment(created.toObject());
+    return {
+        ...normalizeComment(created.toObject()),
+        trackingCode: resolvedTrackingCode,
+    };
 }
 
 export async function listClinicianComments({
@@ -258,4 +294,33 @@ export async function replyToClinicianComment({
     }
 
     return normalizeComment(updated);
+}
+
+export async function lookupClinicianReplies({
+    actorUsername,
+    trackingCode,
+}) {
+    const normalizedActorUsername = String(actorUsername || "").trim().toLowerCase();
+    if (!normalizedActorUsername) {
+        throw createClinicianCommentError(
+            "INVALID_INPUT",
+            "Le nom ou pseudonyme est requis."
+        );
+    }
+
+    const normalizedTrackingCode = normalizeTrackingCode(trackingCode);
+    validateTrackingCode(normalizedTrackingCode);
+
+    const items = await ClinicianComment.find({
+        actorUsername: normalizedActorUsername,
+        trackingCodeHash: hashTrackingCode(normalizedTrackingCode),
+        "replies.0": { $exists: true },
+    })
+        .sort({ createdAt: -1 })
+        .lean();
+
+    return {
+        actorUsername: normalizedActorUsername,
+        items: items.map(normalizeComment),
+    };
 }

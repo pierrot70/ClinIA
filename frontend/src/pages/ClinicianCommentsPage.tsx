@@ -7,12 +7,15 @@ import {
     type ClinicianComment,
 } from "../services/clinicianCommentsApi";
 
+const CLINICIAN_COMMENT_STORAGE_KEY = "clinia_comment_tracking";
+
 export function ClinicianCommentsPage() {
     const { user, isAuthenticated, status } = useAuth();
     const canReviewAll = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
     const [scope, setScope] = useState<"own" | "all">("own");
     const [comment, setComment] = useState("");
     const [guestDisplayName, setGuestDisplayName] = useState("");
+    const [trackingCode, setTrackingCode] = useState("");
     const [items, setItems] = useState<ClinicianComment[]>([]);
     const [availableActorUsernames, setAvailableActorUsernames] = useState<string[]>([]);
     const [actorUsernameFilter, setActorUsernameFilter] = useState("");
@@ -23,6 +26,32 @@ export function ClinicianCommentsPage() {
     const [replying, setReplying] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            return;
+        }
+
+        try {
+            const raw = window.localStorage.getItem(CLINICIAN_COMMENT_STORAGE_KEY);
+            if (!raw) {
+                return;
+            }
+
+            const parsed = JSON.parse(raw) as {
+                guestDisplayName?: string;
+                trackingCode?: string;
+            };
+            if (parsed.guestDisplayName) {
+                setGuestDisplayName(parsed.guestDisplayName);
+            }
+            if (parsed.trackingCode) {
+                setTrackingCode(parsed.trackingCode);
+            }
+        } catch {
+            // Ignore local storage errors.
+        }
+    }, [isAuthenticated]);
 
     useEffect(() => {
         if (!canReviewAll && scope === "all") {
@@ -81,7 +110,8 @@ export function ClinicianCommentsPage() {
 
         const response = await createClinicianComment(
             comment,
-            isAuthenticated ? undefined : guestDisplayName
+            isAuthenticated ? undefined : guestDisplayName,
+            isAuthenticated ? undefined : trackingCode
         );
         setSubmitting(false);
 
@@ -91,11 +121,24 @@ export function ClinicianCommentsPage() {
         }
 
         setComment("");
-        setGuestDisplayName("");
+        if (!isAuthenticated) {
+            setTrackingCode(response.data.trackingCode || trackingCode);
+            try {
+                window.localStorage.setItem(
+                    CLINICIAN_COMMENT_STORAGE_KEY,
+                    JSON.stringify({
+                        guestDisplayName,
+                        trackingCode: response.data.trackingCode || trackingCode,
+                    })
+                );
+            } catch {
+                // Ignore local storage errors.
+            }
+        }
         setSuccess(
-            response.data.redactionCount > 0
+            `${response.data.redactionCount > 0
                 ? "Commentaire enregistre avec obfuscation automatique des identifiants detectes."
-                : "Commentaire enregistre."
+                : "Commentaire enregistre."} Code de suivi: ${response.data.trackingCode || trackingCode}`
         );
 
         if (isAuthenticated) {
@@ -170,7 +213,7 @@ export function ClinicianCommentsPage() {
                         Nouveau commentaire
                     </label>
                     {!isAuthenticated && (
-                        <div className="mb-3">
+                        <div className="mb-3 space-y-3">
                             <label
                                 htmlFor="clinician-comment-name"
                                 className="mb-2 block text-sm font-medium text-gray-800"
@@ -185,6 +228,26 @@ export function ClinicianCommentsPage() {
                                 onChange={(event) => setGuestDisplayName(event.target.value)}
                                 maxLength={120}
                             />
+                            <div>
+                                <label
+                                    htmlFor="clinician-tracking-code"
+                                    className="mb-2 block text-sm font-medium text-gray-800"
+                                >
+                                    Code de suivi
+                                </label>
+                                <input
+                                    id="clinician-tracking-code"
+                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                                    placeholder="Genere automatiquement au premier commentaire"
+                                    value={trackingCode}
+                                    onChange={(event) => setTrackingCode(event.target.value.toUpperCase())}
+                                    maxLength={8}
+                                />
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Laissez vide pour recevoir un nouveau code de suivi, ou
+                                    reutilisez votre code actuel pour regrouper vos commentaires.
+                                </p>
+                            </div>
                         </div>
                     )}
                     <textarea
