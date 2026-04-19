@@ -57,6 +57,10 @@ function hashToken(token) {
     return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+function revokeAccessTokens(user, at = new Date()) {
+    user.authTokenInvalidBefore = at;
+}
+
 function getJwtAccessSecret() {
     const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
     if (!secret) {
@@ -126,6 +130,7 @@ function mapPublicUser(user) {
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt || null,
         lastLogoutAt: user.lastLogoutAt || null,
+        authTokenInvalidBefore: user.authTokenInvalidBefore || null,
     };
 }
 
@@ -398,6 +403,7 @@ export async function login({ username, email, password, req }) {
     user.failedLoginAttempts = 0;
     user.lockUntil = null;
     user.lastLoginAt = new Date();
+    user.authTokenInvalidBefore = null;
 
     const refreshToken = await setRotatedRefreshToken(user);
     const accessToken = signAccessToken(user);
@@ -446,6 +452,7 @@ export async function refresh({ refreshToken, req }) {
     ) {
         user.refreshTokenHash = null;
         user.refreshTokenExpiresAt = null;
+        revokeAccessTokens(user);
         await user.save();
 
         throw createAuthError(
@@ -457,6 +464,7 @@ export async function refresh({ refreshToken, req }) {
     if (isShutdownEnforcedForRole(user.role)) {
         user.refreshTokenHash = null;
         user.refreshTokenExpiresAt = null;
+        revokeAccessTokens(user);
         await user.save();
         throw createAuthError(
             "APP_SHUTDOWN",
@@ -500,6 +508,7 @@ export async function logout({ refreshToken, authUser, req }) {
     user.refreshTokenHash = null;
     user.refreshTokenExpiresAt = null;
     user.lastLogoutAt = new Date();
+    revokeAccessTokens(user, user.lastLogoutAt);
     await user.save();
 
     await recordAuthAuditEvent({
@@ -1099,6 +1108,7 @@ export async function setUserActiveStatus({ userId, isActive, authUser, req }) {
     if (!isActive) {
         user.refreshTokenHash = null;
         user.refreshTokenExpiresAt = null;
+        revokeAccessTokens(user);
     }
     await user.save();
 
@@ -1134,6 +1144,7 @@ export async function resetUserPassword({ userId, newPassword, authUser, req }) 
     user.passwordHash = await hashPassword(newPassword);
     user.refreshTokenHash = null;
     user.refreshTokenExpiresAt = null;
+    revokeAccessTokens(user);
     await user.save();
 
     await recordAuthAuditEvent({

@@ -15,6 +15,16 @@ function getTokenFromRequest(req) {
     return authHeader.slice("Bearer ".length).trim();
 }
 
+function isTokenRevokedByServer(user, payload) {
+    if (!user?.authTokenInvalidBefore || !payload?.iat) {
+        return false;
+    }
+
+    const issuedAtMs = Number(payload.iat) * 1000;
+    return Number.isFinite(issuedAtMs) &&
+        issuedAtMs <= new Date(user.authTokenInvalidBefore).getTime();
+}
+
 export async function attachOptionalAuth(req, res, next) {
     const token = getTokenFromRequest(req);
 
@@ -34,10 +44,15 @@ export async function attachOptionalAuth(req, res, next) {
         }
 
         const user = await AdminUser.findById(payload.sub)
-            .select("_id username role isActive")
+            .select("_id username role isActive authTokenInvalidBefore")
             .lean();
 
-        if (!user || user.isActive === false || user.role !== payload.role) {
+        if (
+            !user ||
+            user.isActive === false ||
+            user.role !== payload.role ||
+            isTokenRevokedByServer(user, payload)
+        ) {
             return next();
         }
 

@@ -48,6 +48,7 @@ describe("verifyJWT middleware", () => {
             sub: "user-1",
             role: "ADMIN",
             username: "admin",
+            iat: Math.floor(Date.now() / 1000),
         });
         findById.mockReturnValue({
             select: vi.fn().mockReturnValue({
@@ -56,6 +57,7 @@ describe("verifyJWT middleware", () => {
                     role: "ADMIN",
                     username: "admin",
                     isActive: true,
+                    authTokenInvalidBefore: null,
                 }),
             }),
         });
@@ -93,6 +95,7 @@ describe("verifyJWT middleware", () => {
             sub: "user-1",
             role: "NOT_A_ROLE",
             username: "admin",
+            iat: Math.floor(Date.now() / 1000),
         });
 
         const req = {
@@ -106,6 +109,47 @@ describe("verifyJWT middleware", () => {
         await verifyJWT(req, res, next);
 
         expect(res.status).toHaveBeenCalledWith(401);
+        expect(next).not.toHaveBeenCalled();
+    });
+
+    it("rejects access token revoked by server-side invalidation timestamp", async () => {
+        process.env.JWT_ACCESS_SECRET = "test-access-secret";
+        verify.mockReturnValue({
+            sub: "user-1",
+            role: "ADMIN",
+            username: "admin",
+            iat: Math.floor(new Date("2026-04-19T10:00:00.000Z").getTime() / 1000),
+        });
+        findById.mockReturnValue({
+            select: vi.fn().mockReturnValue({
+                lean: vi.fn().mockResolvedValue({
+                    _id: "user-1",
+                    role: "ADMIN",
+                    username: "admin",
+                    isActive: true,
+                    authTokenInvalidBefore: new Date("2026-04-19T10:00:01.000Z"),
+                }),
+            }),
+        });
+
+        const req = {
+            headers: {
+                authorization: "Bearer token-value",
+            },
+        };
+        const res = makeRes();
+        const next = vi.fn();
+
+        await verifyJWT(req, res, next);
+
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "TOKEN_REVOKED",
+                message: "Session invalidee. Reconnectez-vous.",
+                retryable: false,
+            },
+        });
         expect(next).not.toHaveBeenCalled();
     });
 });

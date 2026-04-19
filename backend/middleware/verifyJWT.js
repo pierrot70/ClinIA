@@ -19,6 +19,16 @@ function getTokenFromRequest(req) {
     return authHeader.slice("Bearer ".length).trim();
 }
 
+function isTokenRevokedByServer(user, payload) {
+    if (!user?.authTokenInvalidBefore || !payload?.iat) {
+        return false;
+    }
+
+    const issuedAtMs = Number(payload.iat) * 1000;
+    return Number.isFinite(issuedAtMs) &&
+        issuedAtMs <= new Date(user.authTokenInvalidBefore).getTime();
+}
+
 export async function verifyJWT(req, res, next) {
     const token = getTokenFromRequest(req);
 
@@ -53,7 +63,7 @@ export async function verifyJWT(req, res, next) {
         }
 
         const user = await AdminUser.findById(payload.sub)
-            .select("_id username role isActive")
+            .select("_id username role isActive authTokenInvalidBefore")
             .lean();
 
         if (!user || user.isActive === false) {
@@ -71,6 +81,16 @@ export async function verifyJWT(req, res, next) {
                 error: {
                     code: "INVALID_TOKEN",
                     message: "Token d'acces invalide ou expire.",
+                    retryable: false,
+                },
+            });
+        }
+
+        if (isTokenRevokedByServer(user, payload)) {
+            return res.status(401).json({
+                error: {
+                    code: "TOKEN_REVOKED",
+                    message: "Session invalidee. Reconnectez-vous.",
                     retryable: false,
                 },
             });

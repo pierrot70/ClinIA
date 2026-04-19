@@ -52,6 +52,11 @@ const AdminUserSchema = new mongoose.Schema({
         type: Date,
         default: null,
     },
+    authTokenInvalidBefore: {
+        type: Date,
+        default: null,
+        index: true,
+    },
 }, { timestamps: true });
 
 export const AdminUser = mongoose.model("AdminUser", AdminUserSchema);

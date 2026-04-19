@@ -218,6 +218,7 @@ describe("auth service", () => {
         const user = buildUser({
             refreshTokenHash: "old-hash",
             refreshTokenExpiresAt: new Date(Date.now() - 1_000),
+            authTokenInvalidBefore: null,
         });
         mockFindOne.mockResolvedValue(user);
 
@@ -232,6 +233,7 @@ describe("auth service", () => {
 
         expect(user.refreshTokenHash).toBeNull();
         expect(user.refreshTokenExpiresAt).toBeNull();
+        expect(user.authTokenInvalidBefore).toBeInstanceOf(Date);
         expect(user.save).toHaveBeenCalledTimes(1);
     });
 
@@ -252,6 +254,7 @@ describe("auth service", () => {
         expect(user.refreshTokenHash).toBeNull();
         expect(user.refreshTokenExpiresAt).toBeNull();
         expect(user.lastLogoutAt).toBeInstanceOf(Date);
+        expect(user.authTokenInvalidBefore).toBeInstanceOf(Date);
         expect(user.save).toHaveBeenCalledTimes(1);
         expect(recordAuthAuditEvent).toHaveBeenCalledWith(
             expect.objectContaining({
