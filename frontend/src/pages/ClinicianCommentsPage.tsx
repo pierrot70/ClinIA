@@ -3,6 +3,7 @@ import { useAuth } from "../hooks/useAuth";
 import {
     createClinicianComment,
     listClinicianComments,
+    replyToClinicianComment,
     type ClinicianComment,
 } from "../services/clinicianCommentsApi";
 
@@ -13,8 +14,13 @@ export function ClinicianCommentsPage() {
     const [comment, setComment] = useState("");
     const [guestDisplayName, setGuestDisplayName] = useState("");
     const [items, setItems] = useState<ClinicianComment[]>([]);
+    const [availableActorUsernames, setAvailableActorUsernames] = useState<string[]>([]);
+    const [actorUsernameFilter, setActorUsernameFilter] = useState("");
+    const [selectedCommentId, setSelectedCommentId] = useState("");
+    const [replyMessage, setReplyMessage] = useState("");
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [replying, setReplying] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
@@ -37,7 +43,7 @@ export function ClinicianCommentsPage() {
             setLoading(true);
             setError("");
 
-            const response = await listClinicianComments(scope);
+            const response = await listClinicianComments(scope, actorUsernameFilter);
             if (cancelled) {
                 return;
             }
@@ -50,6 +56,7 @@ export function ClinicianCommentsPage() {
             }
 
             setItems(response.data.items || []);
+            setAvailableActorUsernames(response.data.availableActorUsernames || []);
             setLoading(false);
         };
 
@@ -58,7 +65,13 @@ export function ClinicianCommentsPage() {
         return () => {
             cancelled = true;
         };
-    }, [isAuthenticated, scope]);
+    }, [actorUsernameFilter, isAuthenticated, scope]);
+
+    useEffect(() => {
+        if (!items.some((item) => item.id === selectedCommentId)) {
+            setSelectedCommentId(items[0]?.id || "");
+        }
+    }, [items, selectedCommentId]);
 
     async function handleSubmit(event: React.FormEvent) {
         event.preventDefault();
@@ -86,12 +99,44 @@ export function ClinicianCommentsPage() {
         );
 
         if (isAuthenticated) {
-            const refreshed = await listClinicianComments(scope);
+            const refreshed = await listClinicianComments(scope, actorUsernameFilter);
             if (refreshed.ok) {
                 setItems(refreshed.data.items || []);
+                setAvailableActorUsernames(refreshed.data.availableActorUsernames || []);
             }
         }
     }
+
+    async function handleReplySubmit(event: React.FormEvent) {
+        event.preventDefault();
+        if (!selectedCommentId) {
+            setError("Selectionnez un commentaire avant de repondre.");
+            return;
+        }
+
+        setReplying(true);
+        setError("");
+        setSuccess("");
+
+        const response = await replyToClinicianComment(selectedCommentId, replyMessage);
+        setReplying(false);
+
+        if (!response.ok) {
+            setError(response.error.message);
+            return;
+        }
+
+        setReplyMessage("");
+        setSuccess("Reponse enregistree.");
+        setItems((currentItems) =>
+            currentItems.map((item) =>
+                item.id === response.data.id ? response.data : item
+            )
+        );
+    }
+
+    const selectedComment =
+        items.find((item) => item.id === selectedCommentId) || null;
 
     return (
         <section className="mx-auto max-w-5xl px-4 py-8">
@@ -148,10 +193,10 @@ export function ClinicianCommentsPage() {
                         placeholder="Exemple: Le module de rendez-vous affiche une erreur au moment de confirmer l'horaire. Ne pas inclure de nom de patient, RAMQ, telephone ou email."
                         value={comment}
                         onChange={(event) => setComment(event.target.value)}
-                        maxLength={4000}
+                        maxLength={500}
                     />
                     <div className="mt-2 text-right text-xs text-gray-500">
-                        {comment.length} / 4000
+                        {comment.length} / 500
                     </div>
 
                     {error && (
@@ -194,14 +239,28 @@ export function ClinicianCommentsPage() {
                             </p>
                         </div>
                         {canReviewAll && (
-                            <select
-                                value={scope}
-                                onChange={(event) => setScope(event.target.value as "own" | "all")}
-                                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-                            >
-                                <option value="own">Mes commentaires</option>
-                                <option value="all">Tous les commentaires</option>
-                            </select>
+                            <div className="flex flex-col gap-2">
+                                <select
+                                    value={scope}
+                                    onChange={(event) => setScope(event.target.value as "own" | "all")}
+                                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+                                >
+                                    <option value="own">Mes commentaires</option>
+                                    <option value="all">Tous les commentaires</option>
+                                </select>
+                                <select
+                                    value={actorUsernameFilter}
+                                    onChange={(event) => setActorUsernameFilter(event.target.value)}
+                                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+                                >
+                                    <option value="">Tous les noms ou pseudonymes</option>
+                                    {availableActorUsernames.map((username) => (
+                                        <option key={username} value={username}>
+                                            {username}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                         )}
                     </div>
 
@@ -216,7 +275,55 @@ export function ClinicianCommentsPage() {
                             Aucun commentaire enregistre pour le moment.
                         </p>
                     ) : (
-                        <div className="space-y-3">
+                        <div className="space-y-4">
+                            {canReviewAll && items.length > 0 && (
+                                <form
+                                    onSubmit={handleReplySubmit}
+                                    className="rounded-lg border border-sky-100 bg-sky-50 p-4"
+                                >
+                                    <div className="grid gap-3">
+                                        <label className="text-sm font-medium text-gray-800">
+                                            Selection du commentaire
+                                        </label>
+                                        <select
+                                            value={selectedCommentId}
+                                            onChange={(event) => setSelectedCommentId(event.target.value)}
+                                            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+                                        >
+                                            {items.map((item) => (
+                                                <option key={item.id} value={item.id}>
+                                                    {item.actorUsername} — {new Date(item.createdAt).toLocaleString("fr-CA")}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {selectedComment && (
+                                            <div className="rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-700">
+                                                <div className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+                                                    Commentaire selectionne
+                                                </div>
+                                                <p className="whitespace-pre-wrap">{selectedComment.comment}</p>
+                                            </div>
+                                        )}
+                                        <textarea
+                                            className="min-h-[120px] rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                                            placeholder="Ecrire une reponse au commentaire selectionne..."
+                                            value={replyMessage}
+                                            onChange={(event) => setReplyMessage(event.target.value)}
+                                            maxLength={500}
+                                        />
+                                        <div className="flex justify-end">
+                                            <button
+                                                type="submit"
+                                                disabled={replying || !selectedCommentId}
+                                                className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                                {replying ? "Enregistrement..." : "Repondre au commentaire"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            )}
+
                             {items.map((item) => (
                                 <article
                                     key={item.id}
@@ -239,6 +346,29 @@ export function ClinicianCommentsPage() {
                                     <p className="whitespace-pre-wrap text-sm text-gray-800">
                                         {item.comment}
                                     </p>
+                                    {item.replies.length > 0 && (
+                                        <div className="mt-3 space-y-2 border-t border-gray-200 pt-3">
+                                            {item.replies.map((reply) => (
+                                                <div
+                                                    key={reply.id}
+                                                    className="rounded-lg bg-white p-3"
+                                                >
+                                                    <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                                                        <span className="font-medium text-gray-700">
+                                                            {reply.responderUsername}
+                                                        </span>
+                                                        <span>{reply.responderRole}</span>
+                                                        <span>
+                                                            {new Date(reply.createdAt).toLocaleString("fr-CA")}
+                                                        </span>
+                                                    </div>
+                                                    <p className="whitespace-pre-wrap text-sm text-gray-800">
+                                                        {reply.message}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </article>
                             ))}
                         </div>

@@ -1,5 +1,36 @@
 import mongoose from "mongoose";
 
+const ClinicianCommentReplySchema = new mongoose.Schema(
+    {
+        responderUserId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "AdminUser",
+            required: true,
+        },
+        responderUsername: {
+            type: String,
+            required: true,
+            trim: true,
+            lowercase: true,
+        },
+        responderRole: {
+            type: String,
+            enum: ["ADMIN", "SUPERADMIN"],
+            required: true,
+        },
+        message: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        createdAt: {
+            type: Date,
+            default: () => new Date(),
+        },
+    },
+    { _id: true, id: false }
+);
+
 const ClinicianCommentSchema = new mongoose.Schema(
     {
         actorUserId: {
@@ -33,6 +64,10 @@ const ClinicianCommentSchema = new mongoose.Schema(
         },
         redactionTypes: {
             type: [String],
+            default: [],
+        },
+        replies: {
+            type: [ClinicianCommentReplySchema],
             default: [],
         },
     },

@@ -1,8 +1,10 @@
 import { ClinicianComment } from "../models/ClinicianComment.js";
 import { obfuscateClinicianComment } from "../utils/clinicianCommentPrivacy.js";
+import mongoose from "mongoose";
 
 const DEFAULT_PAGE_LIMIT = 20;
 const MAX_PAGE_LIMIT = 100;
+const MAX_COMMENT_LENGTH = 500;
 
 function createClinicianCommentError(code, message) {
     return { code, message };
@@ -63,13 +65,23 @@ function normalizeScope(scope) {
 function normalizeComment(entry) {
     return {
         id: String(entry._id),
-        actorUserId: String(entry.actorUserId),
+        actorUserId: entry.actorUserId ? String(entry.actorUserId) : null,
         actorUsername: entry.actorUsername,
         actorRole: entry.actorRole,
         comment: entry.comment,
         redactionCount: Number(entry.redactionCount || 0),
         redactionTypes: Array.isArray(entry.redactionTypes) ? entry.redactionTypes : [],
         createdAt: entry.createdAt,
+        replies: Array.isArray(entry.replies)
+            ? entry.replies.map((reply) => ({
+                id: String(reply._id),
+                responderUserId: String(reply.responderUserId),
+                responderUsername: reply.responderUsername,
+                responderRole: reply.responderRole,
+                message: reply.message,
+                createdAt: reply.createdAt,
+            }))
+            : [],
     };
 }
 
@@ -84,10 +96,10 @@ export async function createClinicianComment({ authUser, comment, guestDisplayNa
         );
     }
 
-    if (trimmedComment.length > 4000) {
+    if (trimmedComment.length > MAX_COMMENT_LENGTH) {
         throw createClinicianCommentError(
             "INVALID_INPUT",
-            "Le commentaire est trop long."
+            "Le commentaire ne peut pas depasser 500 caracteres."
         );
     }
 
@@ -133,6 +145,7 @@ export async function listClinicianComments({
     page,
     limit,
     scope,
+    actorUsername,
 }) {
     if (!authUser) {
         throw createClinicianCommentError(
@@ -147,6 +160,7 @@ export async function listClinicianComments({
     const normalizedLimit = normalizePageLimit(limit);
     const normalizedScope = normalizeScope(scope);
     const query = {};
+    const actorUsernameFilter = String(actorUsername || "").trim().toLowerCase();
 
     if (normalizedScope === "all") {
         assertAdminAccess(authUser);
@@ -154,15 +168,22 @@ export async function listClinicianComments({
         query.actorUserId = authUser.userId;
     }
 
-    const skip = (normalizedPage - 1) * normalizedLimit;
+    if (actorUsernameFilter) {
+        query.actorUsername = actorUsernameFilter;
+    }
 
-    const [items, total] = await Promise.all([
+    const skip = (normalizedPage - 1) * normalizedLimit;
+    const usernamesQuery = { ...query };
+    delete usernamesQuery.actorUsername;
+
+    const [items, total, availableActorUsernames] = await Promise.all([
         ClinicianComment.find(query)
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(normalizedLimit)
             .lean(),
         ClinicianComment.countDocuments(query),
+        ClinicianComment.distinct("actorUsername", usernamesQuery),
     ]);
 
     return {
@@ -174,5 +195,67 @@ export async function listClinicianComments({
             totalPages: Math.max(1, Math.ceil(total / normalizedLimit)),
         },
         scope: normalizedScope,
+        availableActorUsernames: availableActorUsernames
+            .map((entry) => String(entry || "").trim())
+            .filter(Boolean)
+            .sort((a, b) => a.localeCompare(b, "fr")),
     };
+}
+
+export async function replyToClinicianComment({
+    authUser,
+    commentId,
+    message,
+}) {
+    assertAdminAccess(authUser);
+
+    const normalizedCommentId = String(commentId || "").trim();
+    if (!mongoose.Types.ObjectId.isValid(normalizedCommentId)) {
+        throw createClinicianCommentError(
+            "INVALID_INPUT",
+            "Identifiant de commentaire invalide."
+        );
+    }
+
+    const trimmedMessage = String(message || "").trim();
+    if (!trimmedMessage) {
+        throw createClinicianCommentError(
+            "INVALID_INPUT",
+            "La reponse est requise."
+        );
+    }
+
+    if (trimmedMessage.length > 4000) {
+        throw createClinicianCommentError(
+            "INVALID_INPUT",
+            "La reponse est trop longue."
+        );
+    }
+
+    const obfuscated = obfuscateClinicianComment(trimmedMessage);
+
+    const updated = await ClinicianComment.findByIdAndUpdate(
+        normalizedCommentId,
+        {
+            $push: {
+                replies: {
+                    responderUserId: authUser.userId,
+                    responderUsername: authUser.username,
+                    responderRole: authUser.role,
+                    message: obfuscated.sanitized,
+                    createdAt: new Date(),
+                },
+            },
+        },
+        { new: true, lean: true }
+    );
+
+    if (!updated) {
+        throw createClinicianCommentError(
+            "INVALID_INPUT",
+            "Commentaire introuvable."
+        );
+    }
+
+    return normalizeComment(updated);
 }
