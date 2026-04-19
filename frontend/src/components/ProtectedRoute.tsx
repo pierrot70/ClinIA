@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { getDefaultRouteForRole, type UserRole } from "../auth/roles";
@@ -15,9 +15,41 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     redirectTo = "/login",
 }) => {
     const location = useLocation();
-    const { status, user, isAuthenticated } = useAuth();
+    const { status, user, isAuthenticated, authFetch } = useAuth();
+    const [isVerifyingSession, setIsVerifyingSession] = useState(false);
 
-    if (status === "loading") {
+    useEffect(() => {
+        let cancelled = false;
+
+        async function verifyProtectedSession() {
+            if (status !== "authenticated") {
+                if (!cancelled) {
+                    setIsVerifyingSession(false);
+                }
+                return;
+            }
+
+            setIsVerifyingSession(true);
+
+            try {
+                await authFetch("/api/auth/session");
+            } catch {
+                // authFetch handles forced logout and redirect when needed.
+            } finally {
+                if (!cancelled) {
+                    setIsVerifyingSession(false);
+                }
+            }
+        }
+
+        void verifyProtectedSession();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [authFetch, location.pathname, status]);
+
+    if (status === "loading" || isVerifyingSession) {
         return (
             <div className="max-w-6xl mx-auto px-4 py-8">
                 <p className="text-sm text-gray-500">Validation de session...</p>
