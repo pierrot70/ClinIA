@@ -65,6 +65,7 @@ router.get(
             limit: req.query.limit,
             scope: req.query.scope,
             actorUsername: req.query.actorUsername,
+            category: req.query.category,
         });
 
         return res.status(200).json({

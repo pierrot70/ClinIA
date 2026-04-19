@@ -235,6 +235,7 @@ export async function listClinicianComments({
     limit,
     scope,
     actorUsername,
+    category,
 }) {
     if (!authUser) {
         throw createClinicianCommentError(
@@ -250,6 +251,7 @@ export async function listClinicianComments({
     const normalizedScope = normalizeScope(scope);
     const query = {};
     const actorUsernameFilter = String(actorUsername || "").trim().toLowerCase();
+    const categoryFilter = String(category || "").trim().toUpperCase();
 
     if (normalizedScope === "all") {
         assertAdminAccess(authUser);
@@ -259,6 +261,10 @@ export async function listClinicianComments({
 
     if (actorUsernameFilter) {
         query.actorUsername = actorUsernameFilter;
+    }
+
+    if (categoryFilter) {
+        query.category = normalizeCommentCategory(categoryFilter);
     }
 
     const skip = (normalizedPage - 1) * normalizedLimit;

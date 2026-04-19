@@ -49,11 +49,15 @@ async function toJson(response: Response): Promise<ClinicianCommentsResponse> {
 
 export async function listClinicianComments(
     scope: "own" | "all" = "own",
-    actorUsername = ""
+    actorUsername = "",
+    category = ""
 ) {
     const query = new URLSearchParams({ scope });
     if (actorUsername.trim()) {
         query.set("actorUsername", actorUsername.trim().toLowerCase());
+    }
+    if (category.trim()) {
+        query.set("category", category.trim().toUpperCase());
     }
 
     const response = await authFetch(`/api/clinician-comments?${query.toString()}`);

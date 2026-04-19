@@ -2,11 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const findMock = vi.fn();
 const createMock = vi.fn();
+const countDocumentsMock = vi.fn();
+const distinctMock = vi.fn();
 
 vi.mock("../../models/ClinicianComment.js", () => ({
     ClinicianComment: {
         find: findMock,
         create: createMock,
+        countDocuments: countDocumentsMock,
+        distinct: distinctMock,
     },
 }));
 
@@ -14,6 +18,8 @@ describe("clinicianComments service", () => {
     beforeEach(() => {
         findMock.mockReset();
         createMock.mockReset();
+        countDocumentsMock.mockReset();
+        distinctMock.mockReset();
     });
 
     it("returns a neutral responder label for public reply lookups", async () => {
@@ -71,5 +77,29 @@ describe("clinicianComments service", () => {
         });
 
         expect(createMock).not.toHaveBeenCalled();
+    });
+
+    it("filters admin comment listing by category", async () => {
+        const leanMock = vi.fn().mockResolvedValue([]);
+        const limitMock = vi.fn(() => ({ lean: leanMock }));
+        const skipMock = vi.fn(() => ({ limit: limitMock }));
+        const sortMock = vi.fn(() => ({ skip: skipMock }));
+        findMock.mockReturnValue({ sort: sortMock });
+        countDocumentsMock.mockResolvedValue(0);
+        distinctMock.mockResolvedValue([]);
+
+        const { listClinicianComments } = await import("../clinicianComments.js");
+
+        await listClinicianComments({
+            authUser: { userId: "664444444444444444444444", role: "ADMIN" },
+            scope: "all",
+            category: "urgent",
+        });
+
+        expect(findMock).toHaveBeenCalledWith({ category: "URGENT" });
+        expect(countDocumentsMock).toHaveBeenCalledWith({ category: "URGENT" });
+        expect(distinctMock).toHaveBeenCalledWith("actorUsername", {
+            category: "URGENT",
+        });
     });
 });

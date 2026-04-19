@@ -31,6 +31,7 @@ export function ClinicianCommentsPage() {
     const [scope, setScope] = useState<"own" | "all">("own");
     const [category, setCategory] =
         useState<ClinicianComment["category"]>("BUG");
+    const [categoryFilter, setCategoryFilter] = useState("");
     const [comment, setComment] = useState("");
     const [guestDisplayName, setGuestDisplayName] = useState("");
     const [trackingCode, setTrackingCode] = useState("");
@@ -90,7 +91,11 @@ export function ClinicianCommentsPage() {
             setLoading(true);
             setError("");
 
-            const response = await listClinicianComments(scope, actorUsernameFilter);
+            const response = await listClinicianComments(
+                scope,
+                actorUsernameFilter,
+                categoryFilter
+            );
             if (cancelled) {
                 return;
             }
@@ -112,7 +117,7 @@ export function ClinicianCommentsPage() {
         return () => {
             cancelled = true;
         };
-    }, [actorUsernameFilter, isAuthenticated, scope]);
+    }, [actorUsernameFilter, categoryFilter, isAuthenticated, scope]);
 
     useEffect(() => {
         if (!items.some((item) => item.id === selectedCommentId)) {
@@ -161,7 +166,11 @@ export function ClinicianCommentsPage() {
         );
 
         if (isAuthenticated) {
-            const refreshed = await listClinicianComments(scope, actorUsernameFilter);
+            const refreshed = await listClinicianComments(
+                scope,
+                actorUsernameFilter,
+                categoryFilter
+            );
             if (refreshed.ok) {
                 setItems(refreshed.data.items || []);
                 setAvailableActorUsernames(refreshed.data.availableActorUsernames || []);
@@ -363,6 +372,18 @@ export function ClinicianCommentsPage() {
                                     {availableActorUsernames.map((username) => (
                                         <option key={username} value={username}>
                                             {username}
+                                        </option>
+                                    ))}
+                                </select>
+                                <select
+                                    value={categoryFilter}
+                                    onChange={(event) => setCategoryFilter(event.target.value)}
+                                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+                                >
+                                    <option value="">Toutes les categories</option>
+                                    {COMMENT_CATEGORY_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
                                         </option>
                                     ))}
                                 </select>
