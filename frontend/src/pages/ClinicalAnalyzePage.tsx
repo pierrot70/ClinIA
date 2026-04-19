@@ -1,4 +1,5 @@
 import { useEffect, useState, useContext } from "react";
+import { Link } from "react-router-dom";
 import { ClinicalForm } from "../components/clinical/ClinicalForm";
 // import { ClinicalResultPage } from "./ClinicalResultPage";
 import ClinicalDemoResult from "../components/ClinicalDemoResult";
@@ -257,6 +258,15 @@ export function ClinicalAnalyzePage() {
                     {backendErrorLabel}
                 </div>
             )}
+
+            <div className="flex justify-end">
+                <Link
+                    to="/comments"
+                    className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-800 transition hover:bg-sky-100"
+                >
+                    Laisser un commentaire
+                </Link>
+            </div>
 
             {!blockingIncident && blockingActionableMessage && (
                 <div className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">

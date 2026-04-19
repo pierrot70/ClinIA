@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+
+headline() {
+  echo
+  echo "=================================================="
+  echo "$1"
+  echo "=================================================="
+}
+
 # -----------------------------
 # Scan sécurité Loi 25/PIPEDA : fuite de données identifiables
 # -----------------------------
@@ -52,13 +60,6 @@ dc() {
   docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
 }
 
-headline() {
-  echo
-  echo "=================================================="
-  echo "$1"
-  echo "=================================================="
-}
-
 # -----------------------------
 # 0) Build/type-check frontend (strict)
 # -----------------------------
@@ -96,6 +97,17 @@ if ! grep -q '<div id="root">' dist/index.html; then
   echo "❌ Erreur critique : <div id=\"root\"> absent de dist/index.html (build corrompu ou crash JS)"
   exit 1
 fi
+
+popd > /dev/null
+
+# -----------------------------
+# 0b) Test backend ciblé : obfuscation des commentaires
+# -----------------------------
+headline "Vérification backend ciblée (obfuscation des commentaires)"
+pushd backend > /dev/null
+
+echo "> npm test -- utils/__tests__/clinicianCommentPrivacy.test.js"
+npm test -- utils/__tests__/clinicianCommentPrivacy.test.js
 
 popd > /dev/null
 

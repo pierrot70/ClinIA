@@ -1,0 +1,250 @@
+import React, { useEffect, useState } from "react";
+import { useAuth } from "../hooks/useAuth";
+import {
+    createClinicianComment,
+    listClinicianComments,
+    type ClinicianComment,
+} from "../services/clinicianCommentsApi";
+
+export function ClinicianCommentsPage() {
+    const { user, isAuthenticated, status } = useAuth();
+    const canReviewAll = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+    const [scope, setScope] = useState<"own" | "all">("own");
+    const [comment, setComment] = useState("");
+    const [guestDisplayName, setGuestDisplayName] = useState("");
+    const [items, setItems] = useState<ClinicianComment[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
+
+    useEffect(() => {
+        if (!canReviewAll && scope === "all") {
+            setScope("own");
+        }
+    }, [canReviewAll, scope]);
+
+    useEffect(() => {
+        if (!isAuthenticated) {
+            setLoading(false);
+            setItems([]);
+            return;
+        }
+
+        let cancelled = false;
+
+        const load = async () => {
+            setLoading(true);
+            setError("");
+
+            const response = await listClinicianComments(scope);
+            if (cancelled) {
+                return;
+            }
+
+            if (!response.ok) {
+                setError(response.error.message);
+                setItems([]);
+                setLoading(false);
+                return;
+            }
+
+            setItems(response.data.items || []);
+            setLoading(false);
+        };
+
+        void load();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isAuthenticated, scope]);
+
+    async function handleSubmit(event: React.FormEvent) {
+        event.preventDefault();
+        setSubmitting(true);
+        setError("");
+        setSuccess("");
+
+        const response = await createClinicianComment(
+            comment,
+            isAuthenticated ? undefined : guestDisplayName
+        );
+        setSubmitting(false);
+
+        if (!response.ok) {
+            setError(response.error.message);
+            return;
+        }
+
+        setComment("");
+        setGuestDisplayName("");
+        setSuccess(
+            response.data.redactionCount > 0
+                ? "Commentaire enregistre avec obfuscation automatique des identifiants detectes."
+                : "Commentaire enregistre."
+        );
+
+        if (isAuthenticated) {
+            const refreshed = await listClinicianComments(scope);
+            if (refreshed.ok) {
+                setItems(refreshed.data.items || []);
+            }
+        }
+    }
+
+    return (
+        <section className="mx-auto max-w-5xl px-4 py-8">
+            <div className="mb-6 space-y-2">
+                <h1 className="text-2xl font-semibold text-gray-900">
+                    Commentaires medecins
+                </h1>
+                <p className="text-sm text-gray-600">
+                    Utilisez cet espace pour laisser des commentaires de support ou de suivi.
+                    N'inserez jamais de donnees permettant d'identifier un patient. Les
+                    emails, telephones, RAMQ, SSN/NAS et certaines valeurs libellees sont
+                    obfusques automatiquement avant sauvegarde.
+                </p>
+                {!isAuthenticated && status !== "loading" && (
+                    <p className="text-sm text-amber-700">
+                        Vous pouvez laisser un commentaire sans connexion. Ajoutez simplement
+                        votre nom ou un pseudonyme professionnel.
+                    </p>
+                )}
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+                <form
+                    onSubmit={handleSubmit}
+                    className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+                >
+                    <label
+                        htmlFor="clinician-comment"
+                        className="mb-2 block text-sm font-medium text-gray-800"
+                    >
+                        Nouveau commentaire
+                    </label>
+                    {!isAuthenticated && (
+                        <div className="mb-3">
+                            <label
+                                htmlFor="clinician-comment-name"
+                                className="mb-2 block text-sm font-medium text-gray-800"
+                            >
+                                Nom ou pseudonyme
+                            </label>
+                            <input
+                                id="clinician-comment-name"
+                                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                                placeholder="Exemple: dr.lasante"
+                                value={guestDisplayName}
+                                onChange={(event) => setGuestDisplayName(event.target.value)}
+                                maxLength={120}
+                            />
+                        </div>
+                    )}
+                    <textarea
+                        id="clinician-comment"
+                        className="min-h-[220px] w-full rounded-lg border border-gray-300 px-3 py-3 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                        placeholder="Exemple: Le module de rendez-vous affiche une erreur au moment de confirmer l'horaire. Ne pas inclure de nom de patient, RAMQ, telephone ou email."
+                        value={comment}
+                        onChange={(event) => setComment(event.target.value)}
+                        maxLength={4000}
+                    />
+                    <div className="mt-2 text-right text-xs text-gray-500">
+                        {comment.length} / 4000
+                    </div>
+
+                    {error && (
+                        <div className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                            {error}
+                        </div>
+                    )}
+
+                    {success && (
+                        <div className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                            {success}
+                        </div>
+                    )}
+
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                        <div className="text-xs text-gray-500">
+                            {isAuthenticated
+                                ? "Votre nom d'usager et la date/heure seront sauvegardes avec le commentaire obfusque."
+                                : "Votre nom ou pseudonyme, la date/heure et le commentaire obfusque seront sauvegardes."}
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={submitting}
+                            className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {submitting ? "Enregistrement..." : "Enregistrer le commentaire"}
+                        </button>
+                    </div>
+                </form>
+
+                <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                        <div>
+                            <h2 className="text-lg font-semibold text-gray-900">
+                                Commentaires sauvegardes
+                            </h2>
+                            <p className="text-xs text-gray-500">
+                                Les commentaires sont affiches tels qu'ils ont ete sauvegardes
+                                apres obfuscation.
+                            </p>
+                        </div>
+                        {canReviewAll && (
+                            <select
+                                value={scope}
+                                onChange={(event) => setScope(event.target.value as "own" | "all")}
+                                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+                            >
+                                <option value="own">Mes commentaires</option>
+                                <option value="all">Tous les commentaires</option>
+                            </select>
+                        )}
+                    </div>
+
+                    {!isAuthenticated ? (
+                        <p className="text-sm text-gray-500">
+                            Connectez-vous pour consulter l'historique des commentaires.
+                        </p>
+                    ) : loading ? (
+                        <p className="text-sm text-gray-500">Chargement des commentaires...</p>
+                    ) : items.length === 0 ? (
+                        <p className="text-sm text-gray-500">
+                            Aucun commentaire enregistre pour le moment.
+                        </p>
+                    ) : (
+                        <div className="space-y-3">
+                            {items.map((item) => (
+                                <article
+                                    key={item.id}
+                                    className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+                                >
+                                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                                        <span className="font-medium text-gray-700">
+                                            {item.actorUsername}
+                                        </span>
+                                        <span>{item.actorRole}</span>
+                                        <span>
+                                            {new Date(item.createdAt).toLocaleString("fr-CA")}
+                                        </span>
+                                        {item.redactionCount > 0 && (
+                                            <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-800">
+                                                {item.redactionCount} obfuscation(s)
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="whitespace-pre-wrap text-sm text-gray-800">
+                                        {item.comment}
+                                    </p>
+                                </article>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </section>
+    );
+}

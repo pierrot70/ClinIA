@@ -40,6 +40,7 @@ import cliniquesRouter from "./routes/cliniques.js";
 import specialistsRouter from "./routes/specialists.js";
 import securityIncidentsRouter from "./routes/securityIncidents.js";
 import openaiLogsRouter from "./routes/openaiLogs.js";
+import clinicianCommentsRouter from "./routes/clinicianComments.js";
 import authRouter from "./routes/auth.js";
 import translationRouter from "./routes/translation.js";
 
@@ -1466,6 +1467,12 @@ app.use(
     requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
     loi25DataLeakGuard,
     openaiLogsRouter
+);
+app.use(
+    "/api/clinician-comments",
+    attachOptionalAuth,
+    loi25DataLeakGuard,
+    clinicianCommentsRouter
 );
 app.use(
     "/api/auth",

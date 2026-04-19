@@ -838,6 +838,12 @@ const Header: React.FC = () => {
                         Analyse clinique
                     </Link>
 
+                    {isAuthenticated && (
+                        <Link to="/comments" className={linkClass("/comments")}>
+                            Commentaires
+                        </Link>
+                    )}
+
                     <div className="relative group">
                         <button
                             type="button"
@@ -1148,6 +1154,7 @@ const Header: React.FC = () => {
                         <div className="space-y-1 border-t border-gray-100 pt-2">
                             <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Accueil</Link>
                             <Link to="/clinical" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Analyse clinique</Link>
+                            <Link to="/comments" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Commentaires</Link>
                             <Link to="/appointments" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Rendez-vous</Link>
                             <Link to="/patients" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Patients</Link>
                             <Link to="/cliniques" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Cliniques</Link>

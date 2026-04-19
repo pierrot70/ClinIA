@@ -26,6 +26,7 @@ import { PatientAuditLogsPage } from "./pages/PatientAuditLogsPage";
 import { OpenAILogsPage } from "./pages/OpenAILogsPage";
 import { CliniquesPage } from "./pages/CliniquesPage";
 import { SpecialistsPage } from "./pages/SpecialistsPage";
+import { ClinicianCommentsPage } from "./pages/ClinicianCommentsPage";
 
 const CLINICAL_ROLES = ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
 const ADMIN_ROLES = ["ADMIN", "SUPERADMIN"] as const;
@@ -209,6 +210,10 @@ const App: React.FC = () => {
                                 <PatientsPage />
                             </ProtectedRoute>
                         }
+                    />
+                    <Route
+                        path="/comments"
+                        element={<ClinicianCommentsPage />}
                     />
                     <Route
                         path="/cliniques"
