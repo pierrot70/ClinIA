@@ -110,8 +110,6 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
               namespace,
               sourceLocale,
             }).catch(() => {});
-          } else if (targetLang.startsWith("en")) {
-            setTranslated(text);
           } else if (enFallback[text]) {
             setTranslated(enFallback[text]);
           } else {
