@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { Routes, Route, Navigate, Link } from "react-router-dom";
 
 import DemoPage from "./pages/DemoPage";
@@ -28,6 +28,8 @@ import { CliniquesPage } from "./pages/CliniquesPage";
 import { SpecialistsPage } from "./pages/SpecialistsPage";
 import { ClinicianCommentsPage } from "./pages/ClinicianCommentsPage";
 import { labels } from "./i18n/uiLabels";
+import { HomeI18nContext } from "./contexts/HomeI18nContext";
+import { useTranslation } from "./hooks/useTranslation";
 
 const CLINICAL_ROLES = ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
 const ADMIN_ROLES = ["ADMIN", "SUPERADMIN"] as const;
@@ -37,15 +39,25 @@ const APP_STATUS_REFRESH_MS = 10_000;
 
 function CoolifyLandingPage() {
     const landingLabels = labels.app.landing;
+    const i18n = useContext(HomeI18nContext) || { locale: "fr" };
+    const targetLang = i18n.locale;
+    const { translated: title } = useTranslation({ text: landingLabels.title, targetLang, namespace: "app-landing" });
+    const { translated: subtitle } = useTranslation({ text: landingLabels.subtitle, targetLang, namespace: "app-landing" });
+    const { translated: clinicalDemoTitle } = useTranslation({ text: landingLabels.clinicalDemoTitle, targetLang, namespace: "app-landing" });
+    const { translated: clinicalDemoBody } = useTranslation({ text: landingLabels.clinicalDemoBody, targetLang, namespace: "app-landing" });
+    const { translated: doctorLoginTitle } = useTranslation({ text: landingLabels.doctorLoginTitle, targetLang, namespace: "app-landing" });
+    const { translated: doctorLoginBody } = useTranslation({ text: landingLabels.doctorLoginBody, targetLang, namespace: "app-landing" });
+    const { translated: adminLoginTitle } = useTranslation({ text: landingLabels.adminLoginTitle, targetLang, namespace: "app-landing" });
+    const { translated: adminLoginBody } = useTranslation({ text: landingLabels.adminLoginBody, targetLang, namespace: "app-landing" });
 
     return (
         <section className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-12">
             <div className="space-y-3 text-center">
                 <h1 className="text-3xl font-semibold text-gray-900">
-                    {landingLabels.title}
+                    {title}
                 </h1>
                 <p className="mx-auto max-w-2xl text-sm text-gray-600">
-                    {landingLabels.subtitle}
+                    {subtitle}
                 </p>
             </div>
 
@@ -55,10 +67,10 @@ function CoolifyLandingPage() {
                     className="rounded-xl border border-sky-200 bg-sky-50 p-5 shadow-sm transition hover:border-sky-300 hover:bg-sky-100"
                 >
                     <div className="text-lg font-semibold text-sky-950">
-                        {landingLabels.clinicalDemoTitle}
+                        {clinicalDemoTitle}
                     </div>
                     <p className="mt-2 text-sm text-sky-900">
-                        {landingLabels.clinicalDemoBody}
+                        {clinicalDemoBody}
                     </p>
                 </Link>
 
@@ -67,10 +79,10 @@ function CoolifyLandingPage() {
                     className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-gray-300 hover:bg-gray-50"
                 >
                     <div className="text-lg font-semibold text-gray-900">
-                        {landingLabels.doctorLoginTitle}
+                        {doctorLoginTitle}
                     </div>
                     <p className="mt-2 text-sm text-gray-600">
-                        {landingLabels.doctorLoginBody}
+                        {doctorLoginBody}
                     </p>
                 </Link>
 
@@ -79,10 +91,10 @@ function CoolifyLandingPage() {
                     className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm transition hover:border-amber-300 hover:bg-amber-100"
                 >
                     <div className="text-lg font-semibold text-amber-950">
-                        {landingLabels.adminLoginTitle}
+                        {adminLoginTitle}
                     </div>
                     <p className="mt-2 text-sm text-amber-900">
-                        {landingLabels.adminLoginBody}
+                        {adminLoginBody}
                     </p>
                 </Link>
             </div>
@@ -91,9 +103,16 @@ function CoolifyLandingPage() {
 }
 
 const App: React.FC = () => {
+    const i18n = useContext(HomeI18nContext) || { locale: "fr" };
+    const targetLang = i18n.locale;
     const { blockingIncident, setBlockingIncident } = useSecurityIncident();
     const [acknowledging, setAcknowledging] = useState(false);
     const showCoolifyLanding = !!import.meta.env.PROD;
+    const { translated: maintenanceLabel } = useTranslation({
+        text: labels.app.status.maintenance,
+        targetLang,
+        namespace: "app-status",
+    });
         // Handler for acknowledgment
         const handleAcknowledge = async () => {
             if (!blockingIncident) return;
@@ -155,7 +174,7 @@ const App: React.FC = () => {
             )}
             {maintenanceActive && (
                 <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">
-                    {labels.app.status.maintenance}
+                    {maintenanceLabel}
                 </div>
             )}
             <main className="flex-1">
