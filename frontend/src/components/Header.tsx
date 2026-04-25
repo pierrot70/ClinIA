@@ -929,6 +929,12 @@ const Header: React.FC = () => {
                                 >
                                     Montrer Auth Log
                                 </button>
+                                <Link
+                                    to="/admin/translations"
+                                    className="block px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50"
+                                >
+                                    Translation Admin
+                                </Link>
                                 <details className="group/graphs border-t border-gray-100">
                                     <summary className="cursor-pointer list-none px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50">
                                         Graphiques Auth
@@ -1090,6 +1096,20 @@ const Header: React.FC = () => {
                         </Link>
                     )}
 
+                    {canAccessAdmin && user?.role === "SUPERADMIN" && (
+                        <Link
+                            to="/admin/translations"
+                            className={
+                                "hover:text-blue-600 transition-colors " +
+                                (location.pathname === "/admin/translations"
+                                    ? "text-blue-600 font-medium"
+                                    : "text-gray-600")
+                            }
+                        >
+                            Traductions
+                        </Link>
+                    )}
+
                     {canAccessAdmin && (
                         <button
                             onClick={logout}
@@ -1180,6 +1200,7 @@ const Header: React.FC = () => {
                                 <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Gestion Application</div>
                                 <button type="button" onClick={() => { void openActiveUsersModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Montrer Usager Actif</button>
                                 <button type="button" onClick={() => { void openAuthLogsModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Montrer Auth Log</button>
+                                <Link to="/admin/translations" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Translation Admin</Link>
                                 <details>
                                     <summary className="cursor-pointer rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Graphiques Auth</summary>
                                     <div className="mt-1 space-y-1 pl-2">

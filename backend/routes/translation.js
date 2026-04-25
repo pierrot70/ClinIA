@@ -27,8 +27,15 @@ router.post("/", async (req, res) => {
           sourceLocale: sourceLocale || "fr",
           targetLang,
           sourceHash,
+          sourceText: text,
           payload: { text: translated },
+          model: "manual",
         });
+      } else {
+        cache.payload = { text: translated };
+        cache.sourceText = text;
+        cache.model = "manual";
+        await cache.save();
       }
       return res.json({ translation: translated });
     }

@@ -40,6 +40,7 @@ import cliniquesRouter from "./routes/cliniques.js";
 import specialistsRouter from "./routes/specialists.js";
 import securityIncidentsRouter from "./routes/securityIncidents.js";
 import openaiLogsRouter from "./routes/openaiLogs.js";
+import translationAdminRouter from "./routes/translationAdmin.js";
 import clinicianCommentsRouter from "./routes/clinicianComments.js";
 import authRouter from "./routes/auth.js";
 import translationRouter from "./routes/translation.js";
@@ -59,6 +60,7 @@ import {
     finalizeOpenAIRequestAuditEvent,
     recordOpenAIRequestAuditEvent,
 } from "./audit/openaiRequestAudit.js";
+import { onUiTranslationCacheChanged } from "./services/uiTranslationCacheRuntime.js";
 
 dotenv.config();
 
@@ -366,6 +368,16 @@ function cacheTranslationInMemory({
         })
     );
 }
+
+onUiTranslationCacheChanged(({ namespace, targetLang, sourceHash }) => {
+    const memoryKey = makeTranslationCacheKey({
+        namespace,
+        targetLang,
+        sourceHash,
+    });
+
+    translationMemoryCache.delete(memoryKey);
+});
 
 async function warmTranslationMemoryCache() {
     const docs = await UiTranslationCache.find({
@@ -1282,6 +1294,7 @@ app.post("/api/i18n/home-translate", async (req, res) => {
                     sourceLocale: "fr",
                     targetLang: target,
                     sourceHash,
+                    sourceText: JSON.stringify(sourceStrings),
                     payload: translated,
                     voiceAck,
                     voicePrompts: translatedVoicePrompts,
@@ -1480,6 +1493,13 @@ app.use(
     authRouter
 );
 app.use("/api/translation", translationRouter);
+app.use(
+    "/api/admin/translations",
+    verifyJWT,
+    requireRole(AUTH_ROLES.SUPERADMIN),
+    loi25DataLeakGuard,
+    translationAdminRouter
+);
 
 app.listen(4000, () =>
     console.log(

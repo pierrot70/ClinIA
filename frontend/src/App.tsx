@@ -24,6 +24,7 @@ import { AppointmentsListPage } from "./pages/AppointmentsList";
 import { PatientsPage } from "./pages/PatientsPage";
 import { PatientAuditLogsPage } from "./pages/PatientAuditLogsPage";
 import { OpenAILogsPage } from "./pages/OpenAILogsPage";
+import { TranslationAdminPage } from "./pages/TranslationAdminPage";
 import { CliniquesPage } from "./pages/CliniquesPage";
 import { SpecialistsPage } from "./pages/SpecialistsPage";
 import { ClinicianCommentsPage } from "./pages/ClinicianCommentsPage";
@@ -263,6 +264,14 @@ const App: React.FC = () => {
                         element={
                             <ProtectedRoute allowedRoles={[...SUPERADMIN_ROLES]}>
                                 <UserRegisterPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/admin/translations"
+                        element={
+                            <ProtectedRoute allowedRoles={[...SUPERADMIN_ROLES]}>
+                                <TranslationAdminPage />
                             </ProtectedRoute>
                         }
                     />

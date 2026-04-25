@@ -44,6 +44,7 @@ export async function getOrCreateTranslation({
     sourceLocale,
     targetLang,
     sourceHash,
+    sourceText: text,
     payload: { text: translated },
   });
   return cache.payload;

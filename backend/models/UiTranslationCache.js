@@ -23,6 +23,10 @@ const UiTranslationCacheSchema = new mongoose.Schema(
             required: true,
             index: true,
         },
+        sourceText: {
+            type: String,
+            default: "",
+        },
         payload: {
             type: Object,
             required: true,
