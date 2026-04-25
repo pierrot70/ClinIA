@@ -103,6 +103,12 @@ Contraintes :
 - ne jamais afficher données sensibles dans la console
 - protéger les routes selon rôle utilisateur
 - privilégier une UX simple et rapide pour les médecins
+- tous les labels visibles de l'interface doivent avoir leur source
+  française dans `frontend/src/i18n/uiLabels.fr.ts` avant d'être
+  consommés par les composants
+- les traductions éventuelles doivent dériver de cette source française
+  versionnée; aucun label UI principal ne doit dépendre uniquement
+  d'une traduction dynamique, d'une base de données ou d'un appel IA
 
 Structure recommandée :
 
