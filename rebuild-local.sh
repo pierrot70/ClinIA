@@ -89,6 +89,12 @@ fi
 echo "> npx tsc --noEmit"
 npx tsc --noEmit
 
+echo "> node ../scripts/verify-ui-labels.mjs"
+node ../scripts/verify-ui-labels.mjs
+
+echo "> npx vitest run src/i18n/uiLabels.test.ts"
+npx vitest run src/i18n/uiLabels.test.ts
+
 echo "> npm run build"
 npm run build
 
