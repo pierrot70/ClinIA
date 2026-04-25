@@ -101,17 +101,6 @@ fi
 popd > /dev/null
 
 # -----------------------------
-# 0b) Test backend ciblé : obfuscation des commentaires
-# -----------------------------
-headline "Vérification backend ciblée (obfuscation des commentaires)"
-pushd backend > /dev/null
-
-echo "> npm test -- utils/__tests__/clinicianCommentPrivacy.test.js"
-npm test -- utils/__tests__/clinicianCommentPrivacy.test.js
-
-popd > /dev/null
-
-# -----------------------------
 # Mode nucléaire (optionnel)
 # -----------------------------
 if [[ "$NUCLEAR" == "1" ]]; then
@@ -129,6 +118,22 @@ if [[ "${MODE^^}" == "PROD" ]]; then
 elif [[ "${MODE^^}" == "DEV" ]]; then
   export NODE_ENV="development"
   export VITE_APP_ENV="development"
+fi
+
+# -----------------------------
+# 0b) Tests backend DEV ciblés : conformité privacy/auth
+# -----------------------------
+if [[ "${MODE^^}" == "DEV" ]]; then
+  headline "Tests backend DEV ciblés (privacy/auth)"
+  pushd backend > /dev/null
+
+  echo "> npm test -- audit/__tests__/authAudit.test.js utils/__tests__/clinicianCommentPrivacy.test.js"
+  npm test -- audit/__tests__/authAudit.test.js utils/__tests__/clinicianCommentPrivacy.test.js
+
+  popd > /dev/null
+else
+  headline "Tests backend DEV ciblés (privacy/auth)"
+  echo "Mode ${MODE^^:-<unset>} : tests DEV ignorés."
 fi
 
 echo "Compose file : $COMPOSE_FILE"
