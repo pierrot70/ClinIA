@@ -18,6 +18,7 @@ import { SecurityBlockingAlert } from "../components/system/SecurityBlockingAler
 import { useTranslation } from "../hooks/useTranslation";
 import { getClinicalDemoScenario } from "../data/clinicalDemoScenarios";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
+import { labels } from "../i18n/uiLabels";
 
 import type { ClinicalPayload } from "../types/clinical";
 import type {
@@ -235,7 +236,7 @@ export function ClinicalAnalyzePage() {
 
         setReplyLookupItems(response.data.items || []);
         if ((response.data.items || []).length === 0) {
-            setReplyLookupError("Aucune reponse trouvee pour ces informations de suivi.");
+            setReplyLookupError(noRepliesFoundLabel);
         }
     }
 
@@ -262,6 +263,18 @@ export function ClinicalAnalyzePage() {
     const { translated: simModeLabel, loading: loadingSim, error: errorSim } = useTranslation({ text: "Mode simulation", targetLang, openaiModel });
     const { translated: backendErrorLabel, loading: loadingBackend, error: errorBackend } = useTranslation({ text: "Erreur backend brute (sans flafla)", targetLang, openaiModel });
     const { translated: loadingLabel } = useTranslation({ text: "Chargement...", targetLang, openaiModel });
+    const commentLabels = labels.clinicalDemo.comments;
+    const { translated: leaveCommentLabel, loading: loadingLeaveComment, error: errorLeaveComment } = useTranslation({ text: commentLabels.leaveComment, targetLang, openaiModel });
+    const { translated: replyLookupTitleLabel, loading: loadingReplyLookupTitle, error: errorReplyLookupTitle } = useTranslation({ text: commentLabels.replyLookupTitle, targetLang, openaiModel });
+    const { translated: replyLookupDescriptionLabel, loading: loadingReplyLookupDescription, error: errorReplyLookupDescription } = useTranslation({ text: commentLabels.replyLookupDescription, targetLang, openaiModel });
+    const { translated: namePlaceholderLabel } = useTranslation({ text: commentLabels.namePlaceholder, targetLang, openaiModel });
+    const { translated: trackingCodePlaceholderLabel } = useTranslation({ text: commentLabels.trackingCodePlaceholder, targetLang, openaiModel });
+    const { translated: searchLoadingLabel, loading: loadingSearchLoading, error: errorSearchLoading } = useTranslation({ text: commentLabels.searchLoading, targetLang, openaiModel });
+    const { translated: viewRepliesLabel, loading: loadingViewReplies, error: errorViewReplies } = useTranslation({ text: commentLabels.viewReplies, targetLang, openaiModel });
+    const { translated: noRepliesFoundLabel } = useTranslation({ text: commentLabels.noRepliesFound, targetLang, openaiModel });
+    const { translated: commentCreatedAtPrefixLabel } = useTranslation({ text: commentLabels.commentCreatedAtPrefix, targetLang, openaiModel });
+    const { translated: replyFromPrefixLabel } = useTranslation({ text: commentLabels.replyFromPrefix, targetLang, openaiModel });
+    const { translated: replyFromSeparatorLabel } = useTranslation({ text: commentLabels.replyFromSeparator, targetLang, openaiModel });
 
         // Affichage loading/erreur pour la traduction dynamique
         const [showTranslationError, setShowTranslationError] = useState<string | null>(null);
@@ -272,8 +285,25 @@ export function ClinicalAnalyzePage() {
             else if (errorReal) setShowTranslationError(errorReal);
             else if (errorSim) setShowTranslationError(errorSim);
             else if (errorBackend) setShowTranslationError(errorBackend);
+            else if (errorLeaveComment) setShowTranslationError(errorLeaveComment);
+            else if (errorReplyLookupTitle) setShowTranslationError(errorReplyLookupTitle);
+            else if (errorReplyLookupDescription) setShowTranslationError(errorReplyLookupDescription);
+            else if (errorSearchLoading) setShowTranslationError(errorSearchLoading);
+            else if (errorViewReplies) setShowTranslationError(errorViewReplies);
             else setShowTranslationError(null);
-        }, [errorModel, errorMini, errorLegacy, errorReal, errorSim, errorBackend]);
+        }, [
+            errorModel,
+            errorMini,
+            errorLegacy,
+            errorReal,
+            errorSim,
+            errorBackend,
+            errorLeaveComment,
+            errorReplyLookupTitle,
+            errorReplyLookupDescription,
+            errorSearchLoading,
+            errorViewReplies,
+        ]);
 
         const renderLabel = (label: string, loading: boolean, error?: string) => {
             if (loading) return <span style={{ opacity: 0.6 }}>{loadingLabel}</span>;
@@ -314,31 +344,29 @@ export function ClinicalAnalyzePage() {
                     to="/comments"
                     className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-800 transition hover:bg-sky-100"
                 >
-                    Laisser un commentaire
+                    {renderLabel(leaveCommentLabel, loadingLeaveComment, errorLeaveComment ?? undefined)}
                 </Link>
             </div>
 
             <section className="rounded-xl border border-amber-200 bg-amber-50 p-5">
                 <div className="mb-3">
                     <h2 className="text-lg font-semibold text-amber-950">
-                        Voir les reponses a mes commentaires
+                        {renderLabel(replyLookupTitleLabel, loadingReplyLookupTitle, errorReplyLookupTitle ?? undefined)}
                     </h2>
                     <p className="mt-1 text-sm text-amber-900">
-                        Entrez exactement le nom ou pseudonyme utilise lors du commentaire,
-                        ainsi que votre code de suivi. Si votre navigateur a conserve ces
-                        informations, elles sont pre-remplies automatiquement.
+                        {renderLabel(replyLookupDescriptionLabel, loadingReplyLookupDescription, errorReplyLookupDescription ?? undefined)}
                     </p>
                 </div>
                 <form onSubmit={handleLookupReplies} className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
                     <input
                         className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
-                        placeholder="Nom ou pseudonyme"
+                        placeholder={namePlaceholderLabel}
                         value={replyLookupName}
                         onChange={(event) => setReplyLookupName(event.target.value)}
                     />
                     <input
                         className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm uppercase outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
-                        placeholder="Code de suivi"
+                        placeholder={trackingCodePlaceholderLabel}
                         value={replyLookupCode}
                         onChange={(event) => setReplyLookupCode(event.target.value.toUpperCase())}
                         maxLength={8}
@@ -348,7 +376,9 @@ export function ClinicalAnalyzePage() {
                         disabled={replyLookupLoading}
                         className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        {replyLookupLoading ? "Recherche..." : "Voir mes reponses"}
+                        {replyLookupLoading
+                            ? renderLabel(searchLoadingLabel, loadingSearchLoading, errorSearchLoading ?? undefined)
+                            : renderLabel(viewRepliesLabel, loadingViewReplies, errorViewReplies ?? undefined)}
                     </button>
                 </form>
                 {replyLookupError && (
@@ -361,7 +391,8 @@ export function ClinicalAnalyzePage() {
                         {replyLookupItems.map((item) => (
                             <article key={item.id} className="rounded-lg border border-amber-100 bg-white p-4">
                                 <div className="mb-2 text-xs text-gray-500">
-                                    Commentaire du {new Date(item.createdAt).toLocaleString("fr-CA")}
+                                    {commentCreatedAtPrefixLabel}{" "}
+                                    {new Date(item.createdAt).toLocaleString(targetLang)}
                                 </div>
                                 <p className="whitespace-pre-wrap text-sm text-gray-800">
                                     {item.comment}
@@ -370,8 +401,9 @@ export function ClinicalAnalyzePage() {
                                     {item.replies.map((reply) => (
                                         <div key={reply.id} className="rounded-lg bg-amber-50 p-3">
                                             <div className="mb-1 text-xs text-gray-500">
-                                                Reponse de {reply.responderUsername} le{" "}
-                                                {new Date(reply.createdAt).toLocaleString("fr-CA")}
+                                                {replyFromPrefixLabel} {reply.responderUsername}{" "}
+                                                {replyFromSeparatorLabel}{" "}
+                                                {new Date(reply.createdAt).toLocaleString(targetLang)}
                                             </div>
                                             <p className="whitespace-pre-wrap text-sm text-gray-800">
                                                 {reply.message}
