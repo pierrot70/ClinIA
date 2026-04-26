@@ -33,7 +33,7 @@ const criticalLabelFallbacks: Record<string, Record<string, string>> = {
   },
   // TODO: Un médecin peut écrire "Ho" comme symptôme en vietnamien (toux).
   // Garder ces labels courts hors traduction IA: OpenAI peut retourner une explication
-  // au lieu d'un libellé utilisable pour des mots très courts comme Nom/Prénom.
+  // au lieu d'un libellé utilisable pour des mots très courts comme Nom/Prénom/Rue.
   "Nom": {
     "vi": "Họ",
   },
@@ -45,6 +45,9 @@ const criticalLabelFallbacks: Record<string, Record<string, string>> = {
   },
   "Prénom *": {
     "vi": "Tên *",
+  },
+  "Rue": {
+    "vi": "Đường",
   },
   // Ajoutez ici d'autres labels critiques si besoin
 };

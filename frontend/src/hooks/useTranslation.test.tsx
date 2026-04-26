@@ -74,6 +74,26 @@ describe("useTranslation", () => {
         expect(translateTextMock).not.toHaveBeenCalled();
     });
 
+    it("uses deterministic Vietnamese fallback for the short street label", async () => {
+        translateTextMock.mockResolvedValue("Rue en vietnamien se traduit par \"đường\".");
+
+        const { result } = renderHook(() =>
+            useTranslation({
+                text: labels.cliniquesPage.filters.streetLabel,
+                targetLang: "vi",
+                namespace: "cliniques-page",
+            })
+        );
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        expect(result.current.translated).toBe("Đường");
+        expect(result.current.error).toBeNull();
+        expect(translateTextMock).not.toHaveBeenCalled();
+    });
+
     it("falls back to the English label when the translation API fails", async () => {
         translateTextMock.mockRejectedValue(new Error("Translation API error"));
 

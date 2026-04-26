@@ -1,4 +1,5 @@
 import { withSecurityIncidentGuard } from "./securityIncidentGuard";
+import { authFetch } from "./authService";
 import type { ApiResponse } from "../types/api";
 
 const API_URL = import.meta.env.VITE_API_URL as string;
@@ -88,8 +89,8 @@ export async function fetchCliniquesPaginated(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(
-                    `${API_URL}/api/cliniques?${query.toString()}`
+                const response = await authFetch(
+                    `/api/cliniques?${query.toString()}`
                 );
                 return (await safeJson(response)) as ApiResponse<PaginatedCliniques>;
             } catch {
@@ -115,7 +116,7 @@ export async function createClinique(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(`${API_URL}/api/cliniques`, {
+                const response = await authFetch(`/api/cliniques`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
@@ -145,7 +146,7 @@ export async function updateClinique(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(`${API_URL}/api/cliniques/${id}`, {
+                const response = await authFetch(`/api/cliniques/${id}`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
@@ -174,7 +175,7 @@ export async function deleteClinique(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(`${API_URL}/api/cliniques/${id}`, {
+                const response = await authFetch(`/api/cliniques/${id}`, {
                     method: "DELETE",
                 });
                 return (await safeJson(response)) as ApiResponse<Clinique>;
