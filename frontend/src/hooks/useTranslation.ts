@@ -34,6 +34,7 @@ const criticalLabelFallbacks: Record<string, Record<string, string>> = {
   // TODO: Un médecin peut écrire "Ho" comme symptôme en vietnamien (toux).
   // Garder ces labels courts hors traduction IA: OpenAI peut retourner une explication
   // au lieu d'un libellé utilisable pour des mots très courts comme Nom/Prénom/Rue.
+  // Les libellés cliniques ambigus doivent rester des libellés UI, pas des phrases explicatives.
   "Nom": {
     "vi": "Họ",
   },
@@ -48,6 +49,9 @@ const criticalLabelFallbacks: Record<string, Record<string, string>> = {
   },
   "Rue": {
     "vi": "Đường",
+  },
+  "Disponibilités": {
+    "vi": "Lịch trống",
   },
   // Ajoutez ici d'autres labels critiques si besoin
 };

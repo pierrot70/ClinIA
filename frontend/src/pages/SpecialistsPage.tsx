@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { HomeI18nContext } from "../contexts/HomeI18nContext";
+import { useTranslation } from "../hooks/useTranslation";
+import { labels } from "../i18n/uiLabels";
 import {
     createSpecialist,
     deleteSpecialist,
@@ -24,20 +27,116 @@ function padTime(value: number) {
     return String(value).padStart(2, "0");
 }
 
-const MONTH_OPTIONS = [
-    { value: "01", label: "Janvier" },
-    { value: "02", label: "Février" },
-    { value: "03", label: "Mars" },
-    { value: "04", label: "Avril" },
-    { value: "05", label: "Mai" },
-    { value: "06", label: "Juin" },
-    { value: "07", label: "Juillet" },
-    { value: "08", label: "Août" },
-    { value: "09", label: "Septembre" },
-    { value: "10", label: "Octobre" },
-    { value: "11", label: "Novembre" },
-    { value: "12", label: "Décembre" },
-];
+function useSpecialistsPageLabels(targetLang: string) {
+    const source = labels.specialistsPage;
+    const options = { targetLang, namespace: "specialists-page" };
+
+    const { translated: title } = useTranslation({ text: source.title, ...options });
+    const { translated: createTab } = useTranslation({ text: source.tabs.create, ...options });
+    const { translated: searchTab } = useTranslation({ text: source.tabs.search, ...options });
+    const { translated: invalidServerResponse } = useTranslation({ text: source.validation.invalidServerResponse, ...options });
+    const { translated: availabilityRequiresDateAndSlot } = useTranslation({ text: source.validation.availabilityRequiresDateAndSlot, ...options });
+    const { translated: invalidAvailabilityDates } = useTranslation({ text: source.validation.invalidAvailabilityDates, ...options });
+    const { translated: invalidAvailabilityHours } = useTranslation({ text: source.validation.invalidAvailabilityHours, ...options });
+    const { translated: invalidAvailabilityAlignment } = useTranslation({ text: source.validation.invalidAvailabilityAlignment, ...options });
+    const { translated: availabilityInPast } = useTranslation({ text: source.validation.availabilityInPast, ...options });
+    const { translated: overlappingAvailability } = useTranslation({ text: source.validation.overlappingAvailability, ...options });
+    const { translated: availabilityRequiresSlot } = useTranslation({ text: source.validation.availabilityRequiresSlot, ...options });
+    const { translated: requiredIdentity } = useTranslation({ text: source.validation.requiredIdentity, ...options });
+    const { translated: invalidAvailability } = useTranslation({ text: source.validation.invalidAvailability, ...options });
+    const { translated: deleteConfirm } = useTranslation({ text: source.validation.deleteConfirm, ...options });
+    const { translated: editTitle } = useTranslation({ text: source.form.editTitle, ...options });
+    const { translated: createTitle } = useTranslation({ text: source.form.createTitle, ...options });
+    const { translated: firstNamePlaceholder } = useTranslation({ text: source.form.firstNamePlaceholder, ...options });
+    const { translated: lastNamePlaceholder } = useTranslation({ text: source.form.lastNamePlaceholder, ...options });
+    const { translated: doctorNumberPlaceholder } = useTranslation({ text: source.form.doctorNumberPlaceholder, ...options });
+    const { translated: phonePlaceholder } = useTranslation({ text: source.form.phonePlaceholder, ...options });
+    const { translated: emailPlaceholder } = useTranslation({ text: source.form.emailPlaceholder, ...options });
+    const { translated: noClinic } = useTranslation({ text: source.form.noClinic, ...options });
+    const { translated: noSpecialty } = useTranslation({ text: source.form.noSpecialty, ...options });
+    const { translated: smsEnabled } = useTranslation({ text: source.form.smsEnabled, ...options });
+    const { translated: availabilityTitle } = useTranslation({ text: source.form.availabilityTitle, ...options });
+    const { translated: targetMonth } = useTranslation({ text: source.form.targetMonth, ...options });
+    const { translated: selectDaysHint } = useTranslation({ text: source.form.selectDaysHint, ...options });
+    const { translated: noDaySelected } = useTranslation({ text: source.form.noDaySelected, ...options });
+    const { translated: chooseRangePrefix } = useTranslation({ text: source.form.chooseRangePrefix, ...options });
+    const { translated: slotHelp } = useTranslation({ text: source.form.slotHelp, ...options });
+    const { translated: multipleSlotsHint } = useTranslation({ text: source.form.multipleSlotsHint, ...options });
+    const { translated: noSlot } = useTranslation({ text: source.form.noSlot, ...options });
+    const { translated: editSlot } = useTranslation({ text: source.form.editSlot, ...options });
+    const { translated: removeDay } = useTranslation({ text: source.form.removeDay, ...options });
+    const { translated: isoHint } = useTranslation({ text: source.form.isoHint, ...options });
+    const { translated: save } = useTranslation({ text: source.form.save, ...options });
+    const { translated: create } = useTranslation({ text: source.form.create, ...options });
+    const { translated: cancel } = useTranslation({ text: source.form.cancel, ...options });
+    const { translated: searchTitle } = useTranslation({ text: source.search.title, ...options });
+    const { translated: searchLastNamePlaceholder } = useTranslation({ text: source.search.lastNamePlaceholder, ...options });
+    const { translated: searchFirstNamePlaceholder } = useTranslation({ text: source.search.firstNamePlaceholder, ...options });
+    const { translated: searchDoctorNumberPlaceholder } = useTranslation({ text: source.search.doctorNumberPlaceholder, ...options });
+    const { translated: allClinics } = useTranslation({ text: source.search.allClinics, ...options });
+    const { translated: tableLastName } = useTranslation({ text: source.table.lastName, ...options });
+    const { translated: tableFirstName } = useTranslation({ text: source.table.firstName, ...options });
+    const { translated: tableDoctorNumber } = useTranslation({ text: source.table.doctorNumber, ...options });
+    const { translated: tableSpecialty } = useTranslation({ text: source.table.specialty, ...options });
+    const { translated: tableClinic } = useTranslation({ text: source.table.clinic, ...options });
+    const { translated: tablePhone } = useTranslation({ text: source.table.phone, ...options });
+    const { translated: tableEmail } = useTranslation({ text: source.table.email, ...options });
+    const { translated: tableAvailability } = useTranslation({ text: source.table.availability, ...options });
+    const { translated: tableActions } = useTranslation({ text: source.table.actions, ...options });
+    const { translated: tableLoading } = useTranslation({ text: source.table.loading, ...options });
+    const { translated: tableEmpty } = useTranslation({ text: source.table.empty, ...options });
+    const { translated: tableEdit } = useTranslation({ text: source.table.edit, ...options });
+    const { translated: tableDelete } = useTranslation({ text: source.table.delete, ...options });
+    const { translated: previous } = useTranslation({ text: source.pagination.previous, ...options });
+    const { translated: next } = useTranslation({ text: source.pagination.next, ...options });
+    const { translated: pagePrefix } = useTranslation({ text: source.pagination.pagePrefix, ...options });
+    const { translated: pageSeparator } = useTranslation({ text: source.pagination.pageSeparator, ...options });
+    const { translated: january } = useTranslation({ text: source.months.january, ...options });
+    const { translated: february } = useTranslation({ text: source.months.february, ...options });
+    const { translated: march } = useTranslation({ text: source.months.march, ...options });
+    const { translated: april } = useTranslation({ text: source.months.april, ...options });
+    const { translated: may } = useTranslation({ text: source.months.may, ...options });
+    const { translated: june } = useTranslation({ text: source.months.june, ...options });
+    const { translated: july } = useTranslation({ text: source.months.july, ...options });
+    const { translated: august } = useTranslation({ text: source.months.august, ...options });
+    const { translated: september } = useTranslation({ text: source.months.september, ...options });
+    const { translated: october } = useTranslation({ text: source.months.october, ...options });
+    const { translated: november } = useTranslation({ text: source.months.november, ...options });
+    const { translated: december } = useTranslation({ text: source.months.december, ...options });
+
+    return {
+        title, createTab, searchTab, invalidServerResponse,
+        availabilityRequiresDateAndSlot, invalidAvailabilityDates,
+        invalidAvailabilityHours, invalidAvailabilityAlignment,
+        availabilityInPast, overlappingAvailability, availabilityRequiresSlot,
+        requiredIdentity, invalidAvailability, deleteConfirm, editTitle,
+        createTitle, firstNamePlaceholder, lastNamePlaceholder,
+        doctorNumberPlaceholder, phonePlaceholder, emailPlaceholder,
+        noClinic, noSpecialty, smsEnabled, availabilityTitle, targetMonth,
+        selectDaysHint, noDaySelected, chooseRangePrefix, slotHelp,
+        multipleSlotsHint, noSlot, editSlot, removeDay, isoHint, save, create,
+        cancel, searchTitle, searchLastNamePlaceholder,
+        searchFirstNamePlaceholder, searchDoctorNumberPlaceholder, allClinics,
+        tableLastName, tableFirstName, tableDoctorNumber, tableSpecialty,
+        tableClinic, tablePhone, tableEmail, tableAvailability, tableActions,
+        tableLoading, tableEmpty, tableEdit, tableDelete, previous, next,
+        pagePrefix, pageSeparator,
+        monthOptions: [
+            { value: "01", label: january },
+            { value: "02", label: february },
+            { value: "03", label: march },
+            { value: "04", label: april },
+            { value: "05", label: may },
+            { value: "06", label: june },
+            { value: "07", label: july },
+            { value: "08", label: august },
+            { value: "09", label: september },
+            { value: "10", label: october },
+            { value: "11", label: november },
+            { value: "12", label: december },
+        ],
+    };
+}
 
 function formatDisponibilites(disponibilites?: string[]) {
     if (!disponibilites || disponibilites.length === 0) {
@@ -114,6 +213,8 @@ function buildTimeSlots() {
 const TIME_SLOTS = buildTimeSlots();
 
 export function SpecialistsPage() {
+    const i18n = useContext(HomeI18nContext) || { locale: "fr" };
+    const pageLabels = useSpecialistsPageLabels(i18n.locale);
     const [specialists, setSpecialists] = useState<Specialist[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
@@ -227,8 +328,7 @@ export function SpecialistsPage() {
         if (!response.data || !response.data.meta) {
             setError({
                 code: "INTERNAL_ERROR",
-                message:
-                    "Réponse serveur invalide (pagination manquante).",
+                message: pageLabels.invalidServerResponse,
                 retryable: false,
             });
             setLoading(false);
@@ -321,8 +421,7 @@ export function SpecialistsPage() {
         for (const slot of values.disponibilites) {
             if (!slot.date || !slot.slots || slot.slots.length === 0) {
                 return {
-                    error:
-                        "Chaque disponibilité doit contenir une date et au moins un créneau.",
+                    error: pageLabels.availabilityRequiresDateAndSlot,
                 };
             }
             const [year, month, day] = slot.date
@@ -334,8 +433,7 @@ export function SpecialistsPage() {
                 Number.isNaN(day)
             ) {
                 return {
-                    error:
-                        "Les dates de disponibilité doivent être valides.",
+                    error: pageLabels.invalidAvailabilityDates,
                 };
             }
             for (const time of slot.slots) {
@@ -344,14 +442,12 @@ export function SpecialistsPage() {
                     .map((value) => Number(value));
                 if (Number.isNaN(hours) || Number.isNaN(minutes)) {
                     return {
-                        error:
-                            "Les heures de disponibilité doivent être valides.",
+                        error: pageLabels.invalidAvailabilityHours,
                     };
                 }
                 if (minutes % 15 !== 0) {
                     return {
-                        error:
-                            "Les heures doivent être alignées sur 15 minutes.",
+                        error: pageLabels.invalidAvailabilityAlignment,
                     };
                 }
                 const start = new Date(
@@ -365,21 +461,18 @@ export function SpecialistsPage() {
                 );
                 if (Number.isNaN(start.getTime())) {
                     return {
-                        error:
-                            "Les dates de disponibilité doivent être valides.",
+                        error: pageLabels.invalidAvailabilityDates,
                     };
                 }
                 if (start.getTime() < now.getTime()) {
                     return {
-                        error:
-                            "Les disponibilités ne peuvent pas être dans le passé.",
+                        error: pageLabels.availabilityInPast,
                     };
                 }
                 const iso = start.toISOString();
                 if (seen.has(iso)) {
                     return {
-                        error:
-                            "Les disponibilités ne doivent pas se chevaucher.",
+                        error: pageLabels.overlappingAvailability,
                     };
                 }
                 seen.add(iso);
@@ -389,8 +482,7 @@ export function SpecialistsPage() {
 
         if (slots.length === 0 && values.disponibilites.length > 0) {
             return {
-                error:
-                    "Chaque disponibilité doit contenir au moins un créneau.",
+                error: pageLabels.availabilityRequiresSlot,
             };
         }
 
@@ -432,8 +524,7 @@ export function SpecialistsPage() {
         ) {
             setError({
                 code: "INVALID_INPUT",
-                message:
-                    "Nom, prénom et numéro de médecin sont requis.",
+                message: pageLabels.requiredIdentity,
                 retryable: false,
             });
             return;
@@ -449,7 +540,7 @@ export function SpecialistsPage() {
                 code: "INVALID_INPUT",
                 message:
                     disponibiliteError ??
-                    "Disponibilités invalides.",
+                    pageLabels.invalidAvailability,
                 retryable: false,
             });
             return;
@@ -552,7 +643,7 @@ export function SpecialistsPage() {
 
     async function handleDelete(id: string) {
         const confirmed = window.confirm(
-            "Supprimer ce spécialiste définitivement ?"
+            pageLabels.deleteConfirm
         );
         if (!confirmed) return;
 
@@ -572,7 +663,7 @@ export function SpecialistsPage() {
 
     return (
         <div className="max-w-6xl mx-auto p-6 space-y-6">
-            <h1 className="text-2xl font-semibold">Spécialistes</h1>
+            <h1 className="text-2xl font-semibold">{pageLabels.title}</h1>
 
             <div className="flex flex-wrap gap-2">
                 <button
@@ -584,7 +675,7 @@ export function SpecialistsPage() {
                     }`}
                     onClick={() => setViewMode("create")}
                 >
-                    Créer un spécialiste
+                    {pageLabels.createTab}
                 </button>
                 <button
                     type="button"
@@ -595,7 +686,7 @@ export function SpecialistsPage() {
                     }`}
                     onClick={() => setViewMode("list")}
                 >
-                    Rechercher les spécialistes
+                    {pageLabels.searchTab}
                 </button>
             </div>
 
@@ -615,14 +706,14 @@ export function SpecialistsPage() {
                 >
                     <div className="text-sm font-medium">
                         {editingId
-                            ? "Modifier un spécialiste"
-                            : "Créer un spécialiste"}
+                            ? pageLabels.editTitle
+                            : pageLabels.createTitle}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <input
                             className="border rounded p-2"
-                            placeholder="Prénom *"
+                            placeholder={pageLabels.firstNamePlaceholder}
                             value={form.prenom}
                             onChange={(e) =>
                                 setForm((p) => ({
@@ -633,7 +724,7 @@ export function SpecialistsPage() {
                         />
                         <input
                             className="border rounded p-2"
-                            placeholder="Nom *"
+                            placeholder={pageLabels.lastNamePlaceholder}
                             value={form.nom}
                             onChange={(e) =>
                                 setForm((p) => ({
@@ -644,7 +735,7 @@ export function SpecialistsPage() {
                         />
                         <input
                             className="border rounded p-2"
-                            placeholder="Numéro de médecin *"
+                            placeholder={pageLabels.doctorNumberPlaceholder}
                             value={form.numero_medecin}
                             onChange={(e) =>
                                 setForm((p) => ({
@@ -655,13 +746,13 @@ export function SpecialistsPage() {
                         />
                         <input
                             className="border rounded p-2 bg-gray-50"
-                            placeholder="Téléphone (automatique)"
+                            placeholder={pageLabels.phonePlaceholder}
                             value={form.telephone}
                             readOnly
                         />
                         <input
                             className="border rounded p-2 bg-gray-50"
-                            placeholder="Courriel (automatique)"
+                            placeholder={pageLabels.emailPlaceholder}
                             value={form.email}
                             readOnly
                         />
@@ -674,7 +765,7 @@ export function SpecialistsPage() {
                                 )
                             }
                         >
-                            <option value="">Aucune clinique</option>
+                            <option value="">{pageLabels.noClinic}</option>
                             {cliniqueOptions.map((clinique) => (
                                 <option
                                     key={clinique._id}
@@ -696,7 +787,7 @@ export function SpecialistsPage() {
                                 }))
                             }
                         >
-                            <option value="">Aucune spécialité</option>
+                            <option value="">{pageLabels.noSpecialty}</option>
                             {SPECIALTIES.map((specialite) => (
                                 <option
                                     key={specialite}
@@ -719,17 +810,17 @@ export function SpecialistsPage() {
                                 }))
                             }
                         />
-                        SMS activé
+                        {pageLabels.smsEnabled}
                     </label>
 
                     <div className="space-y-2">
                         <div className="text-sm font-medium">
-                            Disponibilités (jours du mois)
+                            {pageLabels.availabilityTitle}
                         </div>
                         <div className="grid gap-3 md:grid-cols-[200px_1fr] items-start">
                             <div className="space-y-2">
                                 <label className="text-xs text-gray-600">
-                                    Mois ciblé
+                                    {pageLabels.targetMonth}
                                 </label>
                                 <div className="grid grid-cols-2 gap-2">
                                     <select
@@ -749,7 +840,7 @@ export function SpecialistsPage() {
                                             }));
                                         }}
                                     >
-                                        {MONTH_OPTIONS.map((option) => (
+                                        {pageLabels.monthOptions.map((option) => (
                                             <option
                                                 key={option.value}
                                                 value={option.value}
@@ -794,7 +885,7 @@ export function SpecialistsPage() {
                                     </select>
                                 </div>
                                 <div className="text-xs text-gray-500">
-                                    Sélectionnez les jours à activer.
+                                    {pageLabels.selectDaysHint}
                                 </div>
                             </div>
                             <div className="grid grid-cols-7 gap-2">
@@ -902,7 +993,7 @@ export function SpecialistsPage() {
                         </div>
                         {form.disponibilites.length === 0 && (
                             <div className="text-xs text-gray-500">
-                                Aucun jour sélectionné.
+                                {pageLabels.noDaySelected}
                             </div>
                         )}
                         {activeDay &&
@@ -911,13 +1002,11 @@ export function SpecialistsPage() {
                             ) && (
                                 <div className="border rounded p-3 bg-white space-y-2">
                                     <div className="text-sm font-medium">
-                                        Choisir une plage pour{" "}
+                                        {pageLabels.chooseRangePrefix}{" "}
                                         {activeDay}
                                     </div>
                                     <div className="text-xs text-gray-500">
-                                        Cliquez pour activer/désactiver les
-                                        créneaux de 15 minutes (shift pour
-                                        une plage).
+                                        {pageLabels.slotHelp}
                                     </div>
                                     <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
                                         {TIME_SLOTS.map((slot) => {
@@ -1042,8 +1131,7 @@ export function SpecialistsPage() {
                                         })}
                                     </div>
                                     <div className="text-xs text-gray-500">
-                                        Cliquez plusieurs créneaux pour créer
-                                        une liste (ex: 14:45, 16:15).
+                                        {pageLabels.multipleSlotsHint}
                                     </div>
                                 </div>
                             )}
@@ -1066,7 +1154,7 @@ export function SpecialistsPage() {
                                                   .slice()
                                                   .sort()
                                                   .join(", ")
-                                            : "Aucun créneau"}
+                                            : pageLabels.noSlot}
                                         <button
                                             type="button"
                                             className="ml-2 text-xs text-primary underline"
@@ -1074,7 +1162,7 @@ export function SpecialistsPage() {
                                                 setActiveDay(slot.date);
                                             }}
                                         >
-                                            Modifier
+                                            {pageLabels.editSlot}
                                         </button>
                                     </div>
                                     <button
@@ -1092,13 +1180,12 @@ export function SpecialistsPage() {
                                             }))
                                         }
                                     >
-                                        Retirer
+                                        {pageLabels.removeDay}
                                     </button>
                                 </div>
                             ))}
                         <div className="text-xs text-gray-500">
-                            Les créneaux sont générés par pas de 15
-                            minutes et sauvegardés en ISO.
+                            {pageLabels.isoHint}
                         </div>
                     </div>
 
@@ -1107,14 +1194,14 @@ export function SpecialistsPage() {
                             onClick={handleSubmit}
                             className="px-4 py-2 bg-primary text-white rounded"
                         >
-                            {editingId ? "Enregistrer" : "Créer"}
+                            {editingId ? pageLabels.save : pageLabels.create}
                         </button>
                         {editingId && (
                             <button
                                 onClick={resetForm}
                                 className="px-4 py-2 border rounded"
                             >
-                                Annuler
+                                {pageLabels.cancel}
                             </button>
                         )}
                     </div>
@@ -1125,12 +1212,12 @@ export function SpecialistsPage() {
                 <div className="space-y-4">
                     <div className="border rounded p-4 space-y-3">
                         <div className="text-sm font-medium">
-                            Recherche
+                            {pageLabels.searchTitle}
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                             <input
                                 className="border rounded p-2"
-                                placeholder="Nom"
+                                placeholder={pageLabels.searchLastNamePlaceholder}
                                 value={filterNom}
                                 onChange={(e) => {
                                     setPage(1);
@@ -1139,7 +1226,7 @@ export function SpecialistsPage() {
                             />
                             <input
                                 className="border rounded p-2"
-                                placeholder="Prénom"
+                                placeholder={pageLabels.searchFirstNamePlaceholder}
                                 value={filterPrenom}
                                 onChange={(e) => {
                                     setPage(1);
@@ -1148,7 +1235,7 @@ export function SpecialistsPage() {
                             />
                             <input
                                 className="border rounded p-2"
-                                placeholder="Numéro de médecin"
+                                placeholder={pageLabels.searchDoctorNumberPlaceholder}
                                 value={filterNumero}
                                 onChange={(e) => {
                                     setPage(1);
@@ -1164,7 +1251,7 @@ export function SpecialistsPage() {
                                 }}
                             >
                                 <option value="">
-                                    Toutes les cliniques
+                                    {pageLabels.allClinics}
                                 </option>
                                 {cliniqueOptions.map((clinique) => (
                                     <option
@@ -1185,31 +1272,31 @@ export function SpecialistsPage() {
                             <thead className="bg-gray-100 text-gray-700">
                         <tr>
                             <th className="text-left p-2">
-                                Nom
+                                {pageLabels.tableLastName}
                             </th>
                             <th className="text-left p-2">
-                                Prénom
+                                {pageLabels.tableFirstName}
                             </th>
                             <th className="text-left p-2">
-                                Numéro médecin
+                                {pageLabels.tableDoctorNumber}
                             </th>
                             <th className="text-left p-2">
-                                Spécialité
+                                {pageLabels.tableSpecialty}
                             </th>
                             <th className="text-left p-2">
-                                Clinique
+                                {pageLabels.tableClinic}
                             </th>
                             <th className="text-left p-2">
-                                Téléphone
+                                {pageLabels.tablePhone}
                             </th>
                             <th className="text-left p-2">
-                                Courriel
+                                {pageLabels.tableEmail}
                             </th>
                             <th className="text-left p-2">
-                                Disponibilités
+                                {pageLabels.tableAvailability}
                             </th>
                             <th className="text-left p-2">
-                                Actions
+                                {pageLabels.tableActions}
                             </th>
                         </tr>
                             </thead>
@@ -1220,7 +1307,7 @@ export function SpecialistsPage() {
                                             className="p-2 text-gray-500"
                                             colSpan={9}
                                         >
-                                            Chargement…
+                                            {pageLabels.tableLoading}
                                         </td>
                                     </tr>
                                 )}
@@ -1231,8 +1318,7 @@ export function SpecialistsPage() {
                                                 className="p-2 text-gray-500"
                                                 colSpan={9}
                                             >
-                                                Aucun spécialiste
-                                                trouvé.
+                                                {pageLabels.tableEmpty}
                                             </td>
                                         </tr>
                                     )}
@@ -1302,7 +1388,7 @@ export function SpecialistsPage() {
                                                             handleEdit(sp)
                                                         }
                                                     >
-                                                        Éditer
+                                                        {pageLabels.tableEdit}
                                                     </button>
                                                     <button
                                                         className="px-2 py-1 border rounded text-red-600"
@@ -1318,7 +1404,7 @@ export function SpecialistsPage() {
                                                             )
                                                         }
                                                     >
-                                                        Supprimer
+                                                        {pageLabels.tableDelete}
                                                     </button>
                                                 </td>
                                             </tr>
@@ -1336,10 +1422,10 @@ export function SpecialistsPage() {
                                 setPage((p) => Math.max(p - 1, 1))
                             }
                         >
-                            Précédent
+                            {pageLabels.previous}
                         </button>
                         <span className="text-sm text-gray-600">
-                            Page {page} / {totalPages}
+                            {pageLabels.pagePrefix} {page} {pageLabels.pageSeparator} {totalPages}
                         </span>
                         <button
                             className="px-3 py-1 border rounded"
@@ -1350,7 +1436,7 @@ export function SpecialistsPage() {
                                 )
                             }
                         >
-                            Suivant
+                            {pageLabels.next}
                         </button>
                     </div>
                 </div>

@@ -94,6 +94,28 @@ describe("useTranslation", () => {
         expect(translateTextMock).not.toHaveBeenCalled();
     });
 
+    it("uses deterministic Vietnamese fallback for the availability label", async () => {
+        translateTextMock.mockResolvedValue(
+            "Disponibilités se traduit en vietnamien par : \"Sẵn sàng\" ou \"Khả năng cung cấp\" selon le contexte."
+        );
+
+        const { result } = renderHook(() =>
+            useTranslation({
+                text: labels.specialistsPage.table.availability,
+                targetLang: "vi",
+                namespace: "specialists-page",
+            })
+        );
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        expect(result.current.translated).toBe("Lịch trống");
+        expect(result.current.error).toBeNull();
+        expect(translateTextMock).not.toHaveBeenCalled();
+    });
+
     it("falls back to the English label when the translation API fails", async () => {
         translateTextMock.mockRejectedValue(new Error("Translation API error"));
 

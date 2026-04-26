@@ -1,4 +1,5 @@
 import { withSecurityIncidentGuard } from "./securityIncidentGuard";
+import { authFetch } from "./authService";
 import type { ApiResponse } from "../types/api";
 
 const API_URL = import.meta.env.VITE_API_URL as string;
@@ -87,8 +88,8 @@ export async function fetchSpecialistsPaginated(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(
-                    `${API_URL}/api/specialists?${query.toString()}`
+                const response = await authFetch(
+                    `/api/specialists?${query.toString()}`
                 );
                 return (await safeJson(response)) as ApiResponse<PaginatedSpecialists>;
             } catch {
@@ -110,7 +111,7 @@ export async function createSpecialist(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(`${API_URL}/api/specialists`, {
+                const response = await authFetch(`/api/specialists`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
@@ -136,7 +137,7 @@ export async function updateSpecialist(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(`${API_URL}/api/specialists/${id}`, {
+                const response = await authFetch(`/api/specialists/${id}`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
@@ -161,7 +162,7 @@ export async function deleteSpecialist(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(`${API_URL}/api/specialists/${id}`, {
+                const response = await authFetch(`/api/specialists/${id}`, {
                     method: "DELETE",
                 });
                 return (await safeJson(response)) as ApiResponse<Specialist>;

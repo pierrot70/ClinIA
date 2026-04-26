@@ -270,6 +270,107 @@ export const UI_LABELS_FR = {
             pageSeparator: "/",
         },
     },
+    // SpecialistsPage.tsx - page /specialists, création et recherche de spécialistes.
+    specialistsPage: {
+        title: "Spécialistes",
+        tabs: {
+            create: "Créer un spécialiste",
+            search: "Rechercher les spécialistes",
+        },
+        validation: {
+            invalidServerResponse:
+                "Réponse serveur invalide (pagination manquante).",
+            availabilityRequiresDateAndSlot:
+                "Chaque disponibilité doit contenir une date et au moins un créneau.",
+            invalidAvailabilityDates:
+                "Les dates de disponibilité doivent être valides.",
+            invalidAvailabilityHours:
+                "Les heures de disponibilité doivent être valides.",
+            invalidAvailabilityAlignment:
+                "Les heures doivent être alignées sur 15 minutes.",
+            availabilityInPast:
+                "Les disponibilités ne peuvent pas être dans le passé.",
+            overlappingAvailability:
+                "Les disponibilités ne doivent pas se chevaucher.",
+            availabilityRequiresSlot:
+                "Chaque disponibilité doit contenir au moins un créneau.",
+            requiredIdentity:
+                "Nom, prénom et numéro de médecin sont requis.",
+            invalidAvailability: "Disponibilités invalides.",
+            deleteConfirm: "Supprimer ce spécialiste définitivement ?",
+        },
+        form: {
+            editTitle: "Modifier un spécialiste",
+            createTitle: "Créer un spécialiste",
+            firstNamePlaceholder: "Prénom *",
+            lastNamePlaceholder: "Nom *",
+            doctorNumberPlaceholder: "Numéro de médecin *",
+            phonePlaceholder: "Téléphone (automatique)",
+            emailPlaceholder: "Courriel (automatique)",
+            noClinic: "Aucune clinique",
+            noSpecialty: "Aucune spécialité",
+            smsEnabled: "SMS activé",
+            availabilityTitle: "Disponibilités (jours du mois)",
+            targetMonth: "Mois ciblé",
+            selectDaysHint: "Sélectionnez les jours à activer.",
+            noDaySelected: "Aucun jour sélectionné.",
+            chooseRangePrefix: "Choisir une plage pour",
+            slotHelp:
+                "Cliquez pour activer/désactiver les créneaux de 15 minutes (shift pour une plage).",
+            multipleSlotsHint:
+                "Cliquez plusieurs créneaux pour créer une liste (ex: 14:45, 16:15).",
+            noSlot: "Aucun créneau",
+            editSlot: "Modifier",
+            removeDay: "Retirer",
+            isoHint:
+                "Les créneaux sont générés par pas de 15 minutes et sauvegardés en ISO.",
+            save: "Enregistrer",
+            create: "Créer",
+            cancel: "Annuler",
+        },
+        search: {
+            title: "Recherche",
+            lastNamePlaceholder: "Nom",
+            firstNamePlaceholder: "Prénom",
+            doctorNumberPlaceholder: "Numéro de médecin",
+            allClinics: "Toutes les cliniques",
+        },
+        table: {
+            lastName: "Nom",
+            firstName: "Prénom",
+            doctorNumber: "Numéro médecin",
+            specialty: "Spécialité",
+            clinic: "Clinique",
+            phone: "Téléphone",
+            email: "Courriel",
+            availability: "Disponibilités",
+            actions: "Actions",
+            loading: "Chargement...",
+            empty: "Aucun spécialiste trouvé.",
+            edit: "Éditer",
+            delete: "Supprimer",
+        },
+        pagination: {
+            previous: "Précédent",
+            next: "Suivant",
+            pagePrefix: "Page",
+            pageSeparator: "/",
+        },
+        months: {
+            january: "Janvier",
+            february: "Février",
+            march: "Mars",
+            april: "Avril",
+            may: "Mai",
+            june: "Juin",
+            july: "Juillet",
+            august: "Août",
+            september: "Septembre",
+            october: "Octobre",
+            november: "Novembre",
+            december: "Décembre",
+        },
+    },
 } as const;
 
 export type UiLabelsFr = typeof UI_LABELS_FR;
