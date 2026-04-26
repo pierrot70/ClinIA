@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { HomeI18nContext } from "../contexts/HomeI18nContext";
+import { labels } from "../i18n/uiLabels";
+import { useTranslation } from "../hooks/useTranslation";
 import {
     createPatient,
     deletePatient,
@@ -10,6 +13,103 @@ import {
 } from "../services/patientsApi";
 import type { ApiError } from "../types/api";
 import { useDebounce } from "../hooks/useDebounce";
+
+function usePatientsPageLabels(targetLang: string) {
+    const source = labels.patientsPage;
+    const options = { targetLang, namespace: "patients-page" };
+
+    const { translated: title } = useTranslation({ text: source.title, ...options });
+    const { translated: createTab } = useTranslation({ text: source.tabs.create, ...options });
+    const { translated: searchTab } = useTranslation({ text: source.tabs.search, ...options });
+    const { translated: invalidServerResponse } = useTranslation({ text: source.validation.invalidServerResponse, ...options });
+    const { translated: invalidLatitude } = useTranslation({ text: source.validation.invalidLatitude, ...options });
+    const { translated: invalidLongitude } = useTranslation({ text: source.validation.invalidLongitude, ...options });
+    const { translated: requiredName } = useTranslation({ text: source.validation.requiredName, ...options });
+    const { translated: invalidCoordinates } = useTranslation({ text: source.validation.invalidCoordinates, ...options });
+    const { translated: deleteConfirm } = useTranslation({ text: source.validation.deleteConfirm, ...options });
+    const { translated: editTitle } = useTranslation({ text: source.form.editTitle, ...options });
+    const { translated: createTitle } = useTranslation({ text: source.form.createTitle, ...options });
+    const { translated: firstNamePlaceholder } = useTranslation({ text: source.form.firstNamePlaceholder, ...options });
+    const { translated: lastNamePlaceholder } = useTranslation({ text: source.form.lastNamePlaceholder, ...options });
+    const { translated: ramqPlaceholder } = useTranslation({ text: source.form.ramqPlaceholder, ...options });
+    const { translated: phonePlaceholder } = useTranslation({ text: source.form.phonePlaceholder, ...options });
+    const { translated: emailPlaceholder } = useTranslation({ text: source.form.emailPlaceholder, ...options });
+    const { translated: addressPlaceholder } = useTranslation({ text: source.form.addressPlaceholder, ...options });
+    const { translated: latitudePlaceholder } = useTranslation({ text: source.form.latitudePlaceholder, ...options });
+    const { translated: longitudePlaceholder } = useTranslation({ text: source.form.longitudePlaceholder, ...options });
+    const { translated: smsEnabled } = useTranslation({ text: source.form.smsEnabled, ...options });
+    const { translated: save } = useTranslation({ text: source.form.save, ...options });
+    const { translated: create } = useTranslation({ text: source.form.create, ...options });
+    const { translated: cancel } = useTranslation({ text: source.form.cancel, ...options });
+    const { translated: searchTitle } = useTranslation({ text: source.search.title, ...options });
+    const { translated: filterLastNamePlaceholder } = useTranslation({ text: source.search.lastNamePlaceholder, ...options });
+    const { translated: filterFirstNamePlaceholder } = useTranslation({ text: source.search.firstNamePlaceholder, ...options });
+    const { translated: filterAddressPlaceholder } = useTranslation({ text: source.search.addressPlaceholder, ...options });
+    const { translated: filterPhonePlaceholder } = useTranslation({ text: source.search.phonePlaceholder, ...options });
+    const { translated: filterRamqPlaceholder } = useTranslation({ text: source.search.ramqPlaceholder, ...options });
+    const { translated: empty } = useTranslation({ text: source.search.empty, ...options });
+    const { translated: tableLastName } = useTranslation({ text: source.table.lastName, ...options });
+    const { translated: tableFirstName } = useTranslation({ text: source.table.firstName, ...options });
+    const { translated: tableAddress } = useTranslation({ text: source.table.address, ...options });
+    const { translated: tablePhone } = useTranslation({ text: source.table.phone, ...options });
+    const { translated: tableRamq } = useTranslation({ text: source.table.ramq, ...options });
+    const { translated: tableActions } = useTranslation({ text: source.table.actions, ...options });
+    const { translated: tableLoading } = useTranslation({ text: source.table.loading, ...options });
+    const { translated: createAppointment } = useTranslation({ text: source.table.createAppointment, ...options });
+    const { translated: edit } = useTranslation({ text: source.table.edit, ...options });
+    const { translated: deleteLabel } = useTranslation({ text: source.table.delete, ...options });
+    const { translated: previous } = useTranslation({ text: source.pagination.previous, ...options });
+    const { translated: next } = useTranslation({ text: source.pagination.next, ...options });
+    const { translated: pagePrefix } = useTranslation({ text: source.pagination.pagePrefix, ...options });
+    const { translated: pageSeparator } = useTranslation({ text: source.pagination.pageSeparator, ...options });
+
+    return {
+        title,
+        createTab,
+        searchTab,
+        invalidServerResponse,
+        invalidLatitude,
+        invalidLongitude,
+        requiredName,
+        invalidCoordinates,
+        deleteConfirm,
+        editTitle,
+        createTitle,
+        firstNamePlaceholder,
+        lastNamePlaceholder,
+        ramqPlaceholder,
+        phonePlaceholder,
+        emailPlaceholder,
+        addressPlaceholder,
+        latitudePlaceholder,
+        longitudePlaceholder,
+        smsEnabled,
+        save,
+        create,
+        cancel,
+        searchTitle,
+        filterLastNamePlaceholder,
+        filterFirstNamePlaceholder,
+        filterAddressPlaceholder,
+        filterPhonePlaceholder,
+        filterRamqPlaceholder,
+        empty,
+        tableLastName,
+        tableFirstName,
+        tableAddress,
+        tablePhone,
+        tableRamq,
+        tableActions,
+        tableLoading,
+        createAppointment,
+        edit,
+        deleteLabel,
+        previous,
+        next,
+        pagePrefix,
+        pageSeparator,
+    };
+}
 
 declare global {
     interface Window {
@@ -62,6 +162,9 @@ function loadGoogleMapsScript(apiKey: string): Promise<void> {
 /* ------------------------------------------------------------------ */
 
 export function PatientsPage() {
+    const i18n = useContext(HomeI18nContext) || { locale: "fr" };
+    const targetLang = i18n.locale;
+    const ui = usePatientsPageLabels(targetLang);
     const [patients, setPatients] = useState<Patient[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
@@ -238,8 +341,7 @@ export function PatientsPage() {
         if (!response.data || !response.data.meta) {
             setError({
                 code: "INTERNAL_ERROR",
-                message:
-                    "Réponse serveur invalide (pagination manquante).",
+                message: ui.invalidServerResponse,
                 retryable: false,
             });
             setLoading(false);
@@ -312,14 +414,14 @@ export function PatientsPage() {
         if (values.lat.trim()) {
             const latValue = Number(values.lat.trim());
             if (!Number.isFinite(latValue)) {
-                throw new Error("Latitude invalide.");
+                throw new Error(ui.invalidLatitude);
             }
             payload.lat = latValue;
         }
         if (values.long.trim()) {
             const longValue = Number(values.long.trim());
             if (!Number.isFinite(longValue)) {
-                throw new Error("Longitude invalide.");
+                throw new Error(ui.invalidLongitude);
             }
             payload.long = longValue;
         }
@@ -331,7 +433,7 @@ export function PatientsPage() {
         if (!form.nom.trim() || !form.prenom.trim()) {
             setError({
                 code: "INVALID_INPUT",
-                message: "Nom et prénom sont requis.",
+                message: ui.requiredName,
                 retryable: false,
             });
             return;
@@ -349,7 +451,7 @@ export function PatientsPage() {
                     message:
                         err instanceof Error
                             ? err.message
-                            : "Coordonnées invalides.",
+                            : ui.invalidCoordinates,
                     retryable: false,
                 });
                 return;
@@ -369,7 +471,7 @@ export function PatientsPage() {
                     message:
                         err instanceof Error
                             ? err.message
-                            : "Coordonnées invalides.",
+                            : ui.invalidCoordinates,
                     retryable: false,
                 });
                 return;
@@ -403,7 +505,7 @@ export function PatientsPage() {
 
     async function handleDelete(id: string) {
         const confirmed = window.confirm(
-            "Supprimer ce patient définitivement ?"
+            ui.deleteConfirm
         );
         if (!confirmed) return;
 
@@ -454,7 +556,7 @@ export function PatientsPage() {
 
     return (
         <div className="max-w-6xl mx-auto p-6 space-y-6">
-            <h1 className="text-2xl font-semibold">Patients</h1>
+            <h1 className="text-2xl font-semibold">{ui.title}</h1>
 
             <div className="flex flex-wrap gap-2">
                 <button
@@ -466,7 +568,7 @@ export function PatientsPage() {
                     }`}
                     onClick={() => setViewMode("create")}
                 >
-                    Créer un patient
+                    {ui.createTab}
                 </button>
                 <button
                     type="button"
@@ -477,7 +579,7 @@ export function PatientsPage() {
                     }`}
                     onClick={() => setViewMode("list")}
                 >
-                    Rechercher les patients
+                    {ui.searchTab}
                 </button>
             </div>
 
@@ -491,14 +593,14 @@ export function PatientsPage() {
                 <div className="grid grid-cols-1 gap-4 bg-gray-50 border rounded p-4">
                     <div className="text-sm font-medium">
                         {editingId
-                            ? "Modifier un patient"
-                            : "Créer un patient"}
+                            ? ui.editTitle
+                            : ui.createTitle}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <input
                             className="border rounded p-2"
-                            placeholder="Prénom *"
+                            placeholder={ui.firstNamePlaceholder}
                             value={form.prenom}
                             onChange={(e) =>
                                 setForm((p) => ({
@@ -509,7 +611,7 @@ export function PatientsPage() {
                         />
                         <input
                             className="border rounded p-2"
-                            placeholder="Nom *"
+                            placeholder={ui.lastNamePlaceholder}
                             value={form.nom}
                             onChange={(e) =>
                                 setForm((p) => ({
@@ -520,7 +622,7 @@ export function PatientsPage() {
                         />
                         <input
                             className="border rounded p-2"
-                            placeholder="Numéro RAMQ (optionnel)"
+                            placeholder={ui.ramqPlaceholder}
                             value={form.num_assurance_maladie}
                             onChange={(e) =>
                                 setForm((p) => ({
@@ -531,7 +633,7 @@ export function PatientsPage() {
                         />
                         <input
                             className="border rounded p-2"
-                            placeholder="Téléphone (optionnel)"
+                            placeholder={ui.phonePlaceholder}
                             value={form.telephone}
                             onChange={(e) =>
                                 setForm((p) => ({
@@ -542,7 +644,7 @@ export function PatientsPage() {
                         />
                         <input
                             className="border rounded p-2"
-                            placeholder="Courriel (optionnel)"
+                            placeholder={ui.emailPlaceholder}
                             value={form.courriel}
                             onChange={(e) =>
                                 setForm((p) => ({
@@ -553,7 +655,7 @@ export function PatientsPage() {
                         />
                         <input
                             className="border rounded p-2"
-                            placeholder="Adresse (optionnel)"
+                            placeholder={ui.addressPlaceholder}
                             value={form.addresse}
                             ref={addressInputRef}
                             autoComplete="off"
@@ -566,7 +668,7 @@ export function PatientsPage() {
                         />
                         <input
                             className="border rounded p-2"
-                            placeholder="Latitude (optionnel)"
+                            placeholder={ui.latitudePlaceholder}
                             value={form.lat}
                             onChange={(e) =>
                                 setForm((p) => ({
@@ -577,7 +679,7 @@ export function PatientsPage() {
                         />
                         <input
                             className="border rounded p-2"
-                            placeholder="Longitude (optionnel)"
+                            placeholder={ui.longitudePlaceholder}
                             value={form.long}
                             onChange={(e) =>
                                 setForm((p) => ({
@@ -599,7 +701,7 @@ export function PatientsPage() {
                                 }))
                             }
                         />
-                        SMS activé
+                        {ui.smsEnabled}
                     </label>
 
                     <div className="flex gap-2">
@@ -607,14 +709,14 @@ export function PatientsPage() {
                             onClick={handleSubmit}
                             className="px-4 py-2 bg-primary text-white rounded"
                         >
-                            {editingId ? "Enregistrer" : "Créer"}
+                            {editingId ? ui.save : ui.create}
                         </button>
                         {editingId && (
                             <button
                                 onClick={resetForm}
                                 className="px-4 py-2 border rounded"
                             >
-                                Annuler
+                                {ui.cancel}
                             </button>
                         )}
                     </div>
@@ -625,12 +727,12 @@ export function PatientsPage() {
                 <>
                     <div className="border rounded p-4 space-y-3">
                         <div className="text-sm font-medium">
-                            Recherche
+                            {ui.searchTitle}
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                             <input
                                 className="border rounded p-2"
-                                placeholder="Nom"
+                                placeholder={ui.filterLastNamePlaceholder}
                                 value={filterNom}
                                 onChange={(e) => {
                                     setPage(1);
@@ -639,7 +741,7 @@ export function PatientsPage() {
                             />
                             <input
                                 className="border rounded p-2"
-                                placeholder="Prénom"
+                                placeholder={ui.filterFirstNamePlaceholder}
                                 value={filterPrenom}
                                 onChange={(e) => {
                                     setPage(1);
@@ -648,7 +750,7 @@ export function PatientsPage() {
                             />
                             <input
                                 className="border rounded p-2"
-                                placeholder="Adresse"
+                                placeholder={ui.filterAddressPlaceholder}
                                 value={filterAddresse}
                                 onChange={(e) => {
                                     setPage(1);
@@ -657,7 +759,7 @@ export function PatientsPage() {
                             />
                             <input
                                 className="border rounded p-2"
-                                placeholder="Téléphone"
+                                placeholder={ui.filterPhonePlaceholder}
                                 value={filterTelephone}
                                 onChange={(e) => {
                                     setPage(1);
@@ -666,7 +768,7 @@ export function PatientsPage() {
                             />
                             <input
                                 className="border rounded p-2"
-                                placeholder="RAMQ"
+                                placeholder={ui.filterRamqPlaceholder}
                                 value={filterRamq}
                                 onChange={(e) => {
                                     setPage(1);
@@ -686,7 +788,7 @@ export function PatientsPage() {
                                             className="hover:underline"
                                             onClick={() => toggleSort("nom")}
                                         >
-                                            Nom{sortLabel("nom")}
+                                            {ui.tableLastName}{sortLabel("nom")}
                                         </button>
                                     </th>
                                     <th className="text-left p-2">
@@ -697,7 +799,7 @@ export function PatientsPage() {
                                                 toggleSort("prenom")
                                             }
                                         >
-                                            Prénom{sortLabel("prenom")}
+                                            {ui.tableFirstName}{sortLabel("prenom")}
                                         </button>
                                     </th>
                                     <th className="text-left p-2">
@@ -708,7 +810,7 @@ export function PatientsPage() {
                                                 toggleSort("addresse")
                                             }
                                         >
-                                            Adresse{sortLabel("addresse")}
+                                            {ui.tableAddress}{sortLabel("addresse")}
                                         </button>
                                     </th>
                                     <th className="text-left p-2">
@@ -719,7 +821,7 @@ export function PatientsPage() {
                                                 toggleSort("telephone")
                                             }
                                         >
-                                            Téléphone{sortLabel("telephone")}
+                                            {ui.tablePhone}{sortLabel("telephone")}
                                         </button>
                                     </th>
                                     <th className="text-left p-2">
@@ -732,13 +834,13 @@ export function PatientsPage() {
                                                 )
                                             }
                                         >
-                                            RAMQ
+                                            {ui.tableRamq}
                                             {sortLabel(
                                                 "num_assurance_maladie"
                                             )}
                                         </button>
                                     </th>
-                                    <th className="text-left p-2">Actions</th>
+                                    <th className="text-left p-2">{ui.tableActions}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -748,7 +850,7 @@ export function PatientsPage() {
                                             className="p-2 text-gray-500"
                                             colSpan={5}
                                         >
-                                            Chargement…
+                                            {ui.tableLoading}
                                         </td>
                                     </tr>
                                 )}
@@ -758,7 +860,7 @@ export function PatientsPage() {
                                             className="p-2 text-gray-500"
                                             colSpan={5}
                                         >
-                                            Aucun patient trouvé.
+                                            {ui.empty}
                                         </td>
                                     </tr>
                                 )}
@@ -790,7 +892,7 @@ export function PatientsPage() {
                                                         p.num_assurance_maladie
                                                     )}`}
                                                 >
-                                                    Créer rendez-vous
+                                                    {ui.createAppointment}
                                                 </Link>
                                                 <button
                                                     className="px-2 py-1 border rounded"
@@ -798,7 +900,7 @@ export function PatientsPage() {
                                                         handleEdit(p)
                                                     }
                                                 >
-                                                    Éditer
+                                                    {ui.edit}
                                                 </button>
                                                 <button
                                                     className="px-2 py-1 border rounded text-red-600"
@@ -809,7 +911,7 @@ export function PatientsPage() {
                                                         handleDelete(p._id)
                                                     }
                                                 >
-                                                    Supprimer
+                                                    {ui.deleteLabel}
                                                 </button>
                                             </td>
                                         </tr>
@@ -826,10 +928,10 @@ export function PatientsPage() {
                                 setPage((p) => Math.max(p - 1, 1))
                             }
                         >
-                            Précédent
+                            {ui.previous}
                         </button>
                         <span className="text-sm text-gray-600">
-                            Page {page} / {totalPages}
+                            {ui.pagePrefix} {page} {ui.pageSeparator} {totalPages}
                         </span>
                         <button
                             className="px-3 py-1 border rounded"
@@ -840,7 +942,7 @@ export function PatientsPage() {
                                 )
                             }
                         >
-                            Suivant
+                            {ui.next}
                         </button>
                     </div>
                 </>

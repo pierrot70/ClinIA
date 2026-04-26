@@ -49,7 +49,7 @@ export const UI_LABELS_FR = {
         header: {
             title: "Commentaires médecins",
             description:
-                "Utilisez cet espace pour laisser des commentaires de support ou de suivi. N'insérez jamais de données permettant d'identifier un patient. Les emails, téléphones, RAMQ, SSN/NAS et certaines valeurs libellées sont obfusqués automatiquement avant sauvegarde.",
+                "Utilisez cet espace pour laisser des commentaires de support ou de suivi. N'insérez jamais de données permettant d'identifier un patient. Les emails, téléphones, numéros d'assurance maladie, SSN/NAS et certaines valeurs libellées sont obfusqués automatiquement avant sauvegarde.",
             guestHint:
                 "Vous pouvez laisser un commentaire sans connexion. Ajoutez simplement votre nom ou un pseudonyme professionnel.",
         },
@@ -64,7 +64,7 @@ export const UI_LABELS_FR = {
                 "Laissez vide pour recevoir un nouveau code de suivi, ou réutilisez votre code actuel pour regrouper vos commentaires.",
             categoryLabel: "Type de commentaire",
             commentPlaceholder:
-                "Exemple: Le module de rendez-vous affiche une erreur au moment de confirmer l'horaire. Ne pas inclure de nom de patient, RAMQ, téléphone ou email.",
+                "Exemple: Le module de rendez-vous affiche une erreur au moment de confirmer l'horaire. Ne pas inclure de nom de patient, numéro d'assurance maladie, téléphone ou email.",
             authenticatedPrivacyHint:
                 "Votre nom d'usager et la date/heure seront sauvegardés avec le commentaire obfusqué.",
             guestPrivacyHint:
@@ -142,6 +142,66 @@ export const UI_LABELS_FR = {
             loading: "Création...",
             submit: "Créer le rendez-vous",
             success: "Rendez-vous créé avec succès.",
+        },
+    },
+    // PatientsPage.tsx - page /patients, création et recherche de patients.
+    patientsPage: {
+        title: "Patients",
+        tabs: {
+            create: "Créer un patient",
+            search: "Rechercher les patients",
+        },
+        validation: {
+            invalidServerResponse:
+                "Réponse serveur invalide (pagination manquante).",
+            invalidLatitude: "Latitude invalide.",
+            invalidLongitude: "Longitude invalide.",
+            requiredName: "Nom et prénom sont requis.",
+            invalidCoordinates: "Coordonnées invalides.",
+            deleteConfirm: "Supprimer ce patient définitivement ?",
+        },
+        form: {
+            editTitle: "Modifier un patient",
+            createTitle: "Créer un patient",
+            firstNamePlaceholder: "Prénom *",
+            lastNamePlaceholder: "Nom *",
+            ramqPlaceholder: "Numéro d'assurance maladie (optionnel)",
+            phonePlaceholder: "Téléphone (optionnel)",
+            emailPlaceholder: "Courriel (optionnel)",
+            addressPlaceholder: "Adresse (optionnel)",
+            latitudePlaceholder: "Latitude (optionnel)",
+            longitudePlaceholder: "Longitude (optionnel)",
+            smsEnabled: "SMS activé",
+            save: "Enregistrer",
+            create: "Créer",
+            cancel: "Annuler",
+        },
+        search: {
+            title: "Recherche",
+            lastNamePlaceholder: "Nom",
+            firstNamePlaceholder: "Prénom",
+            addressPlaceholder: "Adresse",
+            phonePlaceholder: "Téléphone",
+            ramqPlaceholder: "Numéro assurance maladie",
+            empty: "Aucun patient trouvé.",
+        },
+        table: {
+            lastName: "Nom",
+            firstName: "Prénom",
+            address: "Adresse",
+            phone: "Téléphone",
+            ramq: "Numéro assurance maladie",
+            actions: "Actions",
+            loading: "Chargement...",
+            createAppointment: "Créer rendez-vous",
+            edit: "Éditer",
+            delete: "Supprimer",
+        },
+        pagination: {
+            previous: "Précédent",
+            next: "Suivant",
+            pagePrefix: "Page",
+            pageSeparator: "/",
         },
     },
 } as const;

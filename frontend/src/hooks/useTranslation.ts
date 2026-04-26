@@ -31,10 +31,33 @@ const criticalLabelFallbacks: Record<string, Record<string, string>> = {
   "gpt-4-0613 (legacy)": {
     "default": "gpt-4-0613",
   },
+  // TODO: Un médecin peut écrire "Ho" comme symptôme en vietnamien (toux).
+  // Garder ces labels courts hors traduction IA: OpenAI peut retourner une explication
+  // au lieu d'un libellé utilisable pour des mots très courts comme Nom/Prénom.
+  "Nom": {
+    "vi": "Họ",
+  },
+  "Nom *": {
+    "vi": "Họ *",
+  },
+  "Prénom": {
+    "vi": "Tên",
+  },
+  "Prénom *": {
+    "vi": "Tên *",
+  },
   // Ajoutez ici d'autres labels critiques si besoin
 };
 
 const translationCache = new Map();
+
+function baseLocale(locale: string) {
+  return locale.toLowerCase().split("-")[0];
+}
+
+function shouldTranslateText(text: string) {
+  return /[\p{L}\p{N}]/u.test(text.trim());
+}
 
 export function useTranslation({ text, targetLang, namespace = "clinical-demo", sourceLocale = "fr", openaiModel }: {
   text: string;
@@ -45,13 +68,19 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
 }) {
   const [error, setError] = useState<string | null>(null);
   const cacheKey = `${namespace}|${sourceLocale}|${targetLang}|${text}`;
+  const isSourceLocale = baseLocale(targetLang) === baseLocale(sourceLocale);
   const [translated, setTranslated] = useState(text);
-  const [loading, setLoading] = useState(targetLang !== sourceLocale);
+  const [loading, setLoading] = useState(!isSourceLocale);
   const isMounted = useRef(true);
 
   useEffect(() => {
     isMounted.current = true;
     setError(null);
+    if (!shouldTranslateText(text)) {
+      setTranslated(text);
+      setLoading(false);
+      return;
+    }
     // Fallback local prioritaire pour les labels critiques, même si la langue source et la langue cible sont identiques
     const fallback =
       criticalLabelFallbacks[text]?.[targetLang] ||
@@ -70,7 +99,7 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
       }).catch(() => {});
       return;
     }
-    if (targetLang === sourceLocale) {
+    if (isSourceLocale) {
       setTranslated(text);
       setLoading(false);
       return;
