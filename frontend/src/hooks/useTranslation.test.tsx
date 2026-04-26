@@ -164,6 +164,28 @@ describe("useTranslation", () => {
         expect(translateTextMock).not.toHaveBeenCalled();
     });
 
+    it("keeps the ClinIA product name unchanged in Norwegian", async () => {
+        translateTextMock.mockResolvedValue(
+            "Le terme \"ClinIA\" semble être un nom propre ou un acronyme spécifique."
+        );
+
+        const { result } = renderHook(() =>
+            useTranslation({
+                text: labels.app.landing.title,
+                targetLang: "no-NO",
+                namespace: "app-landing",
+            })
+        );
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        expect(result.current.translated).toBe("ClinIA");
+        expect(result.current.error).toBeNull();
+        expect(translateTextMock).not.toHaveBeenCalled();
+    });
+
     it("keeps short OpenAI log count labels stable in Vietnamese", async () => {
         translateTextMock.mockResolvedValue(
             "Le mot \"logs\" peut se traduire en vietnamien selon le contexte."

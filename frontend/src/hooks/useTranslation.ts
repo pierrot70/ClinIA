@@ -31,6 +31,9 @@ const criticalLabelFallbacks: Record<string, Record<string, string>> = {
   "gpt-4-0613 (legacy)": {
     "default": "gpt-4-0613",
   },
+  "ClinIA": {
+    "default": "ClinIA",
+  },
   // TODO: Un médecin peut écrire "Ho" comme symptôme en vietnamien (toux).
   // Garder ces labels courts hors traduction IA: OpenAI peut retourner une explication
   // au lieu d'un libellé utilisable pour des mots très courts comme Nom/Prénom/Rue.
