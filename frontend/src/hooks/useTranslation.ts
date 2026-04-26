@@ -55,8 +55,8 @@ const criticalLabelFallbacks: Record<string, Record<string, string>> = {
   },
   // Libellés techniques des journaux: garder une terminologie anglaise stable
   // dans les langues où la traduction automatique rend le sens moins clair.
-  "Username masqué": {
-    "default": "Masked username",
+  "Nom d'utilisateur masqué": {
+    "vi": "Masked username",
   },
   "Transport": {
     "default": "Transport",

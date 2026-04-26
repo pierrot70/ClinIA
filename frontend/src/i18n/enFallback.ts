@@ -205,8 +205,10 @@ export const enFallback: Record<string, string> = {
   "Temps requête:": "Query time:",
   "Fermer": "Close",
   "Résultat": "Result",
-  "Username masqué": "Masked username",
+  "Nom d'utilisateur masqué": "Masked username",
   "Rôle": "Role",
+  "ID utilisateur acteur": "Actor user ID",
+  "Chemin de requête": "Request path",
   "Modèle": "Model",
   "Empreinte de charge utile": "Payload hash",
   "Taille de charge utile en octets": "Payload size bytes",
@@ -241,6 +243,9 @@ export const enFallback: Record<string, string> = {
   "Route": "Route",
   "Erreur": "Error",
   "Neutralisé": "Neutralized",
+  "ID d'accusé d'incident": "Incident ack id",
+  "ID de requête amont": "Upstream request id",
+  "Code d'erreur": "Error code",
   "résultats": "results",
   "-": "-"
 };

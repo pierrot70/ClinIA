@@ -117,7 +117,7 @@ describe("useTranslation", () => {
     });
 
     it("keeps technical OpenAI log labels stable in Vietnamese", async () => {
-        translateTextMock.mockResolvedValue("Nom d'utilisateur masqué");
+        translateTextMock.mockResolvedValue("Tên người dùng bị ẩn");
 
         const username = renderHook(() =>
             useTranslation({
@@ -141,6 +141,26 @@ describe("useTranslation", () => {
 
         expect(username.result.current.translated).toBe("Masked username");
         expect(transport.result.current.translated).toBe("Transport");
+        expect(translateTextMock).not.toHaveBeenCalled();
+    });
+
+    it("keeps the French source for technical OpenAI log labels in French", async () => {
+        translateTextMock.mockRejectedValue(new Error("Translation API error"));
+
+        const { result } = renderHook(() =>
+            useTranslation({
+                text: labels.openAiLogs.filters.maskedUsername,
+                targetLang: "fr-CA",
+                namespace: "openai-logs",
+            })
+        );
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        expect(result.current.translated).toBe("Nom d'utilisateur masqué");
+        expect(result.current.error).toBeNull();
         expect(translateTextMock).not.toHaveBeenCalled();
     });
 
