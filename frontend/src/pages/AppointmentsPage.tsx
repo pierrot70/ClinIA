@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { HomeI18nContext } from "../contexts/HomeI18nContext";
+import { labels } from "../i18n/uiLabels";
+import { useTranslation } from "../hooks/useTranslation";
 import {
     createAppointment,
     fetchAvailableSlots,
@@ -18,11 +21,75 @@ import {
 } from "../services/specialistsApi";
 import type { ApiError } from "../types/api";
 
+function useAppointmentsPageLabels(targetLang: string) {
+    const source = labels.appointmentsPage;
+    const options = { targetLang, namespace: "appointments-page" };
+
+    const { translated: title } = useTranslation({ text: source.title, ...options });
+    const { translated: createTab } = useTranslation({ text: source.tabs.create, ...options });
+    const { translated: listTab } = useTranslation({ text: source.tabs.list, ...options });
+    const { translated: insurancePlaceholder } = useTranslation({ text: source.patientSearch.insurancePlaceholder, ...options });
+    const { translated: patientSearchTitle } = useTranslation({ text: source.patientSearch.title, ...options });
+    const { translated: lastNamePlaceholder } = useTranslation({ text: source.patientSearch.lastNamePlaceholder, ...options });
+    const { translated: firstNamePlaceholder } = useTranslation({ text: source.patientSearch.firstNamePlaceholder, ...options });
+    const { translated: phonePlaceholder } = useTranslation({ text: source.patientSearch.phonePlaceholder, ...options });
+    const { translated: patientSearchLoading } = useTranslation({ text: source.patientSearch.loading, ...options });
+    const { translated: patientSearchSubmit } = useTranslation({ text: source.patientSearch.submit, ...options });
+    const { translated: patientSearchEmpty } = useTranslation({ text: source.patientSearch.empty, ...options });
+    const { translated: specialistsLoading } = useTranslation({ text: source.specialist.loading, ...options });
+    const { translated: chooseSpecialist } = useTranslation({ text: source.specialist.choose, ...options });
+    const { translated: nearestClinicMissing } = useTranslation({ text: source.specialist.nearestClinicMissing, ...options });
+    const { translated: selectPatient } = useTranslation({ text: source.specialist.selectPatient, ...options });
+    const { translated: noneInNearestClinic } = useTranslation({ text: source.specialist.noneInNearestClinic, ...options });
+    const { translated: missingCoordinates } = useTranslation({ text: source.specialist.missingCoordinates, ...options });
+    const { translated: priorityLabel } = useTranslation({ text: source.priority.label, ...options });
+    const { translated: normalPriority } = useTranslation({ text: source.priority.normal, ...options });
+    const { translated: urgentPriority } = useTranslation({ text: source.priority.urgent, ...options });
+    const { translated: slotsLabel } = useTranslation({ text: source.slots.label, ...options });
+    const { translated: slotsLoading } = useTranslation({ text: source.slots.loading, ...options });
+    const { translated: reasonPlaceholder } = useTranslation({ text: source.reasonPlaceholder, ...options });
+    const { translated: createLoading } = useTranslation({ text: source.action.loading, ...options });
+    const { translated: createSubmit } = useTranslation({ text: source.action.submit, ...options });
+    const { translated: createSuccess } = useTranslation({ text: source.action.success, ...options });
+
+    return {
+        title,
+        createTab,
+        listTab,
+        insurancePlaceholder,
+        patientSearchTitle,
+        lastNamePlaceholder,
+        firstNamePlaceholder,
+        phonePlaceholder,
+        patientSearchLoading,
+        patientSearchSubmit,
+        patientSearchEmpty,
+        specialistsLoading,
+        chooseSpecialist,
+        nearestClinicMissing,
+        selectPatient,
+        noneInNearestClinic,
+        missingCoordinates,
+        priorityLabel,
+        normalPriority,
+        urgentPriority,
+        slotsLabel,
+        slotsLoading,
+        reasonPlaceholder,
+        createLoading,
+        createSubmit,
+        createSuccess,
+    };
+}
+
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 
 export function AppointmentsPage() {
+    const i18n = useContext(HomeI18nContext) || { locale: "fr" };
+    const targetLang = i18n.locale;
+    const ui = useAppointmentsPageLabels(targetLang);
     const [searchParams] = useSearchParams();
     const [insuranceNumber, setInsuranceNumber] = useState("");
     const [patientId, setPatientId] = useState("");
@@ -418,7 +485,7 @@ export function AppointmentsPage() {
     return (
         <div className="max-w-4xl mx-auto p-6 space-y-6">
             <h1 className="text-2xl font-semibold">
-                Créer un rendez-vous
+                {ui.title}
             </h1>
 
             <div className="flex gap-4">
@@ -426,14 +493,14 @@ export function AppointmentsPage() {
                     to="/appointments"
                     className="px-3 py-1 border rounded bg-primary text-white"
                 >
-                    Création
+                    {ui.createTab}
                 </Link>
 
                 <Link
                     to="/appointments/list"
                     className="px-3 py-1 border rounded hover:bg-gray-100"
                 >
-                    Voir la liste
+                    {ui.listTab}
                 </Link>
             </div>
 
@@ -442,20 +509,20 @@ export function AppointmentsPage() {
             <div className="grid grid-cols-1 gap-4">
                 <input
                     className="border-2 border-red-500 rounded p-2"
-                    placeholder="Numéro d’assurance maladie (auto)"
+                    placeholder={ui.insurancePlaceholder}
                     value={insuranceNumber}
                     readOnly
                 />
 
                 <div className="border rounded p-3 bg-gray-50 space-y-2">
                     <div className="text-sm font-medium">
-                        Rechercher un patient existant
+                        {ui.patientSearchTitle}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                         <input
                             className="border rounded p-2"
-                            placeholder="Nom"
+                            placeholder={ui.lastNamePlaceholder}
                             value={searchNom}
                             onChange={(e) =>
                                 setSearchNom(e.target.value)
@@ -463,7 +530,7 @@ export function AppointmentsPage() {
                         />
                         <input
                             className="border rounded p-2"
-                            placeholder="Prénom"
+                            placeholder={ui.firstNamePlaceholder}
                             value={searchPrenom}
                             onChange={(e) =>
                                 setSearchPrenom(e.target.value)
@@ -471,7 +538,7 @@ export function AppointmentsPage() {
                         />
                         <input
                             className="border rounded p-2"
-                            placeholder="Téléphone"
+                            placeholder={ui.phonePlaceholder}
                             value={searchTelephone}
                             onChange={(e) =>
                                 setSearchTelephone(e.target.value)
@@ -484,8 +551,8 @@ export function AppointmentsPage() {
                             className="px-3 py-2 border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
                         >
                             {patientsLoading
-                                ? "Recherche…"
-                                : "Rechercher"}
+                                ? ui.patientSearchLoading
+                                : ui.patientSearchSubmit}
                         </button>
                     </div>
 
@@ -499,7 +566,7 @@ export function AppointmentsPage() {
                         !patientsLoading &&
                         patients.length === 0 && (
                         <div className="text-xs text-gray-500">
-                            Aucun patient trouvé.
+                            {ui.patientSearchEmpty}
                         </div>
                     )}
 
@@ -547,12 +614,12 @@ export function AppointmentsPage() {
                 >
                     <option value="">
                         {specialistsLoading || cliniquesLoading
-                            ? "Chargement des spécialistes…"
+                            ? ui.specialistsLoading
                             : patientId && nearestCliniqueId
-                                ? "Choisir un spécialiste *"
+                                ? ui.chooseSpecialist
                                 : patientId
-                                    ? "Clinique la plus proche introuvable"
-                                    : "Sélectionnez un patient"}
+                                    ? ui.nearestClinicMissing
+                                    : ui.selectPatient}
                     </option>
                     {filteredSpecialists.map((sp) => (
                         <option key={sp._id} value={sp._id}>
@@ -578,21 +645,19 @@ export function AppointmentsPage() {
                     nearestCliniqueId &&
                     filteredSpecialists.length === 0 && (
                     <div className="text-xs text-gray-500">
-                        Aucun spécialiste disponible dans la clinique la plus
-                        proche.
+                        {ui.noneInNearestClinic}
                     </div>
                 )}
                 {patientId && !nearestCliniqueId && (
                     <div className="text-xs text-gray-500">
-                        Coordonnées manquantes pour déterminer la clinique la
-                        plus proche.
+                        {ui.missingCoordinates}
                     </div>
                 )}
 
                 {/* Priorité */}
                 <div className="flex items-center gap-6">
                     <span className="text-sm font-medium">
-                        Priorité
+                        {ui.priorityLabel}
                     </span>
 
                     <label className="flex items-center gap-2">
@@ -601,7 +666,7 @@ export function AppointmentsPage() {
                             checked={priority === "normal"}
                             onChange={() => setPriority("normal")}
                         />
-                        Normal
+                        {ui.normalPriority}
                     </label>
 
                     <label className="flex items-center gap-2 text-red-600">
@@ -610,7 +675,7 @@ export function AppointmentsPage() {
                             checked={priority === "urgent"}
                             onChange={() => setPriority("urgent")}
                         />
-                        Urgent
+                        {ui.urgentPriority}
                     </label>
                 </div>
 
@@ -631,12 +696,12 @@ export function AppointmentsPage() {
                 {/* Créneaux */}
                 <div>
                     <div className="text-xs text-gray-500 mb-1">
-                        Créneaux disponibles
+                        {ui.slotsLabel}
                     </div>
 
                     {slotsLoading && (
                         <div className="text-xs text-gray-400">
-                            Chargement…
+                            {ui.slotsLoading}
                         </div>
                     )}
 
@@ -660,7 +725,7 @@ export function AppointmentsPage() {
 
                 <textarea
                     className="border rounded p-2"
-                    placeholder="Motif (optionnel)"
+                    placeholder={ui.reasonPlaceholder}
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                 />
@@ -674,7 +739,7 @@ export function AppointmentsPage() {
                     disabled={!isComplete || loading}
                     className="px-4 py-2 bg-primary text-white rounded disabled:opacity-50"
                 >
-                    {loading ? "Création…" : "Créer le rendez-vous"}
+                    {loading ? ui.createLoading : ui.createSubmit}
                 </button>
 
                 {apiError && (
@@ -685,7 +750,7 @@ export function AppointmentsPage() {
 
                 {success && (
                     <div className="text-sm text-green-600">
-                        Rendez-vous créé avec succès.
+                        {ui.createSuccess}
                     </div>
                 )}
             </div>

@@ -101,6 +101,49 @@ export const UI_LABELS_FR = {
             redactionSuffix: "obfuscation(s)",
         },
     },
+    // AppointmentsPage.tsx - page /appointments, création de rendez-vous.
+    appointmentsPage: {
+        title: "Créer un rendez-vous",
+        tabs: {
+            create: "Création",
+            list: "Voir la liste",
+        },
+        patientSearch: {
+            insurancePlaceholder: "Numéro d'assurance maladie (auto)",
+            title: "Rechercher un patient existant",
+            lastNamePlaceholder: "Nom",
+            firstNamePlaceholder: "Prénom",
+            phonePlaceholder: "Téléphone",
+            loading: "Recherche...",
+            submit: "Rechercher",
+            empty: "Aucun patient trouvé.",
+        },
+        specialist: {
+            loading: "Chargement des spécialistes...",
+            choose: "Choisir un spécialiste *",
+            nearestClinicMissing: "Clinique la plus proche introuvable",
+            selectPatient: "Sélectionnez un patient",
+            noneInNearestClinic:
+                "Aucun spécialiste disponible dans la clinique la plus proche.",
+            missingCoordinates:
+                "Coordonnées manquantes pour déterminer la clinique la plus proche.",
+        },
+        priority: {
+            label: "Priorité",
+            normal: "Normal",
+            urgent: "Urgent",
+        },
+        slots: {
+            label: "Créneaux disponibles",
+            loading: "Chargement...",
+        },
+        reasonPlaceholder: "Motif (optionnel)",
+        action: {
+            loading: "Création...",
+            submit: "Créer le rendez-vous",
+            success: "Rendez-vous créé avec succès.",
+        },
+    },
 } as const;
 
 export type UiLabelsFr = typeof UI_LABELS_FR;
