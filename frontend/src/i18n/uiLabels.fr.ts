@@ -38,6 +38,69 @@ export const UI_LABELS_FR = {
             replyFromSeparator: "le",
         },
     },
+    // ClinicianCommentsPage.tsx - page /comments.
+    commentsPage: {
+        categories: {
+            bug: "Bug",
+            suggestion: "Suggestion",
+            urgent: "Urgence",
+            incomprehension: "Incompréhension",
+        },
+        header: {
+            title: "Commentaires médecins",
+            description:
+                "Utilisez cet espace pour laisser des commentaires de support ou de suivi. N'insérez jamais de données permettant d'identifier un patient. Les emails, téléphones, RAMQ, SSN/NAS et certaines valeurs libellées sont obfusqués automatiquement avant sauvegarde.",
+            guestHint:
+                "Vous pouvez laisser un commentaire sans connexion. Ajoutez simplement votre nom ou un pseudonyme professionnel.",
+        },
+        form: {
+            newCommentLabel: "Nouveau commentaire",
+            nameLabel: "Nom ou pseudonyme",
+            namePlaceholder: "Exemple: dr.lasante",
+            trackingCodeLabel: "Code de suivi",
+            trackingCodePlaceholder:
+                "Généré automatiquement au premier commentaire",
+            trackingCodeHint:
+                "Laissez vide pour recevoir un nouveau code de suivi, ou réutilisez votre code actuel pour regrouper vos commentaires.",
+            categoryLabel: "Type de commentaire",
+            commentPlaceholder:
+                "Exemple: Le module de rendez-vous affiche une erreur au moment de confirmer l'horaire. Ne pas inclure de nom de patient, RAMQ, téléphone ou email.",
+            authenticatedPrivacyHint:
+                "Votre nom d'usager et la date/heure seront sauvegardés avec le commentaire obfusqué.",
+            guestPrivacyHint:
+                "Votre nom ou pseudonyme, la date/heure et le commentaire obfusqué seront sauvegardés.",
+            submitting: "Enregistrement...",
+            submit: "Enregistrer le commentaire",
+        },
+        status: {
+            saved: "Commentaire enregistré.",
+            savedWithRedaction:
+                "Commentaire enregistré avec obfuscation automatique des identifiants détectés.",
+            trackingCodePrefix: "Code de suivi:",
+            selectCommentBeforeReply:
+                "Sélectionnez un commentaire avant de répondre.",
+            replySaved: "Réponse enregistrée.",
+        },
+        list: {
+            title: "Commentaires sauvegardés",
+            description:
+                "Les commentaires sont affichés tels qu'ils ont été sauvegardés après obfuscation.",
+            ownScope: "Mes commentaires",
+            allScope: "Tous les commentaires",
+            allActors: "Tous les noms ou pseudonymes",
+            allCategories: "Toutes les catégories",
+            loginRequired:
+                "Connectez-vous pour consulter l'historique des commentaires.",
+            loading: "Chargement des commentaires...",
+            empty: "Aucun commentaire enregistré pour le moment.",
+            selectedCommentLabel: "Sélection du commentaire",
+            selectedCommentPreviewTitle: "Commentaire sélectionné",
+            replyPlaceholder:
+                "Écrire une réponse au commentaire sélectionné...",
+            replySubmit: "Répondre au commentaire",
+            redactionSuffix: "obfuscation(s)",
+        },
+    },
 } as const;
 
 export type UiLabelsFr = typeof UI_LABELS_FR;

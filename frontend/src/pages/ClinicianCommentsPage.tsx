@@ -1,5 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { HomeI18nContext } from "../contexts/HomeI18nContext";
+import { labels } from "../i18n/uiLabels";
+import { useTranslation } from "../hooks/useTranslation";
 import {
     createClinicianComment,
     listClinicianComments,
@@ -8,24 +11,106 @@ import {
 } from "../services/clinicianCommentsApi";
 
 const CLINICIAN_COMMENT_STORAGE_KEY = "clinia_comment_tracking";
-const COMMENT_CATEGORY_OPTIONS: Array<{
+
+type CommentCategoryOption = {
     value: ClinicianComment["category"];
     label: string;
-}> = [
-    { value: "BUG", label: "Bug" },
-    { value: "SUGGESTION", label: "Suggestion" },
-    { value: "URGENT", label: "Urgence" },
-    { value: "INCOMPREHENSION", label: "Incomprehension" },
-];
+};
 
-function getCategoryLabel(category: ClinicianComment["category"]) {
-    return (
-        COMMENT_CATEGORY_OPTIONS.find((option) => option.value === category)?.label ||
-        category
-    );
+function useCommentsPageLabels(targetLang: string) {
+    const source = labels.commentsPage;
+    const translationOptions = {
+        targetLang,
+        namespace: "comments-page",
+    };
+
+    const { translated: categoryBug } = useTranslation({ text: source.categories.bug, ...translationOptions });
+    const { translated: categorySuggestion } = useTranslation({ text: source.categories.suggestion, ...translationOptions });
+    const { translated: categoryUrgent } = useTranslation({ text: source.categories.urgent, ...translationOptions });
+    const { translated: categoryIncomprehension } = useTranslation({ text: source.categories.incomprehension, ...translationOptions });
+    const { translated: pageTitle } = useTranslation({ text: source.header.title, ...translationOptions });
+    const { translated: pageDescription } = useTranslation({ text: source.header.description, ...translationOptions });
+    const { translated: guestHint } = useTranslation({ text: source.header.guestHint, ...translationOptions });
+    const { translated: newCommentLabel } = useTranslation({ text: source.form.newCommentLabel, ...translationOptions });
+    const { translated: nameLabel } = useTranslation({ text: source.form.nameLabel, ...translationOptions });
+    const { translated: namePlaceholder } = useTranslation({ text: source.form.namePlaceholder, ...translationOptions });
+    const { translated: trackingCodeLabel } = useTranslation({ text: source.form.trackingCodeLabel, ...translationOptions });
+    const { translated: trackingCodePlaceholder } = useTranslation({ text: source.form.trackingCodePlaceholder, ...translationOptions });
+    const { translated: trackingCodeHint } = useTranslation({ text: source.form.trackingCodeHint, ...translationOptions });
+    const { translated: categoryLabel } = useTranslation({ text: source.form.categoryLabel, ...translationOptions });
+    const { translated: commentPlaceholder } = useTranslation({ text: source.form.commentPlaceholder, ...translationOptions });
+    const { translated: authenticatedPrivacyHint } = useTranslation({ text: source.form.authenticatedPrivacyHint, ...translationOptions });
+    const { translated: guestPrivacyHint } = useTranslation({ text: source.form.guestPrivacyHint, ...translationOptions });
+    const { translated: submittingLabel } = useTranslation({ text: source.form.submitting, ...translationOptions });
+    const { translated: submitLabel } = useTranslation({ text: source.form.submit, ...translationOptions });
+    const { translated: savedLabel } = useTranslation({ text: source.status.saved, ...translationOptions });
+    const { translated: savedWithRedactionLabel } = useTranslation({ text: source.status.savedWithRedaction, ...translationOptions });
+    const { translated: trackingCodePrefix } = useTranslation({ text: source.status.trackingCodePrefix, ...translationOptions });
+    const { translated: selectCommentBeforeReply } = useTranslation({ text: source.status.selectCommentBeforeReply, ...translationOptions });
+    const { translated: replySaved } = useTranslation({ text: source.status.replySaved, ...translationOptions });
+    const { translated: savedCommentsTitle } = useTranslation({ text: source.list.title, ...translationOptions });
+    const { translated: savedCommentsDescription } = useTranslation({ text: source.list.description, ...translationOptions });
+    const { translated: ownScope } = useTranslation({ text: source.list.ownScope, ...translationOptions });
+    const { translated: allScope } = useTranslation({ text: source.list.allScope, ...translationOptions });
+    const { translated: allActors } = useTranslation({ text: source.list.allActors, ...translationOptions });
+    const { translated: allCategories } = useTranslation({ text: source.list.allCategories, ...translationOptions });
+    const { translated: loginRequired } = useTranslation({ text: source.list.loginRequired, ...translationOptions });
+    const { translated: loadingComments } = useTranslation({ text: source.list.loading, ...translationOptions });
+    const { translated: emptyComments } = useTranslation({ text: source.list.empty, ...translationOptions });
+    const { translated: selectedCommentLabel } = useTranslation({ text: source.list.selectedCommentLabel, ...translationOptions });
+    const { translated: selectedCommentPreviewTitle } = useTranslation({ text: source.list.selectedCommentPreviewTitle, ...translationOptions });
+    const { translated: replyPlaceholder } = useTranslation({ text: source.list.replyPlaceholder, ...translationOptions });
+    const { translated: replySubmitLabel } = useTranslation({ text: source.list.replySubmit, ...translationOptions });
+    const { translated: redactionSuffix } = useTranslation({ text: source.list.redactionSuffix, ...translationOptions });
+
+    return {
+        categoryOptions: [
+            { value: "BUG", label: categoryBug },
+            { value: "SUGGESTION", label: categorySuggestion },
+            { value: "URGENT", label: categoryUrgent },
+            { value: "INCOMPREHENSION", label: categoryIncomprehension },
+        ] as CommentCategoryOption[],
+        pageTitle,
+        pageDescription,
+        guestHint,
+        newCommentLabel,
+        nameLabel,
+        namePlaceholder,
+        trackingCodeLabel,
+        trackingCodePlaceholder,
+        trackingCodeHint,
+        categoryLabel,
+        commentPlaceholder,
+        authenticatedPrivacyHint,
+        guestPrivacyHint,
+        submittingLabel,
+        submitLabel,
+        savedLabel,
+        savedWithRedactionLabel,
+        trackingCodePrefix,
+        selectCommentBeforeReply,
+        replySaved,
+        savedCommentsTitle,
+        savedCommentsDescription,
+        ownScope,
+        allScope,
+        allActors,
+        allCategories,
+        loginRequired,
+        loadingComments,
+        emptyComments,
+        selectedCommentLabel,
+        selectedCommentPreviewTitle,
+        replyPlaceholder,
+        replySubmitLabel,
+        redactionSuffix,
+    };
 }
 
 export function ClinicianCommentsPage() {
+    const i18n = useContext(HomeI18nContext) || { locale: "fr" };
+    const targetLang = i18n.locale;
+    const ui = useCommentsPageLabels(targetLang);
     const { user, isAuthenticated, status } = useAuth();
     const canReviewAll = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
     const [scope, setScope] = useState<"own" | "all">("own");
@@ -161,8 +246,8 @@ export function ClinicianCommentsPage() {
         }
         setSuccess(
             `${response.data.redactionCount > 0
-                ? "Commentaire enregistre avec obfuscation automatique des identifiants detectes."
-                : "Commentaire enregistre."} Code de suivi: ${response.data.trackingCode || trackingCode}`
+                ? ui.savedWithRedactionLabel
+                : ui.savedLabel} ${ui.trackingCodePrefix} ${response.data.trackingCode || trackingCode}`
         );
 
         if (isAuthenticated) {
@@ -181,7 +266,7 @@ export function ClinicianCommentsPage() {
     async function handleReplySubmit(event: React.FormEvent) {
         event.preventDefault();
         if (!selectedCommentId) {
-            setError("Selectionnez un commentaire avant de repondre.");
+            setError(ui.selectCommentBeforeReply);
             return;
         }
 
@@ -198,7 +283,7 @@ export function ClinicianCommentsPage() {
         }
 
         setReplyMessage("");
-        setSuccess("Reponse enregistree.");
+        setSuccess(ui.replySaved);
         setItems((currentItems) =>
             currentItems.map((item) =>
                 item.id === response.data.id ? response.data : item
@@ -208,23 +293,22 @@ export function ClinicianCommentsPage() {
 
     const selectedComment =
         items.find((item) => item.id === selectedCommentId) || null;
+    const getCategoryLabel = (commentCategory: ClinicianComment["category"]) =>
+        ui.categoryOptions.find((option) => option.value === commentCategory)?.label ||
+        commentCategory;
 
     return (
         <section className="mx-auto max-w-5xl px-4 py-8">
             <div className="mb-6 space-y-2">
                 <h1 className="text-2xl font-semibold text-gray-900">
-                    Commentaires medecins
+                    {ui.pageTitle}
                 </h1>
                 <p className="text-sm text-gray-600">
-                    Utilisez cet espace pour laisser des commentaires de support ou de suivi.
-                    N'inserez jamais de donnees permettant d'identifier un patient. Les
-                    emails, telephones, RAMQ, SSN/NAS et certaines valeurs libellees sont
-                    obfusques automatiquement avant sauvegarde.
+                    {ui.pageDescription}
                 </p>
                 {!isAuthenticated && status !== "loading" && (
                     <p className="text-sm text-amber-700">
-                        Vous pouvez laisser un commentaire sans connexion. Ajoutez simplement
-                        votre nom ou un pseudonyme professionnel.
+                        {ui.guestHint}
                     </p>
                 )}
             </div>
@@ -238,7 +322,7 @@ export function ClinicianCommentsPage() {
                         htmlFor="clinician-comment"
                         className="mb-2 block text-sm font-medium text-gray-800"
                     >
-                        Nouveau commentaire
+                        {ui.newCommentLabel}
                     </label>
                     {!isAuthenticated && (
                         <div className="mb-3 space-y-3">
@@ -246,12 +330,12 @@ export function ClinicianCommentsPage() {
                                 htmlFor="clinician-comment-name"
                                 className="mb-2 block text-sm font-medium text-gray-800"
                             >
-                                Nom ou pseudonyme
+                                {ui.nameLabel}
                             </label>
                             <input
                                 id="clinician-comment-name"
                                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
-                                placeholder="Exemple: dr.lasante"
+                                placeholder={ui.namePlaceholder}
                                 value={guestDisplayName}
                                 onChange={(event) => setGuestDisplayName(event.target.value)}
                                 maxLength={120}
@@ -261,19 +345,18 @@ export function ClinicianCommentsPage() {
                                     htmlFor="clinician-tracking-code"
                                     className="mb-2 block text-sm font-medium text-gray-800"
                                 >
-                                    Code de suivi
+                                    {ui.trackingCodeLabel}
                                 </label>
                                 <input
                                     id="clinician-tracking-code"
                                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
-                                    placeholder="Genere automatiquement au premier commentaire"
+                                    placeholder={ui.trackingCodePlaceholder}
                                     value={trackingCode}
                                     onChange={(event) => setTrackingCode(event.target.value.toUpperCase())}
                                     maxLength={8}
                                 />
                                 <p className="mt-1 text-xs text-gray-500">
-                                    Laissez vide pour recevoir un nouveau code de suivi, ou
-                                    reutilisez votre code actuel pour regrouper vos commentaires.
+                                    {ui.trackingCodeHint}
                                 </p>
                             </div>
                         </div>
@@ -283,7 +366,7 @@ export function ClinicianCommentsPage() {
                             htmlFor="clinician-comment-category"
                             className="mb-2 block text-sm font-medium text-gray-800"
                         >
-                            Type de commentaire
+                            {ui.categoryLabel}
                         </label>
                         <select
                             id="clinician-comment-category"
@@ -295,7 +378,7 @@ export function ClinicianCommentsPage() {
                                 )
                             }
                         >
-                            {COMMENT_CATEGORY_OPTIONS.map((option) => (
+                            {ui.categoryOptions.map((option) => (
                                 <option key={option.value} value={option.value}>
                                     {option.label}
                                 </option>
@@ -305,7 +388,7 @@ export function ClinicianCommentsPage() {
                     <textarea
                         id="clinician-comment"
                         className="min-h-[220px] w-full rounded-lg border border-gray-300 px-3 py-3 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
-                        placeholder="Exemple: Le module de rendez-vous affiche une erreur au moment de confirmer l'horaire. Ne pas inclure de nom de patient, RAMQ, telephone ou email."
+                        placeholder={ui.commentPlaceholder}
                         value={comment}
                         onChange={(event) => setComment(event.target.value)}
                         maxLength={500}
@@ -329,15 +412,15 @@ export function ClinicianCommentsPage() {
                     <div className="mt-4 flex items-center justify-between gap-3">
                         <div className="text-xs text-gray-500">
                             {isAuthenticated
-                                ? "Votre nom d'usager et la date/heure seront sauvegardes avec le commentaire obfusque."
-                                : "Votre nom ou pseudonyme, la date/heure et le commentaire obfusque seront sauvegardes."}
+                                ? ui.authenticatedPrivacyHint
+                                : ui.guestPrivacyHint}
                         </div>
                         <button
                             type="submit"
                             disabled={submitting}
                             className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            {submitting ? "Enregistrement..." : "Enregistrer le commentaire"}
+                            {submitting ? ui.submittingLabel : ui.submitLabel}
                         </button>
                     </div>
                 </form>
@@ -346,11 +429,10 @@ export function ClinicianCommentsPage() {
                     <div className="mb-4 flex items-center justify-between gap-3">
                         <div>
                             <h2 className="text-lg font-semibold text-gray-900">
-                                Commentaires sauvegardes
+                                {ui.savedCommentsTitle}
                             </h2>
                             <p className="text-xs text-gray-500">
-                                Les commentaires sont affiches tels qu'ils ont ete sauvegardes
-                                apres obfuscation.
+                                {ui.savedCommentsDescription}
                             </p>
                         </div>
                         {canReviewAll && (
@@ -360,15 +442,15 @@ export function ClinicianCommentsPage() {
                                     onChange={(event) => setScope(event.target.value as "own" | "all")}
                                     className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
                                 >
-                                    <option value="own">Mes commentaires</option>
-                                    <option value="all">Tous les commentaires</option>
+                                    <option value="own">{ui.ownScope}</option>
+                                    <option value="all">{ui.allScope}</option>
                                 </select>
                                 <select
                                     value={actorUsernameFilter}
                                     onChange={(event) => setActorUsernameFilter(event.target.value)}
                                     className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
                                 >
-                                    <option value="">Tous les noms ou pseudonymes</option>
+                                    <option value="">{ui.allActors}</option>
                                     {availableActorUsernames.map((username) => (
                                         <option key={username} value={username}>
                                             {username}
@@ -380,8 +462,8 @@ export function ClinicianCommentsPage() {
                                     onChange={(event) => setCategoryFilter(event.target.value)}
                                     className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
                                 >
-                                    <option value="">Toutes les categories</option>
-                                    {COMMENT_CATEGORY_OPTIONS.map((option) => (
+                                    <option value="">{ui.allCategories}</option>
+                                    {ui.categoryOptions.map((option) => (
                                         <option key={option.value} value={option.value}>
                                             {option.label}
                                         </option>
@@ -393,13 +475,13 @@ export function ClinicianCommentsPage() {
 
                     {!isAuthenticated ? (
                         <p className="text-sm text-gray-500">
-                            Connectez-vous pour consulter l'historique des commentaires.
+                            {ui.loginRequired}
                         </p>
                     ) : loading ? (
-                        <p className="text-sm text-gray-500">Chargement des commentaires...</p>
+                        <p className="text-sm text-gray-500">{ui.loadingComments}</p>
                     ) : items.length === 0 ? (
                         <p className="text-sm text-gray-500">
-                            Aucun commentaire enregistre pour le moment.
+                            {ui.emptyComments}
                         </p>
                     ) : (
                         <div className="space-y-4">
@@ -410,7 +492,7 @@ export function ClinicianCommentsPage() {
                                 >
                                     <div className="grid gap-3">
                                         <label className="text-sm font-medium text-gray-800">
-                                            Selection du commentaire
+                                            {ui.selectedCommentLabel}
                                         </label>
                                         <select
                                             value={selectedCommentId}
@@ -419,21 +501,21 @@ export function ClinicianCommentsPage() {
                                         >
                                             {items.map((item) => (
                                                 <option key={item.id} value={item.id}>
-                                                    {item.actorUsername} — {getCategoryLabel(item.category)} — {new Date(item.createdAt).toLocaleString("fr-CA")}
+                                                    {item.actorUsername} — {getCategoryLabel(item.category)} — {new Date(item.createdAt).toLocaleString(targetLang)}
                                                 </option>
                                             ))}
                                         </select>
                                         {selectedComment && (
                                             <div className="rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-700">
                                                 <div className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
-                                                    Commentaire selectionne
+                                                    {ui.selectedCommentPreviewTitle}
                                                 </div>
                                                 <p className="whitespace-pre-wrap">{selectedComment.comment}</p>
                                             </div>
                                         )}
                                         <textarea
                                             className="min-h-[120px] rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
-                                            placeholder="Ecrire une reponse au commentaire selectionne..."
+                                            placeholder={ui.replyPlaceholder}
                                             value={replyMessage}
                                             onChange={(event) => setReplyMessage(event.target.value)}
                                             maxLength={500}
@@ -444,7 +526,7 @@ export function ClinicianCommentsPage() {
                                                 disabled={replying || !selectedCommentId}
                                                 className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
                                             >
-                                                {replying ? "Enregistrement..." : "Repondre au commentaire"}
+                                                {replying ? ui.submittingLabel : ui.replySubmitLabel}
                                             </button>
                                         </div>
                                     </div>
@@ -465,11 +547,11 @@ export function ClinicianCommentsPage() {
                                             {getCategoryLabel(item.category)}
                                         </span>
                                         <span>
-                                            {new Date(item.createdAt).toLocaleString("fr-CA")}
+                                            {new Date(item.createdAt).toLocaleString(targetLang)}
                                         </span>
                                         {item.redactionCount > 0 && (
                                             <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-800">
-                                                {item.redactionCount} obfuscation(s)
+                                                {item.redactionCount} {ui.redactionSuffix}
                                             </span>
                                         )}
                                     </div>
@@ -489,7 +571,7 @@ export function ClinicianCommentsPage() {
                                                         </span>
                                                         <span>{reply.responderRole}</span>
                                                         <span>
-                                                            {new Date(reply.createdAt).toLocaleString("fr-CA")}
+                                                            {new Date(reply.createdAt).toLocaleString(targetLang)}
                                                         </span>
                                                     </div>
                                                     <p className="whitespace-pre-wrap text-sm text-gray-800">
