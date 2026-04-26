@@ -47,6 +47,7 @@ const SUPPORTED_UI_LOCALES = [
   "es",
   "ko-KR",
   "vi",
+  "no-NO",
 ] as const;
 type SupportedUiLocale = (typeof SUPPORTED_UI_LOCALES)[number];
 
@@ -64,6 +65,7 @@ const toSupportedUiLocale = (value: string): SupportedUiLocale => {
   if (normalized.startsWith("es")) return "es";
   if (normalized.startsWith("ko")) return "ko-KR";
   if (normalized.startsWith("vi")) return "vi";
+  if (normalized.startsWith("no") || normalized.startsWith("nb") || normalized.startsWith("nn")) return "no-NO";
   return "en-CA";
 };
 
@@ -98,6 +100,7 @@ const VOICE_ACK_LABELS: Record<string, string> = {
   ko: "korean",
   zh: "chinese",
   vi: "vietnamese",
+  no: "norwegian",
   ar: "arabic",
   ru: "russian",
 };
@@ -124,6 +127,7 @@ const DICTATION_PROMPT_BY_LANG: Record<string, string> = {
   vi: "Vui long doc hoac nhap chan doan cua ban.",
   zh: "Qing koushu huo shuru nin de zhenduan.",
   he: "נא להכתיב או להקליד את האבחנה שלך.",
+  no: "Dikter eller skriv diagnosen din.",
 };
 
 const buildDictationPrompt = (localeCode: string) => {

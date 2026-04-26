@@ -294,6 +294,7 @@ const Header: React.FC = () => {
         { value: "es", label: "SPA - Español" },
         { value: "ko-KR", label: "KOR - 한국어 (대한민국)" },
         { value: "vi", label: "VIE - Tiếng Việt" },
+        { value: "no-NO", label: "NOR - Norsk" },
         { value: "ja", label: "JPN - 日本語" },
         { value: "zh", label: "ZHO - 中文（普通话）" },
         { value: "he", label: "HEB - עברית" },

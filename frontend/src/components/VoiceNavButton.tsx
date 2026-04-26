@@ -64,6 +64,12 @@ const LANGUAGE_ALIASES: Record<string, string> = {
     korean: "ko",
     coren: "ko",
     한국어: "ko",
+    norvegien: "no",
+    norvégien: "no",
+    norvegienne: "no",
+    norvégienne: "no",
+    norsk: "no",
+    norwegian: "no",
     // Japanese words for French (common STT outputs)
     フランス語: "fr",
     フランス: "fr",
@@ -235,6 +241,10 @@ const detectLocaleFromTranscript = (transcript: string): string | null => {
                 "korean",
                 "ko",
             ],
+        },
+        {
+            code: "no",
+            tokens: ["norvegien", "norwegian", "norsk", "no"],
         },
     ];
 
@@ -496,6 +506,7 @@ const getRecognitionLang = (localeCode: string) => {
     if (normalized === "pt") return "pt-PT";
     if (normalized === "ja") return "ja-JP";
     if (normalized === "ko") return "ko-KR";
+    if (normalized === "no") return "no-NO";
     if (normalized === "zh") return "zh-CN";
     return "fr-CA";
 };
@@ -509,6 +520,7 @@ const getSpeechSynthesisLang = (localeCode: string) => {
     if (normalized === "pt") return "pt-PT";
     if (normalized === "ja") return "ja-JP";
     if (normalized === "ko") return "ko-KR";
+    if (normalized === "no") return "no-NO";
     if (normalized === "zh") return "zh-CN";
 
     // French: prefer Canadian French when user locale/timezone suggests Canada/Quebec.
