@@ -204,6 +204,72 @@ export const UI_LABELS_FR = {
             pageSeparator: "/",
         },
     },
+    // CliniquesPage.tsx - page /cliniques, création et recherche d'établissements.
+    cliniquesPage: {
+        header: {
+            title: "Gestion des établissements",
+            description:
+                "Créez, modifiez ou supprimez les établissements suivis par ClinIA.",
+        },
+        tabs: {
+            create: "Créer une clinique",
+            search: "Rechercher les cliniques",
+        },
+        validation: {
+            requiredFields:
+                "Les champs 'nom', 'num_civique', 'rue' et 'code_postal' sont requis.",
+            invalidLatitude: "Latitude invalide.",
+            invalidLongitude: "Longitude invalide.",
+        },
+        filters: {
+            title: "Filtres",
+            nameLabel: "Nom",
+            namePlaceholder: "Ex: Clinique Mont-Royal",
+            streetLabel: "Rue",
+            streetPlaceholder: "Ex: Rue Saint-Denis",
+            postalCodeLabel: "Code postal",
+            postalCodePlaceholder: "Ex: H2X 1S1",
+        },
+        table: {
+            name: "Nom",
+            address: "Adresse",
+            postalCode: "Code postal",
+            phone: "Téléphone",
+            email: "Courriel",
+            latitude: "Latitude",
+            longitude: "Longitude",
+            actions: "Actions",
+            empty: "Aucune clinique trouvée.",
+            edit: "Modifier",
+            delete: "Supprimer",
+        },
+        summary: {
+            empty: "Aucune clinique enregistrée",
+            singularSuffix: "clinique",
+            pluralSuffix: "cliniques",
+        },
+        form: {
+            editTitle: "Modifier une clinique",
+            createTitle: "Nouvelle clinique",
+            nameLabel: "Nom de la clinique",
+            civicNumberLabel: "Numéro civique",
+            streetLabel: "Rue",
+            postalCodeLabel: "Code postal",
+            phoneLabel: "Téléphone",
+            emailLabel: "Courriel",
+            latitudeLabel: "Latitude",
+            longitudeLabel: "Longitude",
+            save: "Enregistrer",
+            cancel: "Annuler",
+        },
+        pagination: {
+            loading: "Chargement...",
+            previous: "Précédent",
+            next: "Suivant",
+            pagePrefix: "Page",
+            pageSeparator: "/",
+        },
+    },
 } as const;
 
 export type UiLabelsFr = typeof UI_LABELS_FR;

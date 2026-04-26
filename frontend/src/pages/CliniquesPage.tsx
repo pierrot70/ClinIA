@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
+import { HomeI18nContext } from "../contexts/HomeI18nContext";
+import { useTranslation } from "../hooks/useTranslation";
+import { labels } from "../i18n/uiLabels";
 import {
     createClinique,
     deleteClinique,
@@ -8,6 +11,105 @@ import {
     updateClinique,
 } from "../services/cliniqueApi";
 import type { ApiError } from "../types/api";
+
+function useCliniquesPageLabels(targetLang: string) {
+    const source = labels.cliniquesPage;
+    const options = { targetLang, namespace: "cliniques-page" };
+
+    const { translated: title } = useTranslation({ text: source.header.title, ...options });
+    const { translated: description } = useTranslation({ text: source.header.description, ...options });
+    const { translated: createTab } = useTranslation({ text: source.tabs.create, ...options });
+    const { translated: searchTab } = useTranslation({ text: source.tabs.search, ...options });
+    const { translated: requiredFields } = useTranslation({ text: source.validation.requiredFields, ...options });
+    const { translated: invalidLatitude } = useTranslation({ text: source.validation.invalidLatitude, ...options });
+    const { translated: invalidLongitude } = useTranslation({ text: source.validation.invalidLongitude, ...options });
+    const { translated: filtersTitle } = useTranslation({ text: source.filters.title, ...options });
+    const { translated: filterNameLabel } = useTranslation({ text: source.filters.nameLabel, ...options });
+    const { translated: filterNamePlaceholder } = useTranslation({ text: source.filters.namePlaceholder, ...options });
+    const { translated: filterStreetLabel } = useTranslation({ text: source.filters.streetLabel, ...options });
+    const { translated: filterStreetPlaceholder } = useTranslation({ text: source.filters.streetPlaceholder, ...options });
+    const { translated: filterPostalCodeLabel } = useTranslation({ text: source.filters.postalCodeLabel, ...options });
+    const { translated: filterPostalCodePlaceholder } = useTranslation({ text: source.filters.postalCodePlaceholder, ...options });
+    const { translated: tableName } = useTranslation({ text: source.table.name, ...options });
+    const { translated: tableAddress } = useTranslation({ text: source.table.address, ...options });
+    const { translated: tablePostalCode } = useTranslation({ text: source.table.postalCode, ...options });
+    const { translated: tablePhone } = useTranslation({ text: source.table.phone, ...options });
+    const { translated: tableEmail } = useTranslation({ text: source.table.email, ...options });
+    const { translated: tableLatitude } = useTranslation({ text: source.table.latitude, ...options });
+    const { translated: tableLongitude } = useTranslation({ text: source.table.longitude, ...options });
+    const { translated: tableActions } = useTranslation({ text: source.table.actions, ...options });
+    const { translated: tableEmpty } = useTranslation({ text: source.table.empty, ...options });
+    const { translated: edit } = useTranslation({ text: source.table.edit, ...options });
+    const { translated: deleteLabel } = useTranslation({ text: source.table.delete, ...options });
+    const { translated: summaryEmpty } = useTranslation({ text: source.summary.empty, ...options });
+    const { translated: summarySingularSuffix } = useTranslation({ text: source.summary.singularSuffix, ...options });
+    const { translated: summaryPluralSuffix } = useTranslation({ text: source.summary.pluralSuffix, ...options });
+    const { translated: editTitle } = useTranslation({ text: source.form.editTitle, ...options });
+    const { translated: createTitle } = useTranslation({ text: source.form.createTitle, ...options });
+    const { translated: nameLabel } = useTranslation({ text: source.form.nameLabel, ...options });
+    const { translated: civicNumberLabel } = useTranslation({ text: source.form.civicNumberLabel, ...options });
+    const { translated: streetLabel } = useTranslation({ text: source.form.streetLabel, ...options });
+    const { translated: postalCodeLabel } = useTranslation({ text: source.form.postalCodeLabel, ...options });
+    const { translated: phoneLabel } = useTranslation({ text: source.form.phoneLabel, ...options });
+    const { translated: emailLabel } = useTranslation({ text: source.form.emailLabel, ...options });
+    const { translated: latitudeLabel } = useTranslation({ text: source.form.latitudeLabel, ...options });
+    const { translated: longitudeLabel } = useTranslation({ text: source.form.longitudeLabel, ...options });
+    const { translated: save } = useTranslation({ text: source.form.save, ...options });
+    const { translated: cancel } = useTranslation({ text: source.form.cancel, ...options });
+    const { translated: loading } = useTranslation({ text: source.pagination.loading, ...options });
+    const { translated: previous } = useTranslation({ text: source.pagination.previous, ...options });
+    const { translated: next } = useTranslation({ text: source.pagination.next, ...options });
+    const { translated: pagePrefix } = useTranslation({ text: source.pagination.pagePrefix, ...options });
+    const { translated: pageSeparator } = useTranslation({ text: source.pagination.pageSeparator, ...options });
+
+    return {
+        title,
+        description,
+        createTab,
+        searchTab,
+        requiredFields,
+        invalidLatitude,
+        invalidLongitude,
+        filtersTitle,
+        filterNameLabel,
+        filterNamePlaceholder,
+        filterStreetLabel,
+        filterStreetPlaceholder,
+        filterPostalCodeLabel,
+        filterPostalCodePlaceholder,
+        tableName,
+        tableAddress,
+        tablePostalCode,
+        tablePhone,
+        tableEmail,
+        tableLatitude,
+        tableLongitude,
+        tableActions,
+        tableEmpty,
+        edit,
+        deleteLabel,
+        summaryEmpty,
+        summarySingularSuffix,
+        summaryPluralSuffix,
+        editTitle,
+        createTitle,
+        nameLabel,
+        civicNumberLabel,
+        streetLabel,
+        postalCodeLabel,
+        phoneLabel,
+        emailLabel,
+        latitudeLabel,
+        longitudeLabel,
+        save,
+        cancel,
+        loading,
+        previous,
+        next,
+        pagePrefix,
+        pageSeparator,
+    };
+}
 
 /* ------------------------------------------------------------------ */
 /* Hook debounce                                                       */
@@ -29,6 +131,8 @@ function useDebounce<T>(value: T, delay = 300): T {
 /* ------------------------------------------------------------------ */
 
 export function CliniquesPage() {
+    const i18n = useContext(HomeI18nContext) || { locale: "fr" };
+    const pageLabels = useCliniquesPageLabels(i18n.locale);
     const [cliniques, setCliniques] = useState<Clinique[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
@@ -145,8 +249,7 @@ export function CliniquesPage() {
         if (!trimmedNom || !trimmedNum || !trimmedRue || !trimmedPostal) {
             setError({
                 code: "INVALID_INPUT",
-                message:
-                    "Les champs 'nom', 'num_civique', 'rue' et 'code_postal' sont requis.",
+                message: pageLabels.requiredFields,
                 retryable: false,
             });
             return null;
@@ -164,7 +267,7 @@ export function CliniquesPage() {
             if (!Number.isFinite(latValue)) {
                 setError({
                     code: "INVALID_INPUT",
-                    message: "Latitude invalide.",
+                    message: pageLabels.invalidLatitude,
                     retryable: false,
                 });
                 return null;
@@ -177,7 +280,7 @@ export function CliniquesPage() {
             if (!Number.isFinite(longValue)) {
                 setError({
                     code: "INVALID_INPUT",
-                    message: "Longitude invalide.",
+                    message: pageLabels.invalidLongitude,
                     retryable: false,
                 });
                 return null;
@@ -270,11 +373,10 @@ export function CliniquesPage() {
         <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
             <header className="space-y-2">
                 <h1 className="text-2xl font-semibold text-gray-900">
-                    Gestion des établissements
+                    {pageLabels.title}
                 </h1>
                 <p className="text-sm text-gray-600">
-                    Créez, modifiez ou supprimez les établissements suivis par
-                    ClinIA.
+                    {pageLabels.description}
                 </p>
             </header>
 
@@ -288,7 +390,7 @@ export function CliniquesPage() {
                     }`}
                     onClick={() => setViewMode("create")}
                 >
-                    Créer une clinique
+                    {pageLabels.createTab}
                 </button>
                 <button
                     type="button"
@@ -299,7 +401,7 @@ export function CliniquesPage() {
                     }`}
                     onClick={() => setViewMode("list")}
                 >
-                    Rechercher les cliniques
+                    {pageLabels.searchTab}
                 </button>
             </div>
 
@@ -314,15 +416,15 @@ export function CliniquesPage() {
                 <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                     <div>
                         <p className="text-xs uppercase tracking-wide text-gray-500">
-                            Filtres
+                            {pageLabels.filtersTitle}
                         </p>
                         <div className="grid gap-3 sm:grid-cols-3">
                             <label className="text-sm text-gray-700">
-                                Nom
+                                {pageLabels.filterNameLabel}
                                 <input
                                     type="text"
                                     className="mt-1 w-full rounded border border-gray-200 px-3 py-2 text-sm"
-                                    placeholder="Ex: Clinique Mont-Royal"
+                                    placeholder={pageLabels.filterNamePlaceholder}
                                     value={filterNom}
                                     onChange={(event) =>
                                         setFilterNom(event.target.value)
@@ -330,11 +432,11 @@ export function CliniquesPage() {
                                 />
                             </label>
                             <label className="text-sm text-gray-700">
-                                Rue
+                                {pageLabels.filterStreetLabel}
                                 <input
                                     type="text"
                                     className="mt-1 w-full rounded border border-gray-200 px-3 py-2 text-sm"
-                                    placeholder="Ex: Rue Saint-Denis"
+                                    placeholder={pageLabels.filterStreetPlaceholder}
                                     value={filterRue}
                                     onChange={(event) =>
                                         setFilterRue(event.target.value)
@@ -342,11 +444,11 @@ export function CliniquesPage() {
                                 />
                             </label>
                             <label className="text-sm text-gray-700">
-                                Code postal
+                                {pageLabels.filterPostalCodeLabel}
                                 <input
                                     type="text"
                                     className="mt-1 w-full rounded border border-gray-200 px-3 py-2 text-sm"
-                                    placeholder="Ex: H2X 1S1"
+                                    placeholder={pageLabels.filterPostalCodePlaceholder}
                                     value={filterCodePostal}
                                     onChange={(event) =>
                                         setFilterCodePostal(event.target.value)
@@ -356,7 +458,9 @@ export function CliniquesPage() {
                         </div>
                     </div>
                     <div className="text-sm text-gray-500">
-                        {loading ? "Chargement..." : `Page ${page} / ${totalPages}`}
+                        {loading
+                            ? pageLabels.loading
+                            : `${pageLabels.pagePrefix} ${page} ${pageLabels.pageSeparator} ${totalPages}`}
                     </div>
                 </div>
 
@@ -364,14 +468,14 @@ export function CliniquesPage() {
                     <table className="min-w-full text-left text-sm">
                         <thead>
                             <tr className="text-xs uppercase text-gray-500">
-                                <th className="px-3 py-2">Nom</th>
-                                <th className="px-3 py-2">Adresse</th>
-                                <th className="px-3 py-2">Code postal</th>
-                                <th className="px-3 py-2">Téléphone</th>
-                                <th className="px-3 py-2">Courriel</th>
-                                <th className="px-3 py-2">Latitude</th>
-                                <th className="px-3 py-2">Longitude</th>
-                                <th className="px-3 py-2">Actions</th>
+                                <th className="px-3 py-2">{pageLabels.tableName}</th>
+                                <th className="px-3 py-2">{pageLabels.tableAddress}</th>
+                                <th className="px-3 py-2">{pageLabels.tablePostalCode}</th>
+                                <th className="px-3 py-2">{pageLabels.tablePhone}</th>
+                                <th className="px-3 py-2">{pageLabels.tableEmail}</th>
+                                <th className="px-3 py-2">{pageLabels.tableLatitude}</th>
+                                <th className="px-3 py-2">{pageLabels.tableLongitude}</th>
+                                <th className="px-3 py-2">{pageLabels.tableActions}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -381,7 +485,7 @@ export function CliniquesPage() {
                                         colSpan={8}
                                         className="px-3 py-6 text-center text-sm text-gray-500"
                                     >
-                                        Aucune clinique trouvée.
+                                        {pageLabels.tableEmpty}
                                     </td>
                                 </tr>
                             ) : null}
@@ -418,7 +522,7 @@ export function CliniquesPage() {
                                                     handleEdit(clinique)
                                                 }
                                             >
-                                                Modifier
+                                                {pageLabels.edit}
                                             </button>
                                             <button
                                                 type="button"
@@ -430,7 +534,7 @@ export function CliniquesPage() {
                                                     busyIds[clinique._id]
                                                 )}
                                             >
-                                                Supprimer
+                                                {pageLabels.deleteLabel}
                                             </button>
                                         </div>
                                     </td>
@@ -443,10 +547,12 @@ export function CliniquesPage() {
                 <div className="flex items-center justify-between text-sm text-gray-600">
                     <div>
                         {totalCount
-                            ? `${totalCount} clinique${
-                                  totalCount > 1 ? "s" : ""
+                            ? `${totalCount} ${
+                                  totalCount > 1
+                                      ? pageLabels.summaryPluralSuffix
+                                      : pageLabels.summarySingularSuffix
                               }`
-                            : "Aucune clinique enregistrée"}
+                            : pageLabels.summaryEmpty}
                     </div>
                     <div className="flex gap-2">
                         <button
@@ -457,7 +563,7 @@ export function CliniquesPage() {
                             }
                             disabled={page <= 1 || loading}
                         >
-                            Précédent
+                            {pageLabels.previous}
                         </button>
                         <button
                             type="button"
@@ -467,7 +573,7 @@ export function CliniquesPage() {
                             }
                             disabled={page >= totalPages || loading}
                         >
-                            Suivant
+                            {pageLabels.next}
                         </button>
                     </div>
                 </div>
@@ -477,12 +583,12 @@ export function CliniquesPage() {
             {viewMode === "create" && (
                 <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <h2 className="text-lg font-semibold text-gray-900">
-                    {editingId ? "Modifier une clinique" : "Nouvelle clinique"}
+                    {editingId ? pageLabels.editTitle : pageLabels.createTitle}
                 </h2>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <label className="text-sm text-gray-700">
-                        Nom de la clinique
+                        {pageLabels.nameLabel}
                         <input
                             type="text"
                             value={form.nom}
@@ -496,7 +602,7 @@ export function CliniquesPage() {
                         />
                     </label>
                     <label className="text-sm text-gray-700">
-                        Numéro civique
+                        {pageLabels.civicNumberLabel}
                         <input
                             type="text"
                             value={form.num_civique}
@@ -510,7 +616,7 @@ export function CliniquesPage() {
                         />
                     </label>
                     <label className="text-sm text-gray-700">
-                        Rue
+                        {pageLabels.streetLabel}
                         <input
                             type="text"
                             value={form.rue}
@@ -524,7 +630,7 @@ export function CliniquesPage() {
                         />
                     </label>
                     <label className="text-sm text-gray-700">
-                        Code postal
+                        {pageLabels.postalCodeLabel}
                         <input
                             type="text"
                             value={form.code_postal}
@@ -538,7 +644,7 @@ export function CliniquesPage() {
                         />
                     </label>
                     <label className="text-sm text-gray-700">
-                        Téléphone
+                        {pageLabels.phoneLabel}
                         <input
                             type="text"
                             value={form.telephone}
@@ -552,7 +658,7 @@ export function CliniquesPage() {
                         />
                     </label>
                     <label className="text-sm text-gray-700">
-                        Courriel
+                        {pageLabels.emailLabel}
                         <input
                             type="email"
                             value={form.courriel}
@@ -566,7 +672,7 @@ export function CliniquesPage() {
                         />
                     </label>
                     <label className="text-sm text-gray-700">
-                        Latitude
+                        {pageLabels.latitudeLabel}
                         <input
                             type="number"
                             value={form.lat}
@@ -580,7 +686,7 @@ export function CliniquesPage() {
                         />
                     </label>
                     <label className="text-sm text-gray-700">
-                        Longitude
+                        {pageLabels.longitudeLabel}
                         <input
                             type="number"
                             value={form.long}
@@ -602,7 +708,7 @@ export function CliniquesPage() {
                         disabled={isFormBusy}
                         className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
                     >
-                        Enregistrer
+                        {pageLabels.save}
                     </button>
                     {editingId && (
                         <button
@@ -610,7 +716,7 @@ export function CliniquesPage() {
                             onClick={resetForm}
                             className="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400"
                         >
-                            Annuler
+                            {pageLabels.cancel}
                         </button>
                     )}
                 </div>
