@@ -53,6 +53,20 @@ const criticalLabelFallbacks: Record<string, Record<string, string>> = {
   "Disponibilités": {
     "vi": "Lịch trống",
   },
+  // Libellés techniques des journaux: garder une terminologie anglaise stable
+  // dans les langues où la traduction automatique rend le sens moins clair.
+  "Username masqué": {
+    "default": "Masked username",
+  },
+  "Transport": {
+    "default": "Transport",
+  },
+  "log": {
+    "default": "log",
+  },
+  "logs": {
+    "default": "logs",
+  },
   // Ajoutez ici d'autres labels critiques si besoin
 };
 

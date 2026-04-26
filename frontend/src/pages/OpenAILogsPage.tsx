@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { HomeI18nContext } from "../contexts/HomeI18nContext";
+import { useTranslation } from "../hooks/useTranslation";
+import { labels } from "../i18n/uiLabels";
 import {
     exportOpenAILogsCsv,
     fetchOpenAILogs,
@@ -21,6 +24,78 @@ const ERROR_CODE_OPTIONS = [
     "SECURITY_IDENTIFIER_DETECTED",
 ] as const;
 const PAGE_LIMIT = 20;
+
+function useOpenAiLogsLabels(targetLang: string) {
+    const source = labels.openAiLogs;
+    const options = { targetLang, namespace: "openai-logs" };
+
+    const entries = {
+        title: source.title,
+        description: source.description,
+        action: source.filters.action,
+        result: source.filters.result,
+        maskedUsername: source.filters.maskedUsername,
+        role: source.filters.role,
+        actorUserId: source.filters.actorUserId,
+        ip: source.filters.ip,
+        requestPath: source.filters.requestPath,
+        transport: source.filters.transport,
+        model: source.filters.model,
+        payloadHash: source.filters.payloadHash,
+        payloadSizeBytes: source.filters.payloadSizeBytes,
+        classification: source.filters.classification,
+        incidentAckId: source.filters.incidentAckId,
+        neutralized: source.filters.neutralized,
+        upstreamRequestId: source.filters.upstreamRequestId,
+        errorCode: source.filters.errorCode,
+        startDate: source.filters.startDate,
+        endDate: source.filters.endDate,
+        all: source.filters.all,
+        allFeminine: source.filters.allFeminine,
+        search: source.actions.search,
+        recentClinicalErrors: source.actions.recentClinicalErrors,
+        refresh: source.actions.refresh,
+        reset: source.actions.reset,
+        exportCsv: source.actions.exportCsv,
+        exportCsvLoading: source.actions.exportCsvLoading,
+        loading: source.status.loading,
+        loadingLogs: source.status.loadingLogs,
+        noLogs: source.status.noLogs,
+        exportTruncated: source.status.exportTruncated,
+        exportCsvFailed: source.status.exportCsvFailed,
+        logSingular: source.status.logSingular,
+        logPlural: source.status.logPlural,
+        yes: source.status.yes,
+        no: source.status.no,
+        neutralizedPrefix: source.status.neutralizedPrefix,
+        unknownActor: source.status.unknownActor,
+        bytesSuffix: source.status.bytesSuffix,
+        date: source.table.date,
+        tableAction: source.table.action,
+        tableResult: source.table.result,
+        actor: source.table.actor,
+        tableIp: source.table.ip,
+        tableModel: source.table.model,
+        payload: source.table.payload,
+        tableClassification: source.table.classification,
+        context: source.table.context,
+        route: source.table.route,
+        error: source.table.error,
+        previous: source.pagination.previous,
+        next: source.pagination.next,
+        pagePrefix: source.pagination.pagePrefix,
+        pageSeparator: source.pagination.pageSeparator,
+    };
+
+    const translatedEntries = Object.fromEntries(
+        Object.entries(entries).map(([key, text]) => [
+            key,
+            useTranslation({ text, ...options }).translated,
+        ])
+    ) as Record<keyof typeof entries, string>;
+
+    return translatedEntries;
+}
 
 function getLocalDateInputValue() {
     const now = new Date();
@@ -59,6 +134,8 @@ function downloadBlob(blob: Blob, fileName: string) {
 }
 
 export function OpenAILogsPage() {
+    const i18n = useContext(HomeI18nContext) || { locale: "fr" };
+    const pageLabels = useOpenAiLogsLabels(i18n.locale);
     const [searchParams, setSearchParams] = useSearchParams();
     const [logs, setLogs] = useState<OpenAILogEntry[]>([]);
     const [loading, setLoading] = useState(false);
@@ -227,7 +304,7 @@ export function OpenAILogsPage() {
             downloadBlob(blob, `openai-logs-${timestamp}.csv`);
             setExportTruncated(truncated);
         } catch (err) {
-            setExportError(err instanceof Error ? err.message : "Impossible d'exporter le CSV.");
+            setExportError(err instanceof Error ? err.message : pageLabels.exportCsvFailed);
         } finally {
             setExporting(false);
         }
@@ -236,16 +313,16 @@ export function OpenAILogsPage() {
     return (
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
             <header className="space-y-2">
-                <h1 className="text-2xl font-semibold text-gray-900">OpenAI logs</h1>
+                <h1 className="text-2xl font-semibold text-gray-900">{pageLabels.title}</h1>
                 <p className="text-sm text-gray-600 max-w-4xl">
-                    Consultez les requetes anonymisees envoyees a OpenAI, avec filtres persistants dans l'URL et export CSV base sur les memes criteres.
+                    {pageLabels.description}
                 </p>
             </header>
 
             <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
                     <label className="text-sm text-gray-700">
-                        Action
+                        {pageLabels.action}
                         <select
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={draftFilters.action}
@@ -253,14 +330,14 @@ export function OpenAILogsPage() {
                         >
                             {ACTION_OPTIONS.map((option) => (
                                 <option key={option || "all-actions"} value={option}>
-                                    {option || "Toutes"}
+                                    {option || pageLabels.allFeminine}
                                 </option>
                             ))}
                         </select>
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Resultat
+                        {pageLabels.result}
                         <select
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={draftFilters.outcome}
@@ -268,14 +345,14 @@ export function OpenAILogsPage() {
                         >
                             {OUTCOME_OPTIONS.map((option) => (
                                 <option key={option || "all-outcomes"} value={option}>
-                                    {option || "Tous"}
+                                    {option || pageLabels.all}
                                 </option>
                             ))}
                         </select>
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Username masque
+                        {pageLabels.maskedUsername}
                         <input
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={draftFilters.actorUsernameMasked}
@@ -285,7 +362,7 @@ export function OpenAILogsPage() {
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Role
+                        {pageLabels.role}
                         <select
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={draftFilters.actorRole}
@@ -293,14 +370,14 @@ export function OpenAILogsPage() {
                         >
                             {ROLE_OPTIONS.map((option) => (
                                 <option key={option || "all-roles"} value={option}>
-                                    {option || "Tous"}
+                                    {option || pageLabels.all}
                                 </option>
                             ))}
                         </select>
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Actor user ID
+                        {pageLabels.actorUserId}
                         <input
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={draftFilters.actorUserId}
@@ -320,7 +397,7 @@ export function OpenAILogsPage() {
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Request path
+                        {pageLabels.requestPath}
                         <input
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={draftFilters.requestPath}
@@ -340,7 +417,7 @@ export function OpenAILogsPage() {
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Modele
+                        {pageLabels.model}
                         <input
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={draftFilters.model}
@@ -350,7 +427,7 @@ export function OpenAILogsPage() {
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Payload hash
+                        {pageLabels.payloadHash}
                         <input
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={draftFilters.payloadHash}
@@ -360,7 +437,7 @@ export function OpenAILogsPage() {
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Payload size bytes
+                        {pageLabels.payloadSizeBytes}
                         <input
                             type="number"
                             min="0"
@@ -371,7 +448,7 @@ export function OpenAILogsPage() {
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Classification
+                        {pageLabels.classification}
                         <select
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={draftFilters.dataClassification}
@@ -379,14 +456,14 @@ export function OpenAILogsPage() {
                         >
                             {CLASSIFICATION_OPTIONS.map((option) => (
                                 <option key={option || "all-classifications"} value={option}>
-                                    {option || "Toutes"}
+                                    {option || pageLabels.allFeminine}
                                 </option>
                             ))}
                         </select>
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Incident ack id
+                        {pageLabels.incidentAckId}
                         <input
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={draftFilters.acknowledgmentIncidentId}
@@ -396,7 +473,7 @@ export function OpenAILogsPage() {
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Neutralized
+                        {pageLabels.neutralized}
                         <select
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={draftFilters.neutralized}
@@ -404,14 +481,14 @@ export function OpenAILogsPage() {
                         >
                             {NEUTRALIZED_OPTIONS.map((option) => (
                                 <option key={option || "all-neutralized"} value={option}>
-                                    {option || "Tous"}
+                                    {option || pageLabels.all}
                                 </option>
                             ))}
                         </select>
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Upstream request id
+                        {pageLabels.upstreamRequestId}
                         <input
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={draftFilters.upstreamRequestId}
@@ -421,7 +498,7 @@ export function OpenAILogsPage() {
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Error code
+                        {pageLabels.errorCode}
                         <select
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={draftFilters.errorCode}
@@ -429,14 +506,14 @@ export function OpenAILogsPage() {
                         >
                             {ERROR_CODE_OPTIONS.map((option) => (
                                 <option key={option || "all-error-codes"} value={option}>
-                                    {option || "Tous"}
+                                    {option || pageLabels.all}
                                 </option>
                             ))}
                         </select>
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Date debut
+                        {pageLabels.startDate}
                         <input
                             type="date"
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
@@ -447,7 +524,7 @@ export function OpenAILogsPage() {
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Date fin
+                        {pageLabels.endDate}
                         <input
                             type="date"
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
@@ -464,28 +541,28 @@ export function OpenAILogsPage() {
                         onClick={applyFilters}
                         className="rounded bg-gray-900 px-4 py-2 font-medium text-white hover:bg-gray-800"
                     >
-                        Rechercher
+                        {pageLabels.search}
                     </button>
                     <button
                         type="button"
                         onClick={applyRecentClinicalErrorsPreset}
                         className="rounded border border-amber-300 bg-amber-50 px-4 py-2 font-medium text-amber-900 hover:bg-amber-100"
                     >
-                        Afficher seulement les erreurs cliniques recentes
+                        {pageLabels.recentClinicalErrors}
                     </button>
                     <button
                         type="button"
                         onClick={() => void loadLogs()}
                         className="rounded border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:border-gray-400"
                     >
-                        Actualiser
+                        {pageLabels.refresh}
                     </button>
                     <button
                         type="button"
                         onClick={resetFilters}
                         className="rounded border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:border-gray-400"
                     >
-                        Reinitialiser
+                        {pageLabels.reset}
                     </button>
                     <button
                         type="button"
@@ -493,10 +570,12 @@ export function OpenAILogsPage() {
                         disabled={exporting}
                         className="rounded border border-emerald-300 bg-emerald-50 px-4 py-2 font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
                     >
-                        {exporting ? "Export CSV..." : "Exporter CSV"}
+                        {exporting ? pageLabels.exportCsvLoading : pageLabels.exportCsv}
                     </button>
                     <span className="text-gray-500">
-                        {loading ? "Chargement..." : `${total} log${total > 1 ? "s" : ""}`}
+                        {loading
+                            ? pageLabels.loading
+                            : `${total} ${total > 1 ? pageLabels.logPlural : pageLabels.logSingular}`}
                     </span>
                 </div>
 
@@ -514,7 +593,7 @@ export function OpenAILogsPage() {
 
                 {exportTruncated && (
                     <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                        L'export CSV a ete tronque a 10000 lignes maximum.
+                        {pageLabels.exportTruncated}
                     </div>
                 )}
             </section>
@@ -524,24 +603,24 @@ export function OpenAILogsPage() {
                     <table className="min-w-full text-left text-sm">
                         <thead className="bg-gray-50 text-gray-600">
                             <tr>
-                                <th className="px-4 py-3">Date</th>
-                                <th className="px-4 py-3">Action</th>
-                                <th className="px-4 py-3">Resultat</th>
-                                <th className="px-4 py-3">Acteur</th>
-                                <th className="px-4 py-3">IP</th>
-                                <th className="px-4 py-3">Modele</th>
-                                <th className="px-4 py-3">Payload</th>
-                                <th className="px-4 py-3">Classification</th>
-                                <th className="px-4 py-3">Contexte</th>
-                                <th className="px-4 py-3">Route</th>
-                                <th className="px-4 py-3">Erreur</th>
+                                <th className="px-4 py-3">{pageLabels.date}</th>
+                                <th className="px-4 py-3">{pageLabels.tableAction}</th>
+                                <th className="px-4 py-3">{pageLabels.tableResult}</th>
+                                <th className="px-4 py-3">{pageLabels.actor}</th>
+                                <th className="px-4 py-3">{pageLabels.tableIp}</th>
+                                <th className="px-4 py-3">{pageLabels.tableModel}</th>
+                                <th className="px-4 py-3">{pageLabels.payload}</th>
+                                <th className="px-4 py-3">{pageLabels.tableClassification}</th>
+                                <th className="px-4 py-3">{pageLabels.context}</th>
+                                <th className="px-4 py-3">{pageLabels.route}</th>
+                                <th className="px-4 py-3">{pageLabels.error}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading && (
                                 <tr>
                                     <td className="px-4 py-6 text-gray-500" colSpan={11}>
-                                        Chargement des journaux OpenAI...
+                                        {pageLabels.loadingLogs}
                                     </td>
                                 </tr>
                             )}
@@ -549,7 +628,7 @@ export function OpenAILogsPage() {
                             {!loading && logs.length === 0 && (
                                 <tr>
                                     <td className="px-4 py-6 text-gray-500" colSpan={11}>
-                                        Aucun journal OpenAI trouve.
+                                        {pageLabels.noLogs}
                                     </td>
                                 </tr>
                             )}
@@ -567,7 +646,7 @@ export function OpenAILogsPage() {
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-gray-700">
-                                            <div>{log.actorUsernameMasked || "unknown"}</div>
+                                            <div>{log.actorUsernameMasked || pageLabels.unknownActor}</div>
                                             <div className="text-xs text-gray-500">{log.actorRole || "-"}</div>
                                             <div className="text-xs text-gray-500 break-all">{log.actorUserId || "-"}</div>
                                         </td>
@@ -575,12 +654,12 @@ export function OpenAILogsPage() {
                                         <td className="px-4 py-3 text-gray-700">{log.model || "-"}</td>
                                         <td className="px-4 py-3 text-gray-700">
                                             <div className="break-all">{log.payloadHash || "-"}</div>
-                                            <div className="text-xs text-gray-500">{log.payloadSizeBytes} B</div>
+                                            <div className="text-xs text-gray-500">{log.payloadSizeBytes} {pageLabels.bytesSuffix}</div>
                                         </td>
                                         <td className="px-4 py-3 text-gray-700">
                                             <div>{log.dataClassification || "-"}</div>
                                             <div className="text-xs text-gray-500">
-                                                Neutralise: {log.neutralized ? "Oui" : "Non"}
+                                                {pageLabels.neutralizedPrefix} {log.neutralized ? pageLabels.yes : pageLabels.no}
                                             </div>
                                             <div className="text-xs text-gray-500 break-all">
                                                 {log.acknowledgmentIncidentId || "-"}
@@ -601,7 +680,7 @@ export function OpenAILogsPage() {
 
                 <div className="flex items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 text-sm text-gray-600">
                     <span>
-                        Page {filters.page} / {Math.max(1, totalPages)}
+                        {pageLabels.pagePrefix} {filters.page} {pageLabels.pageSeparator} {Math.max(1, totalPages)}
                     </span>
                     <div className="flex items-center gap-2">
                         <button
@@ -610,7 +689,7 @@ export function OpenAILogsPage() {
                             disabled={filters.page <= 1 || loading}
                             className="rounded border border-gray-300 px-3 py-1.5 disabled:opacity-50"
                         >
-                            Precedent
+                            {pageLabels.previous}
                         </button>
                         <button
                             type="button"
@@ -618,7 +697,7 @@ export function OpenAILogsPage() {
                             disabled={filters.page >= totalPages || loading}
                             className="rounded border border-gray-300 px-3 py-1.5 disabled:opacity-50"
                         >
-                            Suivant
+                            {pageLabels.next}
                         </button>
                     </div>
                 </div>

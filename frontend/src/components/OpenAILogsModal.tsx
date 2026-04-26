@@ -1,5 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { HomeI18nContext } from "../contexts/HomeI18nContext";
+import { useTranslation } from "../hooks/useTranslation";
+import { labels } from "../i18n/uiLabels";
 import { SessionExpiredError } from "../services/authService";
 
 type OpenAILogEntry = {
@@ -94,20 +97,95 @@ const ERROR_CODE_OPTIONS = [
     "SECURITY_IDENTIFIER_DETECTED",
 ];
 
+function useOpenAiLogsModalLabels(targetLang: string) {
+    const source = labels.openAiLogs;
+    const options = { targetLang, namespace: "openai-logs-modal" };
+    const entries = {
+        title: source.title,
+        modalDescription: source.modalDescription,
+        openDedicatedPage: source.openDedicatedPage,
+        queryTimePrefix: source.queryTimePrefix,
+        close: source.close,
+        startDate: source.filters.startDate,
+        endDate: source.filters.endDate,
+        action: source.filters.action,
+        result: source.filters.result,
+        actorUserId: source.filters.actorUserId,
+        maskedUsername: source.filters.maskedUsername,
+        role: source.filters.role,
+        ip: source.filters.ip,
+        requestPath: source.filters.requestPath,
+        transport: source.filters.transport,
+        model: source.filters.model,
+        payloadHash: source.filters.payloadHash,
+        payloadSizeBytes: source.filters.payloadSizeBytes,
+        classification: source.filters.classification,
+        incidentAckId: source.filters.incidentAckId,
+        neutralized: source.filters.neutralized,
+        upstreamRequestId: source.filters.upstreamRequestId,
+        errorCode: source.filters.errorCode,
+        all: source.filters.all,
+        allFeminine: source.filters.allFeminine,
+        search: source.actions.search,
+        recentClinicalErrors: source.actions.recentClinicalErrors,
+        reset: source.actions.reset,
+        loadingLogs: source.status.loadingLogs,
+        noResult: source.status.noResult,
+        invalidDateRange: source.status.invalidDateRange,
+        loadFailed: source.status.loadFailed,
+        networkLoadFailed: source.status.networkLoadFailed,
+        unknownTimestamp: source.status.unknownTimestamp,
+        invalidTimestamp: source.status.invalidTimestamp,
+        yes: source.status.yes,
+        no: source.status.no,
+        bytesSuffix: source.status.bytesSuffix,
+        date: source.table.date,
+        tableAction: source.table.action,
+        tableResult: source.table.result,
+        user: source.table.user,
+        tableRole: source.table.role,
+        tableIp: source.table.ip,
+        tableModel: source.table.model,
+        tableNeutralized: source.table.neutralized,
+        payload: source.table.payload,
+        path: source.table.path,
+        tableTransport: source.table.transport,
+        tableClassification: source.table.classification,
+        upstream: source.table.upstream,
+        error: source.table.error,
+        context: source.table.context,
+        first: source.pagination.first,
+        previousSymbol: source.pagination.previousSymbol,
+        nextSymbol: source.pagination.nextSymbol,
+        last: source.pagination.last,
+        pagePrefix: source.pagination.pagePrefix,
+        pageSeparator: source.pagination.pageSeparator,
+        dashSeparator: source.pagination.dashSeparator,
+        resultSuffix: source.pagination.resultSuffix,
+    };
+
+    return Object.fromEntries(
+        Object.entries(entries).map(([key, text]) => [
+            key,
+            useTranslation({ text, ...options }).translated,
+        ])
+    ) as Record<keyof typeof entries, string>;
+}
+
 function getLocalDateInputValue() {
     const now = new Date();
     const timezoneOffsetMs = now.getTimezoneOffset() * 60 * 1000;
     return new Date(now.getTime() - timezoneOffsetMs).toISOString().slice(0, 10);
 }
 
-function formatTimestamp(value: string) {
+function formatTimestamp(value: string, labelsText: { unknownTimestamp: string; invalidTimestamp: string }) {
     if (!value) {
-        return "Inconnu";
+        return labelsText.unknownTimestamp;
     }
 
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
-        return "Invalide";
+        return labelsText.invalidTimestamp;
     }
 
     return date.toLocaleString();
@@ -129,6 +207,8 @@ export function OpenAILogsModal({
     authFetch,
     onSessionExpired,
 }: OpenAILogsModalProps) {
+    const i18n = useContext(HomeI18nContext) || { locale: "fr" };
+    const modalLabels = useOpenAiLogsModalLabels(i18n.locale);
     const [filters, setFilters] = useState<OpenAILogFilters>(EMPTY_FILTERS);
     const [logs, setLogs] = useState<OpenAILogEntry[]>([]);
     const [loading, setLoading] = useState(false);
@@ -160,7 +240,7 @@ export function OpenAILogsModal({
             activeFilters.endDate &&
             activeFilters.startDate > activeFilters.endDate
         ) {
-            setError("Date debut ne peut pas etre plus grande que Date fin.");
+            setError(modalLabels.invalidDateRange);
             setLogs([]);
             setPagination((current) => ({ ...current, page: 1, total: 0, totalPages: 1 }));
             setQueryDurationMs(null);
@@ -190,7 +270,7 @@ export function OpenAILogsModal({
             if (!response.ok) {
                 setError(
                     payload?.error?.message ||
-                        "Impossible de charger les journaux OpenAI."
+                        modalLabels.loadFailed
                 );
                 setLogs([]);
                 setQueryDurationMs(Math.round(performance.now() - startedAt));
@@ -215,7 +295,7 @@ export function OpenAILogsModal({
                 return;
             }
 
-            setError("Erreur reseau lors du chargement des journaux OpenAI.");
+            setError(modalLabels.networkLoadFailed);
             setLogs([]);
             setQueryDurationMs(Math.round(performance.now() - startedAt));
         } finally {
@@ -259,22 +339,22 @@ export function OpenAILogsModal({
                 <div className="w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                         <div>
-                            <h2 className="text-lg font-semibold text-gray-900">OpenAI logs</h2>
+                            <h2 className="text-lg font-semibold text-gray-900">{modalLabels.title}</h2>
                             <p className="text-xs text-gray-500">
-                                Consultation en lecture seule des envois anonymises vers OpenAI.
+                                {modalLabels.modalDescription}
                             </p>
                             <Link
                                 to="/admin/openai-logs"
                                 onClick={onClose}
                                 className="mt-2 inline-flex text-xs font-medium text-sky-700 hover:text-sky-800"
                             >
-                                Ouvrir la page dediee
+                                {modalLabels.openDedicatedPage}
                             </Link>
                         </div>
                         <div className="flex items-center gap-3">
                             {queryDurationMs !== null && (
                                 <span className="text-xs text-gray-500">
-                                    Temps requete: {queryDurationMs} ms
+                                    {modalLabels.queryTimePrefix} {queryDurationMs} ms
                                 </span>
                             )}
                             <button
@@ -282,14 +362,14 @@ export function OpenAILogsModal({
                                 onClick={onClose}
                                 className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
                             >
-                                Fermer
+                                {modalLabels.close}
                             </button>
                         </div>
                     </div>
 
                     <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                         <label className="text-sm text-gray-700">
-                            Date debut
+                            {modalLabels.startDate}
                             <input
                                 type="date"
                                 value={filters.startDate}
@@ -302,7 +382,7 @@ export function OpenAILogsModal({
                             />
                         </label>
                         <label className="text-sm text-gray-700">
-                            Date fin
+                            {modalLabels.endDate}
                             <input
                                 type="date"
                                 value={filters.endDate}
@@ -315,7 +395,7 @@ export function OpenAILogsModal({
                             />
                         </label>
                         <label className="text-sm text-gray-700">
-                            Action
+                            {modalLabels.action}
                             <select
                                 value={filters.action}
                                 onChange={(event) => setFilters((current) => ({
@@ -326,13 +406,13 @@ export function OpenAILogsModal({
                             >
                                 {ACTION_OPTIONS.map((option) => (
                                     <option key={option || "ALL_ACTIONS"} value={option}>
-                                        {option || "Toutes"}
+                                        {option || modalLabels.allFeminine}
                                     </option>
                                 ))}
                             </select>
                         </label>
                         <label className="text-sm text-gray-700">
-                            Resultat
+                            {modalLabels.result}
                             <select
                                 value={filters.outcome}
                                 onChange={(event) => setFilters((current) => ({
@@ -343,13 +423,13 @@ export function OpenAILogsModal({
                             >
                                 {OUTCOME_OPTIONS.map((option) => (
                                     <option key={option || "ALL_OUTCOMES"} value={option}>
-                                        {option || "Tous"}
+                                        {option || modalLabels.all}
                                     </option>
                                 ))}
                             </select>
                         </label>
                         <label className="text-sm text-gray-700">
-                            Actor user id
+                            {modalLabels.actorUserId}
                             <input
                                 type="text"
                                 value={filters.actorUserId}
@@ -361,7 +441,7 @@ export function OpenAILogsModal({
                             />
                         </label>
                         <label className="text-sm text-gray-700">
-                            Username masque
+                            {modalLabels.maskedUsername}
                             <input
                                 type="text"
                                 value={filters.actorUsernameMasked}
@@ -373,7 +453,7 @@ export function OpenAILogsModal({
                             />
                         </label>
                         <label className="text-sm text-gray-700">
-                            Role
+                            {modalLabels.role}
                             <select
                                 value={filters.actorRole}
                                 onChange={(event) => setFilters((current) => ({
@@ -384,7 +464,7 @@ export function OpenAILogsModal({
                             >
                                 {ROLE_OPTIONS.map((option) => (
                                     <option key={option || "ALL_ROLES"} value={option}>
-                                        {option || "Tous"}
+                                        {option || modalLabels.all}
                                     </option>
                                 ))}
                             </select>
@@ -402,7 +482,7 @@ export function OpenAILogsModal({
                             />
                         </label>
                         <label className="text-sm text-gray-700">
-                            Request path
+                            {modalLabels.requestPath}
                             <input
                                 type="text"
                                 value={filters.requestPath}
@@ -426,7 +506,7 @@ export function OpenAILogsModal({
                             />
                         </label>
                         <label className="text-sm text-gray-700">
-                            Model
+                            {modalLabels.model}
                             <input
                                 type="text"
                                 value={filters.model}
@@ -438,7 +518,7 @@ export function OpenAILogsModal({
                             />
                         </label>
                         <label className="text-sm text-gray-700">
-                            Payload hash
+                            {modalLabels.payloadHash}
                             <input
                                 type="text"
                                 value={filters.payloadHash}
@@ -450,7 +530,7 @@ export function OpenAILogsModal({
                             />
                         </label>
                         <label className="text-sm text-gray-700">
-                            Payload size bytes
+                            {modalLabels.payloadSizeBytes}
                             <input
                                 type="number"
                                 min="0"
@@ -463,7 +543,7 @@ export function OpenAILogsModal({
                             />
                         </label>
                         <label className="text-sm text-gray-700">
-                            Classification
+                            {modalLabels.classification}
                             <select
                                 value={filters.dataClassification}
                                 onChange={(event) => setFilters((current) => ({
@@ -474,13 +554,13 @@ export function OpenAILogsModal({
                             >
                                 {CLASSIFICATION_OPTIONS.map((option) => (
                                     <option key={option || "ALL_CLASSIFICATIONS"} value={option}>
-                                        {option || "Toutes"}
+                                        {option || modalLabels.allFeminine}
                                     </option>
                                 ))}
                             </select>
                         </label>
                         <label className="text-sm text-gray-700">
-                            Incident ack id
+                            {modalLabels.incidentAckId}
                             <input
                                 type="text"
                                 value={filters.acknowledgmentIncidentId}
@@ -492,7 +572,7 @@ export function OpenAILogsModal({
                             />
                         </label>
                         <label className="text-sm text-gray-700">
-                            Neutralized
+                            {modalLabels.neutralized}
                             <select
                                 value={filters.neutralized}
                                 onChange={(event) => setFilters((current) => ({
@@ -503,13 +583,13 @@ export function OpenAILogsModal({
                             >
                                 {NEUTRALIZED_OPTIONS.map((option) => (
                                     <option key={option || "ALL_NEUTRALIZED"} value={option}>
-                                        {option || "Tous"}
+                                        {option || modalLabels.all}
                                     </option>
                                 ))}
                             </select>
                         </label>
                         <label className="text-sm text-gray-700">
-                            Upstream request id
+                            {modalLabels.upstreamRequestId}
                             <input
                                 type="text"
                                 value={filters.upstreamRequestId}
@@ -521,7 +601,7 @@ export function OpenAILogsModal({
                             />
                         </label>
                         <label className="text-sm text-gray-700">
-                            Error code
+                            {modalLabels.errorCode}
                             <select
                                 value={filters.errorCode}
                                 onChange={(event) => setFilters((current) => ({
@@ -532,7 +612,7 @@ export function OpenAILogsModal({
                             >
                                 {ERROR_CODE_OPTIONS.map((option) => (
                                     <option key={option || "ALL_ERROR_CODES"} value={option}>
-                                        {option || "Tous"}
+                                        {option || modalLabels.all}
                                     </option>
                                 ))}
                             </select>
@@ -547,14 +627,14 @@ export function OpenAILogsModal({
                             }}
                             className="rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
                         >
-                            Rechercher
+                            {modalLabels.search}
                         </button>
                         <button
                             type="button"
                             onClick={applyRecentClinicalErrorsPreset}
                             className="rounded border border-amber-300 bg-amber-50 px-3 py-1 text-sm text-amber-900 hover:bg-amber-100"
                         >
-                            Afficher seulement les erreurs cliniques recentes
+                            {modalLabels.recentClinicalErrors}
                         </button>
                         <button
                             type="button"
@@ -566,7 +646,7 @@ export function OpenAILogsModal({
                             }}
                             className="rounded bg-gray-50 px-3 py-1 text-sm text-gray-700 hover:bg-gray-100"
                         >
-                            Reinitialiser
+                            {modalLabels.reset}
                         </button>
                     </div>
 
@@ -576,42 +656,42 @@ export function OpenAILogsModal({
                                 className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700"
                                 aria-hidden="true"
                             />
-                            <span>Chargement des journaux OpenAI...</span>
+                            <span>{modalLabels.loadingLogs}</span>
                         </div>
                     ) : error ? (
                         <div className="rounded bg-red-50 p-3 text-sm text-red-700">
                             {error}
                         </div>
                     ) : logs.length === 0 ? (
-                        <p className="text-sm text-gray-500">Aucun resultat.</p>
+                        <p className="text-sm text-gray-500">{modalLabels.noResult}</p>
                     ) : (
                         <>
                             <div className="max-h-[420px] overflow-auto rounded border border-gray-200">
                                 <table className="min-w-full border-collapse text-left text-xs sm:text-sm">
                                     <thead className="bg-gray-50 text-gray-600">
                                         <tr>
-                                            <th className="px-3 py-2">Date</th>
-                                            <th className="px-3 py-2">Action</th>
-                                            <th className="px-3 py-2">Resultat</th>
-                                            <th className="px-3 py-2">Usager</th>
-                                            <th className="px-3 py-2">Role</th>
-                                            <th className="px-3 py-2">IP</th>
-                                            <th className="px-3 py-2">Modele</th>
-                                            <th className="px-3 py-2">Neutralise</th>
-                                            <th className="px-3 py-2">Payload</th>
-                                            <th className="px-3 py-2">Path</th>
-                                            <th className="px-3 py-2">Transport</th>
-                                            <th className="px-3 py-2">Classification</th>
-                                            <th className="px-3 py-2">Upstream</th>
-                                            <th className="px-3 py-2">Erreur</th>
-                                            <th className="px-3 py-2">Contexte</th>
+                                            <th className="px-3 py-2">{modalLabels.date}</th>
+                                            <th className="px-3 py-2">{modalLabels.tableAction}</th>
+                                            <th className="px-3 py-2">{modalLabels.tableResult}</th>
+                                            <th className="px-3 py-2">{modalLabels.user}</th>
+                                            <th className="px-3 py-2">{modalLabels.tableRole}</th>
+                                            <th className="px-3 py-2">{modalLabels.tableIp}</th>
+                                            <th className="px-3 py-2">{modalLabels.tableModel}</th>
+                                            <th className="px-3 py-2">{modalLabels.tableNeutralized}</th>
+                                            <th className="px-3 py-2">{modalLabels.payload}</th>
+                                            <th className="px-3 py-2">{modalLabels.path}</th>
+                                            <th className="px-3 py-2">{modalLabels.tableTransport}</th>
+                                            <th className="px-3 py-2">{modalLabels.tableClassification}</th>
+                                            <th className="px-3 py-2">{modalLabels.upstream}</th>
+                                            <th className="px-3 py-2">{modalLabels.error}</th>
+                                            <th className="px-3 py-2">{modalLabels.context}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {logs.map((log) => (
                                             <tr key={log.id} className="border-t border-gray-100 align-top">
                                                 <td className="whitespace-nowrap px-3 py-2 text-gray-700">
-                                                    {formatTimestamp(log.timestamp)}
+                                                    {formatTimestamp(log.timestamp, modalLabels)}
                                                 </td>
                                                 <td className="px-3 py-2 text-gray-800">{log.action || "-"}</td>
                                                 <td className="px-3 py-2 text-gray-800">{log.outcome || "-"}</td>
@@ -624,10 +704,10 @@ export function OpenAILogsModal({
                                                 <td className="px-3 py-2 text-gray-700">{log.actorRole || "-"}</td>
                                                 <td className="px-3 py-2 text-gray-700">{log.ip || "-"}</td>
                                                 <td className="px-3 py-2 text-gray-700">{log.model || "-"}</td>
-                                                <td className="px-3 py-2 text-gray-700">{log.neutralized ? "Oui" : "Non"}</td>
+                                                <td className="px-3 py-2 text-gray-700">{log.neutralized ? modalLabels.yes : modalLabels.no}</td>
                                                 <td className="px-3 py-2 text-gray-700">
                                                     <div className="max-w-[180px] break-all">{log.payloadHash || "-"}</div>
-                                                    <div className="text-[11px] text-gray-500">{log.payloadSizeBytes} B</div>
+                                                    <div className="text-[11px] text-gray-500">{log.payloadSizeBytes} {modalLabels.bytesSuffix}</div>
                                                 </td>
                                                 <td className="px-3 py-2 text-gray-700">{log.requestPath || "-"}</td>
                                                 <td className="px-3 py-2 text-gray-700">{log.transport || "-"}</td>
@@ -661,7 +741,7 @@ export function OpenAILogsModal({
                                     disabled={page <= 1}
                                     className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                    {"<<"}
+                                    {modalLabels.first}
                                 </button>
                                 <button
                                     type="button"
@@ -674,10 +754,10 @@ export function OpenAILogsModal({
                                     disabled={page <= 1}
                                     className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                    {"<"}
+                                    {modalLabels.previousSymbol}
                                 </button>
                                 <span>
-                                    Page {pagination.page}/{Math.max(1, pagination.totalPages)} - {pagination.total} resultats
+                                    {modalLabels.pagePrefix} {pagination.page}{modalLabels.pageSeparator}{Math.max(1, pagination.totalPages)} {modalLabels.dashSeparator} {pagination.total} {modalLabels.resultSuffix}
                                 </span>
                                 <button
                                     type="button"
@@ -693,7 +773,7 @@ export function OpenAILogsModal({
                                     disabled={page >= Math.max(1, pagination.totalPages)}
                                     className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                    {">"}
+                                    {modalLabels.nextSymbol}
                                 </button>
                                 <button
                                     type="button"
@@ -706,7 +786,7 @@ export function OpenAILogsModal({
                                     disabled={page >= Math.max(1, pagination.totalPages)}
                                     className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                    {">>"}
+                                    {modalLabels.last}
                                 </button>
                             </div>
                         </>

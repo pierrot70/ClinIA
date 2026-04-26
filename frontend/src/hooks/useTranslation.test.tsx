@@ -116,6 +116,56 @@ describe("useTranslation", () => {
         expect(translateTextMock).not.toHaveBeenCalled();
     });
 
+    it("keeps technical OpenAI log labels stable in Vietnamese", async () => {
+        translateTextMock.mockResolvedValue("Nom d'utilisateur masqué");
+
+        const username = renderHook(() =>
+            useTranslation({
+                text: labels.openAiLogs.filters.maskedUsername,
+                targetLang: "vi",
+                namespace: "openai-logs",
+            })
+        );
+        const transport = renderHook(() =>
+            useTranslation({
+                text: labels.openAiLogs.filters.transport,
+                targetLang: "vi",
+                namespace: "openai-logs",
+            })
+        );
+
+        await waitFor(() => {
+            expect(username.result.current.loading).toBe(false);
+            expect(transport.result.current.loading).toBe(false);
+        });
+
+        expect(username.result.current.translated).toBe("Masked username");
+        expect(transport.result.current.translated).toBe("Transport");
+        expect(translateTextMock).not.toHaveBeenCalled();
+    });
+
+    it("keeps short OpenAI log count labels stable in Vietnamese", async () => {
+        translateTextMock.mockResolvedValue(
+            "Le mot \"logs\" peut se traduire en vietnamien selon le contexte."
+        );
+
+        const { result } = renderHook(() =>
+            useTranslation({
+                text: labels.openAiLogs.status.logPlural,
+                targetLang: "vi",
+                namespace: "openai-logs",
+            })
+        );
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        expect(result.current.translated).toBe("logs");
+        expect(result.current.error).toBeNull();
+        expect(translateTextMock).not.toHaveBeenCalled();
+    });
+
     it("falls back to the English label when the translation API fails", async () => {
         translateTextMock.mockRejectedValue(new Error("Translation API error"));
 
