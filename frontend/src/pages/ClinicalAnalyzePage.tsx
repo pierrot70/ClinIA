@@ -265,12 +265,15 @@ export function ClinicalAnalyzePage() {
     const { translated: loadingLabel } = useTranslation({ text: "Chargement...", targetLang, openaiModel });
     const commentLabels = labels.clinicalDemo.comments;
     const { translated: leaveCommentLabel, loading: loadingLeaveComment, error: errorLeaveComment } = useTranslation({ text: commentLabels.leaveComment, targetLang, openaiModel });
+    const { translated: leaveCommentTooltipLabel } = useTranslation({ text: commentLabels.leaveCommentTooltip, targetLang, openaiModel });
+    const { translated: openaiModelTooltipLabel } = useTranslation({ text: commentLabels.openaiModelTooltip, targetLang, openaiModel });
     const { translated: replyLookupTitleLabel, loading: loadingReplyLookupTitle, error: errorReplyLookupTitle } = useTranslation({ text: commentLabels.replyLookupTitle, targetLang, openaiModel });
     const { translated: replyLookupDescriptionLabel, loading: loadingReplyLookupDescription, error: errorReplyLookupDescription } = useTranslation({ text: commentLabels.replyLookupDescription, targetLang, openaiModel });
     const { translated: namePlaceholderLabel } = useTranslation({ text: commentLabels.namePlaceholder, targetLang, openaiModel });
     const { translated: trackingCodePlaceholderLabel } = useTranslation({ text: commentLabels.trackingCodePlaceholder, targetLang, openaiModel });
     const { translated: searchLoadingLabel, loading: loadingSearchLoading, error: errorSearchLoading } = useTranslation({ text: commentLabels.searchLoading, targetLang, openaiModel });
     const { translated: viewRepliesLabel, loading: loadingViewReplies, error: errorViewReplies } = useTranslation({ text: commentLabels.viewReplies, targetLang, openaiModel });
+    const { translated: viewRepliesTooltipLabel } = useTranslation({ text: commentLabels.viewRepliesTooltip, targetLang, openaiModel });
     const { translated: noRepliesFoundLabel } = useTranslation({ text: commentLabels.noRepliesFound, targetLang, openaiModel });
     const { translated: commentCreatedAtPrefixLabel } = useTranslation({ text: commentLabels.commentCreatedAtPrefix, targetLang, openaiModel });
     const { translated: replyFromPrefixLabel } = useTranslation({ text: commentLabels.replyFromPrefix, targetLang, openaiModel });
@@ -340,12 +343,21 @@ export function ClinicalAnalyzePage() {
             )}
 
             <div className="flex justify-end">
-                <Link
-                    to="/comments"
-                    className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-800 transition hover:bg-sky-100"
-                >
-                    {renderLabel(leaveCommentLabel, loadingLeaveComment, errorLeaveComment ?? undefined)}
-                </Link>
+                <div className="group relative inline-flex">
+                    <span className="pointer-events-none absolute bottom-full right-0 z-20 mb-3 hidden w-80 rounded-xl border border-sky-200 bg-cyan-50 p-3 text-left text-xs font-normal leading-5 text-cyan-950 shadow-xl group-hover:block">
+                        {leaveCommentTooltipLabel}
+                        <span
+                            className="absolute right-6 top-full h-3 w-3 -translate-y-1/2 rotate-45 border-b border-r border-sky-200 bg-cyan-50"
+                            aria-hidden="true"
+                        />
+                    </span>
+                    <Link
+                        to="/comments"
+                        className="inline-flex rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-800 transition hover:bg-sky-100"
+                    >
+                        {renderLabel(leaveCommentLabel, loadingLeaveComment, errorLeaveComment ?? undefined)}
+                    </Link>
+                </div>
             </div>
 
             <section className="rounded-xl border border-amber-200 bg-amber-50 p-5">
@@ -371,15 +383,24 @@ export function ClinicalAnalyzePage() {
                         onChange={(event) => setReplyLookupCode(event.target.value.toUpperCase())}
                         maxLength={8}
                     />
-                    <button
-                        type="submit"
-                        disabled={replyLookupLoading}
-                        className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        {replyLookupLoading
-                            ? renderLabel(searchLoadingLabel, loadingSearchLoading, errorSearchLoading ?? undefined)
-                            : renderLabel(viewRepliesLabel, loadingViewReplies, errorViewReplies ?? undefined)}
-                    </button>
+                    <div className="group relative inline-flex">
+                        <span className="pointer-events-none absolute bottom-full right-0 z-20 mb-3 hidden w-80 rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-xs font-normal leading-5 text-amber-950 shadow-xl group-hover:block">
+                            {viewRepliesTooltipLabel}
+                            <span
+                                className="absolute right-6 top-full h-3 w-3 -translate-y-1/2 rotate-45 border-b border-r border-amber-200 bg-amber-50"
+                                aria-hidden="true"
+                            />
+                        </span>
+                        <button
+                            type="submit"
+                            disabled={replyLookupLoading}
+                            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {replyLookupLoading
+                                ? renderLabel(searchLoadingLabel, loadingSearchLoading, errorSearchLoading ?? undefined)
+                                : renderLabel(viewRepliesLabel, loadingViewReplies, errorViewReplies ?? undefined)}
+                        </button>
+                    </div>
                 </form>
                 {replyLookupError && (
                     <div className="mt-3 rounded-lg bg-white/80 px-3 py-2 text-sm text-amber-900">
@@ -429,22 +450,31 @@ export function ClinicalAnalyzePage() {
                     {renderLabel(modelLabel, loadingModel, errorModel ?? undefined)}
                 </label>
 
-                <select
-                    value={openaiModel}
-                    onChange={(e) =>
-                        handleModelChange(
-                            e.target.value as OpenAIModel
-                        )
-                    }
-                    className="border rounded px-2 py-1 text-sm"
-                >
-                    <option value="gpt-4.1-mini">
-                        {renderLabel(gptMiniLabel, loadingMini, errorMini ?? undefined)}
-                    </option>
-                    <option value="gpt-4-0613">
-                        {renderLabel(gptLegacyLabel, loadingLegacy, errorLegacy ?? undefined)}
-                    </option>
-                </select>
+                <div className="group relative inline-flex">
+                    <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 hidden w-80 -translate-x-1/2 rounded-xl border border-sky-200 bg-cyan-50 p-3 text-left text-xs font-normal leading-5 text-cyan-950 shadow-xl group-hover:block">
+                        {openaiModelTooltipLabel}
+                        <span
+                            className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-sky-200 bg-cyan-50"
+                            aria-hidden="true"
+                        />
+                    </span>
+                    <select
+                        value={openaiModel}
+                        onChange={(e) =>
+                            handleModelChange(
+                                e.target.value as OpenAIModel
+                            )
+                        }
+                        className="border rounded px-2 py-1 text-sm"
+                    >
+                        <option value="gpt-4.1-mini">
+                            {renderLabel(gptMiniLabel, loadingMini, errorMini ?? undefined)}
+                        </option>
+                        <option value="gpt-4-0613">
+                            {renderLabel(gptLegacyLabel, loadingLegacy, errorLegacy ?? undefined)}
+                        </option>
+                    </select>
+                </div>
             </div>
 
             {/* 🔀 Toggle IA réelle */}

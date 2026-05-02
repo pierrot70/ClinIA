@@ -163,6 +163,12 @@ export const UI_LABELS_FR = {
         // ClinicalAnalyzePage.tsx - bloc commentaires et consultation des réponses.
         comments: {
             leaveComment: "Laisser un commentaire",
+            leaveCommentTooltip:
+                "Cliquez ici pour ouvrir la page des commentaires, laisser un message de support ou de suivi, puis consulter les réponses plus tard avec votre code de suivi.",
+            openaiModelTooltip:
+                "Utilisez ce selecteur pour choisir le modele d'analyse. Le mode mini est habituellement plus rapide et convient bien aux essais courants. L'autre modele peut servir de point de comparaison si vous voulez verifier comment la formulation ou la structure de la reponse change.",
+            exampleCaseTooltip:
+                "Utilisez ce selecteur pour charger un cas clinique deja rempli. C'est utile pour decouvrir rapidement le fonctionnement de ClinIA sans saisir toutes les donnees a la main.",
             replyLookupTitle: "Voir les réponses à mes commentaires",
             replyLookupDescription:
                 "Entrez exactement le nom ou pseudonyme utilisé lors du commentaire, ainsi que votre code de suivi. Si votre navigateur a conservé ces informations, elles sont pré-remplies automatiquement.",
@@ -170,6 +176,8 @@ export const UI_LABELS_FR = {
             trackingCodePlaceholder: "Code de suivi",
             searchLoading: "Recherche...",
             viewReplies: "Voir mes réponses",
+            viewRepliesTooltip:
+                "Cliquez ici pour vérifier si l'équipe ClinIA a répondu à vos commentaires à l'aide de votre nom ou pseudonyme et de votre code de suivi.",
             noRepliesFound:
                 "Aucune réponse trouvée pour ces informations de suivi.",
             commentCreatedAtPrefix: "Commentaire du",

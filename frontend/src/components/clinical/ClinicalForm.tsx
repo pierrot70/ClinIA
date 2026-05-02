@@ -1,6 +1,7 @@
 import { useEffect, useState, useContext } from "react";
 import { useTranslation } from "../../hooks/useTranslation";
 import { HomeI18nContext } from "../../contexts/HomeI18nContext";
+import { labels } from "../../i18n/uiLabels";
 import type { ClinicalPayload, Sex } from "../../types/clinical";
 
 const CACHE_KEY = "clinia_last_clinical_payload";
@@ -227,12 +228,14 @@ export function ClinicalForm({
     // Récupérer la langue courante
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
+    const commentLabels = labels.clinicalDemo.comments;
 
 
     // Traductions dynamiques
     const { translated: clinicalDataLabel } = useTranslation({ text: "Données cliniques", targetLang });
     const { translated: incompleteDataLabel } = useTranslation({ text: "Données cliniques incomplètes", targetLang });
     const { translated: exampleCaseFieldLabel } = useTranslation({ text: "Cas exemple", targetLang });
+    const { translated: exampleCaseTooltipLabel } = useTranslation({ text: commentLabels.exampleCaseTooltip, targetLang });
     const { translated: noExampleCaseLabel } = useTranslation({ text: "Aucun", targetLang });
     const { translated: patient1Label } = useTranslation({ text: "Hypertension", targetLang });
     const { translated: patient2Label } = useTranslation({ text: "Cancer de l'estomac", targetLang });
@@ -284,19 +287,28 @@ export function ClinicalForm({
                     <label htmlFor="clinical-example-case" className="text-sm font-medium text-gray-700">
                         {exampleCaseFieldLabel}
                     </label>
-                    <select
-                        id="clinical-example-case"
-                        className="input w-full"
-                        value={selectedExampleCase}
-                        onChange={(e) => handleExampleCaseChange(e.target.value)}
-                    >
-                        <option value="">{noExampleCaseLabel}</option>
-                        <option value="hypertension55">{patient1Label}</option>
-                        <option value="gastricCancer59">{patient2Label}</option>
-                        <option value="mononucleosis35">{patient3Label}</option>
-                        <option value="cataract72">{patient4Label}</option>
-                        <option value="majorDepression42">{patient5Label}</option>
-                    </select>
+                    <div className="group relative">
+                        <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 hidden w-80 -translate-x-1/2 rounded-xl border border-sky-200 bg-cyan-50 p-3 text-left text-xs font-normal leading-5 text-cyan-950 shadow-xl group-hover:block">
+                            {exampleCaseTooltipLabel}
+                            <span
+                                className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-sky-200 bg-cyan-50"
+                                aria-hidden="true"
+                            />
+                        </span>
+                        <select
+                            id="clinical-example-case"
+                            className="input w-full"
+                            value={selectedExampleCase}
+                            onChange={(e) => handleExampleCaseChange(e.target.value)}
+                        >
+                            <option value="">{noExampleCaseLabel}</option>
+                            <option value="hypertension55">{patient1Label}</option>
+                            <option value="gastricCancer59">{patient2Label}</option>
+                            <option value="mononucleosis35">{patient3Label}</option>
+                            <option value="cataract72">{patient4Label}</option>
+                            <option value="majorDepression42">{patient5Label}</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
