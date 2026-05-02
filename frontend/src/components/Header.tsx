@@ -225,6 +225,9 @@ const Header: React.FC = () => {
     const canAccessAdmin = isAuthenticated && isAdminRole(user?.role);
     const isProd = !!import.meta.env.PROD;
     const isDev = !isProd;
+    const showFullHeaderNav = isAuthenticated || isDev;
+    const showAdminHeaderNav = canAccessAdmin || isDev;
+    const showSuperAdminHeaderNav = user?.role === "SUPERADMIN" || isDev;
     const hostname = window.location.hostname;
     const isLocalRuntime =
         hostname === "localhost" ||
@@ -762,18 +765,44 @@ const Header: React.FC = () => {
                         ClinIA
                     </Link>
 
-                    <div className="justify-self-center">
-                        <VoiceNavButton />
-                    </div>
+                    {showFullHeaderNav ? (
+                        <>
+                            <div className="justify-self-center">
+                                <VoiceNavButton />
+                            </div>
 
-                    <button
-                        type="button"
-                        onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-                        className="justify-self-end rounded border border-gray-300 px-3 py-1 text-sm text-gray-700"
-                        aria-label={headerLabels.controls.openMenu}
-                    >
-                        <HeaderLabel text={isMobileMenuOpen ? headerLabels.controls.close : headerLabels.controls.menu} />
-                    </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+                                className="justify-self-end rounded border border-gray-300 px-3 py-1 text-sm text-gray-700"
+                                aria-label={headerLabels.controls.openMenu}
+                            >
+                                <HeaderLabel text={isMobileMenuOpen ? headerLabels.controls.close : headerLabels.controls.menu} />
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <label className="justify-self-center flex items-center gap-2 text-gray-600">
+                                <span className="text-xs"><HeaderLabel text={headerLabels.controls.language} /></span>
+                                <select
+                                    className="rounded border border-gray-300 bg-white px-2 py-1 text-xs"
+                                    value={locale}
+                                    onChange={onLanguageChange}
+                                    disabled={isTranslating}
+                                    aria-label={headerLabels.controls.language}
+                                >
+                                    {languageOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <Link to="/" className="justify-self-end text-sm text-gray-700">
+                                <HeaderLabel text={headerLabels.nav.home} />
+                            </Link>
+                        </>
+                    )}
                 </div>
 
                 <div className="hidden items-center justify-between gap-3 lg:flex">
@@ -827,7 +856,7 @@ const Header: React.FC = () => {
                 </div>
 
                 <nav className="mt-3 hidden items-center gap-4 text-sm lg:flex">
-                    <VoiceNavButton />
+                    {showFullHeaderNav && <VoiceNavButton />}
 
                     <label className="flex items-center gap-2 text-gray-600">
                         <span className="text-xs"><HeaderLabel text={headerLabels.controls.language} /></span>
@@ -850,74 +879,74 @@ const Header: React.FC = () => {
                         <HeaderLabel text={headerLabels.nav.home} />
                     </Link>
 
-                    <Link to="/clinical" className={linkClass("/clinical")}>
-                        <HeaderLabel text={headerLabels.nav.clinicalAnalysis} />
-                    </Link>
+                    {showFullHeaderNav && (
+                        <>
+                            <Link to="/clinical" className={linkClass("/clinical")}>
+                                <HeaderLabel text={headerLabels.nav.clinicalAnalysis} />
+                            </Link>
 
-                    {isAuthenticated && (
-                        <Link to="/comments" className={linkClass("/comments")}>
-                            <HeaderLabel text={headerLabels.nav.comments} />
-                        </Link>
-                    )}
+                            <Link to="/comments" className={linkClass("/comments")}>
+                                <HeaderLabel text={headerLabels.nav.comments} />
+                            </Link>
 
-                    <div className="relative group">
-                        <button
-                            type="button"
-                            className={
-                                "flex items-center gap-1 rounded px-3 py-1 text-sm transition " +
-                                (isClinicGroupActive
-                                    ? "text-primary font-medium"
-                                    : "text-gray-600 hover:text-primary")
-                            }
-                        >
-                            <HeaderLabel text={headerLabels.nav.clinicManagement} />
-                            <span className="text-xs">▾</span>
-                        </button>
-                        <div className="absolute right-0 top-full z-10 mt-2 hidden min-w-[160px] rounded-lg border border-gray-200 bg-white shadow-lg transition group-hover:block group-focus-within:block">
-                                {[
-                                    {
-                                        label: headerLabels.nav.appointments,
-                                        path: "/appointments",
-                                    },
-                                    {
-                                        label: headerLabels.nav.patients,
-                                        path: "/patients",
-                                    },
-                                    {
-                                        label: headerLabels.nav.cliniques,
-                                        path: "/cliniques",
-                                    },
-                                    {
-                                        label: headerLabels.nav.specialists,
-                                        path: "/specialists",
-                                    },
-                                ].map((item) => (
-                                <Link
-                                    key={item.path}
-                                    to={item.path}
-                                    className={
-                                        "block px-4 py-2 text-sm transition hover:bg-gray-50 " +
-                                        (location.pathname === item.path
-                                            ? "text-primary font-medium"
-                                            : "text-gray-700")
-                                    }
-                                >
-                                    <HeaderLabel text={item.label} />
-                                </Link>
-                            ))}
-                            {canAccessAdmin && (
+                            <div className="relative group">
                                 <button
                                     type="button"
-                                    onClick={openOpenAILogsModal}
-                                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
+                                    className={
+                                        "flex items-center gap-1 rounded px-3 py-1 text-sm transition " +
+                                        (isClinicGroupActive
+                                            ? "text-primary font-medium"
+                                            : "text-gray-600 hover:text-primary")
+                                    }
                                 >
-                                    <HeaderLabel text={headerLabels.nav.openaiLogs} />
+                                    <HeaderLabel text={headerLabels.nav.clinicManagement} />
+                                    <span className="text-xs">▾</span>
                                 </button>
-                            )}
-                        </div>
-                    </div>
+                                <div className="absolute right-0 top-full z-10 mt-2 hidden min-w-[160px] rounded-lg border border-gray-200 bg-white shadow-lg transition group-hover:block group-focus-within:block">
+                                        {[
+                                            {
+                                                label: headerLabels.nav.appointments,
+                                                path: "/appointments",
+                                            },
+                                            {
+                                                label: headerLabels.nav.patients,
+                                                path: "/patients",
+                                            },
+                                            {
+                                                label: headerLabels.nav.cliniques,
+                                                path: "/cliniques",
+                                            },
+                                            {
+                                                label: headerLabels.nav.specialists,
+                                                path: "/specialists",
+                                            },
+                                        ].map((item) => (
+                                        <Link
+                                            key={item.path}
+                                            to={item.path}
+                                            className={
+                                                "block px-4 py-2 text-sm transition hover:bg-gray-50 " +
+                                                (location.pathname === item.path
+                                                    ? "text-primary font-medium"
+                                                    : "text-gray-700")
+                                            }
+                                        >
+                                            <HeaderLabel text={item.label} />
+                                        </Link>
+                                    ))}
+                                    {showAdminHeaderNav && (
+                                        <button
+                                            type="button"
+                                            onClick={openOpenAILogsModal}
+                                            className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
+                                        >
+                                            <HeaderLabel text={headerLabels.nav.openaiLogs} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
 
-                    {user?.role === "SUPERADMIN" && (
+                            {showSuperAdminHeaderNav && (
                         <div className="relative group">
                             <button
                                 type="button"
@@ -1008,35 +1037,23 @@ const Header: React.FC = () => {
                                 </button>
                             </div>
                         </div>
+                            )}
+
+                            <Link to="/quick" className={linkClass("/quick")}>
+                                <HeaderLabel text={headerLabels.nav.quickMode} />
+                            </Link>
+
+                            <Link
+                                to="/patient-summary"
+                                className={linkClass("/patient-summary")}
+                            >
+                                <HeaderLabel text={headerLabels.nav.patientSummary} />
+                            </Link>
+                        </>
                     )}
-
-                    <Link to="/quick" className={linkClass("/quick")}>
-                        <HeaderLabel text={headerLabels.nav.quickMode} />
-                    </Link>
-
-                    <Link
-                        to="/patient-summary"
-                        className={linkClass("/patient-summary")}
-                    >
-                        <HeaderLabel text={headerLabels.nav.patientSummary} />
-                    </Link>
 
                     {/* ---------- ADMIN ---------- */}
-                    {!isAuthenticated && (
-                        <Link
-                            to="/login"
-                            className={
-                                "hover:text-primary transition-colors " +
-                                (location.pathname === "/login"
-                                    ? "text-primary font-medium"
-                                    : "text-gray-600")
-                            }
-                        >
-                            <HeaderLabel text={headerLabels.nav.login} />
-                        </Link>
-                    )}
-
-                    {!canAccessAdmin && (
+                    {showFullHeaderNav && !showAdminHeaderNav && (
                         <Link
                             to="/admin/login"
                             className={
@@ -1050,7 +1067,7 @@ const Header: React.FC = () => {
                         </Link>
                     )}
 
-                    {canAccessAdmin && (
+                    {showAdminHeaderNav && (
                         <Link
                             to="/mock-studio"
                             className={
@@ -1064,7 +1081,7 @@ const Header: React.FC = () => {
                         </Link>
                     )}
 
-                    {canAccessAdmin && (
+                    {showAdminHeaderNav && (
                         <Link
                             to="/admin/patient-audits"
                             className={
@@ -1078,7 +1095,7 @@ const Header: React.FC = () => {
                         </Link>
                     )}
 
-                    {canAccessAdmin && (
+                    {showAdminHeaderNav && (
                         <Link
                             to="/admin/openai-logs"
                             className={
@@ -1092,7 +1109,7 @@ const Header: React.FC = () => {
                         </Link>
                     )}
 
-                    {canAccessAdmin && user?.role === "SUPERADMIN" && (
+                    {showAdminHeaderNav && showSuperAdminHeaderNav && (
                         <Link
                             to="/admin/users/manage"
                             className={
@@ -1116,7 +1133,7 @@ const Header: React.FC = () => {
                     )}
                 </nav>
 
-                {isMobileMenuOpen && (
+                {showFullHeaderNav && isMobileMenuOpen && (
                     <div className="mt-3 space-y-3 rounded-xl border border-gray-200 bg-white p-3 lg:hidden">
                         <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
@@ -1175,7 +1192,7 @@ const Header: React.FC = () => {
                             <Link to="/patients" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.patients} /></Link>
                             <Link to="/cliniques" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.cliniques} /></Link>
                             <Link to="/specialists" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.specialists} /></Link>
-                            {canAccessAdmin && (
+                            {showAdminHeaderNav && (
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -1191,7 +1208,7 @@ const Header: React.FC = () => {
                             <Link to="/patient-summary" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.patientSummary} /></Link>
                         </div>
 
-                        {user?.role === "SUPERADMIN" && (
+                        {showSuperAdminHeaderNav && (
                             <div className="space-y-1 border-t border-gray-100 pt-2">
                                 <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500"><HeaderLabel text={headerLabels.nav.appManagement} /></div>
                                 <button type="button" onClick={() => { void openActiveUsersModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.appManagement.activeUsers} /></button>
@@ -1215,23 +1232,23 @@ const Header: React.FC = () => {
                                 <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.login} /></Link>
                             )}
 
-                            {!canAccessAdmin && (
+                            {showFullHeaderNav && !showAdminHeaderNav && (
                                 <Link to="/admin/login" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.admin} /></Link>
                             )}
 
-                            {canAccessAdmin && (
+                            {showAdminHeaderNav && (
                                 <Link to="/mock-studio" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.mockStudio} /></Link>
                             )}
 
-                            {canAccessAdmin && (
+                            {showAdminHeaderNav && (
                                 <Link to="/admin/patient-audits" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.patientAudits} /></Link>
                             )}
 
-                            {canAccessAdmin && (
+                            {showAdminHeaderNav && (
                                 <Link to="/admin/openai-logs" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.openaiAudits} /></Link>
                             )}
 
-                            {canAccessAdmin && user?.role === "SUPERADMIN" && (
+                            {showAdminHeaderNav && showSuperAdminHeaderNav && (
                                 <Link to="/admin/users/manage" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.users} /></Link>
                             )}
 
