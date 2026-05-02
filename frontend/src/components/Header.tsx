@@ -6,6 +6,8 @@ import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { useAuth } from "../hooks/useAuth";
 import { isAdminRole } from "../auth/roles";
 import { SessionExpiredError } from "../services/authService";
+import { useTranslation } from "../hooks/useTranslation";
+import { labels } from "../i18n/uiLabels";
 import {
     Bar,
     BarChart,
@@ -78,6 +80,19 @@ type AuthHistogramTooltipProps = {
     onOpenLogsForDateAndAction: (date: string, actionName?: string) => void;
 };
 
+const HeaderLabel: React.FC<{ text: string }> = ({ text }) => {
+    const { locale } = useHomeI18n();
+    const { translated } = useTranslation({
+        text,
+        targetLang: locale,
+        namespace: "header",
+    });
+
+    return <>{translated}</>;
+};
+
+const headerLabels = labels.header;
+
 const AuthGraphTooltip: React.FC<AuthGraphTooltipProps> = ({
     active,
     payload,
@@ -101,14 +116,14 @@ const AuthGraphTooltip: React.FC<AuthGraphTooltipProps> = ({
 
     return (
         <div className="rounded border border-gray-200 bg-white p-2 text-xs shadow">
-            <div className="text-gray-700">Date: {date}</div>
-            <div className="text-gray-700">Logs: {count ?? 0}</div>
+            <div className="text-gray-700"><HeaderLabel text={headerLabels.authGraphTooltip.date} /> {date}</div>
+            <div className="text-gray-700"><HeaderLabel text={headerLabels.authGraphTooltip.logs} /> {count ?? 0}</div>
             <button
                 type="button"
                 onClick={() => onOpenLogsForDate(date)}
                 className="mt-2 rounded bg-blue-50 px-2 py-1 text-xs text-blue-700 hover:bg-blue-100"
             >
-                Ouvrir logs
+                <HeaderLabel text={headerLabels.authGraphTooltip.openLogs} />
             </button>
         </div>
     );
@@ -135,15 +150,15 @@ const AuthHistogramTooltip: React.FC<AuthHistogramTooltipProps> = ({
 
     return (
         <div className="max-w-[260px] rounded border border-gray-200 bg-white p-2 text-xs shadow">
-            <div className="mb-1 text-gray-700">Date: {date}</div>
-            <div className="mb-2 text-gray-700">Total logs: {total}</div>
+            <div className="mb-1 text-gray-700"><HeaderLabel text={headerLabels.authGraphTooltip.date} /> {date}</div>
+            <div className="mb-2 text-gray-700"><HeaderLabel text={headerLabels.authGraphTooltip.totalLogs} /> {total}</div>
             <div className="space-y-1">
                 <button
                     type="button"
                     onClick={() => onOpenLogsForDateAndAction(date)}
                     className="block w-full rounded bg-blue-50 px-2 py-1 text-left text-xs text-blue-700 hover:bg-blue-100"
                 >
-                    Tous
+                    <HeaderLabel text={headerLabels.authGraphTooltip.all} />
                 </button>
                 {actionNames.map((actionName) => {
                     const value = point?.[actionName];
@@ -755,9 +770,9 @@ const Header: React.FC = () => {
                         type="button"
                         onClick={() => setIsMobileMenuOpen((prev) => !prev)}
                         className="justify-self-end rounded border border-gray-300 px-3 py-1 text-sm text-gray-700"
-                        aria-label="Ouvrir le menu"
+                        aria-label={headerLabels.controls.openMenu}
                     >
-                        {isMobileMenuOpen ? "Fermer" : "Menu"}
+                        <HeaderLabel text={isMobileMenuOpen ? headerLabels.controls.close : headerLabels.controls.menu} />
                     </button>
                 </div>
 
@@ -773,7 +788,7 @@ const Header: React.FC = () => {
                                 ClinIA
                             </div>
                             <div className="text-xs text-gray-500">
-                                Assistant clinique IA – Prototype
+                                <HeaderLabel text={headerLabels.brand.subtitle} />
                             </div>
                         </div>
                     </Link>
@@ -801,11 +816,11 @@ const Header: React.FC = () => {
                                 }
                                 title={
                                     forceReal
-                                        ? "Forcer IA réelle"
-                                        : "Utiliser le mode mock"
+                                        ? headerLabels.aiMode.forceRealTitle
+                                        : headerLabels.aiMode.mockTitle
                                 }
                             >
-                                {forceReal ? "IA réelle" : "IA mock"}
+                                <HeaderLabel text={forceReal ? headerLabels.aiMode.real : headerLabels.aiMode.mock} />
                             </button>
                         )}
                     </div>
@@ -815,13 +830,13 @@ const Header: React.FC = () => {
                     <VoiceNavButton />
 
                     <label className="flex items-center gap-2 text-gray-600">
-                        <span className="text-xs">Langue</span>
+                        <span className="text-xs"><HeaderLabel text={headerLabels.controls.language} /></span>
                         <select
                             className="rounded border border-gray-300 bg-white px-2 py-1 text-xs"
                             value={locale}
                             onChange={onLanguageChange}
                             disabled={isTranslating}
-                            aria-label="Choisir la langue"
+                            aria-label={headerLabels.controls.language}
                         >
                             {languageOptions.map((option) => (
                                 <option key={option.value} value={option.value}>
@@ -832,16 +847,16 @@ const Header: React.FC = () => {
                     </label>
 
                     <Link to="/" className={linkClass("/")}>
-                        Accueil
+                        <HeaderLabel text={headerLabels.nav.home} />
                     </Link>
 
                     <Link to="/clinical" className={linkClass("/clinical")}>
-                        Analyse clinique
+                        <HeaderLabel text={headerLabels.nav.clinicalAnalysis} />
                     </Link>
 
                     {isAuthenticated && (
                         <Link to="/comments" className={linkClass("/comments")}>
-                            Commentaires
+                            <HeaderLabel text={headerLabels.nav.comments} />
                         </Link>
                     )}
 
@@ -855,25 +870,25 @@ const Header: React.FC = () => {
                                     : "text-gray-600 hover:text-primary")
                             }
                         >
-                        Gestion clinique
+                            <HeaderLabel text={headerLabels.nav.clinicManagement} />
                             <span className="text-xs">▾</span>
                         </button>
                         <div className="absolute right-0 top-full z-10 mt-2 hidden min-w-[160px] rounded-lg border border-gray-200 bg-white shadow-lg transition group-hover:block group-focus-within:block">
                                 {[
                                     {
-                                        label: "Rendez-vous",
+                                        label: headerLabels.nav.appointments,
                                         path: "/appointments",
                                     },
                                     {
-                                        label: "Patients",
+                                        label: headerLabels.nav.patients,
                                         path: "/patients",
                                     },
                                     {
-                                        label: "Cliniques",
+                                        label: headerLabels.nav.cliniques,
                                         path: "/cliniques",
                                     },
                                     {
-                                        label: "Spécialistes",
+                                        label: headerLabels.nav.specialists,
                                         path: "/specialists",
                                     },
                                 ].map((item) => (
@@ -887,7 +902,7 @@ const Header: React.FC = () => {
                                             : "text-gray-700")
                                     }
                                 >
-                                    {item.label}
+                                    <HeaderLabel text={item.label} />
                                 </Link>
                             ))}
                             {canAccessAdmin && (
@@ -896,7 +911,7 @@ const Header: React.FC = () => {
                                     onClick={openOpenAILogsModal}
                                     className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
                                 >
-                                    OpenAI logs
+                                    <HeaderLabel text={headerLabels.nav.openaiLogs} />
                                 </button>
                             )}
                         </div>
@@ -908,7 +923,7 @@ const Header: React.FC = () => {
                                 type="button"
                                 className="flex items-center gap-1 rounded px-3 py-1 text-sm text-gray-600 transition hover:text-primary"
                             >
-                                Gestion Application
+                                <HeaderLabel text={headerLabels.nav.appManagement} />
                                 <span className="text-xs">▾</span>
                             </button>
                             <div className="absolute right-0 top-full z-10 mt-2 hidden min-w-[220px] rounded-lg border border-gray-200 bg-white shadow-lg transition group-hover:block group-focus-within:block">
@@ -919,7 +934,7 @@ const Header: React.FC = () => {
                                     }}
                                     className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
                                 >
-                                    Montrer Usager Actif
+                                    <HeaderLabel text={headerLabels.appManagement.activeUsers} />
                                 </button>
                                 <button
                                     type="button"
@@ -928,11 +943,11 @@ const Header: React.FC = () => {
                                     }}
                                     className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
                                 >
-                                    Montrer Auth Log
+                                    <HeaderLabel text={headerLabels.appManagement.authLogs} />
                                 </button>
                                 <details className="group/graphs border-t border-gray-100">
                                     <summary className="cursor-pointer list-none px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50">
-                                        Graphiques Auth
+                                        <HeaderLabel text={headerLabels.appManagement.authGraphs} />
                                     </summary>
                                     <div className="space-y-1 pb-2 pl-4 pr-2">
                                         <button
@@ -942,7 +957,7 @@ const Header: React.FC = () => {
                                             }}
                                             className="block w-full rounded px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
                                         >
-                                            x-y graph
+                                            <HeaderLabel text={headerLabels.appManagement.xyGraph} />
                                         </button>
                                         <button
                                             type="button"
@@ -951,7 +966,7 @@ const Header: React.FC = () => {
                                             }}
                                             className="block w-full rounded px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
                                         >
-                                            Pie graph
+                                            <HeaderLabel text={headerLabels.appManagement.pieGraph} />
                                         </button>
                                         <button
                                             type="button"
@@ -960,7 +975,7 @@ const Header: React.FC = () => {
                                             }}
                                             className="block w-full rounded px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
                                         >
-                                            Histogramme graph
+                                            <HeaderLabel text={headerLabels.appManagement.histogramGraph} />
                                         </button>
                                     </div>
                                 </details>
@@ -971,7 +986,7 @@ const Header: React.FC = () => {
                                     }}
                                     className="block w-full px-4 py-2 text-left text-sm text-red-700 transition hover:bg-red-50"
                                 >
-                                    Arret de l'application
+                                    <HeaderLabel text={headerLabels.appManagement.shutdown} />
                                 </button>
                                 <button
                                     type="button"
@@ -980,7 +995,7 @@ const Header: React.FC = () => {
                                     }}
                                     className="block w-full px-4 py-2 text-left text-sm text-green-700 transition hover:bg-green-50"
                                 >
-                                    Fin de maintenance
+                                    <HeaderLabel text={headerLabels.appManagement.clearMaintenance} />
                                 </button>
                                 <button
                                     type="button"
@@ -989,21 +1004,21 @@ const Header: React.FC = () => {
                                     }}
                                     className="block w-full px-4 py-2 text-left text-sm text-emerald-800 transition hover:bg-emerald-50"
                                 >
-                                    Forcer reouverture normale
+                                    <HeaderLabel text={headerLabels.appManagement.forceReopen} />
                                 </button>
                             </div>
                         </div>
                     )}
 
                     <Link to="/quick" className={linkClass("/quick")}>
-                        Mode rapide
+                        <HeaderLabel text={headerLabels.nav.quickMode} />
                     </Link>
 
                     <Link
                         to="/patient-summary"
                         className={linkClass("/patient-summary")}
                     >
-                        Résumé patient
+                        <HeaderLabel text={headerLabels.nav.patientSummary} />
                     </Link>
 
                     {/* ---------- ADMIN ---------- */}
@@ -1017,7 +1032,7 @@ const Header: React.FC = () => {
                                     : "text-gray-600")
                             }
                         >
-                            Connexion
+                            <HeaderLabel text={headerLabels.nav.login} />
                         </Link>
                     )}
 
@@ -1031,7 +1046,7 @@ const Header: React.FC = () => {
                                     : "text-gray-600")
                             }
                         >
-                            Admin
+                            <HeaderLabel text={headerLabels.nav.admin} />
                         </Link>
                     )}
 
@@ -1045,7 +1060,7 @@ const Header: React.FC = () => {
                                     : "text-gray-600")
                             }
                         >
-                            Mock Studio
+                            <HeaderLabel text={headerLabels.nav.mockStudio} />
                         </Link>
                     )}
 
@@ -1059,7 +1074,7 @@ const Header: React.FC = () => {
                                     : "text-gray-600")
                             }
                         >
-                            Audits patient
+                            <HeaderLabel text={headerLabels.nav.patientAudits} />
                         </Link>
                     )}
 
@@ -1073,7 +1088,7 @@ const Header: React.FC = () => {
                                     : "text-gray-600")
                             }
                         >
-                            Audits OpenAI
+                            <HeaderLabel text={headerLabels.nav.openaiAudits} />
                         </Link>
                     )}
 
@@ -1087,16 +1102,16 @@ const Header: React.FC = () => {
                                     : "text-gray-600")
                             }
                         >
-                            Utilisateurs
+                            <HeaderLabel text={headerLabels.nav.users} />
                         </Link>
                     )}
 
-                    {canAccessAdmin && (
+                    {isAuthenticated && (
                         <button
                             onClick={logout}
                             className="text-sm text-red-600 hover:text-red-700 ml-3"
                         >
-                            Déconnexion
+                            <HeaderLabel text={headerLabels.nav.logout} />
                         </button>
                     )}
                 </nav>
@@ -1127,7 +1142,7 @@ const Header: React.FC = () => {
                                             : "bg-gray-100 text-gray-700 border-gray-300")
                                     }
                                 >
-                                    {forceReal ? "IA réelle" : "IA mock"}
+                                    <HeaderLabel text={forceReal ? headerLabels.aiMode.real : headerLabels.aiMode.mock} />
                                 </button>
                             )}
                         </div>
@@ -1135,13 +1150,13 @@ const Header: React.FC = () => {
                         <div className="flex items-center justify-between gap-2">
                             <VoiceNavButton />
                             <label className="flex items-center gap-2 text-gray-600">
-                                <span className="text-xs">Langue</span>
+                                <span className="text-xs"><HeaderLabel text={headerLabels.controls.language} /></span>
                                 <select
                                     className="rounded border border-gray-300 bg-white px-2 py-1 text-xs"
                                     value={locale}
                                     onChange={onLanguageChange}
                                     disabled={isTranslating}
-                                    aria-label="Choisir la langue"
+                                    aria-label={headerLabels.controls.language}
                                 >
                                     {languageOptions.map((option) => (
                                         <option key={option.value} value={option.value}>
@@ -1153,13 +1168,13 @@ const Header: React.FC = () => {
                         </div>
 
                         <div className="space-y-1 border-t border-gray-100 pt-2">
-                            <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Accueil</Link>
-                            <Link to="/clinical" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Analyse clinique</Link>
-                            <Link to="/comments" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Commentaires</Link>
-                            <Link to="/appointments" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Rendez-vous</Link>
-                            <Link to="/patients" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Patients</Link>
-                            <Link to="/cliniques" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Cliniques</Link>
-                            <Link to="/specialists" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Spécialistes</Link>
+                            <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.home} /></Link>
+                            <Link to="/clinical" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.clinicalAnalysis} /></Link>
+                            <Link to="/comments" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.comments} /></Link>
+                            <Link to="/appointments" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.appointments} /></Link>
+                            <Link to="/patients" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.patients} /></Link>
+                            <Link to="/cliniques" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.cliniques} /></Link>
+                            <Link to="/specialists" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.specialists} /></Link>
                             {canAccessAdmin && (
                                 <button
                                     type="button"
@@ -1169,63 +1184,63 @@ const Header: React.FC = () => {
                                     }}
                                     className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
                                 >
-                                    OpenAI logs
+                                    <HeaderLabel text={headerLabels.nav.openaiLogs} />
                                 </button>
                             )}
-                            <Link to="/quick" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Mode rapide</Link>
-                            <Link to="/patient-summary" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Résumé patient</Link>
+                            <Link to="/quick" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.quickMode} /></Link>
+                            <Link to="/patient-summary" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.patientSummary} /></Link>
                         </div>
 
                         {user?.role === "SUPERADMIN" && (
                             <div className="space-y-1 border-t border-gray-100 pt-2">
-                                <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Gestion Application</div>
-                                <button type="button" onClick={() => { void openActiveUsersModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Montrer Usager Actif</button>
-                                <button type="button" onClick={() => { void openAuthLogsModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Montrer Auth Log</button>
+                                <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500"><HeaderLabel text={headerLabels.nav.appManagement} /></div>
+                                <button type="button" onClick={() => { void openActiveUsersModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.appManagement.activeUsers} /></button>
+                                <button type="button" onClick={() => { void openAuthLogsModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.appManagement.authLogs} /></button>
                                 <details>
-                                    <summary className="cursor-pointer rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Graphiques Auth</summary>
+                                    <summary className="cursor-pointer rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.appManagement.authGraphs} /></summary>
                                     <div className="mt-1 space-y-1 pl-2">
-                                        <button type="button" onClick={() => { openAuthGraphsModal("xy"); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">x-y graph</button>
-                                        <button type="button" onClick={() => { openAuthGraphsModal("pie"); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Pie graph</button>
-                                        <button type="button" onClick={() => { openAuthGraphsModal("histogram"); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Histogramme graph</button>
+                                        <button type="button" onClick={() => { openAuthGraphsModal("xy"); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.appManagement.xyGraph} /></button>
+                                        <button type="button" onClick={() => { openAuthGraphsModal("pie"); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.appManagement.pieGraph} /></button>
+                                        <button type="button" onClick={() => { openAuthGraphsModal("histogram"); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.appManagement.histogramGraph} /></button>
                                     </div>
                                 </details>
-                                <button type="button" onClick={() => { void triggerAppShutdown(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-red-700 hover:bg-red-50">Arret de l'application</button>
-                                <button type="button" onClick={() => { void clearMaintenance(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-green-700 hover:bg-green-50">Fin de maintenance</button>
-                                <button type="button" onClick={() => { void forceReopenMaintenance(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-emerald-800 hover:bg-emerald-50">Forcer reouverture normale</button>
+                                <button type="button" onClick={() => { void triggerAppShutdown(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-red-700 hover:bg-red-50"><HeaderLabel text={headerLabels.appManagement.shutdown} /></button>
+                                <button type="button" onClick={() => { void clearMaintenance(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-green-700 hover:bg-green-50"><HeaderLabel text={headerLabels.appManagement.clearMaintenance} /></button>
+                                <button type="button" onClick={() => { void forceReopenMaintenance(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-emerald-800 hover:bg-emerald-50"><HeaderLabel text={headerLabels.appManagement.forceReopen} /></button>
                             </div>
                         )}
 
                         <div className="space-y-1 border-t border-gray-100 pt-2">
                             {!isAuthenticated && (
-                                <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Connexion</Link>
+                                <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.login} /></Link>
                             )}
 
                             {!canAccessAdmin && (
-                                <Link to="/admin/login" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Admin</Link>
+                                <Link to="/admin/login" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.admin} /></Link>
                             )}
 
                             {canAccessAdmin && (
-                                <Link to="/mock-studio" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Mock Studio</Link>
+                                <Link to="/mock-studio" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.mockStudio} /></Link>
                             )}
 
                             {canAccessAdmin && (
-                                <Link to="/admin/patient-audits" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Audits patient</Link>
+                                <Link to="/admin/patient-audits" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.patientAudits} /></Link>
                             )}
 
                             {canAccessAdmin && (
-                                <Link to="/admin/openai-logs" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Audits OpenAI</Link>
+                                <Link to="/admin/openai-logs" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.openaiAudits} /></Link>
                             )}
 
                             {canAccessAdmin && user?.role === "SUPERADMIN" && (
-                                <Link to="/admin/users/manage" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">Utilisateurs</Link>
+                                <Link to="/admin/users/manage" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.users} /></Link>
                             )}
 
-                            {canAccessAdmin && (
+                            {isAuthenticated && (
                                 <button
                                     onClick={logout}
                                     className="block w-full rounded px-2 py-2 text-left text-sm text-red-600 hover:bg-red-50"
                                 >
-                                    Déconnexion
+                                    <HeaderLabel text={headerLabels.nav.logout} />
                                 </button>
                             )}
                         </div>
@@ -1238,7 +1253,7 @@ const Header: React.FC = () => {
                     <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-2xl">
                         <div className="mb-4 flex items-center justify-between gap-4">
                             <h2 className="text-lg font-semibold text-gray-900">
-                                Usagers actifs
+                                <HeaderLabel text={headerLabels.activeUsersModal.title} />
                             </h2>
                             <div className="flex items-center gap-2">
                                 <button
@@ -1248,26 +1263,26 @@ const Header: React.FC = () => {
                                     }}
                                     className="rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
                                 >
-                                    Rafraichir
+                                    <HeaderLabel text={headerLabels.controls.refresh} />
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setShowActiveUsersModal(false)}
                                     className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
                                 >
-                                    Fermer
+                                    <HeaderLabel text={headerLabels.controls.close} />
                                 </button>
                             </div>
                         </div>
 
                         {loadingActiveUsers ? (
-                            <p className="text-sm text-gray-500">Chargement des usagers actifs...</p>
+                            <p className="text-sm text-gray-500"><HeaderLabel text={headerLabels.activeUsersModal.loading} /></p>
                         ) : activeUsersError ? (
                             <div className="rounded bg-red-50 p-3 text-sm text-red-700">
                                 {activeUsersError}
                             </div>
                         ) : activeUsers.length === 0 ? (
-                            <p className="text-sm text-gray-500">Aucun usager actif.</p>
+                            <p className="text-sm text-gray-500"><HeaderLabel text={headerLabels.activeUsersModal.empty} /></p>
                         ) : (
                             <div className="max-h-[360px] space-y-3 overflow-y-auto">
                                 {activeUsers.map((activeUser) => (
@@ -1279,12 +1294,12 @@ const Header: React.FC = () => {
                                             {activeUser.username} ({activeUser.role})
                                         </div>
                                         <div className="text-xs text-gray-600">
-                                            {activeUser.email || "Aucun courriel"}
+                                            {activeUser.email || <HeaderLabel text={headerLabels.activeUsersModal.noEmail} />}
                                         </div>
                                         <div className="text-xs text-gray-500">
-                                            Derniere connexion: {activeUser.lastLoginAt
+                                            <HeaderLabel text={headerLabels.activeUsersModal.lastLogin} /> {activeUser.lastLoginAt
                                                 ? new Date(activeUser.lastLoginAt).toLocaleString()
-                                                : "Inconnue"}
+                                                : <HeaderLabel text={headerLabels.activeUsersModal.unknown} />}
                                         </div>
                                     </div>
                                 ))}
@@ -1300,12 +1315,12 @@ const Header: React.FC = () => {
                         <div className="w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
                         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                             <h2 className="text-lg font-semibold text-gray-900">
-                                Auth Log
+                                <HeaderLabel text={headerLabels.authLogsModal.title} />
                             </h2>
                             <div className="flex items-center gap-3">
                                 {user?.role === "SUPERADMIN" && authLogsQueryDurationMs !== null && (
                                     <span className="text-xs text-gray-500">
-                                        Temps requete: {authLogsQueryDurationMs} ms
+                                        <HeaderLabel text={headerLabels.authLogsModal.queryTimePrefix} /> {authLogsQueryDurationMs} ms
                                     </span>
                                 )}
                                 <button
@@ -1313,14 +1328,14 @@ const Header: React.FC = () => {
                                     onClick={closeAuthLogsModal}
                                     className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
                                 >
-                                    Fermer
+                                    <HeaderLabel text={headerLabels.controls.close} />
                                 </button>
                             </div>
                         </div>
 
                         <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <label className="text-sm text-gray-700">
-                                Date debut
+                                <HeaderLabel text={headerLabels.authLogsModal.startDate} />
                                 <input
                                     type="date"
                                     value={authLogStartDate}
@@ -1330,7 +1345,7 @@ const Header: React.FC = () => {
                                 />
                             </label>
                             <label className="text-sm text-gray-700">
-                                Date fin
+                                <HeaderLabel text={headerLabels.authLogsModal.endDate} />
                                 <input
                                     type="date"
                                     value={authLogEndDate}
@@ -1340,7 +1355,7 @@ const Header: React.FC = () => {
                                 />
                             </label>
                             <label className="text-sm text-gray-700 sm:col-span-2">
-                                Action
+                                <HeaderLabel text={headerLabels.authLogsModal.action} />
                                 <select
                                     value={authLogAction}
                                     onChange={(event) => setAuthLogAction(event.target.value)}
@@ -1363,7 +1378,7 @@ const Header: React.FC = () => {
                                 }}
                                 className="rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
                             >
-                                Rechercher
+                                <HeaderLabel text={headerLabels.controls.search} />
                             </button>
                             <button
                                 type="button"
@@ -1375,7 +1390,7 @@ const Header: React.FC = () => {
                                 }}
                                 className="rounded bg-gray-50 px-3 py-1 text-sm text-gray-700 hover:bg-gray-100"
                             >
-                                Reinitialiser
+                                <HeaderLabel text={headerLabels.controls.reset} />
                             </button>
                         </div>
 
@@ -1385,27 +1400,27 @@ const Header: React.FC = () => {
                                     className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700"
                                     aria-hidden="true"
                                 />
-                                <span>Chargement des logs auth...</span>
+                                <span><HeaderLabel text={headerLabels.authLogsModal.loading} /></span>
                             </div>
                         ) : authLogsError ? (
                             <div className="rounded bg-red-50 p-3 text-sm text-red-700">
                                 {authLogsError}
                             </div>
                         ) : authLogs.length === 0 ? (
-                            <p className="text-sm text-gray-500">Aucun resultat.</p>
+                            <p className="text-sm text-gray-500"><HeaderLabel text={headerLabels.authLogsModal.empty} /></p>
                         ) : (
                             <>
                                 <div className="max-h-[420px] overflow-auto rounded border border-gray-200">
                                     <table className="min-w-full border-collapse text-left text-xs sm:text-sm">
                                         <thead className="bg-gray-50 text-gray-600">
                                             <tr>
-                                                <th className="px-3 py-2">Date</th>
-                                                <th className="px-3 py-2">Action</th>
-                                                <th className="px-3 py-2">Resultat</th>
-                                                <th className="px-3 py-2">Usager</th>
-                                                <th className="px-3 py-2">Role</th>
-                                                <th className="px-3 py-2">IP</th>
-                                                <th className="px-3 py-2">Raison</th>
+                                                <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableDate} /></th>
+                                                <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableAction} /></th>
+                                                <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableResult} /></th>
+                                                <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableUser} /></th>
+                                                <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableRole} /></th>
+                                                <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableIp} /></th>
+                                                <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableReason} /></th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1451,7 +1466,7 @@ const Header: React.FC = () => {
                                         {"<"}
                                     </button>
                                     <span>
-                                        Page {authLogPagination.page}/{Math.max(1, authLogPagination.totalPages)} - {authLogPagination.total} resultats
+                                        <HeaderLabel text={headerLabels.authLogsModal.page} /> {authLogPagination.page}/{Math.max(1, authLogPagination.totalPages)} - {authLogPagination.total} <HeaderLabel text={headerLabels.authLogsModal.results} />
                                     </span>
                                     <button
                                         type="button"
@@ -1496,24 +1511,24 @@ const Header: React.FC = () => {
                         <div className="w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
                             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                                 <h2 className="text-lg font-semibold text-gray-900">
-                                    Auth Graphs - {AUTH_GRAPH_TYPE_LABELS[authGraphType]}
+                                    <HeaderLabel text={headerLabels.authGraphsModal.titlePrefix} /> - {AUTH_GRAPH_TYPE_LABELS[authGraphType]}
                                 </h2>
                                 <button
                                     type="button"
                                     onClick={closeAuthGraphsModal}
                                     className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
                                 >
-                                    Fermer
+                                    <HeaderLabel text={headerLabels.controls.close} />
                                 </button>
                             </div>
 
                             <div className="mb-3 text-xs text-gray-500">
-                                Axe X: Date | Axe Y: Nombre de log
+                                <HeaderLabel text={headerLabels.authGraphsModal.axisLabel} />
                             </div>
 
                             <div className="mb-4 grid gap-3 sm:grid-cols-2">
                                 <label className="text-sm text-gray-700">
-                                    Date debut
+                                    <HeaderLabel text={headerLabels.authLogsModal.startDate} />
                                     <input
                                         type="date"
                                         value={authLogStartDate}
@@ -1523,7 +1538,7 @@ const Header: React.FC = () => {
                                     />
                                 </label>
                                 <label className="text-sm text-gray-700">
-                                    Date fin
+                                    <HeaderLabel text={headerLabels.authLogsModal.endDate} />
                                     <input
                                         type="date"
                                         value={authLogEndDate}
@@ -1538,21 +1553,21 @@ const Header: React.FC = () => {
                                 <div className="flex items-center gap-3 text-sm text-gray-500">
                                     <span
                                         className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700"
-                                        aria-hidden="true"
-                                    />
-                                    <span>Chargement du graphique auth...</span>
+                                    aria-hidden="true"
+                                />
+                                    <span><HeaderLabel text={headerLabels.authGraphsModal.loading} /></span>
                                 </div>
                             ) : authGraphsError ? (
                                 <div className="rounded bg-red-50 p-3 text-sm text-red-700">
                                     {authGraphsError}
                                 </div>
                             ) : authGraphPoints.length === 0 ? (
-                                <p className="text-sm text-gray-500">Aucune donnee pour cette plage.</p>
+                                <p className="text-sm text-gray-500"><HeaderLabel text={headerLabels.authGraphsModal.emptyRange} /></p>
                             ) : (
                                 <div className="h-80 w-full rounded border border-gray-200 p-2 sm:p-4">
                                     {authGraphType === "pie" ? (
                                         authGraphPieData.length === 0 ? (
-                                            <p className="px-2 py-4 text-sm text-gray-500">Aucune donnee action pour ce graphique.</p>
+                                            <p className="px-2 py-4 text-sm text-gray-500"><HeaderLabel text={headerLabels.authGraphsModal.emptyAction} /></p>
                                         ) : (
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <PieChart>
@@ -1596,7 +1611,7 @@ const Header: React.FC = () => {
                                                         />
                                                     }
                                                 />
-                                                <Bar dataKey="total" name="Nombre de log" fill="#2563eb" />
+                                                <Bar dataKey="total" name={headerLabels.authGraphsModal.logCount} fill="#2563eb" />
                                             </BarChart>
                                         </ResponsiveContainer>
                                     ) : (

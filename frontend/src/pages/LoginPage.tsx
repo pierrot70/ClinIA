@@ -2,10 +2,22 @@ import React, { useMemo, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { getDefaultRouteForRole, isAdminRole, type UserRole } from "../auth/roles";
 import { useAuth } from "../hooks/useAuth";
+import { useHomeI18n } from "../contexts/HomeI18nContext";
+import { useTranslation } from "../hooks/useTranslation";
+import { labels } from "../i18n/uiLabels";
 
 type LoginPageProps = {
     adminOnly?: boolean;
 };
+
+function useLoginLabel(text: string) {
+    const { locale } = useHomeI18n();
+    return useTranslation({
+        text,
+        targetLang: locale,
+        namespace: "login",
+    }).translated;
+}
 
 const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     const [email, setEmail] = useState("");
@@ -18,6 +30,26 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const { isAuthenticated, user, login, registerSelf, logout } = useAuth();
+    const loginLabels = labels.loginPage;
+    const titleAdmin = useLoginLabel(loginLabels.title.admin);
+    const titleRegister = useLoginLabel(loginLabels.title.register);
+    const titleLogin = useLoginLabel(loginLabels.title.login);
+    const descriptionAdmin = useLoginLabel(loginLabels.description.admin);
+    const descriptionRegister = useLoginLabel(loginLabels.description.register);
+    const descriptionLogin = useLoginLabel(loginLabels.description.login);
+    const alreadyHaveAccountLabel = useLoginLabel(loginLabels.modeToggle.alreadyHaveAccount);
+    const createAccountModeLabel = useLoginLabel(loginLabels.modeToggle.createAccount);
+    const emailLabel = useLoginLabel(loginLabels.fields.email);
+    const identifierLabel = useLoginLabel(loginLabels.fields.identifier);
+    const passwordLabel = useLoginLabel(loginLabels.fields.password);
+    const accountRoleLabel = useLoginLabel(loginLabels.fields.accountRole);
+    const creatingLabel = useLoginLabel(loginLabels.action.creating);
+    const loggingInLabel = useLoginLabel(loginLabels.action.loggingIn);
+    const createAccountLabel = useLoginLabel(loginLabels.action.createAccount);
+    const loginActionLabel = useLoginLabel(loginLabels.action.login);
+    const adminOnlyErrorLabel = useLoginLabel(loginLabels.errors.adminOnly);
+    const createFailedLabel = useLoginLabel(loginLabels.errors.createFailed);
+    const loginFailedLabel = useLoginLabel(loginLabels.errors.loginFailed);
 
     const redirectTarget = useMemo(() => {
         const from = (location.state as { from?: string } | null)?.from;
@@ -50,7 +82,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
 
             if (adminOnly && !isAdminRole(session.user.role)) {
                 await logout();
-                setError("Acces reserve aux comptes administrateurs.");
+                setError(adminOnlyErrorLabel);
                 return;
             }
 
@@ -69,8 +101,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
             } else {
                 setError(
                     registerMode
-                        ? "Impossible de creer le compte."
-                        : "Impossible de se connecter. Verifiez vos identifiants."
+                        ? createFailedLabel
+                        : loginFailedLabel
                 );
             }
         } finally {
@@ -82,17 +114,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
         <div className="max-w-md mx-auto px-4 py-12">
             <h1 className="text-2xl font-semibold mb-2 text-gray-900">
                 {adminOnly
-                    ? "Connexion administrateur"
+                    ? titleAdmin
                     : registerMode
-                        ? "Creation de compte ClinIA"
-                        : "Connexion ClinIA"}
+                        ? titleRegister
+                        : titleLogin}
             </h1>
             <p className="text-sm text-gray-600 mb-6">
                 {adminOnly
-                    ? "Acces reserve a la console d'administration ClinIA."
+                    ? descriptionAdmin
                     : registerMode
-                        ? "Creer un compte avec votre courriel, mot de passe et role."
-                        : "Connectez-vous pour acceder aux modules cliniques securises."}
+                        ? descriptionRegister
+                        : descriptionLogin}
             </p>
 
             {!adminOnly && (
@@ -102,8 +134,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                     className="mb-4 text-sm text-blue-600 hover:text-blue-700"
                 >
                     {registerMode
-                        ? "J'ai deja un compte"
-                        : "Je n'ai pas de compte, en creer un"}
+                        ? alreadyHaveAccountLabel
+                        : createAccountModeLabel}
                 </button>
             )}
 
@@ -117,8 +149,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                 <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1" htmlFor="email">
                         {registerMode && !adminOnly
-                            ? "Courriel"
-                            : "Identifiant (courriel ou nom d'utilisateur)"}
+                            ? emailLabel
+                            : identifierLabel}
                     </label>
                     <input
                         id="email"
@@ -133,7 +165,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
 
                 <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1" htmlFor="password">
-                        Mot de passe
+                        {passwordLabel}
                     </label>
                     <input
                         id="password"
@@ -149,7 +181,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                 {registerMode && !adminOnly && (
                     <div>
                         <label className="block text-xs font-semibold text-gray-700 mb-1" htmlFor="register-role">
-                            Role du compte
+                            {accountRoleLabel}
                         </label>
                         <select
                             id="register-role"
@@ -174,11 +206,11 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                 >
                     {loading
                         ? registerMode && !adminOnly
-                            ? "Creation..."
-                            : "Connexion..."
+                            ? creatingLabel
+                            : loggingInLabel
                         : registerMode && !adminOnly
-                            ? "Creer mon compte"
-                            : "Se connecter"}
+                            ? createAccountLabel
+                            : loginActionLabel}
                 </button>
             </form>
         </div>
