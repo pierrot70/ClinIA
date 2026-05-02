@@ -1,12 +1,7 @@
 import { withSecurityIncidentGuard } from "./securityIncidentGuard";
 import { authFetch } from "./authService";
 import type { ApiResponse } from "../types/api";
-
-const API_URL = import.meta.env.VITE_API_URL as string;
-
-if (!API_URL) {
-    throw new Error("VITE_API_URL is not defined");
-}
+import { API_URL } from "./config";
 
 export interface Specialist {
     _id: string;

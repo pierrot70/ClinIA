@@ -30,12 +30,14 @@ import { ClinicianCommentsPage } from "./pages/ClinicianCommentsPage";
 import { labels } from "./i18n/uiLabels";
 import { HomeI18nContext } from "./contexts/HomeI18nContext";
 import { useTranslation } from "./hooks/useTranslation";
+import { API_URL } from "./services/config";
 
 const CLINICAL_ROLES = ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
 const ADMIN_ROLES = ["ADMIN", "SUPERADMIN"] as const;
 const SUPERADMIN_ROLES = ["SUPERADMIN"] as const;
-const API_URL = import.meta.env.VITE_API_URL as string;
 const APP_STATUS_REFRESH_MS = 10_000;
+const HOME_DEMO_TIP_STORAGE_KEY = "clinia_home_demo_tip_seen";
+const HOME_DEMO_TIP_EVENT = "clinia:show-demo-tooltip";
 
 function CoolifyLandingPage() {
     const landingLabels = labels.app.landing;
@@ -49,6 +51,48 @@ function CoolifyLandingPage() {
     const { translated: doctorLoginBody } = useTranslation({ text: landingLabels.doctorLoginBody, targetLang, namespace: "app-landing" });
     const { translated: adminLoginTitle } = useTranslation({ text: landingLabels.adminLoginTitle, targetLang, namespace: "app-landing" });
     const { translated: adminLoginBody } = useTranslation({ text: landingLabels.adminLoginBody, targetLang, namespace: "app-landing" });
+    const { translated: demoTooltip } = useTranslation({ text: landingLabels.demoTooltip, targetLang, namespace: "app-landing" });
+    const { translated: tooltipOk } = useTranslation({ text: landingLabels.tooltipOk, targetLang, namespace: "app-landing" });
+    const [showDemoTooltip, setShowDemoTooltip] = useState(false);
+
+    const dismissDemoTooltip = () => {
+        try {
+            window.sessionStorage.setItem(HOME_DEMO_TIP_STORAGE_KEY, "true");
+        } catch {}
+        setShowDemoTooltip(false);
+    };
+
+    useEffect(() => {
+        const handleShowDemoTooltip = () => {
+            let alreadySeen = false;
+            try {
+                alreadySeen = window.sessionStorage.getItem(HOME_DEMO_TIP_STORAGE_KEY) === "true";
+            } catch {}
+
+            if (!alreadySeen) {
+                setShowDemoTooltip(true);
+            }
+        };
+
+        window.addEventListener(HOME_DEMO_TIP_EVENT, handleShowDemoTooltip);
+        return () => {
+            window.removeEventListener(HOME_DEMO_TIP_EVENT, handleShowDemoTooltip);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!showDemoTooltip) {
+            return;
+        }
+
+        const timerId = window.setTimeout(() => {
+            dismissDemoTooltip();
+        }, 3_000);
+
+        return () => {
+            window.clearTimeout(timerId);
+        };
+    }, [showDemoTooltip]);
 
     return (
         <section className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-12">
@@ -62,17 +106,40 @@ function CoolifyLandingPage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
-                <Link
-                    to="/clinical-demo"
-                    className="rounded-xl border border-sky-200 bg-sky-50 p-5 shadow-sm transition hover:border-sky-300 hover:bg-sky-100"
-                >
-                    <div className="text-lg font-semibold text-sky-950">
-                        {clinicalDemoTitle}
-                    </div>
-                    <p className="mt-2 text-sm text-sky-900">
-                        {clinicalDemoBody}
-                    </p>
-                </Link>
+                <div className="relative">
+                    {showDemoTooltip && (
+                        <div className="absolute bottom-full left-1/2 z-[100] mb-3 w-72 -translate-x-1/2 rounded-xl border border-cyan-500 bg-cyan-50 p-4 text-sm text-cyan-950 shadow-2xl">
+                            <div className="mb-2 text-base font-semibold">
+                                {clinicalDemoTitle}
+                            </div>
+                            <p>{demoTooltip}</p>
+                            <button
+                                type="button"
+                                onClick={dismissDemoTooltip}
+                                className="mt-3 rounded bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+                            >
+                                {tooltipOk}
+                            </button>
+                            <span className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-cyan-500 bg-cyan-50" aria-hidden="true" />
+                        </div>
+                    )}
+                    <Link
+                        to="/clinical-demo"
+                        className={
+                            "block rounded-xl border bg-sky-50 p-5 shadow-sm transition hover:border-sky-300 hover:bg-sky-100 " +
+                            (showDemoTooltip
+                                ? "border-emerald-500 ring-2 ring-emerald-200"
+                                : "border-sky-200")
+                        }
+                    >
+                        <div className="text-lg font-semibold text-sky-950">
+                            {clinicalDemoTitle}
+                        </div>
+                        <p className="mt-2 text-sm text-sky-900">
+                            {clinicalDemoBody}
+                        </p>
+                    </Link>
+                </div>
 
                 <Link
                     to="/login"

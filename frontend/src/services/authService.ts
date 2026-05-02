@@ -1,12 +1,8 @@
 import type { UserRole } from "../auth/roles";
+import { API_URL } from "./config";
 
-const API_URL = import.meta.env.VITE_API_URL as string;
 const REFRESH_TOKEN_STORAGE_KEY = "clinia_refresh_token";
 const ACCESS_TOKEN_REFRESH_SKEW_MS = 30_000;
-
-if (!API_URL) {
-    throw new Error("VITE_API_URL is not defined");
-}
 
 export interface AuthUser {
     id?: string;

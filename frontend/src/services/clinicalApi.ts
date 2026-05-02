@@ -4,14 +4,9 @@ import { authFetch } from "./authService";
 
 import type { ClinicalAnalysis, ClinicalPayload } from "../types/clinical";
 import type { ApiResponse, ApiSuccess, ApiFailure } from "../types/api";
+import { API_URL } from "./config";
 
 const isDev = import.meta.env.MODE === "development";
-
-const API_URL = import.meta.env.VITE_API_URL as string;
-
-if (!API_URL) {
-    throw new Error("VITE_API_URL is not defined");
-}
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */

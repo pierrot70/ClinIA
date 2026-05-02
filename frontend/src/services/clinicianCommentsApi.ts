@@ -1,4 +1,5 @@
 import { authFetch } from "./authService";
+import { API_URL } from "./config";
 
 export type ClinicianComment = {
     id: string;
@@ -121,7 +122,7 @@ export async function lookupClinicianReplies(
         trackingCode: trackingCode.trim().toUpperCase(),
     });
     const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/clinician-comments/lookup-replies?${query.toString()}`
+        `${API_URL}/api/clinician-comments/lookup-replies?${query.toString()}`
     );
     const payload = await toJson(response);
 

@@ -263,7 +263,11 @@ const Header: React.FC = () => {
         totalPages: 1,
     });
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [showPublicLanguageTip, setShowPublicLanguageTip] = useState(false);
     const ACTIVE_USERS_REFRESH_MS = 5_000;
+    const isPublicHomeHeader = !showFullHeaderNav && location.pathname === "/";
+    const LANGUAGE_TIP_STORAGE_KEY = "clinia_home_language_tip_seen";
+    const DEMO_TIP_EVENT = "clinia:show-demo-tooltip";
 
     const logout = () => {
         logoutSession().finally(() => {
@@ -335,6 +339,40 @@ const Header: React.FC = () => {
             })
         );
     };
+
+    const completePublicLanguageTip = () => {
+        try {
+            window.sessionStorage.setItem(LANGUAGE_TIP_STORAGE_KEY, "true");
+        } catch {}
+        setShowPublicLanguageTip(false);
+        window.dispatchEvent(new CustomEvent(DEMO_TIP_EVENT));
+    };
+
+    useEffect(() => {
+        if (!isPublicHomeHeader) {
+            setShowPublicLanguageTip(false);
+            return;
+        }
+
+        let alreadySeen = false;
+        try {
+            alreadySeen = window.sessionStorage.getItem(LANGUAGE_TIP_STORAGE_KEY) === "true";
+        } catch {}
+
+        if (alreadySeen) {
+            setShowPublicLanguageTip(false);
+            return;
+        }
+
+        setShowPublicLanguageTip(true);
+        const timerId = window.setTimeout(() => {
+            completePublicLanguageTip();
+        }, 3_000);
+
+        return () => {
+            window.clearTimeout(timerId);
+        };
+    }, [isPublicHomeHeader]);
 
     const triggerAppShutdown = async () => {
         const confirmed = window.confirm(
@@ -782,10 +820,32 @@ const Header: React.FC = () => {
                         </>
                     ) : (
                         <>
-                            <label className="justify-self-center flex items-center gap-2 text-gray-600">
+                            <div className="relative justify-self-center">
+                                {showPublicLanguageTip && (
+                                    <div className="absolute left-1/2 top-full z-[100] mt-3 w-72 -translate-x-1/2 rounded-xl border border-cyan-500 bg-cyan-50 p-4 text-sm text-cyan-950 shadow-2xl">
+                                        <span className="absolute bottom-full left-1/2 h-3 w-3 -translate-x-1/2 translate-y-1/2 rotate-45 border-l border-t border-cyan-500 bg-cyan-50" aria-hidden="true" />
+                                        <div className="mb-2 text-base font-semibold">
+                                            <HeaderLabel text={headerLabels.controls.language} />
+                                        </div>
+                                        <p><HeaderLabel text={headerLabels.publicHome.languageTooltip} /></p>
+                                        <button
+                                            type="button"
+                                            onClick={completePublicLanguageTip}
+                                            className="mt-3 rounded bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+                                        >
+                                            <HeaderLabel text={headerLabels.publicHome.tooltipOk} />
+                                        </button>
+                                    </div>
+                                )}
+                            <label className="flex items-center gap-2 text-gray-600">
                                 <span className="text-xs"><HeaderLabel text={headerLabels.controls.language} /></span>
                                 <select
-                                    className="rounded border border-gray-300 bg-white px-2 py-1 text-xs"
+                                    className={
+                                        "rounded border bg-white px-2 py-1 text-xs transition " +
+                                        (showPublicLanguageTip
+                                            ? "border-emerald-500 ring-2 ring-emerald-200"
+                                            : "border-gray-300")
+                                    }
                                     value={locale}
                                     onChange={onLanguageChange}
                                     disabled={isTranslating}
@@ -798,6 +858,7 @@ const Header: React.FC = () => {
                                     ))}
                                 </select>
                             </label>
+                            </div>
                             <Link to="/" className="justify-self-end text-sm text-gray-700">
                                 <HeaderLabel text={headerLabels.nav.home} />
                             </Link>
@@ -858,22 +919,45 @@ const Header: React.FC = () => {
                 <nav className="mt-3 hidden items-center gap-4 text-sm lg:flex">
                     {showFullHeaderNav && <VoiceNavButton />}
 
-                    <label className="flex items-center gap-2 text-gray-600">
-                        <span className="text-xs"><HeaderLabel text={headerLabels.controls.language} /></span>
-                        <select
-                            className="rounded border border-gray-300 bg-white px-2 py-1 text-xs"
-                            value={locale}
-                            onChange={onLanguageChange}
-                            disabled={isTranslating}
-                            aria-label={headerLabels.controls.language}
-                        >
-                            {languageOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
+                    <div className="relative">
+                        {showPublicLanguageTip && (
+                            <div className="absolute left-1/2 top-full z-[100] mt-3 w-72 -translate-x-1/2 rounded-xl border border-cyan-500 bg-cyan-50 p-4 text-sm text-cyan-950 shadow-2xl">
+                                <span className="absolute bottom-full left-1/2 h-3 w-3 -translate-x-1/2 translate-y-1/2 rotate-45 border-l border-t border-cyan-500 bg-cyan-50" aria-hidden="true" />
+                                <div className="mb-2 text-base font-semibold">
+                                    <HeaderLabel text={headerLabels.controls.language} />
+                                </div>
+                                <p><HeaderLabel text={headerLabels.publicHome.languageTooltip} /></p>
+                                <button
+                                    type="button"
+                                    onClick={completePublicLanguageTip}
+                                    className="mt-3 rounded bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+                                >
+                                    <HeaderLabel text={headerLabels.publicHome.tooltipOk} />
+                                </button>
+                            </div>
+                        )}
+                        <label className="flex items-center gap-2 text-gray-600">
+                            <span className="text-xs"><HeaderLabel text={headerLabels.controls.language} /></span>
+                            <select
+                                className={
+                                    "rounded border bg-white px-2 py-1 text-xs transition " +
+                                    (showPublicLanguageTip
+                                        ? "border-emerald-500 ring-2 ring-emerald-200"
+                                        : "border-gray-300")
+                                }
+                                value={locale}
+                                onChange={onLanguageChange}
+                                disabled={isTranslating}
+                                aria-label={headerLabels.controls.language}
+                            >
+                                {languageOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    </div>
 
                     <Link to="/" className={linkClass("/")}>
                         <HeaderLabel text={headerLabels.nav.home} />
@@ -1264,7 +1348,6 @@ const Header: React.FC = () => {
                     </div>
                 )}
             </div>
-
             {showActiveUsersModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
                     <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-2xl">

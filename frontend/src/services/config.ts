@@ -1,8 +1,20 @@
-export const RAW_API_URL = (import.meta.env.VITE_API_URL as string | undefined) || "";
-export const API_URL = RAW_API_URL.endsWith("/")
-  ? RAW_API_URL.slice(0, -1)
-  : RAW_API_URL;
+const RAW_API_URL = (import.meta.env.VITE_API_URL as string | undefined) || "";
 
-// Log temporaire pour debug en production
-// eslint-disable-next-line no-console
-console.log("[DEBUG] VITE_API_URL:", import.meta.env.VITE_API_URL, "API_URL:", API_URL);
+function getFallbackApiUrl() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const hostname = window.location.hostname;
+  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
+    return "http://localhost:4000";
+  }
+
+  return "";
+}
+
+const normalizedRawApiUrl = RAW_API_URL || getFallbackApiUrl();
+
+export const API_URL = normalizedRawApiUrl.endsWith("/")
+  ? normalizedRawApiUrl.slice(0, -1)
+  : normalizedRawApiUrl;

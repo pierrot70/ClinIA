@@ -1,11 +1,6 @@
 import type { ApiResponse } from "../types/api";
 import { withSecurityIncidentGuard } from "./securityIncidentGuard";
-
-const API_URL = import.meta.env.VITE_API_URL as string;
-
-if (!API_URL) {
-    throw new Error("VITE_API_URL is not defined");
-}
+import { API_URL } from "./config";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */

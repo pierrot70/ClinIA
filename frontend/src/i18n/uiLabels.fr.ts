@@ -12,6 +12,9 @@ export const UI_LABELS_FR = {
             doctorLoginBody: "Ouvrir la page de connexion utilisateur.",
             adminLoginTitle: "Connexion admin",
             adminLoginBody: "Ouvrir la page de connexion administrateur.",
+            demoTooltip:
+                "Ce bouton vous permet de vous familiariser avec l'application sans connexion.",
+            tooltipOk: "OK",
         },
         // App.tsx - bannière globale lorsque le mode maintenance est actif.
         status: {
@@ -32,6 +35,11 @@ export const UI_LABELS_FR = {
             refresh: "Rafraichir",
             search: "Rechercher",
             reset: "Reinitialiser",
+        },
+        publicHome: {
+            languageTooltip:
+                "Vous pouvez sélectionner la langue de votre choix.",
+            tooltipOk: "OK",
         },
         aiMode: {
             real: "IA réelle",
