@@ -60,6 +60,10 @@ const AdminUserSchema = new mongoose.Schema({
         type: Date,
         default: null,
     },
+    clinicianCommentsInboxSeenAt: {
+        type: Date,
+        default: null,
+    },
     authTokenInvalidBefore: {
         type: Date,
         default: null,

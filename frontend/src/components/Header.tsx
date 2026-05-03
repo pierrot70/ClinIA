@@ -4,10 +4,15 @@ import VoiceNavButton from "./VoiceNavButton";
 import { OpenAILogsModal } from "./OpenAILogsModal";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { useAuth } from "../hooks/useAuth";
+import { useSensitiveReauthDialog } from "../hooks/useSensitiveReauthDialog";
 import { isAdminRole } from "../auth/roles";
 import { SessionExpiredError } from "../services/authService";
 import { useTranslation } from "../hooks/useTranslation";
 import { labels } from "../i18n/uiLabels";
+import {
+    listClinicianCommentsInbox,
+    type ClinicianComment,
+} from "../services/clinicianCommentsApi";
 import {
     Bar,
     BarChart,
@@ -64,6 +69,7 @@ type DateRangeSnapshot = {
 };
 
 type AuthGraphType = "xy" | "pie" | "histogram";
+type InboxRepliedFilter = "" | "yes" | "no";
 
 type AuthGraphTooltipProps = {
     active?: boolean;
@@ -220,8 +226,8 @@ const Header: React.FC = () => {
         user,
         logout: logoutSession,
         authFetch,
-        reauthenticate,
     } = useAuth();
+    const { requestSensitiveReauth, sensitiveReauthModal } = useSensitiveReauthDialog();
     const FORCE_REAL_STORAGE_KEY = "clinia_force_real";
     const canAccessAdmin = isAuthenticated && isAdminRole(user?.role);
     const isProd = !!import.meta.env.PROD;
@@ -242,6 +248,7 @@ const Header: React.FC = () => {
     const [showAuthLogsModal, setShowAuthLogsModal] = useState(false);
     const [showAuthGraphsModal, setShowAuthGraphsModal] = useState(false);
     const [showOpenAILogsModal, setShowOpenAILogsModal] = useState(false);
+    const [showClinicianInboxModal, setShowClinicianInboxModal] = useState(false);
     const [authGraphType, setAuthGraphType] = useState<AuthGraphType>("xy");
     const [authLogs, setAuthLogs] = useState<AuthLogEntry[]>([]);
     const [loadingAuthLogs, setLoadingAuthLogs] = useState(false);
@@ -257,7 +264,23 @@ const Header: React.FC = () => {
     const [loadingAuthGraphs, setLoadingAuthGraphs] = useState(false);
     const [authGraphsError, setAuthGraphsError] = useState<string | null>(null);
     const [authGraphsDateSnapshot, setAuthGraphsDateSnapshot] = useState<DateRangeSnapshot | null>(null);
+    const [clinicianInboxItems, setClinicianInboxItems] = useState<ClinicianComment[]>([]);
+    const [clinicianInboxActors, setClinicianInboxActors] = useState<string[]>([]);
+    const [clinicianInboxLoading, setClinicianInboxLoading] = useState(false);
+    const [clinicianInboxError, setClinicianInboxError] = useState<string | null>(null);
+    const [clinicianInboxActorFilter, setClinicianInboxActorFilter] = useState("");
+    const [clinicianInboxCategoryFilter, setClinicianInboxCategoryFilter] = useState("");
+    const [clinicianInboxRepliedFilter, setClinicianInboxRepliedFilter] = useState<InboxRepliedFilter>("");
+    const [clinicianInboxStartDate, setClinicianInboxStartDate] = useState(todayDateValue);
+    const [clinicianInboxEndDate, setClinicianInboxEndDate] = useState(todayDateValue);
+    const [hasCheckedClinicianInbox, setHasCheckedClinicianInbox] = useState(false);
     const [authLogPagination, setAuthLogPagination] = useState<AuthLogPagination>({
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 1,
+    });
+    const [clinicianInboxPagination, setClinicianInboxPagination] = useState({
         page: 1,
         limit: 10,
         total: 0,
@@ -269,6 +292,7 @@ const Header: React.FC = () => {
     const isPublicHomeHeader = !showFullHeaderNav && location.pathname === "/";
     const LANGUAGE_TIP_STORAGE_KEY = "clinia_home_language_tip_seen";
     const DEMO_TIP_EVENT = "clinia:show-demo-tooltip";
+    const clinicianInboxLabels = headerLabels.clinicianCommentsInbox;
 
     const logout = () => {
         logoutSession().finally(() => {
@@ -384,19 +408,8 @@ const Header: React.FC = () => {
             return;
         }
 
-        const password = window.prompt(labels.auth.sensitiveAction.prompt) || "";
-        if (!password) {
-            return;
-        }
-
-        try {
-            await reauthenticate(password);
-        } catch (err) {
-            window.alert(
-                err instanceof Error
-                    ? err.message
-                    : labels.auth.sensitiveAction.networkError
-            );
+        const reauthed = await requestSensitiveReauth();
+        if (!reauthed) {
             return;
         }
 
@@ -439,19 +452,8 @@ const Header: React.FC = () => {
             return;
         }
 
-        const password = window.prompt(labels.auth.sensitiveAction.prompt) || "";
-        if (!password) {
-            return;
-        }
-
-        try {
-            await reauthenticate(password);
-        } catch (err) {
-            window.alert(
-                err instanceof Error
-                    ? err.message
-                    : labels.auth.sensitiveAction.networkError
-            );
+        const reauthed = await requestSensitiveReauth();
+        if (!reauthed) {
             return;
         }
 
@@ -488,19 +490,8 @@ const Header: React.FC = () => {
             return;
         }
 
-        const password = window.prompt(labels.auth.sensitiveAction.prompt) || "";
-        if (!password) {
-            return;
-        }
-
-        try {
-            await reauthenticate(password);
-        } catch (err) {
-            window.alert(
-                err instanceof Error
-                    ? err.message
-                    : labels.auth.sensitiveAction.networkError
-            );
+        const reauthed = await requestSensitiveReauth();
+        if (!reauthed) {
             return;
         }
 
@@ -547,14 +538,13 @@ const Header: React.FC = () => {
 
             if (!response.ok) {
                 if (payload?.error?.code === "REAUTH_REQUIRED") {
-                    const password = window.prompt(labels.auth.sensitiveAction.prompt) || "";
-                    if (!password) {
+                    const reauthed = await requestSensitiveReauth();
+                    if (!reauthed) {
                         setActiveUsers([]);
                         return;
                     }
 
                     try {
-                        await reauthenticate(password);
                         await loadActiveUsers(showLoadingState);
                     } catch (err) {
                         setActiveUsersError(
@@ -633,15 +623,14 @@ const Header: React.FC = () => {
 
             if (!response.ok) {
                 if (payload?.error?.code === "REAUTH_REQUIRED") {
-                    const password = window.prompt(labels.auth.sensitiveAction.prompt) || "";
-                    if (!password) {
+                    const reauthed = await requestSensitiveReauth();
+                    if (!reauthed) {
                         setAuthLogs([]);
                         setAuthLogsQueryDurationMs(Math.round(performance.now() - requestStartedAt));
                         return;
                     }
 
                     try {
-                        await reauthenticate(password);
                         await loadAuthLogs(targetPage, showLoadingState);
                     } catch (err) {
                         setAuthLogsError(
@@ -755,15 +744,14 @@ const Header: React.FC = () => {
 
             if (!response.ok) {
                 if (payload?.error?.code === "REAUTH_REQUIRED") {
-                    const password = window.prompt(labels.auth.sensitiveAction.prompt) || "";
-                    if (!password) {
+                    const reauthed = await requestSensitiveReauth();
+                    if (!reauthed) {
                         setAuthGraphPoints([]);
                         setAuthGraphActions([]);
                         return;
                     }
 
                     try {
-                        await reauthenticate(password);
                         await loadAuthGraphs();
                     } catch (err) {
                         setAuthGraphsError(
@@ -863,6 +851,67 @@ const Header: React.FC = () => {
         setShowOpenAILogsModal(false);
     };
 
+    const loadClinicianInbox = async (targetPage = 1, showLoadingState = true) => {
+        if (showLoadingState) {
+            setClinicianInboxLoading(true);
+        }
+        setClinicianInboxError(null);
+
+        try {
+            const response = await listClinicianCommentsInbox(
+                targetPage,
+                clinicianInboxPagination.limit,
+                clinicianInboxActorFilter,
+                clinicianInboxCategoryFilter,
+                clinicianInboxRepliedFilter,
+                clinicianInboxStartDate,
+                clinicianInboxEndDate
+            );
+
+            if (!response.ok) {
+                setClinicianInboxError(response.error.message);
+                setClinicianInboxItems([]);
+                return;
+            }
+
+            setClinicianInboxItems(response.data.items || []);
+            setClinicianInboxActors(response.data.availableActorUsernames || []);
+            setClinicianInboxPagination(
+                response.data.pagination || {
+                    page: targetPage,
+                    limit: 10,
+                    total: 0,
+                    totalPages: 1,
+                }
+            );
+
+            if (response.data.summary?.hasNew) {
+                setShowClinicianInboxModal(true);
+            }
+        } catch (err) {
+            if (err instanceof SessionExpiredError) {
+                logout();
+                return;
+            }
+            setClinicianInboxError("Erreur reseau lors du chargement des nouveaux commentaires.");
+            setClinicianInboxItems([]);
+        } finally {
+            if (showLoadingState) {
+                setClinicianInboxLoading(false);
+            }
+        }
+    };
+
+    const openClinicianInboxModal = async () => {
+        setShowClinicianInboxModal(true);
+        await loadClinicianInbox(1, true);
+    };
+
+    const closeClinicianInboxModal = async () => {
+        setShowClinicianInboxModal(false);
+        setClinicianInboxError(null);
+    };
+
     const formatAuthLogTimestamp = (value: string) => {
         if (!value) {
             return "Inconnu";
@@ -907,6 +956,20 @@ const Header: React.FC = () => {
     useEffect(() => {
         setIsMobileMenuOpen(false);
     }, [location.pathname]);
+
+    useEffect(() => {
+        if (!isAuthenticated || user?.role !== "SUPERADMIN") {
+            setHasCheckedClinicianInbox(false);
+            return;
+        }
+
+        if (hasCheckedClinicianInbox) {
+            return;
+        }
+
+        setHasCheckedClinicianInbox(true);
+        void loadClinicianInbox(1, true);
+    }, [hasCheckedClinicianInbox, isAuthenticated, user?.role]);
 
     return (
         <header className="bg-white border-b border-gray-200">
@@ -1171,6 +1234,15 @@ const Header: React.FC = () => {
                                 >
                                     <HeaderLabel text={headerLabels.appManagement.authLogs} />
                                 </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        void openClinicianInboxModal();
+                                    }}
+                                    className="block w-full px-4 py-2 text-left text-sm text-amber-900 transition hover:bg-amber-50"
+                                >
+                                    <HeaderLabel text={headerLabels.appManagement.newComments} />
+                                </button>
                                 <details className="group/graphs border-t border-gray-100">
                                     <summary className="cursor-pointer list-none px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50">
                                         <HeaderLabel text={headerLabels.appManagement.authGraphs} />
@@ -1410,6 +1482,7 @@ const Header: React.FC = () => {
                                 <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500"><HeaderLabel text={headerLabels.nav.appManagement} /></div>
                                 <button type="button" onClick={() => { void openActiveUsersModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.appManagement.activeUsers} /></button>
                                 <button type="button" onClick={() => { void openAuthLogsModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.appManagement.authLogs} /></button>
+                                <button type="button" onClick={() => { void openClinicianInboxModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-amber-900 hover:bg-amber-50"><HeaderLabel text={headerLabels.appManagement.newComments} /></button>
                                 <details>
                                     <summary className="cursor-pointer rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.appManagement.authGraphs} /></summary>
                                     <div className="mt-1 space-y-1 pl-2">
@@ -1865,6 +1938,204 @@ const Header: React.FC = () => {
                 </div>
             )}
 
+            {showClinicianInboxModal && (
+                <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/40 px-4 py-4 sm:py-6">
+                    <div className="mx-auto flex min-h-full w-full max-w-5xl items-start sm:items-center">
+                        <div className="w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
+                            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <h2 className="text-lg font-semibold text-gray-900">
+                                        {clinicianInboxLabels.title}
+                                    </h2>
+                                    <p className="mt-1 text-sm text-gray-600">
+                                        {clinicianInboxLabels.description}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => { void loadClinicianInbox(1, true); }}
+                                        className="rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
+                                    >
+                                        {clinicianInboxLabels.refresh}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { void closeClinicianInboxModal(); }}
+                                        className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                                    >
+                                        {clinicianInboxLabels.close}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="mb-4 grid gap-3 sm:grid-cols-5">
+                                <label className="text-sm text-gray-700">
+                                    {clinicianInboxLabels.filtersActor}
+                                    <select
+                                        value={clinicianInboxActorFilter}
+                                        onChange={(event) => setClinicianInboxActorFilter(event.target.value)}
+                                        className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
+                                    >
+                                        <option value="">{clinicianInboxLabels.all}</option>
+                                        {clinicianInboxActors.map((actor) => (
+                                            <option key={actor} value={actor}>
+                                                {actor}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                                <label className="text-sm text-gray-700">
+                                    {clinicianInboxLabels.filtersCategory}
+                                    <select
+                                        value={clinicianInboxCategoryFilter}
+                                        onChange={(event) => setClinicianInboxCategoryFilter(event.target.value)}
+                                        className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
+                                    >
+                                        <option value="">{clinicianInboxLabels.allFeminine}</option>
+                                        <option value="BUG">BUG</option>
+                                        <option value="SUGGESTION">SUGGESTION</option>
+                                        <option value="URGENT">URGENT</option>
+                                        <option value="INCOMPREHENSION">INCOMPREHENSION</option>
+                                    </select>
+                                </label>
+                                <label className="text-sm text-gray-700">
+                                    {clinicianInboxLabels.filtersReplied}
+                                    <select
+                                        value={clinicianInboxRepliedFilter}
+                                        onChange={(event) => setClinicianInboxRepliedFilter(event.target.value as InboxRepliedFilter)}
+                                        className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
+                                    >
+                                        <option value="">{clinicianInboxLabels.all}</option>
+                                        <option value="yes">{clinicianInboxLabels.repliedYes}</option>
+                                        <option value="no">{clinicianInboxLabels.repliedNo}</option>
+                                    </select>
+                                </label>
+                                <label className="text-sm text-gray-700">
+                                    {clinicianInboxLabels.filtersStartDate}
+                                    <input
+                                        type="date"
+                                        value={clinicianInboxStartDate}
+                                        max={clinicianInboxEndDate || undefined}
+                                        onChange={(event) => setClinicianInboxStartDate(event.target.value)}
+                                        className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                                    />
+                                </label>
+                                <label className="text-sm text-gray-700">
+                                    {clinicianInboxLabels.filtersEndDate}
+                                    <input
+                                        type="date"
+                                        value={clinicianInboxEndDate}
+                                        min={clinicianInboxStartDate || undefined}
+                                        onChange={(event) => setClinicianInboxEndDate(event.target.value)}
+                                        className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                                    />
+                                </label>
+                            </div>
+
+                            <div className="mb-4">
+                                <button
+                                    type="button"
+                                    onClick={() => { void loadClinicianInbox(1, true); }}
+                                    className="rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
+                                >
+                                    <HeaderLabel text={headerLabels.controls.search} />
+                                </button>
+                            </div>
+
+                            {clinicianInboxLoading ? (
+                                <p className="text-sm text-gray-500">{clinicianInboxLabels.loading}</p>
+                            ) : clinicianInboxError ? (
+                                <div className="rounded bg-red-50 p-3 text-sm text-red-700">
+                                    {clinicianInboxError}
+                                </div>
+                            ) : clinicianInboxItems.length === 0 ? (
+                                <p className="text-sm text-gray-500">{clinicianInboxLabels.empty}</p>
+                            ) : (
+                                <>
+                                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                        <table className="min-w-full text-sm">
+                                            <thead className="bg-gray-50 text-left text-gray-700">
+                                                <tr>
+                                                    <th className="px-3 py-2">{clinicianInboxLabels.createdAt}</th>
+                                                    <th className="px-3 py-2">{clinicianInboxLabels.actor}</th>
+                                                    <th className="px-3 py-2">{clinicianInboxLabels.category}</th>
+                                                    <th className="px-3 py-2">{clinicianInboxLabels.replied}</th>
+                                                    <th className="px-3 py-2">{clinicianInboxLabels.comment}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {clinicianInboxItems.map((item) => (
+                                                    <tr key={item.id} className="border-t border-gray-100 align-top">
+                                                        <td className="px-3 py-2 text-gray-600">
+                                                            {new Date(item.createdAt).toLocaleString()}
+                                                        </td>
+                                                        <td className="px-3 py-2 text-gray-900">
+                                                            {item.actorUsername}
+                                                            <div className="text-xs text-gray-500">{item.actorRole}</div>
+                                                        </td>
+                                                        <td className="px-3 py-2 text-gray-700">{item.category}</td>
+                                                        <td className="px-3 py-2 text-gray-700">
+                                                            {item.replies.length > 0
+                                                                ? clinicianInboxLabels.repliedYes
+                                                                : clinicianInboxLabels.repliedNo}
+                                                        </td>
+                                                        <td className="px-3 py-2 text-gray-800 whitespace-pre-wrap">
+                                                            {item.comment}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <div className="mt-4 flex items-center justify-between gap-3 text-sm text-gray-600">
+                                        <div>
+                                            {clinicianInboxLabels.pagePrefix} {clinicianInboxPagination.page}{clinicianInboxLabels.pageSeparator}{Math.max(1, clinicianInboxPagination.totalPages)} - {clinicianInboxPagination.total} {clinicianInboxLabels.resultSuffix}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                disabled={clinicianInboxPagination.page <= 1}
+                                                onClick={() => { void loadClinicianInbox(1, true); }}
+                                                className="rounded border border-gray-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                {clinicianInboxLabels.first}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={clinicianInboxPagination.page <= 1}
+                                                onClick={() => { void loadClinicianInbox(clinicianInboxPagination.page - 1, true); }}
+                                                className="rounded border border-gray-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                {clinicianInboxLabels.previousSymbol}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={clinicianInboxPagination.page >= clinicianInboxPagination.totalPages}
+                                                onClick={() => { void loadClinicianInbox(clinicianInboxPagination.page + 1, true); }}
+                                                className="rounded border border-gray-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                {clinicianInboxLabels.nextSymbol}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={clinicianInboxPagination.page >= clinicianInboxPagination.totalPages}
+                                                onClick={() => { void loadClinicianInbox(clinicianInboxPagination.totalPages, true); }}
+                                                className="rounded border border-gray-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                {clinicianInboxLabels.last}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {sensitiveReauthModal}
             <OpenAILogsModal
                 isOpen={showOpenAILogsModal}
                 onClose={closeOpenAILogsModal}

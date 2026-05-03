@@ -40,6 +40,35 @@ type ClinicianCommentsResponse = {
     };
 };
 
+type ClinicianCommentsInboxResponse = {
+    data?: {
+        items?: ClinicianComment[];
+        filters?: {
+            actorUsername?: string;
+            category?: string;
+            replied?: string;
+            startDate?: string;
+            endDate?: string;
+        };
+        availableActorUsernames?: string[];
+        pagination?: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+        };
+        summary?: {
+            hasNew?: boolean;
+            startDate?: string;
+            endDate?: string;
+        };
+    };
+    error?: {
+        code?: string;
+        message?: string;
+    };
+};
+
 async function toJson(response: Response): Promise<ClinicianCommentsResponse> {
     try {
         return (await response.json()) as ClinicianCommentsResponse;
@@ -167,5 +196,79 @@ export async function replyToClinicianComment(commentId: string, message: string
     return {
         ok: true as const,
         data: payload.data as ClinicianComment,
+    };
+}
+
+export async function listClinicianCommentsInbox(
+    page = 1,
+    limit = 10,
+    actorUsername = "",
+    category = "",
+    replied = "",
+    startDate = "",
+    endDate = ""
+) {
+    const query = new URLSearchParams({
+        page: String(page),
+        limit: String(limit),
+    });
+
+    if (actorUsername.trim()) {
+        query.set("actorUsername", actorUsername.trim().toLowerCase());
+    }
+    if (category.trim()) {
+        query.set("category", category.trim().toUpperCase());
+    }
+    if (replied.trim()) {
+        query.set("replied", replied.trim().toLowerCase());
+    }
+    if (startDate.trim()) {
+        query.set("startDate", startDate.trim());
+    }
+    if (endDate.trim()) {
+        query.set("endDate", endDate.trim());
+    }
+
+    const response = await authFetch(`/api/clinician-comments/inbox?${query.toString()}`);
+    const payload = (await toJson(response)) as ClinicianCommentsInboxResponse;
+
+    if (!response.ok || !payload.data) {
+        return {
+            ok: false as const,
+            error: {
+                code: payload?.error?.code,
+                message:
+                    payload?.error?.message ||
+                    "Impossible de recuperer les nouveaux commentaires.",
+            },
+        };
+    }
+
+    return {
+        ok: true as const,
+        data: payload.data,
+    };
+}
+
+export async function acknowledgeClinicianCommentsInbox() {
+    const response = await authFetch("/api/clinician-comments/inbox/acknowledge", {
+        method: "POST",
+    });
+    const payload = await toJson(response);
+
+    if (!response.ok || !payload.data) {
+        return {
+            ok: false as const,
+            error: {
+                message:
+                    payload?.error?.message ||
+                    "Impossible de confirmer la lecture des nouveaux commentaires.",
+            },
+        };
+    }
+
+    return {
+        ok: true as const,
+        data: payload.data,
     };
 }

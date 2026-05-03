@@ -130,6 +130,62 @@ function normalizeComment(entry) {
     };
 }
 
+function normalizeRepliedFilter(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (!normalized) {
+        return "";
+    }
+
+    if (!["yes", "no"].includes(normalized)) {
+        throw createClinicianCommentError(
+            "INVALID_INPUT",
+            "Filtre de reponse invalide."
+        );
+    }
+
+    return normalized;
+}
+
+function normalizeDateInput(value, label) {
+    if (value === undefined || value === null || value === "") {
+        return "";
+    }
+
+    const normalized = String(value).trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+        throw createClinicianCommentError(
+            "INVALID_INPUT",
+            `${label} invalide.`
+        );
+    }
+
+    return normalized;
+}
+
+function buildInboxDateRange(startDate, endDate) {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const normalizedStart = normalizeDateInput(startDate, "Date debut") || today;
+    const normalizedEnd = normalizeDateInput(endDate, "Date fin") || normalizedStart;
+
+    if (normalizedStart > normalizedEnd) {
+        throw createClinicianCommentError(
+            "INVALID_INPUT",
+            "Date debut ne peut pas etre plus grande que Date fin."
+        );
+    }
+
+    const startAt = new Date(`${normalizedStart}T00:00:00.000Z`);
+    const endAt = new Date(`${normalizedEnd}T23:59:59.999Z`);
+
+    return {
+        startDate: normalizedStart,
+        endDate: normalizedEnd,
+        startAt,
+        endAt,
+    };
+}
+
 function normalizePublicReply(reply) {
     return {
         id: String(reply._id),
@@ -295,6 +351,118 @@ export async function listClinicianComments({
             .filter(Boolean)
             .sort((a, b) => a.localeCompare(b, "fr")),
     };
+}
+
+export async function listNewClinicianCommentsInbox({
+    authUser,
+    page,
+    limit,
+    actorUsername,
+    category,
+    replied,
+    startDate,
+    endDate,
+}) {
+    if (!authUser?.userId || authUser.role !== "SUPERADMIN") {
+        throw createClinicianCommentError(
+            "FORBIDDEN",
+            "Action reservee au SUPERADMIN."
+        );
+    }
+
+    const normalizedPage = normalizePage(page);
+    const normalizedLimit = normalizePageLimit(limit);
+    const actorUsernameFilter = String(actorUsername || "").trim().toLowerCase();
+    const categoryFilter = String(category || "").trim().toUpperCase();
+    const repliedFilter = normalizeRepliedFilter(replied);
+
+    const dateRange = buildInboxDateRange(startDate, endDate);
+
+    const query = {
+        actorRole: { $in: ["ANONYMOUS", "USER", "MEDECIN"] },
+        createdAt: {
+            $gte: dateRange.startAt,
+            $lte: dateRange.endAt,
+        },
+    };
+
+    if (actorUsernameFilter) {
+        query.actorUsername = actorUsernameFilter;
+    }
+
+    if (categoryFilter) {
+        if (!COMMENT_CATEGORY_VALUES.includes(categoryFilter)) {
+            throw createClinicianCommentError(
+                "INVALID_INPUT",
+                "Le type de commentaire est invalide."
+            );
+        }
+        query.category = categoryFilter;
+    }
+
+    if (repliedFilter === "yes") {
+        query["replies.0"] = { $exists: true };
+    } else if (repliedFilter === "no") {
+        query["replies.0"] = { $exists: false };
+    }
+
+    const [total, items, availableActorUsernames] = await Promise.all([
+        ClinicianComment.countDocuments(query),
+        ClinicianComment.find(query)
+            .sort({ createdAt: -1 })
+            .skip((normalizedPage - 1) * normalizedLimit)
+            .limit(normalizedLimit)
+            .lean(),
+        ClinicianComment.distinct("actorUsername", {
+            actorRole: { $in: ["ANONYMOUS", "USER", "MEDECIN"] },
+            createdAt: {
+                $gte: dateRange.startAt,
+                $lte: dateRange.endAt,
+            },
+        }),
+    ]);
+
+    return {
+        items: items.map(normalizeComment),
+        availableActorUsernames: availableActorUsernames.sort((a, b) =>
+            a.localeCompare(b)
+        ),
+        filters: {
+            actorUsername: actorUsernameFilter,
+            category: categoryFilter,
+            replied: repliedFilter,
+            startDate: dateRange.startDate,
+            endDate: dateRange.endDate,
+        },
+        pagination: {
+            page: normalizedPage,
+            limit: normalizedLimit,
+            total,
+            totalPages: Math.max(1, Math.ceil(total / normalizedLimit)),
+        },
+        summary: {
+            hasNew: total > 0,
+            startDate: dateRange.startDate,
+            endDate: dateRange.endDate,
+        },
+    };
+}
+
+export async function acknowledgeClinicianCommentsInbox({ authUser }) {
+    if (!authUser?.userId || authUser.role !== "SUPERADMIN") {
+        throw createClinicianCommentError(
+            "FORBIDDEN",
+            "Action reservee au SUPERADMIN."
+        );
+    }
+
+    await mongoose.model("AdminUser").findByIdAndUpdate(authUser.userId, {
+        $set: {
+            clinicianCommentsInboxSeenAt: new Date(),
+        },
+    });
+
+    return { success: true };
 }
 
 export async function replyToClinicianComment({

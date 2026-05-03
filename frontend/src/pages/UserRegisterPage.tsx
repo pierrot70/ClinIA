@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useSensitiveReauthDialog } from "../hooks/useSensitiveReauthDialog";
 import { SessionExpiredError } from "../services/authService";
 import { labels } from "../i18n/uiLabels";
 
@@ -58,7 +59,8 @@ type UsersListResponse = {
 
 const UserRegisterPage: React.FC = () => {
     const navigate = useNavigate();
-    const { authFetch, reauthenticate, user: authUser } = useAuth();
+    const { authFetch, user: authUser } = useAuth();
+    const { requestSensitiveReauth, sensitiveReauthModal } = useSensitiveReauthDialog();
 
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
@@ -87,22 +89,7 @@ const UserRegisterPage: React.FC = () => {
     const USERS_PAGE_SIZE = 10;
 
     const ensureSensitiveAccess = async () => {
-        const password = window.prompt(labels.auth.sensitiveAction.prompt) || "";
-        if (!password) {
-            return false;
-        }
-
-        try {
-            await reauthenticate(password);
-            return true;
-        } catch (err) {
-            window.alert(
-                err instanceof Error
-                    ? err.message
-                    : labels.auth.sensitiveAction.networkError
-            );
-            return false;
-        }
+        return requestSensitiveReauth();
     };
 
     const loadUsers = async (
@@ -501,6 +488,7 @@ const UserRegisterPage: React.FC = () => {
     };
 
     return (
+        <>
         <div className="max-w-2xl mx-auto px-4 py-8">
             <div className="mb-4 flex items-center justify-between">
                 <h1 className="text-2xl font-semibold text-gray-900">
@@ -882,6 +870,8 @@ const UserRegisterPage: React.FC = () => {
                 </div>
             )}
         </div>
+        {sensitiveReauthModal}
+        </>
     );
 };
 

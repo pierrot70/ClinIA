@@ -284,7 +284,12 @@ export async function logout(): Promise<void> {
 }
 
 export async function reauthenticate(password: string): Promise<void> {
-    const response = await postJson("/api/auth/reauth", { password });
+    const token = await getValidAccessToken();
+    const response = await postJson(
+        "/api/auth/reauth",
+        { password },
+        token ? { Authorization: `Bearer ${token}` } : {}
+    );
     const data = await safeBasicJson(response);
 
     if (!response.ok) {

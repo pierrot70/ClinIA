@@ -1,7 +1,9 @@
 import express from "express";
 import {
+    acknowledgeClinicianCommentsInbox,
     createClinicianComment,
     listClinicianComments,
+    listNewClinicianCommentsInbox,
     lookupClinicianReplies,
     replyToClinicianComment,
 } from "../services/clinicianComments.js";
@@ -11,6 +13,103 @@ import { AUTH_ROLES } from "../auth/constants.js";
 import { clinicianCommentRateLimiter } from "../middleware/clinicianCommentRateLimiter.js";
 
 const router = express.Router();
+
+router.get(
+    "/inbox",
+    verifyJWT,
+    requireRole(AUTH_ROLES.SUPERADMIN),
+    async (req, res) => {
+        try {
+            const data = await listNewClinicianCommentsInbox({
+                authUser: req.auth,
+                page: req.query.page,
+                limit: req.query.limit,
+                actorUsername: req.query.actorUsername,
+                category: req.query.category,
+                replied: req.query.replied,
+                startDate: req.query.startDate,
+                endDate: req.query.endDate,
+            });
+
+            return res.status(200).json({
+                data,
+                meta: {
+                    source: "real",
+                    model: "mongo",
+                },
+            });
+        } catch (err) {
+            if (err.code === "FORBIDDEN") {
+                return res.status(403).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            if (err.code === "INVALID_INPUT") {
+                return res.status(400).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            console.error("❌ Clinician comments inbox error:", err);
+            return res.status(500).json({
+                error: {
+                    code: "PERSISTENCE_FAILED",
+                    message: "Impossible de recuperer les nouveaux commentaires.",
+                    retryable: true,
+                },
+            });
+        }
+    }
+);
+
+router.post(
+    "/inbox/acknowledge",
+    verifyJWT,
+    requireRole(AUTH_ROLES.SUPERADMIN),
+    async (req, res) => {
+        try {
+            const data = await acknowledgeClinicianCommentsInbox({
+                authUser: req.auth,
+            });
+
+            return res.status(200).json({
+                data,
+                meta: {
+                    source: "real",
+                    model: "mongo",
+                },
+            });
+        } catch (err) {
+            if (err.code === "FORBIDDEN") {
+                return res.status(403).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            console.error("❌ Clinician comments inbox acknowledge error:", err);
+            return res.status(500).json({
+                error: {
+                    code: "PERSISTENCE_FAILED",
+                    message: "Impossible de confirmer la lecture des nouveaux commentaires.",
+                    retryable: true,
+                },
+            });
+        }
+    }
+);
 
 router.get("/lookup-replies", async (req, res) => {
     try {
