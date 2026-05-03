@@ -11,6 +11,7 @@ import { useTranslation } from "../hooks/useTranslation";
 import { labels } from "../i18n/uiLabels";
 import {
     listClinicianCommentsInbox,
+    replyToClinicianComment,
     type ClinicianComment,
 } from "../services/clinicianCommentsApi";
 import {
@@ -286,6 +287,10 @@ const Header: React.FC = () => {
         total: 0,
         totalPages: 1,
     });
+    const [clinicianInboxReplyTargetId, setClinicianInboxReplyTargetId] = useState("");
+    const [clinicianInboxReplyMessage, setClinicianInboxReplyMessage] = useState("");
+    const [clinicianInboxReplying, setClinicianInboxReplying] = useState(false);
+    const [clinicianInboxReplySuccess, setClinicianInboxReplySuccess] = useState("");
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [showPublicLanguageTip, setShowPublicLanguageTip] = useState(false);
     const ACTIVE_USERS_REFRESH_MS = 5_000;
@@ -876,6 +881,7 @@ const Header: React.FC = () => {
 
             setClinicianInboxItems(response.data.items || []);
             setClinicianInboxActors(response.data.availableActorUsernames || []);
+            setClinicianInboxReplySuccess("");
             setClinicianInboxPagination(
                 response.data.pagination || {
                     page: targetPage,
@@ -910,6 +916,48 @@ const Header: React.FC = () => {
     const closeClinicianInboxModal = async () => {
         setShowClinicianInboxModal(false);
         setClinicianInboxError(null);
+        setClinicianInboxReplyTargetId("");
+        setClinicianInboxReplyMessage("");
+        setClinicianInboxReplySuccess("");
+    };
+
+    const submitClinicianInboxReply = async () => {
+        if (!clinicianInboxReplyTargetId || !clinicianInboxReplyMessage.trim()) {
+            return;
+        }
+
+        setClinicianInboxReplying(true);
+        setClinicianInboxError(null);
+        setClinicianInboxReplySuccess("");
+
+        try {
+            const response = await replyToClinicianComment(
+                clinicianInboxReplyTargetId,
+                clinicianInboxReplyMessage.trim()
+            );
+
+            if (!response.ok) {
+                setClinicianInboxError(response.error.message);
+                return;
+            }
+
+            setClinicianInboxItems((currentItems) =>
+                currentItems.map((item) =>
+                    item.id === response.data.id ? response.data : item
+                )
+            );
+            setClinicianInboxReplySuccess(clinicianInboxLabels.replySaved);
+            setClinicianInboxReplyTargetId("");
+            setClinicianInboxReplyMessage("");
+        } catch (err) {
+            if (err instanceof SessionExpiredError) {
+                logout();
+                return;
+            }
+            setClinicianInboxError("Erreur reseau lors de l'enregistrement de la reponse.");
+        } finally {
+            setClinicianInboxReplying(false);
+        }
     };
 
     const formatAuthLogTimestamp = (value: string) => {
@@ -2063,6 +2111,11 @@ const Header: React.FC = () => {
                                 <p className="text-sm text-gray-500">{clinicianInboxLabels.empty}</p>
                             ) : (
                                 <>
+                                    {clinicianInboxReplySuccess ? (
+                                        <div className="mb-3 rounded bg-emerald-50 p-3 text-sm text-emerald-700">
+                                            {clinicianInboxReplySuccess}
+                                        </div>
+                                    ) : null}
                                     <div className="overflow-x-auto rounded-lg border border-gray-200">
                                         <table className="min-w-full text-sm">
                                             <thead className="bg-gray-50 text-left text-gray-700">
@@ -2072,28 +2125,101 @@ const Header: React.FC = () => {
                                                     <th className="px-3 py-2">{clinicianInboxLabels.category}</th>
                                                     <th className="px-3 py-2">{clinicianInboxLabels.replied}</th>
                                                     <th className="px-3 py-2">{clinicianInboxLabels.comment}</th>
+                                                    <th className="px-3 py-2">{clinicianInboxLabels.action}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {clinicianInboxItems.map((item) => (
-                                                    <tr key={item.id} className="border-t border-gray-100 align-top">
-                                                        <td className="px-3 py-2 text-gray-600">
-                                                            {new Date(item.createdAt).toLocaleString()}
-                                                        </td>
-                                                        <td className="px-3 py-2 text-gray-900">
-                                                            {item.actorUsername}
-                                                            <div className="text-xs text-gray-500">{item.actorRole}</div>
-                                                        </td>
-                                                        <td className="px-3 py-2 text-gray-700">{item.category}</td>
-                                                        <td className="px-3 py-2 text-gray-700">
-                                                            {item.replies.length > 0
-                                                                ? clinicianInboxLabels.repliedYes
-                                                                : clinicianInboxLabels.repliedNo}
-                                                        </td>
-                                                        <td className="px-3 py-2 text-gray-800 whitespace-pre-wrap">
-                                                            {item.comment}
-                                                        </td>
-                                                    </tr>
+                                                    <React.Fragment key={item.id}>
+                                                        <tr className="border-t border-gray-100 align-top">
+                                                            <td className="px-3 py-2 text-gray-600">
+                                                                {new Date(item.createdAt).toLocaleString()}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-gray-900">
+                                                                {item.actorUsername}
+                                                                <div className="text-xs text-gray-500">{item.actorRole}</div>
+                                                            </td>
+                                                            <td className="px-3 py-2 text-gray-700">{item.category}</td>
+                                                            <td className="px-3 py-2 text-gray-700">
+                                                                {item.replies.length > 0
+                                                                    ? clinicianInboxLabels.repliedYes
+                                                                    : clinicianInboxLabels.repliedNo}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-gray-800 whitespace-pre-wrap">
+                                                                {item.comment}
+                                                                {item.replies.length > 0 ? (
+                                                                    <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                                                                        {item.replies.map((reply) => (
+                                                                            <div key={reply.id} className="rounded bg-gray-50 p-2 text-xs text-gray-700">
+                                                                                <div className="font-medium text-gray-800">
+                                                                                    {reply.responderUsername} ({reply.responderRole})
+                                                                                </div>
+                                                                                <div className="text-[11px] text-gray-500">
+                                                                                    {new Date(reply.createdAt).toLocaleString()}
+                                                                                </div>
+                                                                                <div className="mt-1 whitespace-pre-wrap">
+                                                                                    {reply.message}
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : null}
+                                                            </td>
+                                                            <td className="px-3 py-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setClinicianInboxReplyTargetId(
+                                                                            clinicianInboxReplyTargetId === item.id ? "" : item.id
+                                                                        );
+                                                                        setClinicianInboxReplyMessage("");
+                                                                        setClinicianInboxReplySuccess("");
+                                                                    }}
+                                                                    className="rounded bg-sky-100 px-3 py-1 text-sm text-sky-800 hover:bg-sky-200"
+                                                                >
+                                                                    {clinicianInboxLabels.reply}
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                        {clinicianInboxReplyTargetId === item.id ? (
+                                                            <tr className="border-t border-gray-100 bg-sky-50/40">
+                                                                <td colSpan={6} className="px-3 py-3">
+                                                                    <div className="space-y-3">
+                                                                        <textarea
+                                                                            value={clinicianInboxReplyMessage}
+                                                                            onChange={(event) => setClinicianInboxReplyMessage(event.target.value)}
+                                                                            placeholder={clinicianInboxLabels.replyPlaceholder}
+                                                                            className="min-h-[120px] w-full rounded border border-gray-300 bg-white px-3 py-3 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                                                                            maxLength={500}
+                                                                        />
+                                                                        <div className="flex gap-3">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => { void submitClinicianInboxReply(); }}
+                                                                                disabled={clinicianInboxReplying || !clinicianInboxReplyMessage.trim()}
+                                                                                className="rounded bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                                            >
+                                                                                {clinicianInboxReplying
+                                                                                    ? clinicianInboxLabels.replying
+                                                                                    : clinicianInboxLabels.replySubmit}
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setClinicianInboxReplyTargetId("");
+                                                                                    setClinicianInboxReplyMessage("");
+                                                                                }}
+                                                                                disabled={clinicianInboxReplying}
+                                                                                className="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                                                                            >
+                                                                                {clinicianInboxLabels.replyCancel}
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ) : null}
+                                                    </React.Fragment>
                                                 ))}
                                             </tbody>
                                         </table>
