@@ -1059,7 +1059,17 @@ const Header: React.FC = () => {
                         </div>
                     </Link>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
+                        {isAuthenticated && user && (
+                            <div className="text-right">
+                                <div className="max-w-[260px] truncate text-sm font-medium text-gray-900">
+                                    {user.email || user.id || "Utilisateur"}
+                                </div>
+                                <div className="text-xs uppercase tracking-wide text-gray-500">
+                                    {user.role}
+                                </div>
+                            </div>
+                        )}
                         {isDev && (
                             <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 border border-blue-300">
                                 DEV – Docker
