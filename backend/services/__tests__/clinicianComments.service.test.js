@@ -102,4 +102,34 @@ describe("clinicianComments service", () => {
             category: "URGENT",
         });
     });
+
+    it("filters superadmin inbox by actor and replied status", async () => {
+        const leanMock = vi.fn().mockResolvedValue([]);
+        const limitMock = vi.fn(() => ({ lean: leanMock }));
+        const skipMock = vi.fn(() => ({ limit: limitMock }));
+        const sortMock = vi.fn(() => ({ skip: skipMock }));
+        findMock.mockReturnValue({ sort: sortMock });
+        countDocumentsMock.mockResolvedValue(0);
+        distinctMock.mockResolvedValue([]);
+
+        const { listNewClinicianCommentsInbox } = await import("../clinicianComments.js");
+
+        await listNewClinicianCommentsInbox({
+            authUser: { userId: "664444444444444444444444", role: "SUPERADMIN" },
+            actorUsername: "medecin",
+            replied: "no",
+            startDate: "2026-01-01",
+            endDate: "2026-05-03",
+        });
+
+        expect(countDocumentsMock).toHaveBeenCalledWith({
+            actorRole: { $in: ["ANONYMOUS", "USER", "MEDECIN"] },
+            actorUsername: "medecin",
+            createdAt: {
+                $gte: new Date("2026-01-01T00:00:00.000Z"),
+                $lte: new Date("2026-05-03T23:59:59.999Z"),
+            },
+            "replies.0": { $exists: false },
+        });
+    });
 });

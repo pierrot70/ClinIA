@@ -1019,6 +1019,21 @@ const Header: React.FC = () => {
         void loadClinicianInbox(1, true);
     }, [hasCheckedClinicianInbox, isAuthenticated, user?.role]);
 
+    useEffect(() => {
+        if (!showClinicianInboxModal) {
+            return;
+        }
+
+        void loadClinicianInbox(1, true);
+    }, [
+        showClinicianInboxModal,
+        clinicianInboxActorFilter,
+        clinicianInboxCategoryFilter,
+        clinicianInboxRepliedFilter,
+        clinicianInboxStartDate,
+        clinicianInboxEndDate,
+    ]);
+
     return (
         <header className="bg-white border-b border-gray-200">
             <div className="max-w-6xl mx-auto px-4 py-3">
