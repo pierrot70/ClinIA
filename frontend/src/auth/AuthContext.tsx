@@ -16,9 +16,9 @@ import type { UserRole } from "./roles";
 import { labels } from "../i18n/uiLabels";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
-const SESSION_IDLE_TIMEOUT_MS = 5 * 1000;
-const SESSION_WARNING_MS = 3 * 1000;
-const SESSION_SERVER_TOUCH_MS = 1 * 1000;
+const SESSION_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+const SESSION_WARNING_MS = 60 * 1000;
+const SESSION_SERVER_TOUCH_MS = 60 * 1000;
 
 interface AuthContextValue {
     status: AuthStatus;

@@ -9,11 +9,11 @@ export const AUTH_ROLE_VALUES = Object.values(AUTH_ROLES);
 
 export const ACCESS_TOKEN_EXPIRES_IN = "15m";
 export const REFRESH_TOKEN_TTL_MS = 8 * 60 * 60 * 1000;
-export const SESSION_IDLE_TIMEOUT_MS = 5 * 1000;
-export const SESSION_WARNING_MS = 3 * 1000;
-export const SESSION_ABSOLUTE_TIMEOUT_MS = 30 * 1000;
-export const SESSION_ACTIVITY_SAVE_WINDOW_MS = 1 * 1000;
-export const SENSITIVE_REAUTH_TTL_MS = 30 * 1000;
+export const SESSION_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+export const SESSION_WARNING_MS = 60 * 1000;
+export const SESSION_ABSOLUTE_TIMEOUT_MS = 8 * 60 * 60 * 1000;
+export const SESSION_ACTIVITY_SAVE_WINDOW_MS = 60 * 1000;
+export const SENSITIVE_REAUTH_TTL_MS = 5 * 60 * 1000;
 
 export const MAX_LOGIN_ATTEMPTS = 5;
 export const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
