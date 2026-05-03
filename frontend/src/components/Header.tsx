@@ -220,6 +220,7 @@ const Header: React.FC = () => {
         user,
         logout: logoutSession,
         authFetch,
+        reauthenticate,
     } = useAuth();
     const FORCE_REAL_STORAGE_KEY = "clinia_force_real";
     const canAccessAdmin = isAuthenticated && isAdminRole(user?.role);
@@ -383,6 +384,22 @@ const Header: React.FC = () => {
             return;
         }
 
+        const password = window.prompt(labels.auth.sensitiveAction.prompt) || "";
+        if (!password) {
+            return;
+        }
+
+        try {
+            await reauthenticate(password);
+        } catch (err) {
+            window.alert(
+                err instanceof Error
+                    ? err.message
+                    : labels.auth.sensitiveAction.networkError
+            );
+            return;
+        }
+
         try {
             const response = await authFetch("/api/auth/app-shutdown", {
                 method: "POST",
@@ -422,6 +439,22 @@ const Header: React.FC = () => {
             return;
         }
 
+        const password = window.prompt(labels.auth.sensitiveAction.prompt) || "";
+        if (!password) {
+            return;
+        }
+
+        try {
+            await reauthenticate(password);
+        } catch (err) {
+            window.alert(
+                err instanceof Error
+                    ? err.message
+                    : labels.auth.sensitiveAction.networkError
+            );
+            return;
+        }
+
         try {
             const response = await authFetch("/api/auth/app-shutdown/clear", {
                 method: "POST",
@@ -452,6 +485,22 @@ const Header: React.FC = () => {
         );
 
         if (!confirmed) {
+            return;
+        }
+
+        const password = window.prompt(labels.auth.sensitiveAction.prompt) || "";
+        if (!password) {
+            return;
+        }
+
+        try {
+            await reauthenticate(password);
+        } catch (err) {
+            window.alert(
+                err instanceof Error
+                    ? err.message
+                    : labels.auth.sensitiveAction.networkError
+            );
             return;
         }
 
@@ -497,6 +546,26 @@ const Header: React.FC = () => {
             const payload = await response.json().catch(() => ({}));
 
             if (!response.ok) {
+                if (payload?.error?.code === "REAUTH_REQUIRED") {
+                    const password = window.prompt(labels.auth.sensitiveAction.prompt) || "";
+                    if (!password) {
+                        setActiveUsers([]);
+                        return;
+                    }
+
+                    try {
+                        await reauthenticate(password);
+                        await loadActiveUsers(showLoadingState);
+                    } catch (err) {
+                        setActiveUsersError(
+                            err instanceof Error
+                                ? err.message
+                                : labels.auth.sensitiveAction.networkError
+                        );
+                        setActiveUsers([]);
+                    }
+                    return;
+                }
                 setActiveUsersError(
                     payload?.error?.message ||
                         "Impossible de charger les usagers actifs."
@@ -563,6 +632,28 @@ const Header: React.FC = () => {
             const payload = await response.json().catch(() => ({}));
 
             if (!response.ok) {
+                if (payload?.error?.code === "REAUTH_REQUIRED") {
+                    const password = window.prompt(labels.auth.sensitiveAction.prompt) || "";
+                    if (!password) {
+                        setAuthLogs([]);
+                        setAuthLogsQueryDurationMs(Math.round(performance.now() - requestStartedAt));
+                        return;
+                    }
+
+                    try {
+                        await reauthenticate(password);
+                        await loadAuthLogs(targetPage, showLoadingState);
+                    } catch (err) {
+                        setAuthLogsError(
+                            err instanceof Error
+                                ? err.message
+                                : labels.auth.sensitiveAction.networkError
+                        );
+                        setAuthLogs([]);
+                        setAuthLogsQueryDurationMs(Math.round(performance.now() - requestStartedAt));
+                    }
+                    return;
+                }
                 setAuthLogsError(
                     payload?.error?.message ||
                         "Impossible de charger les logs d'authentification."
@@ -663,6 +754,28 @@ const Header: React.FC = () => {
             const payload = await response.json().catch(() => ({}));
 
             if (!response.ok) {
+                if (payload?.error?.code === "REAUTH_REQUIRED") {
+                    const password = window.prompt(labels.auth.sensitiveAction.prompt) || "";
+                    if (!password) {
+                        setAuthGraphPoints([]);
+                        setAuthGraphActions([]);
+                        return;
+                    }
+
+                    try {
+                        await reauthenticate(password);
+                        await loadAuthGraphs();
+                    } catch (err) {
+                        setAuthGraphsError(
+                            err instanceof Error
+                                ? err.message
+                                : labels.auth.sensitiveAction.networkError
+                        );
+                        setAuthGraphPoints([]);
+                        setAuthGraphActions([]);
+                    }
+                    return;
+                }
                 setAuthGraphsError(
                     payload?.error?.message ||
                         "Impossible de charger le graphique des logs auth."

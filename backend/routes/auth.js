@@ -5,6 +5,7 @@ import {
     refreshRateLimiter,
 } from "../middleware/loginRateLimiter.js";
 import { requireRole } from "../middleware/requireRole.js";
+import { requireRecentReauth } from "../middleware/requireRecentReauth.js";
 import { verifyJWT } from "../middleware/verifyJWT.js";
 import { AUTH_ROLES } from "../auth/constants.js";
 import {
@@ -17,6 +18,7 @@ import {
     logout,
     register,
     registerSelf,
+    reauthenticate,
     resetUserPassword,
     refresh,
     setUserActiveStatus,
@@ -30,6 +32,13 @@ import {
     scheduleAppShutdown,
     clearMaintenanceState,
 } from "../services/appShutdown.js";
+import {
+    getRefreshCookieOptions,
+    getRefreshTokenFromRequest,
+    getSensitiveReauthCookieOptions,
+    REFRESH_TOKEN_COOKIE_NAME,
+    SENSITIVE_REAUTH_COOKIE_NAME,
+} from "../auth/sessionCookies.js";
 
 const router = express.Router();
 
@@ -62,8 +71,17 @@ router.post("/login", loginRateLimiter, async (req, res) => {
             req,
         });
 
+        res.cookie(
+            REFRESH_TOKEN_COOKIE_NAME,
+            data.refreshToken,
+            getRefreshCookieOptions(req)
+        );
+
         return res.status(200).json({
-            data,
+            data: {
+                ...data,
+                refreshToken: undefined,
+            },
             meta: {
                 source: "real",
                 model: "auth",
@@ -193,12 +211,22 @@ router.post("/register-self", loginRateLimiter, async (req, res) => {
 });
 
 router.post("/refresh", refreshRateLimiter, async (req, res) => {
-    const { refreshToken } = req.body ?? {};
+    const refreshToken = getRefreshTokenFromRequest(req);
 
     try {
         const data = await refresh({ refreshToken, req });
+
+        res.cookie(
+            REFRESH_TOKEN_COOKIE_NAME,
+            data.refreshToken,
+            getRefreshCookieOptions(req)
+        );
+
         return res.status(200).json({
-            data,
+            data: {
+                ...data,
+                refreshToken: undefined,
+            },
             meta: {
                 source: "real",
                 model: "auth",
@@ -241,10 +269,18 @@ router.post("/refresh", refreshRateLimiter, async (req, res) => {
 });
 
 router.post("/logout", verifyJWT, async (req, res) => {
-    const { refreshToken } = req.body ?? {};
+    const refreshToken = getRefreshTokenFromRequest(req);
 
     try {
         await logout({ refreshToken, authUser: req.auth, req });
+        res.clearCookie(
+            REFRESH_TOKEN_COOKIE_NAME,
+            getRefreshCookieOptions(req)
+        );
+        res.clearCookie(
+            SENSITIVE_REAUTH_COOKIE_NAME,
+            getSensitiveReauthCookieOptions(req)
+        );
 
         return res.status(200).json({
             data: { success: true },
@@ -260,6 +296,53 @@ router.post("/logout", verifyJWT, async (req, res) => {
                 code: "AUTH_LOGOUT_FAILED",
                 message: "Impossible de fermer la session.",
                 retryable: true,
+            },
+        });
+    }
+});
+
+router.post("/reauth", verifyJWT, async (req, res) => {
+    try {
+        const token = await reauthenticate({
+            authUser: req.auth,
+            password: req.body?.password,
+            req,
+        });
+
+        res.cookie(
+            SENSITIVE_REAUTH_COOKIE_NAME,
+            token,
+            getSensitiveReauthCookieOptions(req)
+        );
+
+        return res.status(200).json({
+            data: { success: true },
+            meta: {
+                source: "real",
+                model: "auth",
+            },
+        });
+    } catch (err) {
+        const statusCode =
+            err.code === "INVALID_INPUT"
+                ? 400
+                : err.code === "INVALID_CREDENTIALS" || err.code === "ACCOUNT_INACTIVE"
+                    ? 401
+                    : err.code === "SESSION_IDLE_TIMEOUT" || err.code === "SESSION_ABSOLUTE_TIMEOUT"
+                        ? 401
+                        : 500;
+
+        if (statusCode === 500) {
+            console.error("❌ Auth reauth error:", err?.code || err?.message);
+        }
+
+        return res.status(statusCode).json({
+            error: {
+                code: err.code || "AUTH_REAUTH_FAILED",
+                message:
+                    err.message ||
+                    "Impossible de reconfirmer le mot de passe.",
+                retryable: false,
             },
         });
     }
@@ -284,6 +367,7 @@ router.get("/session", verifyJWT, async (req, res) => {
 router.post(
     "/register",
     verifyJWT,
+    requireRecentReauth,
     requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
     async (req, res) => {
         const { username, email, password, role } = req.body ?? {};
@@ -351,6 +435,7 @@ router.post(
 router.get(
     "/users/active",
     verifyJWT,
+    requireRecentReauth,
     requireRole(AUTH_ROLES.SUPERADMIN),
     async (req, res) => {
         try {
@@ -378,6 +463,7 @@ router.get(
 router.get(
     "/auth-logs/graphs",
     verifyJWT,
+    requireRecentReauth,
     requireRole(AUTH_ROLES.SUPERADMIN),
     async (req, res) => {
         try {
@@ -421,6 +507,7 @@ router.get(
 router.get(
     "/auth-logs",
     verifyJWT,
+    requireRecentReauth,
     requireRole(AUTH_ROLES.SUPERADMIN),
     async (req, res) => {
         try {
@@ -483,6 +570,7 @@ router.get(
 router.get(
     "/users",
     verifyJWT,
+    requireRecentReauth,
     requireRole(AUTH_ROLES.SUPERADMIN),
     async (req, res) => {
         try {
@@ -526,6 +614,7 @@ router.get(
 router.patch(
     "/users/:userId",
     verifyJWT,
+    requireRecentReauth,
     requireRole(AUTH_ROLES.SUPERADMIN),
     async (req, res) => {
         try {
@@ -599,6 +688,7 @@ router.patch(
 router.patch(
     "/users/:userId/status",
     verifyJWT,
+    requireRecentReauth,
     requireRole(AUTH_ROLES.SUPERADMIN),
     async (req, res) => {
         try {
@@ -661,6 +751,7 @@ router.patch(
 router.post(
     "/users/:userId/reset-password",
     verifyJWT,
+    requireRecentReauth,
     requireRole(AUTH_ROLES.SUPERADMIN),
     async (req, res) => {
         try {
@@ -713,6 +804,7 @@ router.post(
 router.delete(
     "/users/:userId",
     verifyJWT,
+    requireRecentReauth,
     requireRole(AUTH_ROLES.SUPERADMIN),
     async (req, res) => {
         try {
@@ -774,6 +866,7 @@ router.delete(
 router.post(
     "/app-shutdown",
     verifyJWT,
+    requireRecentReauth,
     requireRole(AUTH_ROLES.SUPERADMIN),
     async (req, res) => {
         try {
@@ -821,6 +914,7 @@ router.post(
 router.post(
     "/app-shutdown/clear",
     verifyJWT,
+    requireRecentReauth,
     requireRole(AUTH_ROLES.SUPERADMIN),
     async (_req, res) => {
         try {
@@ -845,6 +939,7 @@ router.post(
 router.post(
     "/app-shutdown/force-reopen",
     verifyJWT,
+    requireRecentReauth,
     requireRole(AUTH_ROLES.SUPERADMIN),
     async (_req, res) => {
         const result = await forceClearMaintenanceState();

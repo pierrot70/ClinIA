@@ -8,6 +8,10 @@ import {
     LOCKOUT_DURATION_MS,
     MAX_LOGIN_ATTEMPTS,
     REFRESH_TOKEN_TTL_MS,
+    SESSION_ABSOLUTE_TIMEOUT_MS,
+    SESSION_IDLE_TIMEOUT_MS,
+    SESSION_ACTIVITY_SAVE_WINDOW_MS,
+    SENSITIVE_REAUTH_TTL_MS,
 } from "../auth/constants.js";
 import { recordAuthAuditEvent } from "../audit/authAudit.js";
 import { AdminUser } from "../models/AdminUser.js";
@@ -61,6 +65,15 @@ function revokeAccessTokens(user, at = new Date()) {
     user.authTokenInvalidBefore = at;
 }
 
+function clearActiveSession(user, at = new Date()) {
+    user.refreshTokenHash = null;
+    user.refreshTokenExpiresAt = null;
+    user.sessionStartedAt = null;
+    user.lastActivityAt = null;
+    user.lastLogoutAt = at;
+    revokeAccessTokens(user, at);
+}
+
 function getJwtAccessSecret() {
     const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
     if (!secret) {
@@ -100,6 +113,22 @@ function getRequestIp(req) {
         return forwardedFor.split(",")[0].trim();
     }
     return req.ip || req.socket?.remoteAddress || "unknown";
+}
+
+function isSessionIdleExpired(user, now = Date.now()) {
+    if (!user?.lastActivityAt) {
+        return false;
+    }
+
+    return new Date(user.lastActivityAt).getTime() + SESSION_IDLE_TIMEOUT_MS <= now;
+}
+
+function isSessionAbsoluteExpired(user, now = Date.now()) {
+    if (!user?.sessionStartedAt) {
+        return false;
+    }
+
+    return new Date(user.sessionStartedAt).getTime() + SESSION_ABSOLUTE_TIMEOUT_MS <= now;
 }
 
 function assertSuperAdmin(authUser) {
@@ -298,6 +327,104 @@ async function setRotatedRefreshToken(user) {
     return refreshToken;
 }
 
+export async function validateSessionState(user, now = Date.now()) {
+    if (isSessionAbsoluteExpired(user, now)) {
+        clearActiveSession(user, new Date(now));
+        await user.save();
+        throw createAuthError(
+            "SESSION_ABSOLUTE_TIMEOUT",
+            "La session a atteint sa duree maximale. Reconnectez-vous."
+        );
+    }
+
+    if (isSessionIdleExpired(user, now)) {
+        clearActiveSession(user, new Date(now));
+        await user.save();
+        throw createAuthError(
+            "SESSION_IDLE_TIMEOUT",
+            "La session a expire apres une periode d'inactivite."
+        );
+    }
+}
+
+export async function touchSessionActivity(user, now = Date.now()) {
+    const lastActivityAt = user.lastActivityAt
+        ? new Date(user.lastActivityAt).getTime()
+        : 0;
+
+    if (now - lastActivityAt < SESSION_ACTIVITY_SAVE_WINDOW_MS) {
+        return;
+    }
+
+    user.lastActivityAt = new Date(now);
+    if (typeof user.save !== "function") {
+        return;
+    }
+    await user.save();
+}
+
+export async function reauthenticate({ authUser, password, req }) {
+    const normalizedPassword = String(password || "");
+    if (
+        !authUser?.userId ||
+        typeof password !== "string" ||
+        normalizedPassword.length < 8 ||
+        normalizedPassword.length > 128
+    ) {
+        throw createAuthError(
+            "INVALID_INPUT",
+            "Mot de passe de confirmation invalide."
+        );
+    }
+
+    const ip = getRequestIp(req);
+    const user = await AdminUser.findById(authUser.userId);
+
+    if (!user || user.isActive === false) {
+        throw createAuthError(
+            "ACCOUNT_INACTIVE",
+            "Compte inactif ou inaccessible."
+        );
+    }
+
+    const passwordOk = await bcrypt.compare(normalizedPassword, user.passwordHash);
+    if (!passwordOk) {
+        await recordAuthAuditEvent({
+            action: "FAILED_LOGIN",
+            outcome: "FAILED",
+            userId: user._id,
+            username: user.username,
+            role: user.role,
+            ip,
+            reason: "REAUTH_INVALID_CREDENTIALS",
+        });
+
+        throw createAuthError(
+            "INVALID_CREDENTIALS",
+            "Mot de passe de confirmation invalide."
+        );
+    }
+
+    await validateSessionState(user);
+    user.lastActivityAt = new Date();
+    await user.save();
+
+    return jwt.sign(
+        {
+            purpose: "sensitive-reauth",
+            role: user.role,
+        },
+        getJwtAccessSecret(),
+        {
+            subject: String(user._id),
+            algorithm: "HS256",
+            expiresIn: Math.floor(SENSITIVE_REAUTH_TTL_MS / 1000),
+            issuer: "clinia-backend",
+            audience: "clinia-sensitive-reauth",
+        }
+    );
+}
+
 export async function login({ username, email, password, req }) {
     await enforceScheduledShutdownIfDue();
 
@@ -403,6 +530,8 @@ export async function login({ username, email, password, req }) {
     user.failedLoginAttempts = 0;
     user.lockUntil = null;
     user.lastLoginAt = new Date();
+    user.sessionStartedAt = user.lastLoginAt;
+    user.lastActivityAt = user.lastLoginAt;
     user.authTokenInvalidBefore = null;
 
     const refreshToken = await setRotatedRefreshToken(user);
@@ -450,9 +579,7 @@ export async function refresh({ refreshToken, req }) {
         !user.refreshTokenExpiresAt ||
         user.refreshTokenExpiresAt.getTime() <= Date.now()
     ) {
-        user.refreshTokenHash = null;
-        user.refreshTokenExpiresAt = null;
-        revokeAccessTokens(user);
+        clearActiveSession(user);
         await user.save();
 
         throw createAuthError(
@@ -462,15 +589,16 @@ export async function refresh({ refreshToken, req }) {
     }
 
     if (isShutdownEnforcedForRole(user.role)) {
-        user.refreshTokenHash = null;
-        user.refreshTokenExpiresAt = null;
-        revokeAccessTokens(user);
+        clearActiveSession(user);
         await user.save();
         throw createAuthError(
             "APP_SHUTDOWN",
             "Application arretee par le SUPERADMIN."
         );
     }
+
+    await validateSessionState(user);
+    user.lastActivityAt = new Date();
 
     const newRefreshToken = await setRotatedRefreshToken(user);
     const accessToken = signAccessToken(user);
@@ -505,10 +633,7 @@ export async function logout({ refreshToken, authUser, req }) {
         return { success: true };
     }
 
-    user.refreshTokenHash = null;
-    user.refreshTokenExpiresAt = null;
-    user.lastLogoutAt = new Date();
-    revokeAccessTokens(user, user.lastLogoutAt);
+    clearActiveSession(user, new Date());
     await user.save();
 
     await recordAuthAuditEvent({

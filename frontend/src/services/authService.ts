@@ -1,7 +1,6 @@
 import type { UserRole } from "../auth/roles";
 import { API_URL } from "./config";
 
-const REFRESH_TOKEN_STORAGE_KEY = "clinia_refresh_token";
 const ACCESS_TOKEN_REFRESH_SKEW_MS = 30_000;
 
 export interface AuthUser {
@@ -16,10 +15,17 @@ export interface LoginCredentials {
     role?: UserRole;
 }
 
+type BasicApiResponse = {
+    error?: {
+        code?: string;
+        message?: string;
+    };
+    message?: string;
+};
+
 export interface AuthSession {
     user: AuthUser;
     accessToken: string;
-    refreshToken?: string;
 }
 
 export class SessionExpiredError extends Error {
@@ -96,27 +102,6 @@ function isAccessTokenExpired(token: string): boolean {
     return Date.now() >= expiresAt - ACCESS_TOKEN_REFRESH_SKEW_MS;
 }
 
-function getStoredRefreshToken(): string | null {
-    try {
-        return window.sessionStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
-    } catch {
-        return null;
-    }
-}
-
-function setStoredRefreshToken(token?: string): void {
-    try {
-        if (token) {
-            window.sessionStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, token);
-            return;
-        }
-
-        window.sessionStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
-    } catch {
-        // Ignore storage errors.
-    }
-}
-
 function mapUserFromPayload(
     response: LoginApiResponse,
     accessToken: string
@@ -143,16 +128,12 @@ function mapUserFromPayload(
 function applySession(session: AuthSession): void {
     inMemoryAccessToken = session.accessToken;
     inMemoryUser = session.user;
-
-    setStoredRefreshToken(session.refreshToken);
 }
 
 function clearSession(): void {
     inMemoryAccessToken = null;
     inMemoryUser = null;
     refreshPromise = null;
-
-    setStoredRefreshToken(undefined);
 }
 
 function redirectToLoginIfSessionWasForcedOut(user: AuthUser | null): void {
@@ -211,9 +192,18 @@ async function safeJson(response: Response): Promise<LoginApiResponse> {
     }
 }
 
+async function safeBasicJson(response: Response): Promise<BasicApiResponse> {
+    try {
+        return (await response.json()) as BasicApiResponse;
+    } catch {
+        return {};
+    }
+}
+
 async function postJson(path: string, body: unknown, headers: Record<string, string> = {}) {
     return fetch(`${API_URL}${path}`, {
         method: "POST",
+        credentials: "include",
         headers: {
             "Content-Type": "application/json",
             ...headers,
@@ -237,7 +227,6 @@ function normalizeSessionFromResponse(data: LoginApiResponse): AuthSession {
     return {
         user,
         accessToken,
-        refreshToken: payload.refreshToken,
     };
 }
 
@@ -279,13 +268,12 @@ export async function registerSelf(credentials: LoginCredentials): Promise<AuthS
 }
 
 export async function logout(): Promise<void> {
-    const refreshToken = getStoredRefreshToken();
     const token = inMemoryAccessToken;
 
     try {
         await postJson(
             "/api/auth/logout",
-            refreshToken ? { refreshToken } : {},
+            {},
             token ? { Authorization: `Bearer ${token}` } : {}
         );
     } catch {
@@ -295,24 +283,27 @@ export async function logout(): Promise<void> {
     }
 }
 
+export async function reauthenticate(password: string): Promise<void> {
+    const response = await postJson("/api/auth/reauth", { password });
+    const data = await safeBasicJson(response);
+
+    if (!response.ok) {
+        throw new Error(
+            data?.error?.message ||
+                data?.message ||
+                "Impossible de reconfirmer le mot de passe."
+        );
+    }
+}
+
 export async function refreshAccessToken(): Promise<string | null> {
     if (refreshPromise) {
         return refreshPromise;
     }
 
-    const storedRefreshToken = getStoredRefreshToken();
-    if (!storedRefreshToken) {
-        const previousUser = inMemoryUser;
-        clearSession();
-        redirectToLoginIfSessionWasForcedOut(previousUser);
-        return null;
-    }
-
     refreshPromise = (async () => {
         try {
-            const response = await postJson("/api/auth/refresh", {
-                refreshToken: storedRefreshToken,
-            });
+            const response = await postJson("/api/auth/refresh", {});
             const data = await safeJson(response);
             const payload = getResponsePayload(data);
 
@@ -325,7 +316,6 @@ export async function refreshAccessToken(): Promise<string | null> {
 
             const session = normalizeSessionFromResponse({
                 ...payload,
-                refreshToken: payload.refreshToken ?? storedRefreshToken,
             });
             applySession(session);
             return session.accessToken;
@@ -347,7 +337,6 @@ export async function bootstrapSession(): Promise<AuthSession | null> {
         return {
             user: inMemoryUser,
             accessToken: inMemoryAccessToken,
-            refreshToken: getStoredRefreshToken() ?? undefined,
         };
     }
 
@@ -359,7 +348,6 @@ export async function bootstrapSession(): Promise<AuthSession | null> {
     return {
         user: inMemoryUser,
         accessToken,
-        refreshToken: getStoredRefreshToken() ?? undefined,
     };
 }
 
@@ -417,6 +405,7 @@ export async function authFetch(input: RequestInfo | URL, init: AuthFetchOptions
 
     let response = await fetch(requestTarget, {
         ...rest,
+        credentials: "include",
         headers: requestHeaders,
     });
 
@@ -432,6 +421,7 @@ export async function authFetch(input: RequestInfo | URL, init: AuthFetchOptions
     requestHeaders.set("Authorization", `Bearer ${refreshedToken}`);
     response = await fetch(requestTarget, {
         ...rest,
+        credentials: "include",
         headers: requestHeaders,
     });
 

@@ -48,6 +48,14 @@ const AdminUserSchema = new mongoose.Schema({
         type: Date,
         default: null,
     },
+    sessionStartedAt: {
+        type: Date,
+        default: null,
+    },
+    lastActivityAt: {
+        type: Date,
+        default: null,
+    },
     lastLogoutAt: {
         type: Date,
         default: null,

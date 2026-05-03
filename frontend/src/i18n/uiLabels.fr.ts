@@ -1,4 +1,22 @@
 export const UI_LABELS_FR = {
+    auth: {
+        session: {
+            warningTitle: "Fin de session imminente",
+            warningBody:
+                "Votre session ClinIA va expirer dans moins d'une minute pour cause d'inactivite.",
+            warningContinue: "Continuer la session",
+            warningLogout: "Se deconnecter maintenant",
+            validating: "Validation de session...",
+        },
+        sensitiveAction: {
+            prompt:
+                "Veuillez reconfirmer votre mot de passe pour cette action sensible.",
+            invalidPassword:
+                "Mot de passe de confirmation invalide ou session sensible expiree.",
+            networkError:
+                "Impossible de reconfirmer votre mot de passe pour le moment.",
+        },
+    },
     // App.tsx - page d'accueil Coolify et messages globaux de statut.
     app: {
         // App.tsx / CoolifyLandingPage - cartes de navigation visibles en production.

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { SessionExpiredError } from "../services/authService";
+import { labels } from "../i18n/uiLabels";
 
 const ROLE_OPTIONS = ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
 const USER_ROLE_FILTER_OPTIONS = ["ALL", ...ROLE_OPTIONS] as const;
@@ -57,7 +58,7 @@ type UsersListResponse = {
 
 const UserRegisterPage: React.FC = () => {
     const navigate = useNavigate();
-    const { authFetch, user: authUser } = useAuth();
+    const { authFetch, reauthenticate, user: authUser } = useAuth();
 
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
@@ -84,6 +85,25 @@ const UserRegisterPage: React.FC = () => {
     const [success, setSuccess] = useState<string | null>(null);
 
     const USERS_PAGE_SIZE = 10;
+
+    const ensureSensitiveAccess = async () => {
+        const password = window.prompt(labels.auth.sensitiveAction.prompt) || "";
+        if (!password) {
+            return false;
+        }
+
+        try {
+            await reauthenticate(password);
+            return true;
+        } catch (err) {
+            window.alert(
+                err instanceof Error
+                    ? err.message
+                    : labels.auth.sensitiveAction.networkError
+            );
+            return false;
+        }
+    };
 
     const loadUsers = async (
         page = usersPage,
@@ -115,6 +135,13 @@ const UserRegisterPage: React.FC = () => {
             const payload = (await response.json().catch(() => ({}))) as UsersListResponse;
 
             if (!response.ok) {
+                if (payload?.error?.code === "REAUTH_REQUIRED") {
+                    const reauthed = await ensureSensitiveAccess();
+                    if (reauthed) {
+                        await loadUsers(page, filters);
+                    }
+                    return;
+                }
                 setError(payload?.error?.message || "Impossible de lister les utilisateurs.");
                 return;
             }
@@ -232,6 +259,14 @@ const UserRegisterPage: React.FC = () => {
         setError(null);
         setSuccess(null);
 
+        const reauthed = await ensureSensitiveAccess();
+        if (!reauthed) {
+            setSaving(false);
+            setEditSaveStatus("idle");
+            setEditSaveMessage("");
+            return;
+        }
+
         try {
             const editedUsername = editUsername.trim();
             const response = await authFetch(`/api/auth/users/${selectedUserId}`, {
@@ -282,6 +317,12 @@ const UserRegisterPage: React.FC = () => {
         setError(null);
         setSuccess(null);
 
+        const reauthed = await ensureSensitiveAccess();
+        if (!reauthed) {
+            setSaving(false);
+            return;
+        }
+
         try {
             const response = await authFetch(`/api/auth/users/${managedUser.id}/status`, {
                 method: "PATCH",
@@ -325,6 +366,12 @@ const UserRegisterPage: React.FC = () => {
         setError(null);
         setSuccess(null);
 
+        const reauthed = await ensureSensitiveAccess();
+        if (!reauthed) {
+            setSaving(false);
+            return;
+        }
+
         try {
             const response = await authFetch(`/api/auth/users/${selectedUserId}/reset-password`, {
                 method: "POST",
@@ -364,6 +411,12 @@ const UserRegisterPage: React.FC = () => {
         setError(null);
         setSuccess(null);
 
+        const reauthed = await ensureSensitiveAccess();
+        if (!reauthed) {
+            setSaving(false);
+            return;
+        }
+
         try {
             const response = await authFetch(`/api/auth/users/${managedUser.id}`, {
                 method: "DELETE",
@@ -396,6 +449,12 @@ const UserRegisterPage: React.FC = () => {
         setSaving(true);
         setError(null);
         setSuccess(null);
+
+        const reauthed = await ensureSensitiveAccess();
+        if (!reauthed) {
+            setSaving(false);
+            return;
+        }
 
         try {
             const response = await authFetch("/api/auth/register", {

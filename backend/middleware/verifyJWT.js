@@ -5,6 +5,7 @@ import {
     enforceScheduledShutdownIfDue,
     isShutdownEnforcedForRole,
 } from "../services/appShutdown.js";
+import { touchSessionActivity, validateSessionState } from "../services/auth.js";
 
 function getJwtAccessSecret() {
     return process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
@@ -62,9 +63,12 @@ export async function verifyJWT(req, res, next) {
             throw new Error("Invalid JWT payload");
         }
 
-        const user = await AdminUser.findById(payload.sub)
-            .select("_id username role isActive authTokenInvalidBefore")
-            .lean();
+        const userQuery = AdminUser.findById(payload.sub)
+            .select("_id username role isActive authTokenInvalidBefore sessionStartedAt lastActivityAt refreshTokenHash refreshTokenExpiresAt lastLogoutAt");
+        const user =
+            typeof userQuery?.lean === "function"
+                ? await userQuery.lean()
+                : await userQuery;
 
         if (!user || user.isActive === false) {
             return res.status(401).json({
@@ -96,6 +100,18 @@ export async function verifyJWT(req, res, next) {
             });
         }
 
+        try {
+            await validateSessionState(user);
+        } catch (err) {
+            return res.status(401).json({
+                error: {
+                    code: err.code || "INVALID_TOKEN",
+                    message: err.message || "Token d'acces invalide ou expire.",
+                    retryable: false,
+                },
+            });
+        }
+
         if (isShutdownEnforcedForRole(user.role)) {
             return res.status(401).json({
                 error: {
@@ -111,6 +127,8 @@ export async function verifyJWT(req, res, next) {
             role: user.role,
             username: user.username,
         };
+
+        await touchSessionActivity(user);
         return next();
     } catch {
         return res.status(401).json({
