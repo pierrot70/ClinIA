@@ -1,9 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createSecurityIncident = vi.fn().mockResolvedValue({ _id: "incident-1" });
+const findOneAndUpdate = vi.fn();
+const updateOne = vi.fn();
 
 vi.mock("../../services/securityIncidents.js", () => ({
     createSecurityIncident,
+}));
+
+vi.mock("../../models/MassDownloadWindow.js", () => ({
+    MassDownloadWindow: {
+        findOneAndUpdate,
+        updateOne,
+    },
 }));
 
 const {
@@ -39,6 +48,16 @@ describe("massDownloadDetector", () => {
         };
         const next = vi.fn();
 
+        let totalCost = 0;
+        findOneAndUpdate.mockImplementation(async () => {
+            totalCost += 50;
+            return {
+                _id: "window-1",
+                totalCost,
+                incidentsCreated: 0,
+            };
+        });
+
         for (let i = 0; i < 4; i += 1) {
             await detector(req, {}, next);
         }
@@ -65,6 +84,17 @@ describe("massDownloadDetector", () => {
             },
         };
         const next = vi.fn();
+
+        let totalCost = 0;
+        findOneAndUpdate.mockImplementation(async () => {
+            totalCost += 50;
+            return {
+                _id: "window-2",
+                totalCost,
+                incidentsCreated: totalCost > 200 ? 1 : 0,
+            };
+        });
+        updateOne.mockResolvedValue({ modifiedCount: 1 });
 
         for (let i = 0; i < 5; i += 1) {
             await detector(req, {}, next);
@@ -111,6 +141,17 @@ describe("massDownloadDetector", () => {
         };
         const next = vi.fn();
 
+        let totalCost = 0;
+        findOneAndUpdate.mockImplementation(async () => {
+            totalCost += 1;
+            return {
+                _id: "window-3",
+                totalCost,
+                incidentsCreated: totalCost > 2 ? 1 : 0,
+            };
+        });
+        updateOne.mockResolvedValue({ modifiedCount: 1 });
+
         await detector(req, {}, next);
         await detector(req, {}, next);
         await detector(req, {}, next);
@@ -153,5 +194,46 @@ describe("massDownloadDetector", () => {
 
         expect(next).toHaveBeenCalledTimes(2);
         expect(createSecurityIncident).not.toHaveBeenCalled();
+        expect(findOneAndUpdate).not.toHaveBeenCalled();
+    });
+
+    it("does not create a duplicate incident while cooldown update rejects the second write", async () => {
+        vi.spyOn(Date, "now").mockReturnValue(30_000);
+
+        const detector = createOpenAILogsExportMassDownloadDetector();
+        const req = {
+            method: "GET",
+            path: "/export.csv",
+            originalUrl: "/api/openai-logs/export.csv?startDate=2026-05-01",
+            query: { startDate: "2026-05-01" },
+            headers: {},
+            ip: "127.0.0.9",
+            auth: {
+                userId: "user-9",
+                username: "admin9@example.com",
+                role: "ADMIN",
+            },
+        };
+        const next = vi.fn();
+
+        let totalCost = 0;
+        findOneAndUpdate.mockImplementation(async () => {
+            totalCost += 1;
+            return {
+                _id: "window-9",
+                totalCost,
+                incidentsCreated: totalCost > 2 ? 1 : 0,
+            };
+        });
+        updateOne
+            .mockResolvedValueOnce({ modifiedCount: 1 })
+            .mockResolvedValueOnce({ modifiedCount: 0 });
+
+        await detector(req, {}, next);
+        await detector(req, {}, next);
+        await detector(req, {}, next);
+        await detector(req, {}, next);
+
+        expect(createSecurityIncident).toHaveBeenCalledTimes(1);
     });
 });

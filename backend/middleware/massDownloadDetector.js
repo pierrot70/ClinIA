@@ -1,9 +1,8 @@
 import { createSecurityIncident } from "../services/securityIncidents.js";
+import { MassDownloadWindow } from "../models/MassDownloadWindow.js";
 
 const DEFAULT_WINDOW_MS = 2 * 60 * 1000;
 const DEFAULT_INCIDENT_COOLDOWN_MS = 10 * 60 * 1000;
-
-const detectorState = new Map();
 
 function getRequestIp(req) {
     const forwardedFor = req.headers?.["x-forwarded-for"];
@@ -15,18 +14,14 @@ function getRequestIp(req) {
     return req.ip || "unknown";
 }
 
-function pruneExpiredEntries(now) {
-    for (const [key, entry] of detectorState.entries()) {
-        if (now - entry.windowStartedAt >= entry.windowMs) {
-            detectorState.delete(key);
-        }
-    }
-}
-
 function buildActorKey(req, detectorKey) {
     const userId = req.auth?.userId || "anonymous";
     const ip = getRequestIp(req);
     return `${detectorKey}:${userId}:${ip}`;
+}
+
+function getWindowStartedAt(now, windowMs) {
+    return new Date(Math.floor(now / windowMs) * windowMs);
 }
 
 function getNormalizedRequestedLimit(req, defaultLimit = 0, maxLimit = 100) {
@@ -57,34 +52,53 @@ export function createMassDownloadDetector({
 
     return async function massDownloadDetector(req, res, next) {
         const now = Date.now();
-        pruneExpiredEntries(now);
 
         const actorKey = buildActorKey(req, detectorKey);
+        const ip = getRequestIp(req);
         const eventCost = Math.max(0, Number(computeCost(req)) || 0);
+        const windowStartedAt = getWindowStartedAt(now, windowMs);
+        const expiresAt = new Date(windowStartedAt.getTime() + windowMs + incidentCooldownMs);
 
-        let entry = detectorState.get(actorKey);
-        if (!entry || now - entry.windowStartedAt >= windowMs) {
-            entry = {
-                windowStartedAt: now,
-                totalCost: 0,
-                incidentsCreated: 0,
-                lastIncidentAt: 0,
-                windowMs,
-            };
-            detectorState.set(actorKey, entry);
+        if (eventCost === 0) {
+            return next();
         }
 
-        entry.totalCost += eventCost;
+        const entry = await MassDownloadWindow.findOneAndUpdate(
+            {
+                detectorKey,
+                actorKey,
+                windowStartedAt,
+            },
+            {
+                $setOnInsert: {
+                    detectorKey,
+                    actorKey,
+                    userId: req.auth?.userId || "anonymous",
+                    username: req.auth?.username ?? null,
+                    role: req.auth?.role ?? null,
+                    ip,
+                    windowStartedAt,
+                    windowMs,
+                    expiresAt,
+                },
+                $inc: {
+                    totalCost: eventCost,
+                },
+            },
+            {
+                upsert: true,
+                new: true,
+            }
+        );
 
         if (
-            eventCost > 0 &&
             entry.totalCost > threshold &&
-            (entry.lastIncidentAt === 0 ||
-                now - entry.lastIncidentAt >= incidentCooldownMs)
+            await shouldRecordIncident({
+                entry,
+                incidentCooldownMs,
+                now,
+            })
         ) {
-            entry.lastIncidentAt = now;
-            entry.incidentsCreated += 1;
-
             void createSecurityIncident({
                 type: "MASS_DOWNLOAD_ATTEMPT",
                 phase: "post_cloud",
@@ -95,12 +109,12 @@ export function createMassDownloadDetector({
                     userId: req.auth?.userId ?? null,
                     username: req.auth?.username ?? null,
                     role: req.auth?.role ?? null,
-                    ip: getRequestIp(req),
+                    ip,
                     totalCost: entry.totalCost,
                     threshold,
                     eventCost,
                     windowMs,
-                    incidentsCreated: entry.incidentsCreated,
+                    incidentsCreated: (entry.incidentsCreated || 0) + 1,
                     ...buildContext(req),
                 },
             }).catch((err) => {
@@ -110,6 +124,29 @@ export function createMassDownloadDetector({
 
         return next();
     };
+}
+
+async function shouldRecordIncident({ entry, incidentCooldownMs, now }) {
+    const cooldownCutoff = new Date(now - incidentCooldownMs);
+    const result = await MassDownloadWindow.updateOne(
+        {
+            _id: entry._id,
+            $or: [
+                { lastIncidentAt: null },
+                { lastIncidentAt: { $lte: cooldownCutoff } },
+            ],
+        },
+        {
+            $set: {
+                lastIncidentAt: new Date(now),
+            },
+            $inc: {
+                incidentsCreated: 1,
+            },
+        }
+    );
+
+    return Boolean(result?.modifiedCount);
 }
 
 export function createPatientsMassDownloadDetector() {
@@ -152,5 +189,5 @@ export function createOpenAILogsExportMassDownloadDetector() {
 }
 
 export function resetMassDownloadDetectorForTests() {
-    detectorState.clear();
+    return undefined;
 }
