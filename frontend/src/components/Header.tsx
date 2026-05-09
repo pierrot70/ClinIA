@@ -317,7 +317,7 @@ const Header: React.FC = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [showPublicLanguageTip, setShowPublicLanguageTip] = useState(false);
     const ACTIVE_USERS_REFRESH_MS = 5_000;
-    const SECURITY_INCIDENTS_REFRESH_MS = 60_000;
+    const SECURITY_INCIDENTS_REFRESH_MS = 5_000;
     const isPublicHomeHeader = !showFullHeaderNav && location.pathname === "/";
     const LANGUAGE_TIP_STORAGE_KEY = "clinia_home_language_tip_seen";
     const DEMO_TIP_EVENT = "clinia:show-demo-tooltip";
@@ -1173,12 +1173,27 @@ const Header: React.FC = () => {
 
         void loadSecurityIncidentIndicator();
 
+        const handleWindowFocus = () => {
+            void loadSecurityIncidentIndicator();
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === "visible") {
+                void loadSecurityIncidentIndicator();
+            }
+        };
+
         const intervalId = window.setInterval(() => {
             void loadSecurityIncidentIndicator();
         }, SECURITY_INCIDENTS_REFRESH_MS);
 
+        window.addEventListener("focus", handleWindowFocus);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+
         return () => {
             window.clearInterval(intervalId);
+            window.removeEventListener("focus", handleWindowFocus);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
         };
     }, [isAuthenticated, user?.role]);
 
