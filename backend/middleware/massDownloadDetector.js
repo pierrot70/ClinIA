@@ -15,9 +15,14 @@ function getRequestIp(req) {
 }
 
 function buildActorKey(req, detectorKey) {
-    const userId = req.auth?.userId || "anonymous";
     const ip = getRequestIp(req);
-    return `${detectorKey}:${userId}:${ip}`;
+    const userId = req.auth?.userId;
+
+    if (userId) {
+        return `${detectorKey}:${userId}`;
+    }
+
+    return `${detectorKey}:${ip}`;
 }
 
 function getWindowStartedAt(now, windowMs) {

@@ -120,6 +120,73 @@ describe("massDownloadDetector", () => {
                 }),
             })
         );
+        expect(findOneAndUpdate).toHaveBeenNthCalledWith(
+            1,
+            expect.objectContaining({
+                detectorKey: "patients_list",
+                actorKey: "patients_list:user-2",
+            }),
+            expect.any(Object),
+            expect.any(Object)
+        );
+    });
+
+    it("aggregates authenticated requests by userId even when proxy IP changes", async () => {
+        vi.spyOn(Date, "now").mockReturnValue(6_000);
+
+        const detector = createPatientsMassDownloadDetector();
+        const next = vi.fn();
+        const firstReq = {
+            method: "GET",
+            path: "/",
+            originalUrl: "/api/patients?page=1&limit=50",
+            query: { page: "1", limit: "50" },
+            headers: { "x-forwarded-for": "203.0.113.10, 10.0.0.1" },
+            ip: "127.0.0.1",
+            auth: {
+                userId: "user-shared",
+                username: "superadmin@example.com",
+                role: "SUPERADMIN",
+            },
+        };
+        const secondReq = {
+            ...firstReq,
+            originalUrl: "/api/patients?page=2&limit=50",
+            query: { page: "2", limit: "50" },
+            headers: { "x-forwarded-for": "198.51.100.24, 10.0.0.2" },
+        };
+
+        let totalCost = 0;
+        findOneAndUpdate.mockImplementation(async () => {
+            totalCost += 50;
+            return {
+                _id: "window-shared",
+                totalCost,
+                incidentsCreated: 0,
+            };
+        });
+
+        await detector(firstReq, {}, next);
+        await detector(secondReq, {}, next);
+
+        expect(next).toHaveBeenCalledTimes(2);
+        expect(findOneAndUpdate).toHaveBeenNthCalledWith(
+            1,
+            expect.objectContaining({
+                actorKey: "patients_list:user-shared",
+            }),
+            expect.any(Object),
+            expect.any(Object)
+        );
+        expect(findOneAndUpdate).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({
+                actorKey: "patients_list:user-shared",
+            }),
+            expect.any(Object),
+            expect.any(Object)
+        );
+        expect(createSecurityIncident).not.toHaveBeenCalled();
     });
 
     it("detects repeated OpenAI CSV exports and respects the export path", async () => {
