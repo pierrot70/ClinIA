@@ -8,6 +8,7 @@ const limit = vi.fn(() => ({ lean }));
 const skip = vi.fn(() => ({ limit }));
 const sort = vi.fn(() => ({ skip }));
 const find = vi.fn(() => ({ sort }));
+const findAdminUserById = vi.fn();
 
 vi.mock("../../models/SecurityIncident.js", () => ({
     SecurityIncident: {
@@ -18,9 +19,16 @@ vi.mock("../../models/SecurityIncident.js", () => ({
     },
 }));
 
+vi.mock("../../models/AdminUser.js", () => ({
+    AdminUser: {
+        findById: findAdminUserById,
+    },
+}));
+
 const {
     acknowledgeSecurityIncident,
     createSecurityIncident,
+    handleMassDownloadSignal,
     listSecurityIncidents,
 } = await import("../securityIncidents.js");
 
@@ -31,6 +39,7 @@ beforeEach(() => {
 describe("security incidents service", () => {
     it("creates incident with default type", async () => {
         create.mockResolvedValue({ _id: "abc" });
+        countDocuments.mockResolvedValue(0);
 
         await createSecurityIncident({
             phase: "pre_cloud",
@@ -40,6 +49,95 @@ describe("security incidents service", () => {
 
         expect(create).toHaveBeenCalledTimes(1);
         expect(create.mock.calls[0][0].type).toBe("NON_SECURE_CONTENT");
+    });
+
+    it("does not revoke session on the first mass download incident", async () => {
+        create.mockResolvedValue({
+            _id: "mass-1",
+            type: "MASS_DOWNLOAD_ATTEMPT",
+            detectedAt: new Date("2026-05-09T12:00:00.000Z"),
+            context: { userId: "507f1f77bcf86cd799439011" },
+        });
+        countDocuments.mockResolvedValue(1);
+
+        await createSecurityIncident({
+            type: "MASS_DOWNLOAD_ATTEMPT",
+            phase: "post_cloud",
+            reason: "Volume detecte",
+            requestPath: "/api/patients",
+            context: { userId: "507f1f77bcf86cd799439011" },
+        });
+
+        expect(findAdminUserById).not.toHaveBeenCalled();
+    });
+
+    it("revokes active session on the second recent mass download incident", async () => {
+        const save = vi.fn().mockResolvedValue(undefined);
+        const user = {
+            refreshTokenHash: "hash",
+            refreshTokenExpiresAt: new Date("2026-05-09T13:00:00.000Z"),
+            sessionStartedAt: new Date("2026-05-09T11:00:00.000Z"),
+            lastActivityAt: new Date("2026-05-09T12:00:00.000Z"),
+            lastLogoutAt: null,
+            authTokenInvalidBefore: null,
+            save,
+        };
+        create.mockResolvedValue({
+            _id: "mass-2",
+            type: "MASS_DOWNLOAD_ATTEMPT",
+            detectedAt: new Date("2026-05-09T12:05:00.000Z"),
+            context: { userId: "507f1f77bcf86cd799439011" },
+        });
+        countDocuments.mockResolvedValue(2);
+        findAdminUserById.mockResolvedValue(user);
+
+        await createSecurityIncident({
+            type: "MASS_DOWNLOAD_ATTEMPT",
+            phase: "post_cloud",
+            reason: "Volume detecte",
+            requestPath: "/api/patients",
+            context: { userId: "507f1f77bcf86cd799439011" },
+        });
+
+        expect(findAdminUserById).toHaveBeenCalledWith("507f1f77bcf86cd799439011");
+        expect(user.refreshTokenHash).toBeNull();
+        expect(user.refreshTokenExpiresAt).toBeNull();
+        expect(user.sessionStartedAt).toBeNull();
+        expect(user.lastActivityAt).toBeNull();
+        expect(user.lastLogoutAt).toBeInstanceOf(Date);
+        expect(user.authTokenInvalidBefore).toBeInstanceOf(Date);
+        expect(save).toHaveBeenCalledTimes(1);
+    });
+
+    it("revokes active session on a silent recurrence during detector cooldown", async () => {
+        const save = vi.fn().mockResolvedValue(undefined);
+        const user = {
+            refreshTokenHash: "hash",
+            refreshTokenExpiresAt: new Date("2026-05-09T13:00:00.000Z"),
+            sessionStartedAt: new Date("2026-05-09T11:00:00.000Z"),
+            lastActivityAt: new Date("2026-05-09T12:00:00.000Z"),
+            lastLogoutAt: null,
+            authTokenInvalidBefore: null,
+            save,
+        };
+        countDocuments.mockResolvedValue(1);
+        findAdminUserById.mockResolvedValue(user);
+
+        const revoked = await handleMassDownloadSignal({
+            userId: "507f1f77bcf86cd799439011",
+            detectedAt: new Date("2026-05-09T12:05:00.000Z"),
+            additionalSignals: 1,
+        });
+
+        expect(revoked).toBe(true);
+        expect(findAdminUserById).toHaveBeenCalledWith("507f1f77bcf86cd799439011");
+        expect(user.refreshTokenHash).toBeNull();
+        expect(user.refreshTokenExpiresAt).toBeNull();
+        expect(user.sessionStartedAt).toBeNull();
+        expect(user.lastActivityAt).toBeNull();
+        expect(user.lastLogoutAt).toBeInstanceOf(Date);
+        expect(user.authTokenInvalidBefore).toBeInstanceOf(Date);
+        expect(save).toHaveBeenCalledTimes(1);
     });
 
     it("records explicit acknowledgment with timestamp and context", async () => {

@@ -170,6 +170,7 @@ export const UI_LABELS_FR = {
             reason: "Raison",
             requestPath: "Chemin",
             context: "Contexte",
+            impactedAccount: "Compte impacté",
             action: "Action",
             acknowledge: "Acquitter",
             acknowledging: "Acquittement...",

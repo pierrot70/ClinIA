@@ -1,4 +1,7 @@
-import { createSecurityIncident } from "../services/securityIncidents.js";
+import {
+    createSecurityIncident,
+    handleMassDownloadSignal,
+} from "../services/securityIncidents.js";
 import { MassDownloadWindow } from "../models/MassDownloadWindow.js";
 
 const DEFAULT_WINDOW_MS = 2 * 60 * 1000;
@@ -96,35 +99,44 @@ export function createMassDownloadDetector({
             }
         );
 
-        if (
-            entry.totalCost > threshold &&
-            await shouldRecordIncident({
+        if (entry.totalCost > threshold) {
+            const shouldCreateVisibleIncident = await shouldRecordIncident({
                 entry,
                 incidentCooldownMs,
                 now,
-            })
-        ) {
-            void createSecurityIncident({
-                type: "MASS_DOWNLOAD_ATTEMPT",
-                phase: "post_cloud",
-                reason: "Comportement de consultation ou d'export volumetrique detecte.",
-                requestPath: req.originalUrl || req.path || req.url || "/",
-                context: {
-                    detectorKey,
-                    userId: req.auth?.userId ?? null,
-                    username: req.auth?.username ?? null,
-                    role: req.auth?.role ?? null,
-                    ip,
-                    totalCost: entry.totalCost,
-                    threshold,
-                    eventCost,
-                    windowMs,
-                    incidentsCreated: (entry.incidentsCreated || 0) + 1,
-                    ...buildContext(req),
-                },
-            }).catch((err) => {
-                console.error("❌ MASS_DOWNLOAD_INCIDENT_CREATE_FAILED", err);
             });
+
+            if (shouldCreateVisibleIncident) {
+                await createSecurityIncident({
+                    type: "MASS_DOWNLOAD_ATTEMPT",
+                    phase: "post_cloud",
+                    reason: "Comportement de consultation ou d'export volumetrique detecte.",
+                    requestPath: req.originalUrl || req.path || req.url || "/",
+                    context: {
+                        detectorKey,
+                        userId: req.auth?.userId ?? null,
+                        username: req.auth?.username ?? null,
+                        role: req.auth?.role ?? null,
+                        ip,
+                        totalCost: entry.totalCost,
+                        threshold,
+                        eventCost,
+                        windowMs,
+                        incidentsCreated: (entry.incidentsCreated || 0) + 1,
+                        ...buildContext(req),
+                    },
+                }).catch((err) => {
+                    console.error("❌ MASS_DOWNLOAD_INCIDENT_CREATE_FAILED", err);
+                });
+            } else {
+                await handleMassDownloadSignal({
+                    userId: req.auth?.userId ?? null,
+                    detectedAt: new Date(now),
+                    additionalSignals: 1,
+                }).catch((err) => {
+                    console.error("❌ MASS_DOWNLOAD_ESCALATION_SIGNAL_FAILED", err);
+                });
+            }
         }
 
         return next();

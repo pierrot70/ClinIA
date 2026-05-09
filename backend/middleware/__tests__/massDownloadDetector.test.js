@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createSecurityIncident = vi.fn().mockResolvedValue({ _id: "incident-1" });
+const handleMassDownloadSignal = vi.fn().mockResolvedValue(false);
 const findOneAndUpdate = vi.fn();
 const updateOne = vi.fn();
 
 vi.mock("../../services/securityIncidents.js", () => ({
     createSecurityIncident,
+    handleMassDownloadSignal,
 }));
 
 vi.mock("../../models/MassDownloadWindow.js", () => ({
@@ -64,6 +66,7 @@ describe("massDownloadDetector", () => {
 
         expect(next).toHaveBeenCalledTimes(4);
         expect(createSecurityIncident).not.toHaveBeenCalled();
+        expect(handleMassDownloadSignal).not.toHaveBeenCalled();
     });
 
     it("creates one incident when repeated patient list requests exceed the threshold", async () => {
@@ -102,6 +105,7 @@ describe("massDownloadDetector", () => {
 
         expect(next).toHaveBeenCalledTimes(5);
         expect(createSecurityIncident).toHaveBeenCalledTimes(1);
+        expect(handleMassDownloadSignal).not.toHaveBeenCalled();
         expect(createSecurityIncident).toHaveBeenCalledWith(
             expect.objectContaining({
                 type: "MASS_DOWNLOAD_ATTEMPT",
@@ -187,6 +191,7 @@ describe("massDownloadDetector", () => {
             expect.any(Object)
         );
         expect(createSecurityIncident).not.toHaveBeenCalled();
+        expect(handleMassDownloadSignal).not.toHaveBeenCalled();
     });
 
     it("detects repeated OpenAI CSV exports and respects the export path", async () => {
@@ -225,6 +230,7 @@ describe("massDownloadDetector", () => {
 
         expect(next).toHaveBeenCalledTimes(3);
         expect(createSecurityIncident).toHaveBeenCalledTimes(1);
+        expect(handleMassDownloadSignal).not.toHaveBeenCalled();
         expect(createSecurityIncident).toHaveBeenCalledWith(
             expect.objectContaining({
                 context: expect.objectContaining({
@@ -262,6 +268,7 @@ describe("massDownloadDetector", () => {
         expect(next).toHaveBeenCalledTimes(2);
         expect(createSecurityIncident).not.toHaveBeenCalled();
         expect(findOneAndUpdate).not.toHaveBeenCalled();
+        expect(handleMassDownloadSignal).not.toHaveBeenCalled();
     });
 
     it("does not create a duplicate incident while cooldown update rejects the second write", async () => {
@@ -302,5 +309,52 @@ describe("massDownloadDetector", () => {
         await detector(req, {}, next);
 
         expect(createSecurityIncident).toHaveBeenCalledTimes(1);
+        expect(handleMassDownloadSignal).toHaveBeenCalledTimes(1);
+        expect(handleMassDownloadSignal).toHaveBeenCalledWith({
+            userId: "user-9",
+            detectedAt: expect.any(Date),
+            additionalSignals: 1,
+        });
+    });
+
+    it("waits for the silent escalation signal before continuing", async () => {
+        vi.spyOn(Date, "now").mockReturnValue(40_000);
+
+        const detector = createPatientsMassDownloadDetector();
+        const req = {
+            method: "GET",
+            path: "/",
+            originalUrl: "/api/patients?page=5&limit=50",
+            query: { page: "5", limit: "50" },
+            headers: {},
+            ip: "127.0.0.1",
+            auth: {
+                userId: "user-10",
+                username: "superadmin@example.com",
+                role: "SUPERADMIN",
+            },
+        };
+        const sequence = [];
+        const next = vi.fn(() => {
+            sequence.push("next");
+        });
+
+        let totalCost = 200;
+        findOneAndUpdate.mockImplementation(async () => {
+            totalCost += 50;
+            return {
+                _id: "window-10",
+                totalCost,
+                incidentsCreated: 1,
+            };
+        });
+        updateOne.mockResolvedValue({ modifiedCount: 0 });
+        handleMassDownloadSignal.mockImplementation(async () => {
+            sequence.push("signal");
+        });
+
+        await detector(req, {}, next);
+
+        expect(sequence).toEqual(["signal", "next"]);
     });
 });

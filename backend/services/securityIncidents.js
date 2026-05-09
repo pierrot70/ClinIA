@@ -1,7 +1,9 @@
 import mongoose from "mongoose";
 import { SecurityIncident } from "../models/SecurityIncident.js";
+import { AdminUser } from "../models/AdminUser.js";
 
 const REQUIRED_ACK_ACTION = "J'ai lu et compris";
+const MASS_DOWNLOAD_ESCALATION_WINDOW_MS = 15 * 60 * 1000;
 
 function createSecurityIncidentError(code, message) {
     return { code, message };
@@ -50,7 +52,70 @@ export async function createSecurityIncident(payload) {
         detectedAt: payload?.detectedAt || new Date(),
     };
 
-    return SecurityIncident.create(incidentPayload);
+    const incident = await SecurityIncident.create(incidentPayload);
+    await applySecurityIncidentResponse(incident);
+    return incident;
+}
+
+async function applySecurityIncidentResponse(incident) {
+    if (incident?.type !== "MASS_DOWNLOAD_ATTEMPT") {
+        return;
+    }
+
+    const impactedUserId = extractImpactedUserId(incident?.context);
+    await handleMassDownloadSignal({
+        userId: impactedUserId,
+        detectedAt: incident.detectedAt,
+        additionalSignals: 0,
+    });
+}
+
+function extractImpactedUserId(context) {
+    return context &&
+        typeof context === "object" &&
+        typeof context.userId === "string"
+        ? context.userId
+        : null;
+}
+
+export async function handleMassDownloadSignal({
+    userId,
+    detectedAt = new Date(),
+    additionalSignals = 0,
+}) {
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+        return false;
+    }
+
+    const signalDate = new Date(detectedAt || Date.now());
+    const escalationCutoff = new Date(
+        signalDate.getTime() - MASS_DOWNLOAD_ESCALATION_WINDOW_MS
+    );
+
+    const recentIncidentCount = await SecurityIncident.countDocuments({
+        type: "MASS_DOWNLOAD_ATTEMPT",
+        "context.userId": userId,
+        detectedAt: { $gte: escalationCutoff },
+    });
+
+    if (recentIncidentCount + additionalSignals < 2) {
+        return false;
+    }
+
+    const user = await AdminUser.findById(userId);
+    if (!user) {
+        return false;
+    }
+
+    const now = new Date();
+    user.refreshTokenHash = null;
+    user.refreshTokenExpiresAt = null;
+    user.sessionStartedAt = null;
+    user.lastActivityAt = null;
+    user.lastLogoutAt = now;
+    user.authTokenInvalidBefore = now;
+    await user.save();
+    return true;
 }
 
 export async function listSecurityIncidents({

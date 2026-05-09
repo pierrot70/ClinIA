@@ -2606,6 +2606,12 @@ const Header: React.FC = () => {
                                             </thead>
                                             <tbody>
                                                 {securityIncidentItems.map((item) => {
+                                                    const impactedAccount =
+                                                        typeof item.context?.username === "string" && item.context.username.trim()
+                                                            ? item.context.username.trim()
+                                                            : typeof item.context?.userId === "string" && item.context.userId.trim()
+                                                                ? item.context.userId.trim()
+                                                                : "";
                                                     const contextSummary = [
                                                         item.context?.role ? `role=${String(item.context.role)}` : "",
                                                         item.context?.userId ? `user=${String(item.context.userId)}` : "",
@@ -2637,6 +2643,11 @@ const Header: React.FC = () => {
                                                                 {item.requestPath}
                                                             </td>
                                                             <td className="px-3 py-2 text-xs text-gray-700 whitespace-pre-wrap">
+                                                                {impactedAccount ? (
+                                                                    <div className="mb-1 text-xs font-medium text-gray-900">
+                                                                        {securityIncidentsModalLabels.impactedAccount}: {impactedAccount}
+                                                                    </div>
+                                                                ) : null}
                                                                 {contextSummary || "—"}
                                                             </td>
                                                             <td className="px-3 py-2">
