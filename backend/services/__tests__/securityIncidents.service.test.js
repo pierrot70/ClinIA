@@ -2,10 +2,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const create = vi.fn();
 const findById = vi.fn();
+const countDocuments = vi.fn();
+const lean = vi.fn();
+const limit = vi.fn(() => ({ lean }));
+const skip = vi.fn(() => ({ limit }));
+const sort = vi.fn(() => ({ skip }));
+const find = vi.fn(() => ({ sort }));
 
 vi.mock("../../models/SecurityIncident.js", () => ({
     SecurityIncident: {
         create,
+        countDocuments,
+        find,
         findById,
     },
 }));
@@ -13,6 +21,7 @@ vi.mock("../../models/SecurityIncident.js", () => ({
 const {
     acknowledgeSecurityIncident,
     createSecurityIncident,
+    listSecurityIncidents,
 } = await import("../securityIncidents.js");
 
 beforeEach(() => {
@@ -63,6 +72,106 @@ describe("security incidents service", () => {
             })
         ).rejects.toMatchObject({
             code: "INVALID_ACK_ACTION",
+        });
+    });
+
+    it("lists security incidents for admins with pagination and filters", async () => {
+        countDocuments.mockResolvedValue(2);
+        lean.mockResolvedValue([
+            {
+                _id: "507f1f77bcf86cd799439011",
+                type: "MASS_DOWNLOAD_ATTEMPT",
+                phase: "post_cloud",
+                reason: "Volume detecte",
+                requestPath: "/api/patients?page=4&limit=50",
+                transport: "http",
+                context: { totalCost: 250 },
+                detectedAt: new Date("2026-05-09T12:00:00.000Z"),
+                acknowledged: false,
+                createdAt: new Date("2026-05-09T12:00:00.000Z"),
+                updatedAt: new Date("2026-05-09T12:00:00.000Z"),
+            },
+            {
+                _id: "507f1f77bcf86cd799439012",
+                type: "NON_SECURE_CONTENT",
+                phase: "pre_cloud",
+                reason: "Identifiant detecte",
+                requestPath: "/api/ai/analyze",
+                transport: "openai_chat_completions",
+                context: { field: "email" },
+                detectedAt: new Date("2026-05-08T12:00:00.000Z"),
+                acknowledged: true,
+                acknowledgmentAction: "J'ai lu et compris",
+                acknowledgedAt: new Date("2026-05-08T12:05:00.000Z"),
+                acknowledgmentContext: { userId: "admin-1" },
+                createdAt: new Date("2026-05-08T12:00:00.000Z"),
+                updatedAt: new Date("2026-05-08T12:05:00.000Z"),
+            },
+        ]);
+
+        const result = await listSecurityIncidents({
+            authUser: { role: "SUPERADMIN" },
+            page: "2",
+            limit: "10",
+            acknowledged: "false",
+            type: "mass_download_attempt",
+        });
+
+        expect(countDocuments).toHaveBeenCalledWith({
+            acknowledged: false,
+            type: "MASS_DOWNLOAD_ATTEMPT",
+        });
+        expect(find).toHaveBeenCalledWith({
+            acknowledged: false,
+            type: "MASS_DOWNLOAD_ATTEMPT",
+        });
+        expect(sort).toHaveBeenCalledWith({ detectedAt: -1, createdAt: -1 });
+        expect(skip).toHaveBeenCalledWith(10);
+        expect(limit).toHaveBeenCalledWith(10);
+        expect(result.pagination).toEqual({
+            page: 2,
+            limit: 10,
+            total: 2,
+            totalPages: 1,
+        });
+        expect(result.incidents).toHaveLength(2);
+        expect(result.incidents[0]).toMatchObject({
+            id: "507f1f77bcf86cd799439011",
+            type: "MASS_DOWNLOAD_ATTEMPT",
+            acknowledged: false,
+        });
+    });
+
+    it("rejects invalid security incident pagination", async () => {
+        await expect(
+            listSecurityIncidents({
+                authUser: { role: "ADMIN" },
+                page: "0",
+                limit: "10",
+            })
+        ).rejects.toMatchObject({
+            code: "INVALID_INPUT",
+        });
+    });
+
+    it("rejects invalid acknowledged filter", async () => {
+        await expect(
+            listSecurityIncidents({
+                authUser: { role: "ADMIN" },
+                acknowledged: "maybe",
+            })
+        ).rejects.toMatchObject({
+            code: "INVALID_INPUT",
+        });
+    });
+
+    it("rejects non admin access to security incident listing", async () => {
+        await expect(
+            listSecurityIncidents({
+                authUser: { role: "USER" },
+            })
+        ).rejects.toMatchObject({
+            code: "FORBIDDEN",
         });
     });
 });

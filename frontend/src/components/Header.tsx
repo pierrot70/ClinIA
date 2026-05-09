@@ -15,6 +15,12 @@ import {
     type ClinicianComment,
 } from "../services/clinicianCommentsApi";
 import {
+    acknowledgeSecurityIncident,
+    listSecurityIncidents,
+    REQUIRED_ACK_ACTION,
+    type SecurityIncidentEntry,
+} from "../services/securityIncidentApi";
+import {
     Bar,
     BarChart,
     CartesianGrid,
@@ -71,6 +77,7 @@ type DateRangeSnapshot = {
 
 type AuthGraphType = "xy" | "pie" | "histogram";
 type InboxRepliedFilter = "" | "yes" | "no";
+type SecurityIncidentAcknowledgedFilter = "" | "true" | "false";
 
 type AuthGraphTooltipProps = {
     active?: boolean;
@@ -291,13 +298,32 @@ const Header: React.FC = () => {
     const [clinicianInboxReplyMessage, setClinicianInboxReplyMessage] = useState("");
     const [clinicianInboxReplying, setClinicianInboxReplying] = useState(false);
     const [clinicianInboxReplySuccess, setClinicianInboxReplySuccess] = useState("");
+    const [showSecurityIncidentsModal, setShowSecurityIncidentsModal] = useState(false);
+    const [securityIncidentItems, setSecurityIncidentItems] = useState<SecurityIncidentEntry[]>([]);
+    const [securityIncidentLoading, setSecurityIncidentLoading] = useState(false);
+    const [securityIncidentError, setSecurityIncidentError] = useState<string | null>(null);
+    const [securityIncidentAckingId, setSecurityIncidentAckingId] = useState("");
+    const [securityIncidentAcknowledgedFilter, setSecurityIncidentAcknowledgedFilter] =
+        useState<SecurityIncidentAcknowledgedFilter>("false");
+    const [securityIncidentTypeFilter, setSecurityIncidentTypeFilter] = useState("");
+    const [securityIncidentCount, setSecurityIncidentCount] = useState<number | null>(null);
+    const [securityIncidentIndicatorError, setSecurityIncidentIndicatorError] = useState(false);
+    const [securityIncidentPagination, setSecurityIncidentPagination] = useState({
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 1,
+    });
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [showPublicLanguageTip, setShowPublicLanguageTip] = useState(false);
     const ACTIVE_USERS_REFRESH_MS = 5_000;
+    const SECURITY_INCIDENTS_REFRESH_MS = 60_000;
     const isPublicHomeHeader = !showFullHeaderNav && location.pathname === "/";
     const LANGUAGE_TIP_STORAGE_KEY = "clinia_home_language_tip_seen";
     const DEMO_TIP_EVENT = "clinia:show-demo-tooltip";
     const clinicianInboxLabels = headerLabels.clinicianCommentsInbox;
+    const securityIncidentLabels = headerLabels.securityIncidentsIndicator;
+    const securityIncidentsModalLabels = headerLabels.securityIncidentsModal;
 
     const logout = () => {
         logoutSession().finally(() => {
@@ -913,6 +939,125 @@ const Header: React.FC = () => {
         await loadClinicianInbox(1, true);
     };
 
+    const loadSecurityIncidents = async (targetPage = 1, showLoadingState = true) => {
+        if (showLoadingState) {
+            setSecurityIncidentLoading(true);
+        }
+        setSecurityIncidentError(null);
+
+        try {
+            const response = await listSecurityIncidents({
+                page: targetPage,
+                limit: securityIncidentPagination.limit,
+                acknowledged: securityIncidentAcknowledgedFilter || undefined,
+                type: securityIncidentTypeFilter || undefined,
+            });
+
+            if ("error" in response) {
+                setSecurityIncidentError(response.error.message);
+                setSecurityIncidentItems([]);
+                return;
+            }
+
+            setSecurityIncidentItems(response.data.incidents || []);
+            setSecurityIncidentPagination(
+                response.data.pagination || {
+                    page: targetPage,
+                    limit: 10,
+                    total: 0,
+                    totalPages: 1,
+                }
+            );
+        } catch (err) {
+            if (err instanceof SessionExpiredError) {
+                logout();
+                return;
+            }
+            setSecurityIncidentError("Erreur reseau lors du chargement des incidents de securite.");
+            setSecurityIncidentItems([]);
+        } finally {
+            if (showLoadingState) {
+                setSecurityIncidentLoading(false);
+            }
+        }
+    };
+
+    const loadSecurityIncidentIndicator = async () => {
+        if (!isAuthenticated || user?.role !== "SUPERADMIN") {
+            setSecurityIncidentCount(null);
+            setSecurityIncidentIndicatorError(false);
+            return;
+        }
+
+        try {
+            const response = await listSecurityIncidents({
+                page: 1,
+                limit: 1,
+                acknowledged: "false",
+            });
+
+            if ("error" in response) {
+                setSecurityIncidentIndicatorError(true);
+                setSecurityIncidentCount(null);
+                return;
+            }
+
+            setSecurityIncidentIndicatorError(false);
+            setSecurityIncidentCount(response.data.pagination.total || 0);
+        } catch (err) {
+            if (err instanceof SessionExpiredError) {
+                logout();
+                return;
+            }
+            setSecurityIncidentIndicatorError(true);
+            setSecurityIncidentCount(null);
+        }
+    };
+
+    const openSecurityIncidentsModal = async () => {
+        setShowSecurityIncidentsModal(true);
+        await loadSecurityIncidents(1, true);
+    };
+
+    const closeSecurityIncidentsModal = () => {
+        setShowSecurityIncidentsModal(false);
+        setSecurityIncidentError(null);
+        setSecurityIncidentAckingId("");
+    };
+
+    const acknowledgeIncidentFromModal = async (incidentId: string) => {
+        setSecurityIncidentAckingId(incidentId);
+        setSecurityIncidentError(null);
+
+        try {
+            const response = await acknowledgeSecurityIncident({
+                incidentId,
+                action: REQUIRED_ACK_ACTION,
+                context: {
+                    source: "header_security_incidents_modal",
+                },
+            });
+
+            if ("error" in response) {
+                setSecurityIncidentError(response.error.message);
+                return;
+            }
+
+            await Promise.all([
+                loadSecurityIncidents(securityIncidentPagination.page, false),
+                loadSecurityIncidentIndicator(),
+            ]);
+        } catch (err) {
+            if (err instanceof SessionExpiredError) {
+                logout();
+                return;
+            }
+            setSecurityIncidentError("Erreur reseau lors de l'acquittement de l'incident.");
+        } finally {
+            setSecurityIncidentAckingId("");
+        }
+    };
+
     const closeClinicianInboxModal = async () => {
         setShowClinicianInboxModal(false);
         setClinicianInboxError(null);
@@ -1020,6 +1165,24 @@ const Header: React.FC = () => {
     }, [hasCheckedClinicianInbox, isAuthenticated, user?.role]);
 
     useEffect(() => {
+        if (!isAuthenticated || user?.role !== "SUPERADMIN") {
+            setSecurityIncidentCount(null);
+            setSecurityIncidentIndicatorError(false);
+            return;
+        }
+
+        void loadSecurityIncidentIndicator();
+
+        const intervalId = window.setInterval(() => {
+            void loadSecurityIncidentIndicator();
+        }, SECURITY_INCIDENTS_REFRESH_MS);
+
+        return () => {
+            window.clearInterval(intervalId);
+        };
+    }, [isAuthenticated, user?.role]);
+
+    useEffect(() => {
         if (!showClinicianInboxModal) {
             return;
         }
@@ -1032,6 +1195,18 @@ const Header: React.FC = () => {
         clinicianInboxRepliedFilter,
         clinicianInboxStartDate,
         clinicianInboxEndDate,
+    ]);
+
+    useEffect(() => {
+        if (!showSecurityIncidentsModal) {
+            return;
+        }
+
+        void loadSecurityIncidents(1, true);
+    }, [
+        showSecurityIncidentsModal,
+        securityIncidentAcknowledgedFilter,
+        securityIncidentTypeFilter,
     ]);
 
     return (
@@ -1131,6 +1306,37 @@ const Header: React.FC = () => {
                                 <div className="text-xs uppercase tracking-wide text-gray-500">
                                     {user.role}
                                 </div>
+                                {user.role === "SUPERADMIN" && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            void openSecurityIncidentsModal();
+                                        }}
+                                        className={
+                                            "mt-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition " +
+                                            (securityIncidentIndicatorError
+                                                ? "border-red-200 bg-red-50 text-red-700"
+                                                : (securityIncidentCount || 0) > 0
+                                                    ? "border-amber-200 bg-amber-50 text-amber-800"
+                                                    : "border-emerald-200 bg-emerald-50 text-emerald-700")
+                                        }
+                                        title={
+                                            securityIncidentIndicatorError
+                                                ? securityIncidentLabels.error
+                                                : securityIncidentCount === 1
+                                                    ? securityIncidentLabels.one
+                                                    : securityIncidentCount && securityIncidentCount > 1
+                                                        ? `${securityIncidentCount} ${securityIncidentLabels.manySuffix}`
+                                                        : securityIncidentLabels.none
+                                        }
+                                        aria-label={securityIncidentLabels.refresh}
+                                    >
+                                        <span>{securityIncidentLabels.label}</span>
+                                        <span className="font-semibold">
+                                            {securityIncidentIndicatorError ? "!" : securityIncidentCount ?? "…"}
+                                        </span>
+                                    </button>
+                                )}
                             </div>
                         )}
                         {isDev && (
@@ -1315,6 +1521,15 @@ const Header: React.FC = () => {
                                     className="block w-full px-4 py-2 text-left text-sm text-amber-900 transition hover:bg-amber-50"
                                 >
                                     <HeaderLabel text={headerLabels.appManagement.newComments} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        void openSecurityIncidentsModal();
+                                    }}
+                                    className="block w-full px-4 py-2 text-left text-sm text-red-700 transition hover:bg-red-50"
+                                >
+                                    <HeaderLabel text={headerLabels.appManagement.securityIncidents} />
                                 </button>
                                 <details className="group/graphs border-t border-gray-100">
                                     <summary className="cursor-pointer list-none px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50">
@@ -1556,6 +1771,7 @@ const Header: React.FC = () => {
                                 <button type="button" onClick={() => { void openActiveUsersModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.appManagement.activeUsers} /></button>
                                 <button type="button" onClick={() => { void openAuthLogsModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.appManagement.authLogs} /></button>
                                 <button type="button" onClick={() => { void openClinicianInboxModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-amber-900 hover:bg-amber-50"><HeaderLabel text={headerLabels.appManagement.newComments} /></button>
+                                <button type="button" onClick={() => { void openSecurityIncidentsModal(); setIsMobileMenuOpen(false); }} className="block w-full rounded px-2 py-2 text-left text-sm text-red-700 hover:bg-red-50"><HeaderLabel text={headerLabels.appManagement.securityIncidents} /></button>
                                 <details>
                                     <summary className="cursor-pointer rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.appManagement.authGraphs} /></summary>
                                     <div className="mt-1 space-y-1 pl-2">
@@ -2276,6 +2492,203 @@ const Header: React.FC = () => {
                                                 className="rounded border border-gray-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
                                             >
                                                 {clinicianInboxLabels.last}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showSecurityIncidentsModal && (
+                <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/40 px-4 py-4 sm:py-6">
+                    <div className="mx-auto flex min-h-full w-full max-w-6xl items-start sm:items-center">
+                        <div className="w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
+                            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <h2 className="text-lg font-semibold text-gray-900">
+                                        {securityIncidentsModalLabels.title}
+                                    </h2>
+                                    <p className="mt-1 text-sm text-gray-600">
+                                        {securityIncidentsModalLabels.description}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            void loadSecurityIncidents(1, true);
+                                            void loadSecurityIncidentIndicator();
+                                        }}
+                                        className="rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
+                                    >
+                                        {securityIncidentsModalLabels.refresh}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={closeSecurityIncidentsModal}
+                                        className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                                    >
+                                        {securityIncidentsModalLabels.close}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                                <label className="text-sm text-gray-700">
+                                    {securityIncidentsModalLabels.filtersAcknowledged}
+                                    <select
+                                        value={securityIncidentAcknowledgedFilter}
+                                        onChange={(event) =>
+                                            setSecurityIncidentAcknowledgedFilter(
+                                                event.target.value as SecurityIncidentAcknowledgedFilter
+                                            )
+                                        }
+                                        className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
+                                    >
+                                        <option value="">{securityIncidentsModalLabels.all}</option>
+                                        <option value="false">{securityIncidentsModalLabels.notAcknowledgedOnly}</option>
+                                        <option value="true">{securityIncidentsModalLabels.acknowledgedOnly}</option>
+                                    </select>
+                                </label>
+                                <label className="text-sm text-gray-700">
+                                    {securityIncidentsModalLabels.type}
+                                    <select
+                                        value={securityIncidentTypeFilter}
+                                        onChange={(event) => setSecurityIncidentTypeFilter(event.target.value)}
+                                        className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
+                                    >
+                                        <option value="">{securityIncidentsModalLabels.all}</option>
+                                        <option value="MASS_DOWNLOAD_ATTEMPT">MASS_DOWNLOAD_ATTEMPT</option>
+                                        <option value="NON_SECURE_CONTENT">NON_SECURE_CONTENT</option>
+                                    </select>
+                                </label>
+                            </div>
+
+                            {securityIncidentLoading ? (
+                                <p className="text-sm text-gray-500">{securityIncidentsModalLabels.loading}</p>
+                            ) : securityIncidentError ? (
+                                <div className="rounded bg-red-50 p-3 text-sm text-red-700">
+                                    {securityIncidentError}
+                                </div>
+                            ) : securityIncidentItems.length === 0 ? (
+                                <p className="text-sm text-gray-500">{securityIncidentsModalLabels.empty}</p>
+                            ) : (
+                                <>
+                                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                        <table className="min-w-full text-sm">
+                                            <thead className="bg-gray-50 text-left text-gray-700">
+                                                <tr>
+                                                    <th className="px-3 py-2">{securityIncidentsModalLabels.detectedAt}</th>
+                                                    <th className="px-3 py-2">{securityIncidentsModalLabels.type}</th>
+                                                    <th className="px-3 py-2">{securityIncidentsModalLabels.reason}</th>
+                                                    <th className="px-3 py-2">{securityIncidentsModalLabels.requestPath}</th>
+                                                    <th className="px-3 py-2">{securityIncidentsModalLabels.context}</th>
+                                                    <th className="px-3 py-2">{securityIncidentsModalLabels.action}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {securityIncidentItems.map((item) => {
+                                                    const contextSummary = [
+                                                        item.context?.role ? `role=${String(item.context.role)}` : "",
+                                                        item.context?.userId ? `user=${String(item.context.userId)}` : "",
+                                                        item.context?.ip ? `ip=${String(item.context.ip)}` : "",
+                                                        item.context?.totalCost ? `volume=${String(item.context.totalCost)}` : "",
+                                                    ]
+                                                        .filter(Boolean)
+                                                        .join(" | ");
+
+                                                    return (
+                                                        <tr key={item.id} className="border-t border-gray-100 align-top">
+                                                            <td className="px-3 py-2 text-gray-600">
+                                                                {new Date(item.detectedAt || item.createdAt || "").toLocaleString()}
+                                                                {item.acknowledgedAt ? (
+                                                                    <div className="mt-1 text-xs text-emerald-700">
+                                                                        {securityIncidentsModalLabels.acknowledgedAtPrefix}{" "}
+                                                                        {new Date(item.acknowledgedAt).toLocaleString()}
+                                                                    </div>
+                                                                ) : null}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-gray-900">
+                                                                <div className="font-medium">{item.type}</div>
+                                                                <div className="text-xs text-gray-500">{item.phase}</div>
+                                                            </td>
+                                                            <td className="px-3 py-2 text-gray-800 whitespace-pre-wrap">
+                                                                {item.reason}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-xs text-gray-700 break-all">
+                                                                {item.requestPath}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-xs text-gray-700 whitespace-pre-wrap">
+                                                                {contextSummary || "—"}
+                                                            </td>
+                                                            <td className="px-3 py-2">
+                                                                {item.acknowledged ? (
+                                                                    <span className="inline-flex rounded bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                                                                        {securityIncidentsModalLabels.acknowledged}
+                                                                    </span>
+                                                                ) : (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            void acknowledgeIncidentFromModal(item.id);
+                                                                        }}
+                                                                        disabled={securityIncidentAckingId === item.id}
+                                                                        className="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                                    >
+                                                                        {securityIncidentAckingId === item.id
+                                                                            ? securityIncidentsModalLabels.acknowledging
+                                                                            : securityIncidentsModalLabels.acknowledge}
+                                                                    </button>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <div className="mt-4 flex items-center justify-between gap-3 text-sm text-gray-600">
+                                        <div>
+                                            {securityIncidentsModalLabels.pagePrefix} {securityIncidentPagination.page}
+                                            {securityIncidentsModalLabels.pageSeparator}
+                                            {Math.max(1, securityIncidentPagination.totalPages)} - {securityIncidentPagination.total} {securityIncidentsModalLabels.resultSuffix}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                disabled={securityIncidentPagination.page <= 1}
+                                                onClick={() => { void loadSecurityIncidents(1, true); }}
+                                                className="rounded border border-gray-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                {securityIncidentsModalLabels.first}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={securityIncidentPagination.page <= 1}
+                                                onClick={() => { void loadSecurityIncidents(securityIncidentPagination.page - 1, true); }}
+                                                className="rounded border border-gray-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                {securityIncidentsModalLabels.previousSymbol}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={securityIncidentPagination.page >= securityIncidentPagination.totalPages}
+                                                onClick={() => { void loadSecurityIncidents(securityIncidentPagination.page + 1, true); }}
+                                                className="rounded border border-gray-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                {securityIncidentsModalLabels.nextSymbol}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={securityIncidentPagination.page >= securityIncidentPagination.totalPages}
+                                                onClick={() => { void loadSecurityIncidents(securityIncidentPagination.totalPages, true); }}
+                                                className="rounded border border-gray-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                {securityIncidentsModalLabels.last}
                                             </button>
                                         </div>
                                     </div>

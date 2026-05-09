@@ -54,6 +54,10 @@ import {
     getOpenAIAnalyzeQuotaStatus,
     openAIAnalyzeQuotaGuard,
 } from "./middleware/openaiAnalyzeQuotaGuard.js";
+import {
+    createOpenAILogsExportMassDownloadDetector,
+    createPatientsMassDownloadDetector,
+} from "./middleware/massDownloadDetector.js";
 import { loi25DataLeakGuard } from "./middleware/loi25DataLeakGuard.js";
 import {
     finalizeOpenAIRequestAuditEvent,
@@ -84,6 +88,10 @@ process.on("uncaughtException", (err) => {
 /* ------------------------------------------------------------------ */
 
 const app = express();
+const patientsMassDownloadDetector = createPatientsMassDownloadDetector();
+const openAILogsExportMassDownloadDetector =
+    createOpenAILogsExportMassDownloadDetector();
+
 app.set("trust proxy", 1);
 app.use(
     cors({
@@ -1442,6 +1450,7 @@ app.use(
         AUTH_ROLES.ADMIN,
         AUTH_ROLES.SUPERADMIN
     ),
+    patientsMassDownloadDetector,
     loi25DataLeakGuard,
     patientsRouter
 );
@@ -1470,6 +1479,7 @@ app.use(
     "/api/openai-logs",
     verifyJWT,
     requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+    openAILogsExportMassDownloadDetector,
     loi25DataLeakGuard,
     openaiLogsRouter
 );
