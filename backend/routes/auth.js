@@ -355,6 +355,7 @@ router.get("/session", verifyJWT, async (req, res) => {
                 id: req.auth?.userId,
                 username: req.auth?.username,
                 role: req.auth?.role,
+                passwordResetRequired: req.auth?.passwordResetRequired === true,
             },
         },
         meta: {

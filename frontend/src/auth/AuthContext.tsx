@@ -31,6 +31,7 @@ interface AuthContextValue {
     reauthenticate: (password: string) => Promise<void>;
     authFetch: typeof authFetch;
     hasAnyRole: (roles: UserRole[]) => boolean;
+    passwordResetRequired: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -225,6 +226,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             reauthenticate,
             authFetch,
             hasAnyRole,
+            passwordResetRequired: user?.passwordResetRequired === true,
         }),
         [
             status,
@@ -235,6 +237,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             refreshSession,
             reauthenticate,
             hasAnyRole,
+            user,
         ]
     );
 

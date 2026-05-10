@@ -12,6 +12,7 @@ export type ApiErrorCode =
     | "SECURITY_INCIDENT_BLOCKING" // Acknowledgment explicite obligatoire
     | "TOKEN_REVOKED"         // Session invalidée par le backend
     | "ACCOUNT_TEMPORARILY_RESTRICTED" // Restriction temporaire sur routes sensibles
+    | "PASSWORD_RESET_REQUIRED" // Un vrai reset de mot de passe est imposé
     | "INTERNAL_ERROR";       // Bug serveur inattendu
 
 /* ------------------------------------------------------------------ */

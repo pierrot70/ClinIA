@@ -30,6 +30,16 @@ function isTokenRevokedByServer(user, payload) {
         issuedAtMs <= new Date(user.authTokenInvalidBefore).getTime();
 }
 
+function isAllowedWhilePasswordResetRequired(req) {
+    const path = req.originalUrl || req.path || req.url || "";
+    const method = (req.method || "GET").toUpperCase();
+
+    return (
+        (method === "GET" && path.startsWith("/api/auth/session")) ||
+        (method === "POST" && path.startsWith("/api/auth/logout"))
+    );
+}
+
 export async function verifyJWT(req, res, next) {
     const token = getTokenFromRequest(req);
 
@@ -64,7 +74,7 @@ export async function verifyJWT(req, res, next) {
         }
 
         const userQuery = AdminUser.findById(payload.sub)
-            .select("_id username role isActive authTokenInvalidBefore sessionStartedAt lastActivityAt refreshTokenHash refreshTokenExpiresAt lastLogoutAt");
+            .select("_id username role isActive authTokenInvalidBefore sessionStartedAt lastActivityAt refreshTokenHash refreshTokenExpiresAt lastLogoutAt passwordResetRequired");
         const user =
             typeof userQuery?.lean === "function"
                 ? await userQuery.lean()
@@ -122,10 +132,25 @@ export async function verifyJWT(req, res, next) {
             });
         }
 
+        if (
+            user.passwordResetRequired === true &&
+            !isAllowedWhilePasswordResetRequired(req)
+        ) {
+            return res.status(403).json({
+                error: {
+                    code: "PASSWORD_RESET_REQUIRED",
+                    message:
+                        "Un changement de mot de passe est requis avant de poursuivre.",
+                    retryable: false,
+                },
+            });
+        }
+
         req.auth = {
             userId: String(user._id),
             role: user.role,
             username: user.username,
+            passwordResetRequired: user.passwordResetRequired === true,
         };
 
         await touchSessionActivity(user);

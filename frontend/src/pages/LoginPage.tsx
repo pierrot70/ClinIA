@@ -31,7 +31,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
 
     const location = useLocation();
     const navigate = useNavigate();
-    const { isAuthenticated, user, login, registerSelf, logout } = useAuth();
+    const { isAuthenticated, user, login, registerSelf, logout, passwordResetRequired } = useAuth();
     const loginLabels = labels.loginPage;
     const titleAdmin = useLoginLabel(loginLabels.title.admin);
     const titleRegister = useLoginLabel(loginLabels.title.register);
@@ -74,6 +74,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     }, []);
 
     if (isAuthenticated && user) {
+        if (passwordResetRequired) {
+            return <Navigate to="/security/password-reset-required" replace />;
+        }
+
         if (adminOnly && !isAdminRole(user.role)) {
             return <Navigate to={getDefaultRouteForRole(user.role)} replace />;
         }
@@ -100,7 +104,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
 
             const from = (location.state as { from?: string } | null)?.from;
             const destination =
-                typeof from === "string" && from.trim().length > 0
+                session.user.passwordResetRequired
+                    ? "/security/password-reset-required"
+                    : typeof from === "string" && from.trim().length > 0
                     ? from
                     : adminOnly
                         ? getDefaultRouteForRole(session.user.role)

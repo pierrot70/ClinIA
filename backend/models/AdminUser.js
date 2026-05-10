@@ -74,6 +74,11 @@ const AdminUserSchema = new mongoose.Schema({
         default: null,
         index: true,
     },
+    passwordResetRequired: {
+        type: Boolean,
+        default: false,
+        index: true,
+    },
 }, { timestamps: true });
 
 export const AdminUser = mongoose.model("AdminUser", AdminUserSchema);

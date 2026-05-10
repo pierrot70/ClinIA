@@ -118,6 +118,7 @@ export async function handleMassDownloadSignal({
     user.massDownloadRestrictedUntil = new Date(
         now.getTime() + MASS_DOWNLOAD_RESTRICTION_MS
     );
+    user.passwordResetRequired = true;
     await user.save();
     return true;
 }

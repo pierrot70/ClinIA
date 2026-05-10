@@ -234,7 +234,7 @@ Mode restrict:
 1. Le premier cycle cree un incident MASS_DOWNLOAD_ATTEMPT.
 2. Le second cycle provoque la revocation immediate de la session active.
 3. Le script se reconnecte avec les memes identifiants.
-4. Une route sensible doit alors refuser l'acces avec ACCOUNT_TEMPORARILY_RESTRICTED.
+4. Une route sensible doit alors refuser l'acces, soit avec ACCOUNT_TEMPORARILY_RESTRICTED, soit avec PASSWORD_RESET_REQUIRED si un reset force est maintenant exige.
 
 EOF
 }
@@ -253,6 +253,23 @@ print_existing_restriction_error() {
     console.error(`[trigger-mass-download-incident.sh] Fin de restriction: ${restrictedUntil}`);
     console.error(`[trigger-mass-download-incident.sh] Message API: ${message}`);
     console.error("[trigger-mass-download-incident.sh] Attends la fin de la fenetre, utilise un autre compte, ou reinitialise la restriction en local avant de rejouer le scenario.");
+  ' "$response_body"
+}
+
+print_password_reset_required_error() {
+  local response_body="$1"
+
+  node -e '
+    const fs = require("fs");
+    const payload = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    const error = payload?.error || {};
+    const message =
+      error?.message ||
+      "Un changement de mot de passe est requis avant de poursuivre.";
+    console.error("");
+    console.error("[trigger-mass-download-incident.sh] Ce compte est deja bloque jusqu a reinitialisation du mot de passe.");
+    console.error(`[trigger-mass-download-incident.sh] Message API: ${message}`);
+    console.error("[trigger-mass-download-incident.sh] Fais reinitialiser le mot de passe par un SUPERADMIN, puis rejoue le scenario avec le nouveau mot de passe.");
   ' "$response_body"
 }
 
@@ -317,14 +334,27 @@ verify_sensitive_route_restricted_after_relogin() {
 
   printf '[%s] HTTP restrict-check %s\n' "$SCRIPT_NAME" "$status"
 
-  if [[ "$status" != "423" ]] || ! grep -q '"code":"ACCOUNT_TEMPORARILY_RESTRICTED"' "$RESTRICT_CHECK_BODY"; then
+  if [[ "$status" == "423" ]] && grep -q '"code":"ACCOUNT_TEMPORARILY_RESTRICTED"' "$RESTRICT_CHECK_BODY"; then
+    log "Restriction temporaire confirmee apres reconnexion."
+    return
+  fi
+
+  if [[ "$status" == "403" ]] && grep -q '"code":"PASSWORD_RESET_REQUIRED"' "$RESTRICT_CHECK_BODY"; then
+    log "Reset de mot de passe force confirme apres reconnexion."
+    return
+  fi
+
+  if [[ "$status" != "423" && "$status" != "403" ]]; then
     printf '\n--- Reponse restrict-check (%s) ---\n' "$status" >&2
     cat "$RESTRICT_CHECK_BODY" >&2
     printf '\n----------------------------------\n' >&2
-    fail "La route sensible n'a pas ete restreinte apres reconnexion."
+    fail "La route sensible n'a pas renvoye le blocage attendu apres reconnexion."
   fi
 
-  log "Restriction temporaire confirmee apres reconnexion."
+  printf '\n--- Reponse restrict-check (%s) ---\n' "$status" >&2
+  cat "$RESTRICT_CHECK_BODY" >&2
+  printf '\n----------------------------------\n' >&2
+  fail "La route sensible a repondu, mais pas avec ACCOUNT_TEMPORARILY_RESTRICTED ni PASSWORD_RESET_REQUIRED."
 }
 
 run_restriction_preflight_check() {
@@ -345,6 +375,11 @@ run_restriction_preflight_check() {
 
   if [[ "$status" == "423" ]] && grep -q '"code":"ACCOUNT_TEMPORARILY_RESTRICTED"' "$RESTRICT_CHECK_BODY"; then
     print_existing_restriction_error "$RESTRICT_CHECK_BODY"
+    exit 1
+  fi
+
+  if [[ "$status" == "403" ]] && grep -q '"code":"PASSWORD_RESET_REQUIRED"' "$RESTRICT_CHECK_BODY"; then
+    print_password_reset_required_error "$RESTRICT_CHECK_BODY"
     exit 1
   fi
 
@@ -381,6 +416,18 @@ handle_existing_account_restriction() {
   return 1
 }
 
+handle_password_reset_required() {
+  local status="$1"
+  local response_body="$2"
+
+  if [[ "$status" == "403" ]] && grep -q '"code":"PASSWORD_RESET_REQUIRED"' "$response_body"; then
+    print_password_reset_required_error "$response_body"
+    exit 1
+  fi
+
+  return 1
+}
+
 run_patients_scenario() {
   local token="$1"
   local i
@@ -406,6 +453,10 @@ run_patients_scenario() {
     printf '[%s] HTTP %s\n' "$SCRIPT_NAME" "$status"
     if [[ "$status" != "200" ]]; then
       if handle_existing_account_restriction "$status" "$response_body"; then
+        return
+      fi
+
+      if handle_password_reset_required "$status" "$response_body"; then
         return
       fi
 
@@ -445,6 +496,10 @@ run_openai_logs_scenario() {
     printf '[%s] HTTP %s\n' "$SCRIPT_NAME" "$status"
     if [[ "$status" != "200" ]]; then
       if handle_existing_account_restriction "$status" "$response_body"; then
+        return
+      fi
+
+      if handle_password_reset_required "$status" "$response_body"; then
         return
       fi
 

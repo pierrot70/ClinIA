@@ -17,6 +17,7 @@ import MockStudio from "./pages/MockStudio";
 // 🆕 Import obligatoire pour que le bouton Admin fonctionne
 import AdminLogin from "./pages/AdminLogin";
 import LoginPage from "./pages/LoginPage";
+import PasswordResetRequiredPage from "./pages/PasswordResetRequiredPage";
 import UserRegisterPage from "./pages/UserRegisterPage";
 import {ClinicalAnalyzePage} from "./pages/ClinicalAnalyzePage";
 import { AppointmentsPage } from "./pages/AppointmentsPage";
@@ -262,6 +263,7 @@ const App: React.FC = () => {
                     <Route path="/quick" element={<QuickMode />} />
                     <Route path="/patient-summary" element={<PatientSummary />} />
                     <Route path="/login" element={<LoginPage />} />
+                    <Route path="/security/password-reset-required" element={<PasswordResetRequiredPage />} />
 
                     {/* 🧠 ClinIA – Analyse clinique et appointments */}
                     <Route

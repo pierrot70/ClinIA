@@ -33,6 +33,17 @@ export const UI_LABELS_FR = {
             networkError:
                 "Impossible de reconfirmer votre mot de passe pour le moment.",
         },
+        passwordResetRequired: {
+            title: "Reinitialisation du mot de passe requise",
+            detected:
+                "Une activite inhabituelle a ete detectee sur ce compte.",
+            required:
+                "L'acces aux zones protegees reste bloque tant qu'un vrai reset de mot de passe n'a pas ete effectue.",
+            contact:
+                "Contactez un SUPERADMIN pour faire reinitialiser votre mot de passe, ou utilisez le parcours de reinitialisation prevu lorsqu'il sera disponible.",
+            accountPrefix: "Compte concerne :",
+            logout: "Se deconnecter",
+        },
     },
     // App.tsx - page d'accueil Coolify et messages globaux de statut.
     app: {

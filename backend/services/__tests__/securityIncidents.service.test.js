@@ -81,6 +81,7 @@ describe("security incidents service", () => {
             lastLogoutAt: null,
             authTokenInvalidBefore: null,
             massDownloadRestrictedUntil: null,
+            passwordResetRequired: false,
             save,
         };
         create.mockResolvedValue({
@@ -108,6 +109,7 @@ describe("security incidents service", () => {
         expect(user.lastLogoutAt).toBeInstanceOf(Date);
         expect(user.authTokenInvalidBefore).toBeInstanceOf(Date);
         expect(user.massDownloadRestrictedUntil).toBeInstanceOf(Date);
+        expect(user.passwordResetRequired).toBe(true);
         expect(save).toHaveBeenCalledTimes(1);
     });
 
@@ -121,6 +123,7 @@ describe("security incidents service", () => {
             lastLogoutAt: null,
             authTokenInvalidBefore: null,
             massDownloadRestrictedUntil: null,
+            passwordResetRequired: false,
             save,
         };
         countDocuments.mockResolvedValue(1);
@@ -141,6 +144,7 @@ describe("security incidents service", () => {
         expect(user.lastLogoutAt).toBeInstanceOf(Date);
         expect(user.authTokenInvalidBefore).toBeInstanceOf(Date);
         expect(user.massDownloadRestrictedUntil).toBeInstanceOf(Date);
+        expect(user.passwordResetRequired).toBe(true);
         expect(save).toHaveBeenCalledTimes(1);
     });
 

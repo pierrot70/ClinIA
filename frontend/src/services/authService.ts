@@ -8,6 +8,7 @@ export interface AuthUser {
     id?: string;
     email: string;
     role: UserRole;
+    passwordResetRequired?: boolean;
 }
 
 export interface LoginCredentials {
@@ -64,6 +65,7 @@ type LoginApiResponse = {
         email?: string;
         username?: string;
         role?: string;
+        passwordResetRequired?: boolean;
     };
     role?: string;
     email?: string;
@@ -163,6 +165,7 @@ function mapUserFromPayload(
             payload?.email ??
             "",
         role: roleCandidate,
+        passwordResetRequired: response.user?.passwordResetRequired === true,
     };
 }
 

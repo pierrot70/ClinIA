@@ -156,6 +156,7 @@ function mapPublicUser(user) {
         email: user.email || null,
         role: user.role,
         isActive: user.isActive !== false,
+        passwordResetRequired: user.passwordResetRequired === true,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt || null,
         lastLogoutAt: user.lastLogoutAt || null,
@@ -554,6 +555,7 @@ export async function login({ username, email, password, req }) {
             id: String(user._id),
             username: user.username,
             role: user.role,
+            passwordResetRequired: user.passwordResetRequired === true,
         },
     };
 }
@@ -611,6 +613,7 @@ export async function refresh({ refreshToken, req }) {
             id: String(user._id),
             username: user.username,
             role: user.role,
+            passwordResetRequired: user.passwordResetRequired === true,
         },
     };
 }
@@ -1269,6 +1272,8 @@ export async function resetUserPassword({ userId, newPassword, authUser, req }) 
     user.passwordHash = await hashPassword(newPassword);
     user.refreshTokenHash = null;
     user.refreshTokenExpiresAt = null;
+    user.massDownloadRestrictedUntil = null;
+    user.passwordResetRequired = false;
     revokeAccessTokens(user);
     await user.save();
 

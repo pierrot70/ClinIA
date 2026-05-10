@@ -40,7 +40,7 @@ vi.mock("jsonwebtoken", () => ({
     },
 }));
 
-const { login, logout, refresh, hashPassword, register, registerSelf, listUsers } = await import("../auth.js");
+const { login, logout, refresh, hashPassword, register, registerSelf, listUsers, resetUserPassword } = await import("../auth.js");
 
 function buildUser(overrides = {}) {
     return {
@@ -48,6 +48,7 @@ function buildUser(overrides = {}) {
         username: "admin",
         passwordHash: "hashed-pw",
         role: "ADMIN",
+        passwordResetRequired: false,
         failedLoginAttempts: 0,
         lockUntil: null,
         refreshTokenHash: null,
@@ -93,6 +94,7 @@ describe("auth service", () => {
                 outcome: "SUCCESS",
             })
         );
+        expect(result.user.passwordResetRequired).toBe(false);
     });
 
     it("logs in with username and rotates refresh token", async () => {
@@ -416,6 +418,33 @@ describe("auth service", () => {
             total: 23,
             totalPages: 3,
         });
+    });
+
+    it("clears forced password reset markers when superadmin resets password", async () => {
+        const user = buildUser({
+            massDownloadRestrictedUntil: new Date(Date.now() + 60_000),
+            passwordResetRequired: true,
+        });
+        hash.mockResolvedValue("new-hash");
+        mockFindById.mockResolvedValue(user);
+
+        const result = await resetUserPassword({
+            userId: user._id,
+            newPassword: "newpassword123",
+            authUser: {
+                userId: "507f1f77bcf86cd799439099",
+                username: "superadmin",
+                role: "SUPERADMIN",
+            },
+            req: { headers: {}, ip: "127.0.0.1" },
+        });
+
+        expect(user.passwordHash).toBe("new-hash");
+        expect(user.massDownloadRestrictedUntil).toBeNull();
+        expect(user.passwordResetRequired).toBe(false);
+        expect(user.authTokenInvalidBefore).toBeInstanceOf(Date);
+        expect(user.save).toHaveBeenCalledTimes(1);
+        expect(result.user.passwordResetRequired).toBe(false);
     });
 
     it("applies search and role filters to paginated user listing", async () => {
