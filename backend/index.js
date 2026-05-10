@@ -58,6 +58,7 @@ import {
     createOpenAILogsExportMassDownloadDetector,
     createPatientsMassDownloadDetector,
 } from "./middleware/massDownloadDetector.js";
+import { enforceMassDownloadRestriction } from "./middleware/enforceMassDownloadRestriction.js";
 import { loi25DataLeakGuard } from "./middleware/loi25DataLeakGuard.js";
 import {
     finalizeOpenAIRequestAuditEvent,
@@ -91,6 +92,7 @@ const app = express();
 const patientsMassDownloadDetector = createPatientsMassDownloadDetector();
 const openAILogsExportMassDownloadDetector =
     createOpenAILogsExportMassDownloadDetector();
+const massDownloadRestrictionGuard = enforceMassDownloadRestriction();
 
 app.set("trust proxy", 1);
 app.use(
@@ -1450,6 +1452,7 @@ app.use(
         AUTH_ROLES.ADMIN,
         AUTH_ROLES.SUPERADMIN
     ),
+    massDownloadRestrictionGuard,
     patientsMassDownloadDetector,
     loi25DataLeakGuard,
     patientsRouter
@@ -1479,6 +1482,7 @@ app.use(
     "/api/openai-logs",
     verifyJWT,
     requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+    massDownloadRestrictionGuard,
     openAILogsExportMassDownloadDetector,
     loi25DataLeakGuard,
     openaiLogsRouter

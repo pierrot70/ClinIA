@@ -27,6 +27,7 @@ function usePatientsPageLabels(targetLang: string) {
     const { translated: requiredName } = useTranslation({ text: source.validation.requiredName, ...options });
     const { translated: invalidCoordinates } = useTranslation({ text: source.validation.invalidCoordinates, ...options });
     const { translated: deleteConfirm } = useTranslation({ text: source.validation.deleteConfirm, ...options });
+    const { translated: restrictedAccess } = useTranslation({ text: source.validation.restrictedAccess, ...options });
     const { translated: editTitle } = useTranslation({ text: source.form.editTitle, ...options });
     const { translated: createTitle } = useTranslation({ text: source.form.createTitle, ...options });
     const { translated: firstNamePlaceholder } = useTranslation({ text: source.form.firstNamePlaceholder, ...options });
@@ -73,6 +74,7 @@ function usePatientsPageLabels(targetLang: string) {
         requiredName,
         invalidCoordinates,
         deleteConfirm,
+        restrictedAccess,
         editTitle,
         createTitle,
         firstNamePlaceholder,
@@ -206,6 +208,17 @@ export function PatientsPage() {
     );
 
     const filters = useDebounce(rawFilters, 300);
+    const visibleErrorMessage = useMemo(() => {
+        if (!error) {
+            return null;
+        }
+
+        if (error.code === "ACCOUNT_TEMPORARILY_RESTRICTED") {
+            return ui.restrictedAccess;
+        }
+
+        return error.message;
+    }, [error, ui.restrictedAccess]);
 
     const [editingId, setEditingId] = useState<string | null>(null);
     const [form, setForm] = useState({
@@ -583,9 +596,9 @@ export function PatientsPage() {
                 </button>
             </div>
 
-            {error && (
+            {visibleErrorMessage && (
                 <div className="text-sm text-red-600">
-                    {error.message}
+                    {visibleErrorMessage}
                 </div>
             )}
 

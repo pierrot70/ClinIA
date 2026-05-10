@@ -7,6 +7,13 @@ export const UI_LABELS_FR = {
             warningContinue: "Continuer la session",
             warningLogout: "Se deconnecter maintenant",
             validating: "Validation de session...",
+            revokedTitle: "Session interrompue par securite",
+            revokedBody:
+                "Une activite inhabituelle a ete detectee sur ce compte. Votre session a ete invalidee par securite et une reconnexion est necessaire pour poursuivre. Si cette activite ne venait pas de vous, changez votre mot de passe des maintenant.",
+            restrictedTitle: "Acces temporairement restreint",
+            restrictedBody:
+                "Une activite inhabituelle a ete detectee sur ce compte. Votre session a ete invalidee par securite et une reconnexion est necessaire. ClinIA bloque temporairement l'acces aux routes sensibles pendant la periode de restriction. Si cette activite ne venait pas de vous, changez votre mot de passe des maintenant.",
+            restrictedUntilPrefix: "Fin de restriction :",
         },
         sensitiveAction: {
             title: "Confirmation requise",
@@ -413,6 +420,8 @@ export const UI_LABELS_FR = {
             requiredName: "Nom et prénom sont requis.",
             invalidCoordinates: "Coordonnées invalides.",
             deleteConfirm: "Supprimer ce patient définitivement ?",
+            restrictedAccess:
+                "Acces temporairement restreint: ClinIA a bloque cette zone sensible apres une activite inhabituelle detectee sur ce compte. Reessayez plus tard ou contactez un SUPERADMIN.",
         },
         form: {
             editTitle: "Modifier un patient",

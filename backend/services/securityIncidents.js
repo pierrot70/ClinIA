@@ -4,6 +4,7 @@ import { AdminUser } from "../models/AdminUser.js";
 
 const REQUIRED_ACK_ACTION = "J'ai lu et compris";
 const MASS_DOWNLOAD_ESCALATION_WINDOW_MS = 15 * 60 * 1000;
+const MASS_DOWNLOAD_RESTRICTION_MS = 30 * 60 * 1000;
 
 function createSecurityIncidentError(code, message) {
     return { code, message };
@@ -114,6 +115,9 @@ export async function handleMassDownloadSignal({
     user.lastActivityAt = null;
     user.lastLogoutAt = now;
     user.authTokenInvalidBefore = now;
+    user.massDownloadRestrictedUntil = new Date(
+        now.getTime() + MASS_DOWNLOAD_RESTRICTION_MS
+    );
     await user.save();
     return true;
 }

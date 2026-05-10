@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { getDefaultRouteForRole, isAdminRole, type UserRole } from "../auth/roles";
 import { useAuth } from "../hooks/useAuth";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { useTranslation } from "../hooks/useTranslation";
 import { labels } from "../i18n/uiLabels";
+import { consumeAuthSecurityNotice, type AuthSecurityNotice } from "../services/authService";
 
 type LoginPageProps = {
     adminOnly?: boolean;
@@ -25,6 +26,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     const [registerMode, setRegisterMode] = useState(false);
     const [registerRole, setRegisterRole] = useState<UserRole>("USER");
     const [error, setError] = useState<string | null>(null);
+    const [securityNotice, setSecurityNotice] = useState<AuthSecurityNotice | null>(null);
     const [loading, setLoading] = useState(false);
 
     const location = useLocation();
@@ -50,6 +52,11 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     const adminOnlyErrorLabel = useLoginLabel(loginLabels.errors.adminOnly);
     const createFailedLabel = useLoginLabel(loginLabels.errors.createFailed);
     const loginFailedLabel = useLoginLabel(loginLabels.errors.loginFailed);
+    const revokedTitleLabel = useLoginLabel(labels.auth.session.revokedTitle);
+    const revokedBodyLabel = useLoginLabel(labels.auth.session.revokedBody);
+    const restrictedTitleLabel = useLoginLabel(labels.auth.session.restrictedTitle);
+    const restrictedBodyLabel = useLoginLabel(labels.auth.session.restrictedBody);
+    const restrictedUntilPrefixLabel = useLoginLabel(labels.auth.session.restrictedUntilPrefix);
 
     const redirectTarget = useMemo(() => {
         const from = (location.state as { from?: string } | null)?.from;
@@ -61,6 +68,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
         }
         return adminOnly ? "/mock-studio" : "/";
     }, [adminOnly, location.state, user]);
+
+    useEffect(() => {
+        setSecurityNotice(consumeAuthSecurityNotice());
+    }, []);
 
     if (isAuthenticated && user) {
         if (adminOnly && !isAdminRole(user.role)) {
@@ -74,6 +85,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
         event.preventDefault();
         setLoading(true);
         setError(null);
+        setSecurityNotice(null);
 
         try {
             const session = registerMode && !adminOnly
@@ -126,6 +138,27 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                         ? descriptionRegister
                         : descriptionLogin}
             </p>
+
+            {securityNotice && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <p className="font-semibold">
+                        {securityNotice.code === "ACCOUNT_TEMPORARILY_RESTRICTED"
+                            ? restrictedTitleLabel
+                            : revokedTitleLabel}
+                    </p>
+                    <p className="mt-1">
+                        {securityNotice.code === "ACCOUNT_TEMPORARILY_RESTRICTED"
+                            ? restrictedBodyLabel
+                            : revokedBodyLabel}
+                    </p>
+                    {securityNotice.code === "ACCOUNT_TEMPORARILY_RESTRICTED" &&
+                        securityNotice.restrictedUntil && (
+                            <p className="mt-2 text-xs font-medium text-amber-800">
+                                {restrictedUntilPrefixLabel} {securityNotice.restrictedUntil}
+                            </p>
+                        )}
+                </div>
+            )}
 
             {!adminOnly && (
                 <button

@@ -69,6 +69,11 @@ const AdminUserSchema = new mongoose.Schema({
         default: null,
         index: true,
     },
+    massDownloadRestrictedUntil: {
+        type: Date,
+        default: null,
+        index: true,
+    },
 }, { timestamps: true });
 
 export const AdminUser = mongoose.model("AdminUser", AdminUserSchema);

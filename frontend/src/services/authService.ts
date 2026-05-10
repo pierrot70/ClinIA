@@ -2,6 +2,7 @@ import type { UserRole } from "../auth/roles";
 import { API_URL } from "./config";
 
 const ACCESS_TOKEN_REFRESH_SKEW_MS = 30_000;
+const AUTH_SECURITY_NOTICE_STORAGE_KEY = "clinia.auth.security_notice";
 
 export interface AuthUser {
     id?: string;
@@ -19,8 +20,15 @@ type BasicApiResponse = {
     error?: {
         code?: string;
         message?: string;
+        restrictedUntil?: string;
     };
     message?: string;
+};
+
+export type AuthSecurityNotice = {
+    code: "TOKEN_REVOKED" | "ACCOUNT_TEMPORARILY_RESTRICTED";
+    message: string;
+    restrictedUntil?: string | null;
 };
 
 export interface AuthSession {
@@ -71,6 +79,39 @@ type LoginApiResponse = {
 let inMemoryAccessToken: string | null = null;
 let inMemoryUser: AuthUser | null = null;
 let refreshPromise: Promise<string | null> | null = null;
+
+function persistAuthSecurityNotice(notice: AuthSecurityNotice): void {
+    try {
+        window.sessionStorage.setItem(
+            AUTH_SECURITY_NOTICE_STORAGE_KEY,
+            JSON.stringify(notice)
+        );
+    } catch {
+        // Ignore storage errors to avoid blocking auth UX.
+    }
+}
+
+export function consumeAuthSecurityNotice(): AuthSecurityNotice | null {
+    try {
+        const raw = window.sessionStorage.getItem(AUTH_SECURITY_NOTICE_STORAGE_KEY);
+        if (!raw) {
+            return null;
+        }
+
+        window.sessionStorage.removeItem(AUTH_SECURITY_NOTICE_STORAGE_KEY);
+        const parsed = JSON.parse(raw) as AuthSecurityNotice | null;
+        if (
+            parsed?.code === "TOKEN_REVOKED" ||
+            parsed?.code === "ACCOUNT_TEMPORARILY_RESTRICTED"
+        ) {
+            return parsed;
+        }
+    } catch {
+        // Ignore storage/parse issues and fall back to no notice.
+    }
+
+    return null;
+}
 
 function parseJwtPayload(token: string): DecodedTokenPayload | null {
     const parts = token.split(".");
@@ -136,9 +177,35 @@ function clearSession(): void {
     refreshPromise = null;
 }
 
-function redirectToLoginIfSessionWasForcedOut(user: AuthUser | null): void {
+function extractAuthSecurityNotice(
+    payload: BasicApiResponse
+): AuthSecurityNotice | null {
+    const code = payload?.error?.code;
+
+    if (code !== "TOKEN_REVOKED" && code !== "ACCOUNT_TEMPORARILY_RESTRICTED") {
+        return null;
+    }
+
+    return {
+        code,
+        message:
+            payload?.error?.message ||
+            payload?.message ||
+            "Votre session ClinIA a ete interrompue pour raison de securite.",
+        restrictedUntil: payload?.error?.restrictedUntil || null,
+    };
+}
+
+function redirectToLoginIfSessionWasForcedOut(
+    user: AuthUser | null,
+    notice: AuthSecurityNotice | null = null
+): void {
     if (!user || user.role === "SUPERADMIN") {
         return;
+    }
+
+    if (notice) {
+        persistAuthSecurityNotice(notice);
     }
 
     const currentPath = window.location.pathname;
@@ -414,8 +481,25 @@ export async function authFetch(input: RequestInfo | URL, init: AuthFetchOptions
         headers: requestHeaders,
     });
 
+    if (response.status === 423) {
+        const securityNotice = extractAuthSecurityNotice(
+            await safeBasicJson(response.clone())
+        );
+        if (securityNotice) {
+            persistAuthSecurityNotice(securityNotice);
+        }
+        return response;
+    }
+
     if (response.status !== 401 || !retryOnUnauthorized) {
         return response;
+    }
+
+    const securityNotice = extractAuthSecurityNotice(
+        await safeBasicJson(response.clone())
+    );
+    if (securityNotice) {
+        persistAuthSecurityNotice(securityNotice);
     }
 
     const refreshedToken = await refreshAccessToken();
@@ -433,7 +517,7 @@ export async function authFetch(input: RequestInfo | URL, init: AuthFetchOptions
     if (response.status === 401) {
         const previousUser = inMemoryUser;
         clearSession();
-        redirectToLoginIfSessionWasForcedOut(previousUser);
+        redirectToLoginIfSessionWasForcedOut(previousUser, securityNotice);
         throw new SessionExpiredError();
     }
 

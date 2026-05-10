@@ -8,7 +8,7 @@ set -euo pipefail
 # Optional env vars:
 #   API_URL=http://localhost:4000
 #   SCENARIO=patients|openai-logs
-#   MODE=detect|escalate
+#   MODE=detect|escalate|restrict
 #   PATIENT_LIMIT=50
 #   PATIENT_REQUESTS=5
 #   OPENAI_EXPORT_REQUESTS=3
@@ -32,6 +32,7 @@ LOGIN_BODY="$TMP_DIR/login.json"
 LOGIN_HEADERS="$TMP_DIR/login-headers.txt"
 INCIDENTS_BODY="$TMP_DIR/incidents.json"
 SESSION_CHECK_BODY="$TMP_DIR/session-check.json"
+RESTRICT_CHECK_BODY="$TMP_DIR/restrict-check.json"
 SESSION_REVOKED_DURING_INCIDENT_FETCH="false"
 
 cleanup() {
@@ -95,17 +96,17 @@ prompt_mode() {
 
   while true; do
     local selected_mode
-    printf '\nChoisir le mode du test [detect/escalate] (defaut: detect): '
+    printf '\nChoisir le mode du test [detect/escalate/restrict] (defaut: detect): '
     read -r selected_mode
     selected_mode="${selected_mode:-detect}"
 
     case "$selected_mode" in
-      detect|escalate)
+      detect|escalate|restrict)
         MODE="$selected_mode"
         return
         ;;
       *)
-        printf 'Valeur invalide. Entre "detect" ou "escalate".\n' >&2
+        printf 'Valeur invalide. Entre "detect", "escalate" ou "restrict".\n' >&2
         ;;
     esac
   done
@@ -226,6 +227,35 @@ Mode escalation:
 EOF
 }
 
+print_restriction_expectations() {
+  cat <<'EOF'
+
+Mode restrict:
+1. Le premier cycle cree un incident MASS_DOWNLOAD_ATTEMPT.
+2. Le second cycle provoque la revocation immediate de la session active.
+3. Le script se reconnecte avec les memes identifiants.
+4. Une route sensible doit alors refuser l'acces avec ACCOUNT_TEMPORARILY_RESTRICTED.
+
+EOF
+}
+
+print_existing_restriction_error() {
+  local response_body="$1"
+
+  node -e '
+    const fs = require("fs");
+    const payload = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    const error = payload?.error || {};
+    const restrictedUntil = error?.restrictedUntil || "inconnue";
+    const message = error?.message || "Acces temporairement restreint.";
+    console.error("");
+    console.error(`[trigger-mass-download-incident.sh] Ce compte est deja sous restriction temporaire.`);
+    console.error(`[trigger-mass-download-incident.sh] Fin de restriction: ${restrictedUntil}`);
+    console.error(`[trigger-mass-download-incident.sh] Message API: ${message}`);
+    console.error("[trigger-mass-download-incident.sh] Attends la fin de la fenetre, utilise un autre compte, ou reinitialise la restriction en local avant de rejouer le scenario.");
+  ' "$response_body"
+}
+
 verify_session_revoked() {
   local token="$1"
   local status
@@ -257,6 +287,75 @@ verify_session_revoked() {
   fi
 }
 
+verify_sensitive_route_restricted_after_relogin() {
+  local fresh_token="$1"
+  local status
+  local url
+
+  case "$SCENARIO" in
+    patients)
+      url="$API_URL/api/patients?page=1&limit=1"
+      ;;
+    openai-logs)
+      url="$API_URL/api/openai-logs/export.csv?startDate=2026-05-01&endDate=2026-05-09"
+      ;;
+    *)
+      fail "SCENARIO invalide pour le test de restriction."
+      ;;
+  esac
+
+  log "Verification qu'une reconnexion ne redonne pas acces a la route sensible"
+
+  status="$(
+    curl -sS \
+      -o "$RESTRICT_CHECK_BODY" \
+      -w "%{http_code}" \
+      -b "$COOKIE_JAR" \
+      -H "Authorization: Bearer $fresh_token" \
+      "$url"
+  )"
+
+  printf '[%s] HTTP restrict-check %s\n' "$SCRIPT_NAME" "$status"
+
+  if [[ "$status" != "423" ]] || ! grep -q '"code":"ACCOUNT_TEMPORARILY_RESTRICTED"' "$RESTRICT_CHECK_BODY"; then
+    printf '\n--- Reponse restrict-check (%s) ---\n' "$status" >&2
+    cat "$RESTRICT_CHECK_BODY" >&2
+    printf '\n----------------------------------\n' >&2
+    fail "La route sensible n'a pas ete restreinte apres reconnexion."
+  fi
+
+  log "Restriction temporaire confirmee apres reconnexion."
+}
+
+run_restriction_preflight_check() {
+  local token="$1"
+  local status
+  local url="$API_URL/api/patients?page=1&limit=1"
+
+  log "Preflight: verification immediate d'une restriction deja active sur /api/patients"
+
+  status="$(
+    curl -sS \
+      -o "$RESTRICT_CHECK_BODY" \
+      -w "%{http_code}" \
+      -b "$COOKIE_JAR" \
+      -H "Authorization: Bearer $token" \
+      "$url"
+  )"
+
+  if [[ "$status" == "423" ]] && grep -q '"code":"ACCOUNT_TEMPORARILY_RESTRICTED"' "$RESTRICT_CHECK_BODY"; then
+    print_existing_restriction_error "$RESTRICT_CHECK_BODY"
+    exit 1
+  fi
+
+  if [[ "$status" != "200" ]]; then
+    printf '\n--- Reponse preflight (%s) ---\n' "$status" >&2
+    cat "$RESTRICT_CHECK_BODY" >&2
+    printf '\n------------------------------\n' >&2
+    fail "Le preflight sur /api/patients a echoue avant le scenario."
+  fi
+}
+
 handle_expected_token_revoked() {
   local status="$1"
   local response_body="$2"
@@ -265,6 +364,18 @@ handle_expected_token_revoked() {
     SESSION_REVOKED_DURING_INCIDENT_FETCH="true"
     log "Session compromise revoquee pendant le scenario. Ce 401 TOKEN_REVOKED est attendu."
     return 0
+  fi
+
+  return 1
+}
+
+handle_existing_account_restriction() {
+  local status="$1"
+  local response_body="$2"
+
+  if [[ "$status" == "423" ]] && grep -q '"code":"ACCOUNT_TEMPORARILY_RESTRICTED"' "$response_body"; then
+    print_existing_restriction_error "$response_body"
+    exit 1
   fi
 
   return 1
@@ -294,6 +405,10 @@ run_patients_scenario() {
     )"
     printf '[%s] HTTP %s\n' "$SCRIPT_NAME" "$status"
     if [[ "$status" != "200" ]]; then
+      if handle_existing_account_restriction "$status" "$response_body"; then
+        return
+      fi
+
       if handle_expected_token_revoked "$status" "$response_body"; then
         return
       fi
@@ -329,6 +444,10 @@ run_openai_logs_scenario() {
     )"
     printf '[%s] HTTP %s\n' "$SCRIPT_NAME" "$status"
     if [[ "$status" != "200" ]]; then
+      if handle_existing_account_restriction "$status" "$response_body"; then
+        return
+      fi
+
       if handle_expected_token_revoked "$status" "$response_body"; then
         return
       fi
@@ -358,15 +477,19 @@ main() {
   prompt_mode
 
   case "$MODE" in
-    detect|escalate)
+    detect|escalate|restrict)
       ;;
     *)
-      fail "MODE invalide: utilise 'detect' ou 'escalate'."
+      fail "MODE invalide: utilise 'detect', 'escalate' ou 'restrict'."
       ;;
   esac
 
   local token
   token="$(login_and_get_token)"
+
+  if [[ "$MODE" == "restrict" ]]; then
+    run_restriction_preflight_check "$token"
+  fi
 
   case "$SCENARIO" in
     patients)
@@ -380,8 +503,11 @@ main() {
   log "Verification directe des incidents cote backend"
   fetch_incident_count "$token"
 
-  if [[ "$MODE" == "escalate" ]]; then
+  if [[ "$MODE" == "escalate" || "$MODE" == "restrict" ]]; then
     print_escalation_expectations
+    if [[ "$MODE" == "restrict" ]]; then
+      print_restriction_expectations
+    fi
     if [[ "$SESSION_REVOKED_DURING_INCIDENT_FETCH" != "true" ]]; then
       read -r -p "Pret a lancer un second cycle pour provoquer l'escalade ? [Entrée] " _
 
@@ -401,6 +527,12 @@ main() {
     fi
 
     verify_session_revoked "$token"
+
+    if [[ "$MODE" == "restrict" ]]; then
+      read -r -p "Pret a tester la reconnexion puis la restriction temporaire ? [Entrée] " _
+      token="$(login_and_get_token)"
+      verify_sensitive_route_restricted_after_relogin "$token"
+    fi
   fi
 
   cat <<'EOF'

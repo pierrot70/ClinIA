@@ -10,6 +10,8 @@ export type ApiErrorCode =
     | "PERSISTENCE_FAILED"    // Mongo indisponible
     | "INVALID_INPUT"         // Payload invalide
     | "SECURITY_INCIDENT_BLOCKING" // Acknowledgment explicite obligatoire
+    | "TOKEN_REVOKED"         // Session invalidée par le backend
+    | "ACCOUNT_TEMPORARILY_RESTRICTED" // Restriction temporaire sur routes sensibles
     | "INTERNAL_ERROR";       // Bug serveur inattendu
 
 /* ------------------------------------------------------------------ */
