@@ -20,6 +20,7 @@ import {
     registerSelf,
     reauthenticate,
     resetUserPassword,
+    completeForcedPasswordChange,
     refresh,
     setUserActiveStatus,
     updateUser,
@@ -348,6 +349,53 @@ router.post("/reauth", verifyJWT, async (req, res) => {
     }
 });
 
+router.post("/complete-password-reset", verifyJWT, async (req, res) => {
+    try {
+        const data = await completeForcedPasswordChange({
+            authUser: req.auth,
+            newPassword: req.body?.newPassword,
+            req,
+        });
+
+        return res.status(200).json({
+            data,
+            meta: {
+                source: "real",
+                model: "auth",
+            },
+        });
+    } catch (err) {
+        if (err.code === "INVALID_INPUT") {
+            return res.status(400).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        if (err.code === "FORBIDDEN" || err.code === "ACCOUNT_INACTIVE") {
+            return res.status(403).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        return res.status(500).json({
+            error: {
+                code: "AUTH_PASSWORD_CHANGE_FAILED",
+                message:
+                    "Impossible de finaliser le changement de mot de passe.",
+                retryable: true,
+            },
+        });
+    }
+});
+
 router.get("/session", verifyJWT, async (req, res) => {
     return res.status(200).json({
         data: {
@@ -356,6 +404,8 @@ router.get("/session", verifyJWT, async (req, res) => {
                 username: req.auth?.username,
                 role: req.auth?.role,
                 passwordResetRequired: req.auth?.passwordResetRequired === true,
+                mustChangePasswordOnNextLogin:
+                    req.auth?.mustChangePasswordOnNextLogin === true,
             },
         },
         meta: {

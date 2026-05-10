@@ -44,6 +44,21 @@ export const UI_LABELS_FR = {
             accountPrefix: "Compte concerne :",
             logout: "Se deconnecter",
         },
+        changePasswordRequired: {
+            title: "Choisissez un nouveau mot de passe",
+            description:
+                "Un mot de passe temporaire a ete attribue a ce compte. Vous devez maintenant definir un nouveau mot de passe robuste avant de retrouver l'acces normal.",
+            helper:
+                "Choisissez un mot de passe que vous etes seul a connaitre. L'acces aux zones protegees restera bloque tant que cette etape n'est pas terminee.",
+            newPasswordLabel: "Nouveau mot de passe",
+            confirmPasswordLabel: "Confirmer le nouveau mot de passe",
+            submit: "Enregistrer le nouveau mot de passe",
+            submitting: "Enregistrement...",
+            mismatch: "Les deux mots de passe doivent etre identiques.",
+            success:
+                "Nouveau mot de passe enregistre. Reconnectez-vous avec ce nouveau mot de passe.",
+            logout: "Se deconnecter",
+        },
     },
     // App.tsx - page d'accueil Coolify et messages globaux de statut.
     app: {

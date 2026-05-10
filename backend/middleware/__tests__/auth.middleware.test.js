@@ -77,6 +77,7 @@ describe("verifyJWT middleware", () => {
             role: "ADMIN",
             username: "admin",
             passwordResetRequired: false,
+            mustChangePasswordOnNextLogin: false,
         });
         expect(verify).toHaveBeenCalledWith(
             "token-value",
@@ -172,8 +173,54 @@ describe("verifyJWT middleware", () => {
             role: "ADMIN",
             username: "admin",
             passwordResetRequired: true,
+            mustChangePasswordOnNextLogin: false,
         });
         expect(next).toHaveBeenCalledTimes(1);
+    });
+
+    it("blocks protected access while a forced password change on next login is pending", async () => {
+        process.env.JWT_ACCESS_SECRET = "test-access-secret";
+        verify.mockReturnValue({
+            sub: "user-1",
+            role: "ADMIN",
+            username: "admin",
+            iat: Math.floor(Date.now() / 1000),
+        });
+        findById.mockReturnValue({
+            select: vi.fn().mockReturnValue({
+                lean: vi.fn().mockResolvedValue({
+                    _id: "user-1",
+                    role: "ADMIN",
+                    username: "admin",
+                    isActive: true,
+                    authTokenInvalidBefore: null,
+                    passwordResetRequired: false,
+                    mustChangePasswordOnNextLogin: true,
+                }),
+            }),
+        });
+
+        const req = {
+            method: "GET",
+            originalUrl: "/api/patients?page=1&limit=10",
+            headers: {
+                authorization: "Bearer token-value",
+            },
+        };
+        const res = makeRes();
+        const next = vi.fn();
+
+        await verifyJWT(req, res, next);
+
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "PASSWORD_CHANGE_REQUIRED",
+                message: "Vous devez choisir un nouveau mot de passe avant de poursuivre.",
+                retryable: false,
+            },
+        });
+        expect(next).not.toHaveBeenCalled();
     });
 
     it("rejects token payload with invalid role", async () => {

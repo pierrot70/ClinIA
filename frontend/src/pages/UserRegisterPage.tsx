@@ -24,6 +24,10 @@ type RegisterResponse = {
             email?: string | null;
             role?: NewUserRole;
         };
+        temporaryPassword?: string | null;
+        data?: {
+            temporaryPassword?: string | null;
+        };
     };
     error?: {
         code?: string;
@@ -81,6 +85,7 @@ const UserRegisterPage: React.FC = () => {
     const [editEmail, setEditEmail] = useState("");
     const [editRole, setEditRole] = useState<NewUserRole>("MEDECIN");
     const [resetPassword, setResetPassword] = useState("");
+    const [temporaryPasswordResult, setTemporaryPasswordResult] = useState<string | null>(null);
     const [editSaveStatus, setEditSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
     const [editSaveMessage, setEditSaveMessage] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -229,6 +234,7 @@ const UserRegisterPage: React.FC = () => {
         setEditEmail(managedUser.email || "");
         setEditRole(managedUser.role);
         setResetPassword("");
+        setTemporaryPasswordResult(null);
         setEditSaveStatus("idle");
         setEditSaveMessage("");
         setError(null);
@@ -350,12 +356,17 @@ const UserRegisterPage: React.FC = () => {
         }
 
         setSaving(true);
+        setEditSaveStatus("saving");
+        setEditSaveMessage("Reinitialisation du mot de passe en cours...");
         setError(null);
         setSuccess(null);
+        setTemporaryPasswordResult(null);
 
         const reauthed = await ensureSensitiveAccess();
         if (!reauthed) {
             setSaving(false);
+            setEditSaveStatus("idle");
+            setEditSaveMessage("");
             return;
         }
 
@@ -372,17 +383,41 @@ const UserRegisterPage: React.FC = () => {
 
             const payload = (await response.json().catch(() => ({}))) as RegisterResponse;
             if (!response.ok) {
-                setError(payload?.error?.message || "Impossible de reinitialiser le mot de passe.");
+                const failureMessage =
+                    payload?.error?.message ||
+                    "Impossible de reinitialiser le mot de passe.";
+                setEditSaveStatus("error");
+                setEditSaveMessage(`Echec de la reinitialisation: ${failureMessage}`);
+                setError(failureMessage);
                 return;
             }
 
-            setSuccess("Mot de passe reinitialise.");
+            const temporaryPassword =
+                payload?.data?.temporaryPassword ||
+                payload?.data?.data?.temporaryPassword ||
+                null;
+            if (temporaryPassword) {
+                const successMessage =
+                    `Mot de passe temporaire genere: ${temporaryPassword}. ` +
+                    "L'utilisateur devra le remplacer a la premiere connexion.";
+                setTemporaryPasswordResult(temporaryPassword);
+                setEditSaveStatus("success");
+                setEditSaveMessage(successMessage);
+                setSuccess(successMessage);
+            } else {
+                const successMessage = "Mot de passe reinitialise.";
+                setEditSaveStatus("success");
+                setEditSaveMessage(successMessage);
+                setSuccess(successMessage);
+            }
             setResetPassword("");
         } catch (err) {
             if (err instanceof SessionExpiredError) {
                 navigate("/admin/login", { replace: true });
                 return;
             }
+            setEditSaveStatus("error");
+            setEditSaveMessage("Echec de la reinitialisation: erreur reseau.");
             setError("Erreur reseau.");
         } finally {
             setSaving(false);
@@ -854,8 +889,24 @@ const UserRegisterPage: React.FC = () => {
                             value={resetPassword}
                             onChange={(event) => setResetPassword(event.target.value)}
                             className="w-full rounded-lg border px-3 py-2 text-sm"
+                            placeholder="Laisser vide pour generer un mot de passe temporaire"
                         />
+                        <p className="mt-1 text-xs text-gray-500">
+                            Laissez vide pour generer un mot de passe temporaire et forcer l'utilisateur a en choisir un nouveau a sa premiere connexion.
+                        </p>
                     </div>
+
+                    {temporaryPasswordResult && (
+                        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                            <div className="font-semibold">Mot de passe temporaire genere</div>
+                            <div className="mt-2 break-all rounded bg-white px-3 py-2 font-mono text-emerald-950">
+                                {temporaryPasswordResult}
+                            </div>
+                            <div className="mt-2 text-xs text-emerald-900">
+                                Communiquez ce mot de passe temporaire a l'utilisateur par un canal controle. Il devra le remplacer a sa premiere connexion.
+                            </div>
+                        </div>
+                    )}
 
                     <button
                         type="button"

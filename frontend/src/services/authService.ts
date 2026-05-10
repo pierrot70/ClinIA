@@ -9,6 +9,7 @@ export interface AuthUser {
     email: string;
     role: UserRole;
     passwordResetRequired?: boolean;
+    mustChangePasswordOnNextLogin?: boolean;
 }
 
 export interface LoginCredentials {
@@ -27,7 +28,10 @@ type BasicApiResponse = {
 };
 
 export type AuthSecurityNotice = {
-    code: "TOKEN_REVOKED" | "ACCOUNT_TEMPORARILY_RESTRICTED";
+    code:
+        | "TOKEN_REVOKED"
+        | "ACCOUNT_TEMPORARILY_RESTRICTED"
+        | "PASSWORD_CHANGE_REQUIRED";
     message: string;
     restrictedUntil?: string | null;
 };
@@ -66,6 +70,7 @@ type LoginApiResponse = {
         username?: string;
         role?: string;
         passwordResetRequired?: boolean;
+        mustChangePasswordOnNextLogin?: boolean;
     };
     role?: string;
     email?: string;
@@ -104,7 +109,8 @@ export function consumeAuthSecurityNotice(): AuthSecurityNotice | null {
         const parsed = JSON.parse(raw) as AuthSecurityNotice | null;
         if (
             parsed?.code === "TOKEN_REVOKED" ||
-            parsed?.code === "ACCOUNT_TEMPORARILY_RESTRICTED"
+            parsed?.code === "ACCOUNT_TEMPORARILY_RESTRICTED" ||
+            parsed?.code === "PASSWORD_CHANGE_REQUIRED"
         ) {
             return parsed;
         }
@@ -166,6 +172,8 @@ function mapUserFromPayload(
             "",
         role: roleCandidate,
         passwordResetRequired: response.user?.passwordResetRequired === true,
+        mustChangePasswordOnNextLogin:
+            response.user?.mustChangePasswordOnNextLogin === true,
     };
 }
 
@@ -185,7 +193,11 @@ function extractAuthSecurityNotice(
 ): AuthSecurityNotice | null {
     const code = payload?.error?.code;
 
-    if (code !== "TOKEN_REVOKED" && code !== "ACCOUNT_TEMPORARILY_RESTRICTED") {
+    if (
+        code !== "TOKEN_REVOKED" &&
+        code !== "ACCOUNT_TEMPORARILY_RESTRICTED" &&
+        code !== "PASSWORD_CHANGE_REQUIRED"
+    ) {
         return null;
     }
 

@@ -32,6 +32,7 @@ interface AuthContextValue {
     authFetch: typeof authFetch;
     hasAnyRole: (roles: UserRole[]) => boolean;
     passwordResetRequired: boolean;
+    mustChangePasswordOnNextLogin: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -227,6 +228,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             authFetch,
             hasAnyRole,
             passwordResetRequired: user?.passwordResetRequired === true,
+            mustChangePasswordOnNextLogin:
+                user?.mustChangePasswordOnNextLogin === true,
         }),
         [
             status,

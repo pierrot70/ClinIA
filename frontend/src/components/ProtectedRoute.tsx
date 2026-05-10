@@ -16,7 +16,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     redirectTo = "/login",
 }) => {
     const location = useLocation();
-    const { status, user, isAuthenticated, authFetch, passwordResetRequired } = useAuth();
+    const {
+        status,
+        user,
+        isAuthenticated,
+        authFetch,
+        passwordResetRequired,
+        mustChangePasswordOnNextLogin,
+    } = useAuth();
     const [isVerifyingSession, setIsVerifyingSession] = useState(false);
 
     useEffect(() => {
@@ -64,6 +71,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     if (passwordResetRequired) {
         return <Navigate to="/security/password-reset-required" replace />;
+    }
+
+    if (mustChangePasswordOnNextLogin) {
+        return <Navigate to="/security/change-password-required" replace />;
     }
 
     if (allowedRoles?.length) {

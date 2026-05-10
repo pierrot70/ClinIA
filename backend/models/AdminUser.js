@@ -79,6 +79,11 @@ const AdminUserSchema = new mongoose.Schema({
         default: false,
         index: true,
     },
+    mustChangePasswordOnNextLogin: {
+        type: Boolean,
+        default: false,
+        index: true,
+    },
 }, { timestamps: true });
 
 export const AdminUser = mongoose.model("AdminUser", AdminUserSchema);

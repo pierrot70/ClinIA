@@ -40,6 +40,17 @@ function isAllowedWhilePasswordResetRequired(req) {
     );
 }
 
+function isAllowedWhileForcedPasswordChangePending(req) {
+    const path = req.originalUrl || req.path || req.url || "";
+    const method = (req.method || "GET").toUpperCase();
+
+    return (
+        (method === "GET" && path.startsWith("/api/auth/session")) ||
+        (method === "POST" && path.startsWith("/api/auth/logout")) ||
+        (method === "POST" && path.startsWith("/api/auth/complete-password-reset"))
+    );
+}
+
 export async function verifyJWT(req, res, next) {
     const token = getTokenFromRequest(req);
 
@@ -74,7 +85,7 @@ export async function verifyJWT(req, res, next) {
         }
 
         const userQuery = AdminUser.findById(payload.sub)
-            .select("_id username role isActive authTokenInvalidBefore sessionStartedAt lastActivityAt refreshTokenHash refreshTokenExpiresAt lastLogoutAt passwordResetRequired");
+            .select("_id username role isActive authTokenInvalidBefore sessionStartedAt lastActivityAt refreshTokenHash refreshTokenExpiresAt lastLogoutAt passwordResetRequired mustChangePasswordOnNextLogin");
         const user =
             typeof userQuery?.lean === "function"
                 ? await userQuery.lean()
@@ -146,11 +157,27 @@ export async function verifyJWT(req, res, next) {
             });
         }
 
+        if (
+            user.mustChangePasswordOnNextLogin === true &&
+            !isAllowedWhileForcedPasswordChangePending(req)
+        ) {
+            return res.status(403).json({
+                error: {
+                    code: "PASSWORD_CHANGE_REQUIRED",
+                    message:
+                        "Vous devez choisir un nouveau mot de passe avant de poursuivre.",
+                    retryable: false,
+                },
+            });
+        }
+
         req.auth = {
             userId: String(user._id),
             role: user.role,
             username: user.username,
             passwordResetRequired: user.passwordResetRequired === true,
+            mustChangePasswordOnNextLogin:
+                user.mustChangePasswordOnNextLogin === true,
         };
 
         await touchSessionActivity(user);
