@@ -13,6 +13,8 @@ export async function recordAuthAuditEvent({
     outcome,
     userId = null,
     username = null,
+    actorUsername = null,
+    targetUsername = null,
     role = null,
     ip = null,
     reason = null,
@@ -23,6 +25,14 @@ export async function recordAuthAuditEvent({
             outcome,
             userId,
             usernameMasked: redactUsername(username),
+            actorUsername:
+                typeof actorUsername === "string" && actorUsername.trim()
+                    ? actorUsername.trim().toLowerCase()
+                    : null,
+            targetUsername:
+                typeof targetUsername === "string" && targetUsername.trim()
+                    ? targetUsername.trim().toLowerCase()
+                    : null,
             role,
             ip,
             reason,

@@ -449,6 +449,14 @@ describe("auth service", () => {
         expect(user.authTokenInvalidBefore).toBeInstanceOf(Date);
         expect(user.save).toHaveBeenCalledTimes(1);
         expect(result.user.passwordResetRequired).toBe(false);
+        expect(recordAuthAuditEvent).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: "USER_MANAGEMENT",
+                actorUsername: "superadmin",
+                targetUsername: "admin",
+                reason: expect.stringMatching(/^RESET_PASSWORD:/),
+            })
+        );
     });
 
     it("generates a temporary password when superadmin resets without providing one", async () => {
@@ -474,6 +482,14 @@ describe("auth service", () => {
         expect(result.temporaryPassword.length).toBeGreaterThanOrEqual(8);
         expect(user.mustChangePasswordOnNextLogin).toBe(true);
         expect(user.passwordResetRequired).toBe(false);
+        expect(recordAuthAuditEvent).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: "USER_MANAGEMENT",
+                actorUsername: "superadmin",
+                targetUsername: "admin",
+                reason: expect.stringMatching(/^RESET_PASSWORD:/),
+            })
+        );
     });
 
     it("lets the authenticated user complete a forced password change", async () => {
@@ -499,6 +515,14 @@ describe("auth service", () => {
         expect(user.mustChangePasswordOnNextLogin).toBe(false);
         expect(user.authTokenInvalidBefore).toBeInstanceOf(Date);
         expect(user.save).toHaveBeenCalledTimes(1);
+        expect(recordAuthAuditEvent).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: "PASSWORD_CHANGE",
+                actorUsername: "admin",
+                targetUsername: "admin",
+                reason: "FORCED_PASSWORD_CHANGE_COMPLETED",
+            })
+        );
     });
 
     it("applies search and role filters to paginated user listing", async () => {

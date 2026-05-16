@@ -40,8 +40,10 @@ import {
     REFRESH_TOKEN_COOKIE_NAME,
     SENSITIVE_REAUTH_COOKIE_NAME,
 } from "../auth/sessionCookies.js";
+import { enforceTrustedOrigin } from "../security/originProtection.js";
 
 const router = express.Router();
+const enforceSensitiveAuthOrigin = enforceTrustedOrigin();
 
 router.get("/app-status", async (_req, res) => {
     await enforceScheduledShutdownIfDue();
@@ -211,7 +213,7 @@ router.post("/register-self", loginRateLimiter, async (req, res) => {
     }
 });
 
-router.post("/refresh", refreshRateLimiter, async (req, res) => {
+router.post("/refresh", enforceSensitiveAuthOrigin, refreshRateLimiter, async (req, res) => {
     const refreshToken = getRefreshTokenFromRequest(req);
 
     try {
@@ -269,7 +271,7 @@ router.post("/refresh", refreshRateLimiter, async (req, res) => {
     }
 });
 
-router.post("/logout", verifyJWT, async (req, res) => {
+router.post("/logout", enforceSensitiveAuthOrigin, verifyJWT, async (req, res) => {
     const refreshToken = getRefreshTokenFromRequest(req);
 
     try {
@@ -302,7 +304,7 @@ router.post("/logout", verifyJWT, async (req, res) => {
     }
 });
 
-router.post("/reauth", verifyJWT, async (req, res) => {
+router.post("/reauth", enforceSensitiveAuthOrigin, verifyJWT, async (req, res) => {
     try {
         const token = await reauthenticate({
             authUser: req.auth,
@@ -349,7 +351,7 @@ router.post("/reauth", verifyJWT, async (req, res) => {
     }
 });
 
-router.post("/complete-password-reset", verifyJWT, async (req, res) => {
+router.post("/complete-password-reset", enforceSensitiveAuthOrigin, verifyJWT, async (req, res) => {
     try {
         const data = await completeForcedPasswordChange({
             authUser: req.auth,

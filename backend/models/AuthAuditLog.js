@@ -10,6 +10,7 @@ const AuthAuditLogSchema = new mongoose.Schema(
                 "LOGOUT",
                 "REGISTER",
                 "USER_MANAGEMENT",
+                "PASSWORD_CHANGE",
             ],
             required: true,
         },
@@ -26,6 +27,14 @@ const AuthAuditLogSchema = new mongoose.Schema(
         usernameMasked: {
             type: String,
             default: "unknown",
+        },
+        actorUsername: {
+            type: String,
+            default: null,
+        },
+        targetUsername: {
+            type: String,
+            default: null,
         },
         role: {
             type: String,

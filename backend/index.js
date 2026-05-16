@@ -64,6 +64,7 @@ import {
     finalizeOpenAIRequestAuditEvent,
     recordOpenAIRequestAuditEvent,
 } from "./audit/openaiRequestAudit.js";
+import { createCorsOriginDelegate } from "./security/originProtection.js";
 
 dotenv.config();
 
@@ -97,7 +98,7 @@ const massDownloadRestrictionGuard = enforceMassDownloadRestriction();
 app.set("trust proxy", 1);
 app.use(
     cors({
-        origin: true,
+        origin: createCorsOriginDelegate(),
         credentials: true,
     })
 );
@@ -1499,6 +1500,20 @@ app.use(
     authRouter
 );
 app.use("/api/translation", translationRouter);
+
+app.use((err, _req, res, next) => {
+    if (err?.code === "CORS_ORIGIN_DENIED") {
+        return res.status(403).json({
+            error: {
+                code: "CORS_ORIGIN_DENIED",
+                message: "Origine CORS non autorisee.",
+                retryable: false,
+            },
+        });
+    }
+
+    return next(err);
+});
 
 app.listen(4000, () =>
     console.log(

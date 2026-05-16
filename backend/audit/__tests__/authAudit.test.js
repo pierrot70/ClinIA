@@ -30,6 +30,8 @@ describe("auth audit privacy", () => {
             outcome: "SUCCESS",
             userId: "507f1f77bcf86cd799439011",
             usernameMasked: "do***",
+            actorUsername: null,
+            targetUsername: null,
             role: "MEDECIN",
             ip: "203.0.113.10",
             reason: null,
@@ -61,5 +63,32 @@ describe("auth audit privacy", () => {
         expect(serialized).not.toContain("jean.tremblay@example.com");
         expect(serialized).not.toContain("514-555-1212");
         expect(serialized).not.toContain("RAMQ1234567890");
+    });
+
+    it("stores explicit actor and target usernames for password administration events", async () => {
+        await recordAuthAuditEvent({
+            action: "USER_MANAGEMENT",
+            outcome: "SUCCESS",
+            userId: "507f1f77bcf86cd799439011",
+            username: "superadmin",
+            actorUsername: "SuperAdmin",
+            targetUsername: "pierrot.lasante",
+            role: "SUPERADMIN",
+            ip: "203.0.113.12",
+            reason: "RESET_PASSWORD:507f1f77bcf86cd799439099",
+        });
+
+        expect(create).toHaveBeenCalledWith({
+            action: "USER_MANAGEMENT",
+            outcome: "SUCCESS",
+            userId: "507f1f77bcf86cd799439011",
+            usernameMasked: "su***",
+            actorUsername: "superadmin",
+            targetUsername: "pierrot.lasante",
+            role: "SUPERADMIN",
+            ip: "203.0.113.12",
+            reason: "RESET_PASSWORD:507f1f77bcf86cd799439099",
+            timestamp: expect.any(Date),
+        });
     });
 });
