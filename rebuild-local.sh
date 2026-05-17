@@ -52,6 +52,7 @@ NO_CACHE="${NO_CACHE:-0}"
 PULL="${PULL:-0}"
 DETACH="${DETACH:-1}"
 NUCLEAR="${NUCLEAR:-0}"
+BACKEND_TEST_WATCH="${BACKEND_TEST_WATCH:-0}"
 
 # -----------------------------
 # Helpers
@@ -92,8 +93,8 @@ npx tsc --noEmit
 echo "> node ../scripts/verify-ui-labels.mjs"
 node ../scripts/verify-ui-labels.mjs
 
-echo "> npx vitest run src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/components/admin/AuthLogsModal.test.tsx"
-npx vitest run src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/components/admin/AuthLogsModal.test.tsx
+echo "> npx vitest run src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/components/admin/AuthLogsModal.test.tsx src/components/admin/AuthGraphsModal.test.tsx"
+npx vitest run src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/components/admin/AuthLogsModal.test.tsx src/components/admin/AuthGraphsModal.test.tsx
 
 echo "> npm run build"
 npm run build
@@ -127,18 +128,29 @@ elif [[ "${MODE^^}" == "DEV" ]]; then
 fi
 
 # -----------------------------
-# 0b) Tests backend DEV ciblés : conformité privacy/auth
+# 0b) Tests backend DEV complets : tous les *.test.js
 # -----------------------------
 if [[ "${MODE^^}" == "DEV" ]]; then
-  headline "Tests backend DEV ciblés (privacy/auth)"
+  headline "Tests backend DEV complets (*.test.js)"
   pushd backend > /dev/null
 
-  echo "> npm test -- audit/__tests__/authAudit.test.js security/__tests__/originProtection.test.js services/__tests__/auth.service.test.js utils/__tests__/clinicianCommentPrivacy.test.js"
-  npm test -- audit/__tests__/authAudit.test.js security/__tests__/originProtection.test.js services/__tests__/auth.service.test.js utils/__tests__/clinicianCommentPrivacy.test.js
+  echo "> Fichiers backend *.test.js detectes :"
+  mapfile -t BACKEND_TEST_FILES < <(find . -path '*/__tests__/*.test.js' | sort)
+  printf '  - %s\n' "${BACKEND_TEST_FILES[@]}"
+  echo "> Total: ${#BACKEND_TEST_FILES[@]} fichiers"
+
+  if [[ "$BACKEND_TEST_WATCH" == "1" ]]; then
+    echo "> npx vitest"
+    echo "> Mode watch actif. Tu pourras taper q pour quitter apres inspection."
+    npx vitest
+  else
+    echo "> npx vitest run"
+    npx vitest run
+  fi
 
   popd > /dev/null
 else
-  headline "Tests backend DEV ciblés (privacy/auth)"
+  headline "Tests backend DEV complets (*.test.js)"
   echo "Mode ${MODE^^:-<unset>} : tests DEV ignorés."
 fi
 
