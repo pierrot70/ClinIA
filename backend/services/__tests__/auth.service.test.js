@@ -7,6 +7,7 @@ const mockFind = vi.fn();
 const mockCountDocuments = vi.fn();
 const mockAuthAuditCountDocuments = vi.fn();
 const mockAuthAuditFind = vi.fn();
+const mockAuthAuditAggregate = vi.fn();
 
 const recordAuthAuditEvent = vi.fn();
 
@@ -24,6 +25,7 @@ vi.mock("../../models/AuthAuditLog.js", () => ({
     AuthAuditLog: {
         countDocuments: mockAuthAuditCountDocuments,
         find: mockAuthAuditFind,
+        aggregate: mockAuthAuditAggregate,
     },
 }));
 
@@ -57,6 +59,7 @@ const {
     register,
     registerSelf,
     listUsers,
+    listAuthLogGraphs,
     listAuthLogs,
     resetUserPassword,
     completeForcedPasswordChange,
@@ -649,6 +652,55 @@ describe("auth service", () => {
                 targetUsername: "pierrot.lasante",
                 reason: "RESET_PASSWORD:507f1f77bcf86cd799439011",
             }),
+        ]);
+    });
+
+    it("builds auth log graph points and preferred action order", async () => {
+        mockAuthAuditAggregate.mockResolvedValue([
+            { _id: { date: "2026-05-16", action: "FAILED_LOGIN" }, count: 2 },
+            { _id: { date: "2026-05-16", action: "LOGIN" }, count: 3 },
+            { _id: { date: "2026-05-17", action: "USER_MANAGEMENT" }, count: 1 },
+        ]);
+
+        const result = await listAuthLogGraphs({
+            authUser: { role: "SUPERADMIN" },
+            startDate: "2026-05-16",
+            endDate: "2026-05-17",
+        });
+
+        expect(mockAuthAuditAggregate).toHaveBeenCalledWith([
+            {
+                $match: {
+                    $and: [
+                        {
+                            timestamp: {
+                                $gte: new Date("2026-05-16T00:00:00.000"),
+                                $lte: new Date("2026-05-17T23:59:59.999"),
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $group: {
+                    _id: {
+                        date: {
+                            $dateToString: {
+                                format: "%Y-%m-%d",
+                                date: "$timestamp",
+                            },
+                        },
+                        action: "$action",
+                    },
+                    count: { $sum: 1 },
+                },
+            },
+            { $sort: { "_id.date": 1, "_id.action": 1 } },
+        ]);
+        expect(result.actions).toEqual(["LOGIN", "FAILED_LOGIN", "USER_MANAGEMENT"]);
+        expect(result.points).toEqual([
+            { date: "2026-05-16", total: 5, FAILED_LOGIN: 2, LOGIN: 3 },
+            { date: "2026-05-17", total: 1, USER_MANAGEMENT: 1 },
         ]);
     });
 });

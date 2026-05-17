@@ -10,9 +10,13 @@ headline() {
 TEST_SUMMARY_FRONTEND_TOTAL=0
 TEST_SUMMARY_FRONTEND_FAILED=0
 TEST_SUMMARY_FRONTEND_FAILED_NAMES=""
+TEST_SUMMARY_FRONTEND_TESTS_TOTAL=0
+TEST_SUMMARY_FRONTEND_TESTS_FAILED=0
 TEST_SUMMARY_BACKEND_TOTAL=0
 TEST_SUMMARY_BACKEND_FAILED=0
 TEST_SUMMARY_BACKEND_FAILED_NAMES=""
+TEST_SUMMARY_BACKEND_TESTS_TOTAL=0
+TEST_SUMMARY_BACKEND_TESTS_FAILED=0
 TEST_SUMMARY_BACKEND_WATCH=0
 declare -a TEST_SUMMARY_FRONTEND_FILES=()
 declare -a TEST_SUMMARY_BACKEND_FILES=()
@@ -22,7 +26,9 @@ print_test_summary() {
 
   if [[ "$TEST_SUMMARY_FRONTEND_TOTAL" -gt 0 ]]; then
     local frontend_passed=$((TEST_SUMMARY_FRONTEND_TOTAL - TEST_SUMMARY_FRONTEND_FAILED))
+    local frontend_tests_passed=$((TEST_SUMMARY_FRONTEND_TESTS_TOTAL - TEST_SUMMARY_FRONTEND_TESTS_FAILED))
     echo "Frontend Test Files: ${frontend_passed} passed (${TEST_SUMMARY_FRONTEND_TOTAL})"
+    echo "Frontend Tests: ${frontend_tests_passed} passed (${TEST_SUMMARY_FRONTEND_TESTS_TOTAL})"
     if [[ "$TEST_SUMMARY_FRONTEND_FAILED" -gt 0 ]]; then
       echo "Fichiers frontend en echec:"
       printf '%s\n' "$TEST_SUMMARY_FRONTEND_FAILED_NAMES"
@@ -35,7 +41,9 @@ print_test_summary() {
     echo "Backend Test Files: mode watch actif, resume final non calcule"
   elif [[ "$TEST_SUMMARY_BACKEND_TOTAL" -gt 0 ]]; then
     local backend_passed=$((TEST_SUMMARY_BACKEND_TOTAL - TEST_SUMMARY_BACKEND_FAILED))
+    local backend_tests_passed=$((TEST_SUMMARY_BACKEND_TESTS_TOTAL - TEST_SUMMARY_BACKEND_TESTS_FAILED))
     echo "Backend Test Files: ${backend_passed} passed (${TEST_SUMMARY_BACKEND_TOTAL})"
+    echo "Backend Tests: ${backend_tests_passed} passed (${TEST_SUMMARY_BACKEND_TESTS_TOTAL})"
     if [[ "$TEST_SUMMARY_BACKEND_FAILED" -gt 0 ]]; then
       echo "Fichiers backend en echec:"
       printf '%s\n' "$TEST_SUMMARY_BACKEND_FAILED_NAMES"
@@ -72,25 +80,33 @@ const normalized = results
   }))
   .filter((result) => result.name && !result.name.includes("node_modules"));
 const failedEntries = normalized.filter((result) => result.status === "failed");
+const totalTests = typeof payload.numTotalTests === "number" ? payload.numTotalTests : 0;
+const failedTests = typeof payload.numFailedTests === "number" ? payload.numFailedTests : 0;
 const failedNames = failedEntries.map((result) => result.name).join("||");
-process.stdout.write(`${failedEntries.length}\n${failedNames}`);
+process.stdout.write(`${failedEntries.length}\n${failedNames}\n${totalTests}\n${failedTests}`);
 NODE
 )"
 
   rm -f "$json_file"
 
-  local failed failed_names
+  local failed failed_names total_tests failed_tests
   failed="$(printf '%s\n' "$summary_line" | sed -n '1p')"
   failed_names="$(printf '%s\n' "$summary_line" | sed -n '2p')"
+  total_tests="$(printf '%s\n' "$summary_line" | sed -n '3p')"
+  failed_tests="$(printf '%s\n' "$summary_line" | sed -n '4p')"
 
   if [[ "$suite_name" == "frontend" ]]; then
     TEST_SUMMARY_FRONTEND_TOTAL="${#TEST_SUMMARY_FRONTEND_FILES[@]}"
     TEST_SUMMARY_FRONTEND_FAILED="${failed:-0}"
     TEST_SUMMARY_FRONTEND_FAILED_NAMES="${failed_names//||/$'\n'}"
+    TEST_SUMMARY_FRONTEND_TESTS_TOTAL="${total_tests:-0}"
+    TEST_SUMMARY_FRONTEND_TESTS_FAILED="${failed_tests:-0}"
   else
     TEST_SUMMARY_BACKEND_TOTAL="${#TEST_SUMMARY_BACKEND_FILES[@]}"
     TEST_SUMMARY_BACKEND_FAILED="${failed:-0}"
     TEST_SUMMARY_BACKEND_FAILED_NAMES="${failed_names//||/$'\n'}"
+    TEST_SUMMARY_BACKEND_TESTS_TOTAL="${total_tests:-0}"
+    TEST_SUMMARY_BACKEND_TESTS_FAILED="${failed_tests:-0}"
   fi
 
   return "$status"
