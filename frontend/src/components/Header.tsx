@@ -4,6 +4,7 @@ import VoiceNavButton from "./VoiceNavButton";
 import { OpenAILogsModal } from "./OpenAILogsModal";
 import { AuthLogsModal } from "./admin/AuthLogsModal";
 import { AuthGraphsModal } from "./admin/AuthGraphsModal";
+import { ClinicianInboxModal } from "./admin/ClinicianInboxModal";
 import { SecurityIncidentsModal } from "./admin/SecurityIncidentsModal";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { useAuth } from "../hooks/useAuth";
@@ -1975,280 +1976,45 @@ const Header: React.FC = () => {
                 onPieSliceClick={openAuthLogsForRangeAndAction}
             />
 
-            {showClinicianInboxModal && (
-                <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/40 px-4 py-4 sm:py-6">
-                    <div className="mx-auto flex min-h-full w-full max-w-5xl items-start sm:items-center">
-                        <div className="w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
-                            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                                <div>
-                                    <h2 className="text-lg font-semibold text-gray-900">
-                                        {clinicianInboxLabels.title}
-                                    </h2>
-                                    <p className="mt-1 text-sm text-gray-600">
-                                        {clinicianInboxLabels.description}
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => { void loadClinicianInbox(1, true); }}
-                                        className="rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
-                                    >
-                                        {clinicianInboxLabels.refresh}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => { void closeClinicianInboxModal(); }}
-                                        className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                                    >
-                                        {clinicianInboxLabels.close}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="mb-4 grid gap-3 sm:grid-cols-5">
-                                <label className="text-sm text-gray-700">
-                                    {clinicianInboxLabels.filtersActor}
-                                    <select
-                                        value={clinicianInboxActorFilter}
-                                        onChange={(event) => setClinicianInboxActorFilter(event.target.value)}
-                                        className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
-                                    >
-                                        <option value="">{clinicianInboxLabels.all}</option>
-                                        {clinicianInboxActors.map((actor) => (
-                                            <option key={actor} value={actor}>
-                                                {actor}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
-                                <label className="text-sm text-gray-700">
-                                    {clinicianInboxLabels.filtersCategory}
-                                    <select
-                                        value={clinicianInboxCategoryFilter}
-                                        onChange={(event) => setClinicianInboxCategoryFilter(event.target.value)}
-                                        className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
-                                    >
-                                        <option value="">{clinicianInboxLabels.allFeminine}</option>
-                                        <option value="BUG">BUG</option>
-                                        <option value="SUGGESTION">SUGGESTION</option>
-                                        <option value="URGENT">URGENT</option>
-                                        <option value="INCOMPREHENSION">INCOMPREHENSION</option>
-                                    </select>
-                                </label>
-                                <label className="text-sm text-gray-700">
-                                    {clinicianInboxLabels.filtersReplied}
-                                    <select
-                                        value={clinicianInboxRepliedFilter}
-                                        onChange={(event) => setClinicianInboxRepliedFilter(event.target.value as InboxRepliedFilter)}
-                                        className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
-                                    >
-                                        <option value="">{clinicianInboxLabels.all}</option>
-                                        <option value="yes">{clinicianInboxLabels.repliedYes}</option>
-                                        <option value="no">{clinicianInboxLabels.repliedNo}</option>
-                                    </select>
-                                </label>
-                                <label className="text-sm text-gray-700">
-                                    {clinicianInboxLabels.filtersStartDate}
-                                    <input
-                                        type="date"
-                                        value={clinicianInboxStartDate}
-                                        max={clinicianInboxEndDate || undefined}
-                                        onChange={(event) => setClinicianInboxStartDate(event.target.value)}
-                                        className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                                    />
-                                </label>
-                                <label className="text-sm text-gray-700">
-                                    {clinicianInboxLabels.filtersEndDate}
-                                    <input
-                                        type="date"
-                                        value={clinicianInboxEndDate}
-                                        min={clinicianInboxStartDate || undefined}
-                                        onChange={(event) => setClinicianInboxEndDate(event.target.value)}
-                                        className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                                    />
-                                </label>
-                            </div>
-
-                            <div className="mb-4">
-                                <button
-                                    type="button"
-                                    onClick={() => { void loadClinicianInbox(1, true); }}
-                                    className="rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
-                                >
-                                    <HeaderLabel text={headerLabels.controls.search} />
-                                </button>
-                            </div>
-
-                            {clinicianInboxLoading ? (
-                                <p className="text-sm text-gray-500">{clinicianInboxLabels.loading}</p>
-                            ) : clinicianInboxError ? (
-                                <div className="rounded bg-red-50 p-3 text-sm text-red-700">
-                                    {clinicianInboxError}
-                                </div>
-                            ) : clinicianInboxItems.length === 0 ? (
-                                <p className="text-sm text-gray-500">{clinicianInboxLabels.empty}</p>
-                            ) : (
-                                <>
-                                    {clinicianInboxReplySuccess ? (
-                                        <div className="mb-3 rounded bg-emerald-50 p-3 text-sm text-emerald-700">
-                                            {clinicianInboxReplySuccess}
-                                        </div>
-                                    ) : null}
-                                    <div className="overflow-x-auto rounded-lg border border-gray-200">
-                                        <table className="min-w-full text-sm">
-                                            <thead className="bg-gray-50 text-left text-gray-700">
-                                                <tr>
-                                                    <th className="px-3 py-2">{clinicianInboxLabels.createdAt}</th>
-                                                    <th className="px-3 py-2">{clinicianInboxLabels.actor}</th>
-                                                    <th className="px-3 py-2">{clinicianInboxLabels.category}</th>
-                                                    <th className="px-3 py-2">{clinicianInboxLabels.replied}</th>
-                                                    <th className="px-3 py-2">{clinicianInboxLabels.comment}</th>
-                                                    <th className="px-3 py-2">{clinicianInboxLabels.action}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {clinicianInboxItems.map((item) => (
-                                                    <React.Fragment key={item.id}>
-                                                        <tr className="border-t border-gray-100 align-top">
-                                                            <td className="px-3 py-2 text-gray-600">
-                                                                {new Date(item.createdAt).toLocaleString()}
-                                                            </td>
-                                                            <td className="px-3 py-2 text-gray-900">
-                                                                {item.actorUsername}
-                                                                <div className="text-xs text-gray-500">{item.actorRole}</div>
-                                                            </td>
-                                                            <td className="px-3 py-2 text-gray-700">{item.category}</td>
-                                                            <td className="px-3 py-2 text-gray-700">
-                                                                {item.replies.length > 0
-                                                                    ? clinicianInboxLabels.repliedYes
-                                                                    : clinicianInboxLabels.repliedNo}
-                                                            </td>
-                                                            <td className="px-3 py-2 text-gray-800 whitespace-pre-wrap">
-                                                                {item.comment}
-                                                                {item.replies.length > 0 ? (
-                                                                    <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
-                                                                        {item.replies.map((reply) => (
-                                                                            <div key={reply.id} className="rounded bg-gray-50 p-2 text-xs text-gray-700">
-                                                                                <div className="font-medium text-gray-800">
-                                                                                    {reply.responderUsername} ({reply.responderRole})
-                                                                                </div>
-                                                                                <div className="text-[11px] text-gray-500">
-                                                                                    {new Date(reply.createdAt).toLocaleString()}
-                                                                                </div>
-                                                                                <div className="mt-1 whitespace-pre-wrap">
-                                                                                    {reply.message}
-                                                                                </div>
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                ) : null}
-                                                            </td>
-                                                            <td className="px-3 py-2">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        setClinicianInboxReplyTargetId(
-                                                                            clinicianInboxReplyTargetId === item.id ? "" : item.id
-                                                                        );
-                                                                        setClinicianInboxReplyMessage("");
-                                                                        setClinicianInboxReplySuccess("");
-                                                                    }}
-                                                                    className="rounded bg-sky-100 px-3 py-1 text-sm text-sky-800 hover:bg-sky-200"
-                                                                >
-                                                                    {clinicianInboxLabels.reply}
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                        {clinicianInboxReplyTargetId === item.id ? (
-                                                            <tr className="border-t border-gray-100 bg-sky-50/40">
-                                                                <td colSpan={6} className="px-3 py-3">
-                                                                    <div className="space-y-3">
-                                                                        <textarea
-                                                                            value={clinicianInboxReplyMessage}
-                                                                            onChange={(event) => setClinicianInboxReplyMessage(event.target.value)}
-                                                                            placeholder={clinicianInboxLabels.replyPlaceholder}
-                                                                            className="min-h-[120px] w-full rounded border border-gray-300 bg-white px-3 py-3 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
-                                                                            maxLength={500}
-                                                                        />
-                                                                        <div className="flex gap-3">
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => { void submitClinicianInboxReply(); }}
-                                                                                disabled={clinicianInboxReplying || !clinicianInboxReplyMessage.trim()}
-                                                                                className="rounded bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
-                                                                            >
-                                                                                {clinicianInboxReplying
-                                                                                    ? clinicianInboxLabels.replying
-                                                                                    : clinicianInboxLabels.replySubmit}
-                                                                            </button>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => {
-                                                                                    setClinicianInboxReplyTargetId("");
-                                                                                    setClinicianInboxReplyMessage("");
-                                                                                }}
-                                                                                disabled={clinicianInboxReplying}
-                                                                                className="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-                                                                            >
-                                                                                {clinicianInboxLabels.replyCancel}
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        ) : null}
-                                                    </React.Fragment>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    <div className="mt-4 flex items-center justify-between gap-3 text-sm text-gray-600">
-                                        <div>
-                                            {clinicianInboxLabels.pagePrefix} {clinicianInboxPagination.page}{clinicianInboxLabels.pageSeparator}{Math.max(1, clinicianInboxPagination.totalPages)} - {clinicianInboxPagination.total} {clinicianInboxLabels.resultSuffix}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                type="button"
-                                                disabled={clinicianInboxPagination.page <= 1}
-                                                onClick={() => { void loadClinicianInbox(1, true); }}
-                                                className="rounded border border-gray-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
-                                            >
-                                                {clinicianInboxLabels.first}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                disabled={clinicianInboxPagination.page <= 1}
-                                                onClick={() => { void loadClinicianInbox(clinicianInboxPagination.page - 1, true); }}
-                                                className="rounded border border-gray-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
-                                            >
-                                                {clinicianInboxLabels.previousSymbol}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                disabled={clinicianInboxPagination.page >= clinicianInboxPagination.totalPages}
-                                                onClick={() => { void loadClinicianInbox(clinicianInboxPagination.page + 1, true); }}
-                                                className="rounded border border-gray-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
-                                            >
-                                                {clinicianInboxLabels.nextSymbol}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                disabled={clinicianInboxPagination.page >= clinicianInboxPagination.totalPages}
-                                                onClick={() => { void loadClinicianInbox(clinicianInboxPagination.totalPages, true); }}
-                                                className="rounded border border-gray-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
-                                            >
-                                                {clinicianInboxLabels.last}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ClinicianInboxModal
+                isOpen={showClinicianInboxModal}
+                labels={clinicianInboxLabels}
+                headerLabels={{ controls: { search: headerLabels.controls.search } }}
+                items={clinicianInboxItems}
+                actors={clinicianInboxActors}
+                loading={clinicianInboxLoading}
+                error={clinicianInboxError}
+                actorFilter={clinicianInboxActorFilter}
+                categoryFilter={clinicianInboxCategoryFilter}
+                repliedFilter={clinicianInboxRepliedFilter}
+                startDate={clinicianInboxStartDate}
+                endDate={clinicianInboxEndDate}
+                pagination={clinicianInboxPagination}
+                replyTargetId={clinicianInboxReplyTargetId}
+                replyMessage={clinicianInboxReplyMessage}
+                replying={clinicianInboxReplying}
+                replySuccess={clinicianInboxReplySuccess}
+                onClose={() => { void closeClinicianInboxModal(); }}
+                onRefresh={() => { void loadClinicianInbox(1, true); }}
+                onActorFilterChange={setClinicianInboxActorFilter}
+                onCategoryFilterChange={setClinicianInboxCategoryFilter}
+                onRepliedFilterChange={setClinicianInboxRepliedFilter}
+                onStartDateChange={setClinicianInboxStartDate}
+                onEndDateChange={setClinicianInboxEndDate}
+                onSearch={() => { void loadClinicianInbox(1, true); }}
+                onToggleReply={(itemId) => {
+                    setClinicianInboxReplyTargetId(clinicianInboxReplyTargetId === itemId ? "" : itemId);
+                    setClinicianInboxReplyMessage("");
+                    setClinicianInboxReplySuccess("");
+                }}
+                onReplyMessageChange={setClinicianInboxReplyMessage}
+                onSubmitReply={() => { void submitClinicianInboxReply(); }}
+                onCancelReply={() => {
+                    setClinicianInboxReplyTargetId("");
+                    setClinicianInboxReplyMessage("");
+                }}
+                onLoadPage={(page) => { void loadClinicianInbox(page, true); }}
+            />
 
             <SecurityIncidentsModal
                 isOpen={showSecurityIncidentsModal}

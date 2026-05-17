@@ -190,15 +190,16 @@ npx tsc --noEmit
 echo "> node ../scripts/verify-ui-labels.mjs"
 node ../scripts/verify-ui-labels.mjs
 
-echo "> npx vitest run src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/components/admin/AuthLogsModal.test.tsx src/components/admin/AuthGraphsModal.test.tsx src/components/admin/SecurityIncidentsModal.test.tsx"
+echo "> npx vitest run src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/components/admin/AuthLogsModal.test.tsx src/components/admin/AuthGraphsModal.test.tsx src/components/admin/SecurityIncidentsModal.test.tsx src/components/admin/ClinicianInboxModal.test.tsx"
 TEST_SUMMARY_FRONTEND_FILES=(
   "src/i18n/uiLabels.test.ts"
   "src/hooks/useTranslation.test.tsx"
   "src/components/admin/AuthLogsModal.test.tsx"
   "src/components/admin/AuthGraphsModal.test.tsx"
   "src/components/admin/SecurityIncidentsModal.test.tsx"
+  "src/components/admin/ClinicianInboxModal.test.tsx"
 )
-run_vitest_with_summary frontend src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/components/admin/AuthLogsModal.test.tsx src/components/admin/AuthGraphsModal.test.tsx src/components/admin/SecurityIncidentsModal.test.tsx || exit 1
+run_vitest_with_summary frontend src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/components/admin/AuthLogsModal.test.tsx src/components/admin/AuthGraphsModal.test.tsx src/components/admin/SecurityIncidentsModal.test.tsx src/components/admin/ClinicianInboxModal.test.tsx || exit 1
 fail_if_test_failure_simulated
 
 echo "> npm run build"
