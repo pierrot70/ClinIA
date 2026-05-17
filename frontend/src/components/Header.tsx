@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import VoiceNavButton from "./VoiceNavButton";
 import { OpenAILogsModal } from "./OpenAILogsModal";
+import { AuthLogsModal } from "./admin/AuthLogsModal";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { useAuth } from "../hooks/useAuth";
 import { useSensitiveReauthDialog } from "../hooks/useSensitiveReauthDialog";
@@ -1909,219 +1910,41 @@ const Header: React.FC = () => {
                 </div>
             )}
 
-            {showAuthLogsModal && (
-                <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/40 px-4 py-4 sm:py-6">
-                    <div className="mx-auto flex min-h-full w-full max-w-5xl items-start sm:items-center">
-                        <div className="w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
-                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                            <h2 className="text-lg font-semibold text-gray-900">
-                                <HeaderLabel text={headerLabels.authLogsModal.title} />
-                            </h2>
-                            <div className="flex items-center gap-3">
-                                {user?.role === "SUPERADMIN" && authLogsQueryDurationMs !== null && (
-                                    <span className="text-xs text-gray-500">
-                                        <HeaderLabel text={headerLabels.authLogsModal.queryTimePrefix} /> {authLogsQueryDurationMs} ms
-                                    </span>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={closeAuthLogsModal}
-                                    className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                                >
-                                    <HeaderLabel text={headerLabels.controls.close} />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                            <label className="text-sm text-gray-700">
-                                <HeaderLabel text={headerLabels.authLogsModal.startDate} />
-                                <input
-                                    type="date"
-                                    value={authLogStartDate}
-                                    max={authLogEndDate || undefined}
-                                    onChange={(event) => setAuthLogStartDate(event.target.value)}
-                                    className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                                />
-                            </label>
-                            <label className="text-sm text-gray-700">
-                                <HeaderLabel text={headerLabels.authLogsModal.endDate} />
-                                <input
-                                    type="date"
-                                    value={authLogEndDate}
-                                    min={authLogStartDate || undefined}
-                                    onChange={(event) => setAuthLogEndDate(event.target.value)}
-                                    className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                                />
-                            </label>
-                            <label className="text-sm text-gray-700 sm:col-span-2">
-                                <HeaderLabel text={headerLabels.authLogsModal.action} />
-                                <select
-                                    value={authLogAction}
-                                    onChange={(event) => setAuthLogAction(event.target.value)}
-                                    className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
-                                >
-                                    {AUTH_LOG_ACTION_OPTIONS.map((option) => (
-                                        <option key={option.value || "ALL"} value={option.value}>
-                                            {option.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                        </div>
-
-                        <div className="mb-4">
-                            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                                <input
-                                    type="checkbox"
-                                    checked={authLogPasswordEventsOnly}
-                                    onChange={(event) => setAuthLogPasswordEventsOnly(event.target.checked)}
-                                    className="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
-                                />
-                                <HeaderLabel text={headerLabels.authLogsModal.passwordEventsOnly} />
-                            </label>
-                        </div>
-
-                        <div className="mb-4 flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    void applyAuthLogFilters();
-                                }}
-                                className="rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
-                            >
-                                <HeaderLabel text={headerLabels.controls.search} />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setAuthLogStartDate(todayDateValue);
-                                    setAuthLogEndDate(todayDateValue);
-                                    setAuthLogAction("");
-                                    setAuthLogPasswordEventsOnly(false);
-                                    void loadAuthLogs(1, true);
-                                }}
-                                className="rounded bg-gray-50 px-3 py-1 text-sm text-gray-700 hover:bg-gray-100"
-                            >
-                                <HeaderLabel text={headerLabels.controls.reset} />
-                            </button>
-                        </div>
-
-                        {loadingAuthLogs ? (
-                            <div className="flex items-center gap-3 text-sm text-gray-500">
-                                <span
-                                    className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700"
-                                    aria-hidden="true"
-                                />
-                                <span><HeaderLabel text={headerLabels.authLogsModal.loading} /></span>
-                            </div>
-                        ) : authLogsError ? (
-                            <div className="rounded bg-red-50 p-3 text-sm text-red-700">
-                                {authLogsError}
-                            </div>
-                        ) : authLogs.length === 0 ? (
-                            <p className="text-sm text-gray-500"><HeaderLabel text={headerLabels.authLogsModal.empty} /></p>
-                        ) : (
-                            <>
-                                <div className="max-h-[420px] overflow-auto rounded border border-gray-200">
-                                    <table className="min-w-full border-collapse text-left text-xs sm:text-sm">
-                                        <thead className="bg-gray-50 text-gray-600">
-                                            <tr>
-                                                <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableDate} /></th>
-                                                <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableAction} /></th>
-                                                <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableResult} /></th>
-                                                <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableUser} /></th>
-                                                <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableTargetUser} /></th>
-                                                <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableRole} /></th>
-                                                <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableIp} /></th>
-                                                <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableReason} /></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {authLogs.map((log) => (
-                                                <tr key={log.id} className="border-t border-gray-100 align-top">
-                                                    <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{formatAuthLogTimestamp(log.timestamp)}</td>
-                                                    <td className="px-3 py-2 text-gray-800">{log.action || "-"}</td>
-                                                    <td className="px-3 py-2 text-gray-800">{log.outcome || "-"}</td>
-                                                    <td className="px-3 py-2 text-gray-700">
-                                                        <div>{log.actorUsername || "-"}</div>
-                                                        <div className="text-[11px] text-gray-500">{log.usernameMasked || "-"}</div>
-                                                    </td>
-                                                    <td className="px-3 py-2 text-gray-700">{log.targetUsername || "-"}</td>
-                                                    <td className="px-3 py-2 text-gray-700">{log.role || "-"}</td>
-                                                    <td className="px-3 py-2 text-gray-700">{log.ip || "-"}</td>
-                                                    <td className="px-3 py-2 text-gray-700">{log.reason || "-"}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-sm text-gray-600">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            if (authLogPage !== 1) {
-                                                void loadAuthLogs(1, true);
-                                            }
-                                        }}
-                                        disabled={authLogPage <= 1}
-                                        className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        {"<<"}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const previousPage = Math.max(1, authLogPage - 1);
-                                            if (previousPage !== authLogPage) {
-                                                void loadAuthLogs(previousPage, true);
-                                            }
-                                        }}
-                                        disabled={authLogPage <= 1}
-                                        className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        {"<"}
-                                    </button>
-                                    <span>
-                                        <HeaderLabel text={headerLabels.authLogsModal.page} /> {authLogPagination.page}/{Math.max(1, authLogPagination.totalPages)} - {authLogPagination.total} <HeaderLabel text={headerLabels.authLogsModal.results} />
-                                    </span>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const nextPage = Math.min(
-                                                Math.max(1, authLogPagination.totalPages),
-                                                authLogPage + 1
-                                            );
-                                            if (nextPage !== authLogPage) {
-                                                void loadAuthLogs(nextPage, true);
-                                            }
-                                        }}
-                                        disabled={authLogPage >= Math.max(1, authLogPagination.totalPages)}
-                                        className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        {">"}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const lastPage = Math.max(1, authLogPagination.totalPages);
-                                            if (authLogPage !== lastPage) {
-                                                void loadAuthLogs(lastPage, true);
-                                            }
-                                        }}
-                                        disabled={authLogPage >= Math.max(1, authLogPagination.totalPages)}
-                                        className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        {">>"}
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                    </div>
-                </div>
-            )}
+            <AuthLogsModal
+                isOpen={showAuthLogsModal}
+                isSuperAdmin={user?.role === "SUPERADMIN"}
+                queryDurationMs={authLogsQueryDurationMs}
+                startDate={authLogStartDate}
+                endDate={authLogEndDate}
+                action={authLogAction}
+                passwordEventsOnly={authLogPasswordEventsOnly}
+                options={AUTH_LOG_ACTION_OPTIONS}
+                loading={loadingAuthLogs}
+                error={authLogsError}
+                logs={authLogs}
+                pagination={authLogPagination}
+                headerLabels={headerLabels}
+                renderLabel={(text) => <HeaderLabel text={text} />}
+                formatTimestamp={formatAuthLogTimestamp}
+                onClose={closeAuthLogsModal}
+                onStartDateChange={setAuthLogStartDate}
+                onEndDateChange={setAuthLogEndDate}
+                onActionChange={setAuthLogAction}
+                onPasswordEventsOnlyChange={setAuthLogPasswordEventsOnly}
+                onSearch={() => {
+                    void applyAuthLogFilters();
+                }}
+                onReset={() => {
+                    setAuthLogStartDate(todayDateValue);
+                    setAuthLogEndDate(todayDateValue);
+                    setAuthLogAction("");
+                    setAuthLogPasswordEventsOnly(false);
+                    void loadAuthLogs(1, true);
+                }}
+                onLoadPage={(page) => {
+                    void loadAuthLogs(page, true);
+                }}
+            />
 
             {showAuthGraphsModal && (
                 <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-4 sm:py-6">

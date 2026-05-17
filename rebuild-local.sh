@@ -92,8 +92,8 @@ npx tsc --noEmit
 echo "> node ../scripts/verify-ui-labels.mjs"
 node ../scripts/verify-ui-labels.mjs
 
-echo "> npx vitest run src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx"
-npx vitest run src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx
+echo "> npx vitest run src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/components/admin/AuthLogsModal.test.tsx"
+npx vitest run src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/components/admin/AuthLogsModal.test.tsx
 
 echo "> npm run build"
 npm run build
@@ -133,8 +133,8 @@ if [[ "${MODE^^}" == "DEV" ]]; then
   headline "Tests backend DEV ciblés (privacy/auth)"
   pushd backend > /dev/null
 
-  echo "> npm test -- audit/__tests__/authAudit.test.js utils/__tests__/clinicianCommentPrivacy.test.js"
-  npm test -- audit/__tests__/authAudit.test.js utils/__tests__/clinicianCommentPrivacy.test.js
+  echo "> npm test -- audit/__tests__/authAudit.test.js security/__tests__/originProtection.test.js services/__tests__/auth.service.test.js utils/__tests__/clinicianCommentPrivacy.test.js"
+  npm test -- audit/__tests__/authAudit.test.js security/__tests__/originProtection.test.js services/__tests__/auth.service.test.js utils/__tests__/clinicianCommentPrivacy.test.js
 
   popd > /dev/null
 else
