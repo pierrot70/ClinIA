@@ -51,6 +51,8 @@ type AuthLogEntry = {
     outcome: string;
     userId: string | null;
     usernameMasked: string;
+    actorUsername: string | null;
+    targetUsername: string | null;
     role: string | null;
     ip: string | null;
     reason: string | null;
@@ -203,6 +205,7 @@ const AUTH_LOG_ACTION_OPTIONS = [
     { value: "LOGOUT", label: "LOGOUT" },
     { value: "FAILED_LOGIN", label: "FAILED_LOGIN" },
     { value: "USER_MANAGEMENT", label: "USER_MANAGEMENT" },
+    { value: "PASSWORD_CHANGE", label: "PASSWORD_CHANGE" },
 ];
 
 const AUTH_GRAPH_ACTION_COLORS = {
@@ -265,6 +268,7 @@ const Header: React.FC = () => {
     const [authLogStartDate, setAuthLogStartDate] = useState(todayDateValue);
     const [authLogEndDate, setAuthLogEndDate] = useState(todayDateValue);
     const [authLogAction, setAuthLogAction] = useState("");
+    const [authLogPasswordEventsOnly, setAuthLogPasswordEventsOnly] = useState(false);
     const [authGraphAction, setAuthGraphAction] = useState("");
     const [authLogPage, setAuthLogPage] = useState(1);
     const [authGraphPoints, setAuthGraphPoints] = useState<AuthGraphPoint[]>([]);
@@ -648,6 +652,9 @@ const Header: React.FC = () => {
             if (authLogAction.trim()) {
                 query.set("action", authLogAction.trim());
             }
+            if (authLogPasswordEventsOnly) {
+                query.set("passwordEventsOnly", "true");
+            }
 
             const response = await authFetch(`/api/auth/auth-logs?${query.toString()}`);
             const payload = await response.json().catch(() => ({}));
@@ -723,6 +730,7 @@ const Header: React.FC = () => {
         setAuthLogStartDate(date);
         setAuthLogEndDate(date);
         setAuthLogAction("");
+        setAuthLogPasswordEventsOnly(false);
         setShowAuthLogsModal(true);
     };
 
@@ -734,6 +742,7 @@ const Header: React.FC = () => {
         setAuthLogStartDate(date);
         setAuthLogEndDate(date);
         setAuthLogAction(actionName || "");
+        setAuthLogPasswordEventsOnly(false);
         setShowAuthLogsModal(true);
     };
 
@@ -743,6 +752,7 @@ const Header: React.FC = () => {
             endDate: authLogEndDate,
         });
         setAuthLogAction(actionName);
+        setAuthLogPasswordEventsOnly(false);
         setShowAuthLogsModal(true);
     };
 
@@ -1136,7 +1146,7 @@ const Header: React.FC = () => {
         }
 
         void loadAuthLogs(1, true);
-    }, [showAuthLogsModal, authLogStartDate, authLogEndDate, authLogAction]);
+    }, [showAuthLogsModal, authLogStartDate, authLogEndDate, authLogAction, authLogPasswordEventsOnly]);
 
     useEffect(() => {
         if (!showAuthGraphsModal) {
@@ -1960,6 +1970,18 @@ const Header: React.FC = () => {
                             </label>
                         </div>
 
+                        <div className="mb-4">
+                            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                                <input
+                                    type="checkbox"
+                                    checked={authLogPasswordEventsOnly}
+                                    onChange={(event) => setAuthLogPasswordEventsOnly(event.target.checked)}
+                                    className="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                                />
+                                <HeaderLabel text={headerLabels.authLogsModal.passwordEventsOnly} />
+                            </label>
+                        </div>
+
                         <div className="mb-4 flex items-center gap-2">
                             <button
                                 type="button"
@@ -1976,6 +1998,7 @@ const Header: React.FC = () => {
                                     setAuthLogStartDate(todayDateValue);
                                     setAuthLogEndDate(todayDateValue);
                                     setAuthLogAction("");
+                                    setAuthLogPasswordEventsOnly(false);
                                     void loadAuthLogs(1, true);
                                 }}
                                 className="rounded bg-gray-50 px-3 py-1 text-sm text-gray-700 hover:bg-gray-100"
@@ -2008,6 +2031,7 @@ const Header: React.FC = () => {
                                                 <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableAction} /></th>
                                                 <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableResult} /></th>
                                                 <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableUser} /></th>
+                                                <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableTargetUser} /></th>
                                                 <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableRole} /></th>
                                                 <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableIp} /></th>
                                                 <th className="px-3 py-2"><HeaderLabel text={headerLabels.authLogsModal.tableReason} /></th>
@@ -2019,7 +2043,11 @@ const Header: React.FC = () => {
                                                     <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{formatAuthLogTimestamp(log.timestamp)}</td>
                                                     <td className="px-3 py-2 text-gray-800">{log.action || "-"}</td>
                                                     <td className="px-3 py-2 text-gray-800">{log.outcome || "-"}</td>
-                                                    <td className="px-3 py-2 text-gray-700">{log.usernameMasked || "-"}</td>
+                                                    <td className="px-3 py-2 text-gray-700">
+                                                        <div>{log.actorUsername || "-"}</div>
+                                                        <div className="text-[11px] text-gray-500">{log.usernameMasked || "-"}</div>
+                                                    </td>
+                                                    <td className="px-3 py-2 text-gray-700">{log.targetUsername || "-"}</td>
                                                     <td className="px-3 py-2 text-gray-700">{log.role || "-"}</td>
                                                     <td className="px-3 py-2 text-gray-700">{log.ip || "-"}</td>
                                                     <td className="px-3 py-2 text-gray-700">{log.reason || "-"}</td>

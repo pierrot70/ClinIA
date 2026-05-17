@@ -5,6 +5,8 @@ const mockFindById = vi.fn();
 const mockCreate = vi.fn();
 const mockFind = vi.fn();
 const mockCountDocuments = vi.fn();
+const mockAuthAuditCountDocuments = vi.fn();
+const mockAuthAuditFind = vi.fn();
 
 const recordAuthAuditEvent = vi.fn();
 
@@ -15,6 +17,13 @@ vi.mock("../../models/AdminUser.js", () => ({
         create: mockCreate,
         find: mockFind,
         countDocuments: mockCountDocuments,
+    },
+}));
+
+vi.mock("../../models/AuthAuditLog.js", () => ({
+    AuthAuditLog: {
+        countDocuments: mockAuthAuditCountDocuments,
+        find: mockAuthAuditFind,
     },
 }));
 
@@ -40,7 +49,18 @@ vi.mock("jsonwebtoken", () => ({
     },
 }));
 
-const { login, logout, refresh, hashPassword, register, registerSelf, listUsers, resetUserPassword, completeForcedPasswordChange } = await import("../auth.js");
+const {
+    login,
+    logout,
+    refresh,
+    hashPassword,
+    register,
+    registerSelf,
+    listUsers,
+    listAuthLogs,
+    resetUserPassword,
+    completeForcedPasswordChange,
+} = await import("../auth.js");
 
 function buildUser(overrides = {}) {
     return {
@@ -576,5 +596,59 @@ describe("auth service", () => {
             search: "doctor.house",
             role: "MEDECIN",
         });
+    });
+
+    it("filters auth logs to password events and exposes actor and target usernames", async () => {
+        mockAuthAuditCountDocuments.mockResolvedValue(1);
+        mockAuthAuditFind.mockReturnValue({
+            sort: vi.fn().mockReturnValue({
+                skip: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockReturnValue({
+                        lean: vi.fn().mockResolvedValue([
+                            {
+                                _id: "507f1f77bcf86cd799439021",
+                                action: "USER_MANAGEMENT",
+                                outcome: "SUCCESS",
+                                userId: "507f1f77bcf86cd799439099",
+                                usernameMasked: "su***",
+                                actorUsername: "superadmin",
+                                targetUsername: "pierrot.lasante",
+                                role: "SUPERADMIN",
+                                ip: "127.0.0.1",
+                                reason: "RESET_PASSWORD:507f1f77bcf86cd799439011",
+                                timestamp: new Date("2026-05-17T10:00:00.000Z"),
+                            },
+                        ]),
+                    }),
+                }),
+            }),
+        });
+
+        const result = await listAuthLogs({
+            authUser: { role: "SUPERADMIN" },
+            passwordEventsOnly: true,
+        });
+
+        expect(mockAuthAuditCountDocuments).toHaveBeenCalledWith({
+            $and: [
+                {
+                    $or: [
+                        { action: "PASSWORD_CHANGE" },
+                        {
+                            action: "USER_MANAGEMENT",
+                            reason: { $regex: /^RESET_PASSWORD:/ },
+                        },
+                    ],
+                },
+            ],
+        });
+        expect(result.logs).toEqual([
+            expect.objectContaining({
+                action: "USER_MANAGEMENT",
+                actorUsername: "superadmin",
+                targetUsername: "pierrot.lasante",
+                reason: "RESET_PASSWORD:507f1f77bcf86cd799439011",
+            }),
+        ]);
     });
 });

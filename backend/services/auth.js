@@ -28,11 +28,17 @@ function createAuthError(code, message) {
 const AUTH_LOG_COUNT_CACHE_TTL_MS = 30_000;
 const authLogCountCache = new Map();
 
-function buildAuthLogCountCacheKey({ startDate, endDate, action }) {
+function buildAuthLogCountCacheKey({
+    startDate,
+    endDate,
+    action,
+    passwordEventsOnly = false,
+}) {
     return JSON.stringify({
         startDate: startDate || null,
         endDate: endDate || null,
         action: action || null,
+        passwordEventsOnly: passwordEventsOnly === true,
     });
 }
 
@@ -916,6 +922,7 @@ export async function listAuthLogs({
     startDate,
     endDate,
     action,
+    passwordEventsOnly = false,
 }) {
     assertSuperAdmin(authUser);
 
@@ -937,6 +944,7 @@ export async function listAuthLogs({
         "LOGOUT",
         "FAILED_LOGIN",
         "USER_MANAGEMENT",
+        "PASSWORD_CHANGE",
     ]);
 
     const query = {};
@@ -972,6 +980,22 @@ export async function listAuthLogs({
         andClauses.push({ action: normalizedAction });
     }
 
+    const passwordEventsOnlyEnabled =
+        passwordEventsOnly === true ||
+        String(passwordEventsOnly).trim().toLowerCase() === "true";
+
+    if (passwordEventsOnlyEnabled) {
+        andClauses.push({
+            $or: [
+                { action: "PASSWORD_CHANGE" },
+                {
+                    action: "USER_MANAGEMENT",
+                    reason: { $regex: /^RESET_PASSWORD:/ },
+                },
+            ],
+        });
+    }
+
     if (andClauses.length > 0) {
         query.$and = andClauses;
     }
@@ -981,6 +1005,7 @@ export async function listAuthLogs({
         startDate,
         endDate,
         action,
+        passwordEventsOnly: passwordEventsOnlyEnabled,
     });
     const cachedTotal = getCachedAuthLogCount(cacheKey);
     const totalPromise =
@@ -1007,6 +1032,8 @@ export async function listAuthLogs({
             outcome: log.outcome,
             userId: log.userId ? String(log.userId) : null,
             usernameMasked: log.usernameMasked,
+            actorUsername: log.actorUsername || null,
+            targetUsername: log.targetUsername || null,
             role: log.role,
             ip: log.ip,
             reason: log.reason,
@@ -1034,6 +1061,7 @@ export async function listAuthLogGraphs({
         "LOGOUT",
         "FAILED_LOGIN",
         "USER_MANAGEMENT",
+        "PASSWORD_CHANGE",
     ]);
 
     const query = {};

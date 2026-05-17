@@ -588,6 +588,7 @@ router.get(
                 startDate: req.query?.startDate,
                 endDate: req.query?.endDate,
                 action: req.query?.action,
+                passwordEventsOnly: req.query?.passwordEventsOnly,
             });
 
             return res.status(200).json({
