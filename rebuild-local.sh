@@ -7,6 +7,95 @@ headline() {
   echo "=================================================="
 }
 
+TEST_SUMMARY_FRONTEND_TOTAL=0
+TEST_SUMMARY_FRONTEND_FAILED=0
+TEST_SUMMARY_FRONTEND_FAILED_NAMES=""
+TEST_SUMMARY_BACKEND_TOTAL=0
+TEST_SUMMARY_BACKEND_FAILED=0
+TEST_SUMMARY_BACKEND_FAILED_NAMES=""
+TEST_SUMMARY_BACKEND_WATCH=0
+declare -a TEST_SUMMARY_FRONTEND_FILES=()
+declare -a TEST_SUMMARY_BACKEND_FILES=()
+
+print_test_summary() {
+  headline "Resume des tests"
+
+  if [[ "$TEST_SUMMARY_FRONTEND_TOTAL" -gt 0 ]]; then
+    local frontend_passed=$((TEST_SUMMARY_FRONTEND_TOTAL - TEST_SUMMARY_FRONTEND_FAILED))
+    echo "Frontend Test Files: ${frontend_passed} passed (${TEST_SUMMARY_FRONTEND_TOTAL})"
+    if [[ "$TEST_SUMMARY_FRONTEND_FAILED" -gt 0 ]]; then
+      echo "Fichiers frontend en echec:"
+      printf '%s\n' "$TEST_SUMMARY_FRONTEND_FAILED_NAMES"
+    fi
+  else
+    echo "Frontend Test Files: non executes"
+  fi
+
+  if [[ "$TEST_SUMMARY_BACKEND_WATCH" == "1" ]]; then
+    echo "Backend Test Files: mode watch actif, resume final non calcule"
+  elif [[ "$TEST_SUMMARY_BACKEND_TOTAL" -gt 0 ]]; then
+    local backend_passed=$((TEST_SUMMARY_BACKEND_TOTAL - TEST_SUMMARY_BACKEND_FAILED))
+    echo "Backend Test Files: ${backend_passed} passed (${TEST_SUMMARY_BACKEND_TOTAL})"
+    if [[ "$TEST_SUMMARY_BACKEND_FAILED" -gt 0 ]]; then
+      echo "Fichiers backend en echec:"
+      printf '%s\n' "$TEST_SUMMARY_BACKEND_FAILED_NAMES"
+    fi
+  else
+    echo "Backend Test Files: non executes"
+  fi
+}
+
+trap print_test_summary EXIT
+
+run_vitest_with_summary() {
+  local suite_name="$1"
+  shift
+
+  local json_file
+  json_file="$(mktemp)"
+
+  set +e
+  npx vitest run --reporter=default --reporter=json --outputFile "$json_file" "$@"
+  local status=$?
+  set -e
+
+  local summary_line
+  summary_line="$(node - "$json_file" <<'NODE'
+const fs = require("fs");
+const filePath = process.argv[2];
+const payload = JSON.parse(fs.readFileSync(filePath, "utf8"));
+const results = Array.isArray(payload.testResults) ? payload.testResults : [];
+const normalized = results
+  .map((result) => ({
+    name: typeof result.name === "string" ? result.name : "",
+    status: result.status,
+  }))
+  .filter((result) => result.name && !result.name.includes("node_modules"));
+const failedEntries = normalized.filter((result) => result.status === "failed");
+const failedNames = failedEntries.map((result) => result.name).join("||");
+process.stdout.write(`${failedEntries.length}\n${failedNames}`);
+NODE
+)"
+
+  rm -f "$json_file"
+
+  local failed failed_names
+  failed="$(printf '%s\n' "$summary_line" | sed -n '1p')"
+  failed_names="$(printf '%s\n' "$summary_line" | sed -n '2p')"
+
+  if [[ "$suite_name" == "frontend" ]]; then
+    TEST_SUMMARY_FRONTEND_TOTAL="${#TEST_SUMMARY_FRONTEND_FILES[@]}"
+    TEST_SUMMARY_FRONTEND_FAILED="${failed:-0}"
+    TEST_SUMMARY_FRONTEND_FAILED_NAMES="${failed_names//||/$'\n'}"
+  else
+    TEST_SUMMARY_BACKEND_TOTAL="${#TEST_SUMMARY_BACKEND_FILES[@]}"
+    TEST_SUMMARY_BACKEND_FAILED="${failed:-0}"
+    TEST_SUMMARY_BACKEND_FAILED_NAMES="${failed_names//||/$'\n'}"
+  fi
+
+  return "$status"
+}
+
 # -----------------------------
 # Scan sécurité Loi 25/PIPEDA : fuite de données identifiables
 # -----------------------------
@@ -53,12 +142,20 @@ PULL="${PULL:-0}"
 DETACH="${DETACH:-1}"
 NUCLEAR="${NUCLEAR:-0}"
 BACKEND_TEST_WATCH="${BACKEND_TEST_WATCH:-0}"
+TEST_FAILED="${TEST_FAILED:-0}"
 
 # -----------------------------
 # Helpers
 # -----------------------------
 dc() {
   docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
+}
+
+fail_if_test_failure_simulated() {
+  if [[ "$TEST_FAILED" == "1" ]]; then
+    echo "❌ TEST_FAILED=1 : echec simule apres les tests. Build Docker annule."
+    exit 1
+  fi
 }
 
 # -----------------------------
@@ -93,8 +190,16 @@ npx tsc --noEmit
 echo "> node ../scripts/verify-ui-labels.mjs"
 node ../scripts/verify-ui-labels.mjs
 
-echo "> npx vitest run src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/components/admin/AuthLogsModal.test.tsx src/components/admin/AuthGraphsModal.test.tsx"
-npx vitest run src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/components/admin/AuthLogsModal.test.tsx src/components/admin/AuthGraphsModal.test.tsx
+echo "> npx vitest run src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/components/admin/AuthLogsModal.test.tsx src/components/admin/AuthGraphsModal.test.tsx src/components/admin/SecurityIncidentsModal.test.tsx"
+TEST_SUMMARY_FRONTEND_FILES=(
+  "src/i18n/uiLabels.test.ts"
+  "src/hooks/useTranslation.test.tsx"
+  "src/components/admin/AuthLogsModal.test.tsx"
+  "src/components/admin/AuthGraphsModal.test.tsx"
+  "src/components/admin/SecurityIncidentsModal.test.tsx"
+)
+run_vitest_with_summary frontend src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/components/admin/AuthLogsModal.test.tsx src/components/admin/AuthGraphsModal.test.tsx src/components/admin/SecurityIncidentsModal.test.tsx || exit 1
+fail_if_test_failure_simulated
 
 echo "> npm run build"
 npm run build
@@ -135,17 +240,20 @@ if [[ "${MODE^^}" == "DEV" ]]; then
   pushd backend > /dev/null
 
   echo "> Fichiers backend *.test.js detectes :"
-  mapfile -t BACKEND_TEST_FILES < <(find . -path '*/__tests__/*.test.js' | sort)
+  mapfile -t BACKEND_TEST_FILES < <(find . -path './node_modules' -prune -o -path './backend/node_modules' -prune -o -path '*/__tests__/*.test.js' -print | sort)
+  TEST_SUMMARY_BACKEND_FILES=("${BACKEND_TEST_FILES[@]}")
   printf '  - %s\n' "${BACKEND_TEST_FILES[@]}"
   echo "> Total: ${#BACKEND_TEST_FILES[@]} fichiers"
 
   if [[ "$BACKEND_TEST_WATCH" == "1" ]]; then
+    TEST_SUMMARY_BACKEND_WATCH=1
     echo "> npx vitest"
     echo "> Mode watch actif. Tu pourras taper q pour quitter apres inspection."
     npx vitest
   else
     echo "> npx vitest run"
-    npx vitest run
+    run_vitest_with_summary backend || exit 1
+    fail_if_test_failure_simulated
   fi
 
   popd > /dev/null
