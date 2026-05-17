@@ -24,6 +24,10 @@ import {
     listAuthLogGraphs,
     listAuthLogs,
 } from "./auth/authAuditQueryService.js";
+import {
+    completeForcedPasswordChange as completeForcedPasswordChangeService,
+    resetUserPassword as resetUserPasswordService,
+} from "./auth/passwordAdminService.js";
 import { assertSuperAdmin, createAuthError } from "./auth/shared.js";
 
 export { listAuthLogGraphs, listAuthLogs };
@@ -1002,107 +1006,33 @@ export async function setUserActiveStatus({ userId, isActive, authUser, req }) {
 }
 
 export async function resetUserPassword({ userId, newPassword, authUser, req }) {
-    assertSuperAdmin(authUser);
-    assertValidUserId(userId);
-
-    const shouldGenerateTemporaryPassword =
-        typeof newPassword === "undefined" ||
-        newPassword === null ||
-        newPassword === "";
-    const nextPassword = shouldGenerateTemporaryPassword
-        ? makeTemporaryPassword()
-        : newPassword;
-
-    if (
-        typeof nextPassword !== "string" ||
-        nextPassword.length < 8 ||
-        nextPassword.length > 128
-    ) {
-        throw createAuthError("INVALID_INPUT", "Mot de passe invalide.");
-    }
-
-    const ip = getRequestIp(req);
-    const user = await AdminUser.findById(userId);
-    if (!user) {
-        throw createAuthError("USER_NOT_FOUND", "Utilisateur introuvable.");
-    }
-
-    user.passwordHash = await hashPassword(nextPassword);
-    user.refreshTokenHash = null;
-    user.refreshTokenExpiresAt = null;
-    user.massDownloadRestrictedUntil = null;
-    user.passwordResetRequired = false;
-    user.mustChangePasswordOnNextLogin = shouldGenerateTemporaryPassword;
-    revokeAccessTokens(user);
-    await user.save();
-
-    await recordAuthAuditEvent({
-        action: "USER_MANAGEMENT",
-        outcome: "SUCCESS",
-        userId: authUser.userId,
-        username: authUser.username,
-        actorUsername: authUser.username,
-        targetUsername: user.username,
-        role: authUser.role,
-        ip,
-        reason: `RESET_PASSWORD:${String(user._id)}`,
+    return resetUserPasswordService({
+        userId,
+        newPassword,
+        authUser,
+        req,
+        deps: {
+            assertValidUserId,
+            makeTemporaryPassword,
+            getRequestIp,
+            hashPassword,
+            revokeAccessTokens,
+            mapPublicUser,
+        },
     });
-
-    return {
-        user: mapPublicUser(user),
-        temporaryPassword: shouldGenerateTemporaryPassword ? nextPassword : null,
-    };
 }
 
 export async function completeForcedPasswordChange({ authUser, newPassword, req }) {
-    if (!authUser?.userId) {
-        throw createAuthError("UNAUTHORIZED", "Authentification requise.");
-    }
-
-    if (
-        typeof newPassword !== "string" ||
-        newPassword.length < 8 ||
-        newPassword.length > 128
-    ) {
-        throw createAuthError("INVALID_INPUT", "Mot de passe invalide.");
-    }
-
-    const ip = getRequestIp(req);
-    const user = await AdminUser.findById(authUser.userId);
-    if (!user || user.isActive === false) {
-        throw createAuthError(
-            "ACCOUNT_INACTIVE",
-            "Compte inactif ou inaccessible."
-        );
-    }
-
-    if (user.mustChangePasswordOnNextLogin !== true) {
-        throw createAuthError(
-            "FORBIDDEN",
-            "Aucun changement de mot de passe obligatoire n'est en attente."
-        );
-    }
-
-    user.passwordHash = await hashPassword(newPassword);
-    user.mustChangePasswordOnNextLogin = false;
-    user.passwordResetRequired = false;
-    user.massDownloadRestrictedUntil = null;
-    revokeAccessTokens(user);
-    await user.save();
-
-    await recordAuthAuditEvent({
-        action: "PASSWORD_CHANGE",
-        outcome: "SUCCESS",
-        userId: user._id,
-        username: user.username,
-        actorUsername: user.username,
-        targetUsername: user.username,
-        role: user.role,
-        ip,
-        reason: "FORCED_PASSWORD_CHANGE_COMPLETED",
+    return completeForcedPasswordChangeService({
+        authUser,
+        newPassword,
+        req,
+        deps: {
+            getRequestIp,
+            hashPassword,
+            revokeAccessTokens,
+        },
     });
-
-    return { success: true };
 }
 
 export async function deleteUser({ userId, authUser, req }) {
