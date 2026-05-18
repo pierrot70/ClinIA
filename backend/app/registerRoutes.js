@@ -13,13 +13,17 @@ import { attachOptionalAuth } from "../middleware/attachOptionalAuth.js";
 import { requireRole } from "../middleware/requireRole.js";
 import { loi25DataLeakGuard } from "../middleware/loi25DataLeakGuard.js";
 import { AUTH_ROLES } from "../auth/constants.js";
+import { createAiAnalyzeRouter } from "../routes/aiAnalyze.js";
 
 export function registerRoutes(app, deps) {
     const {
         massDownloadRestrictionGuard,
         patientsMassDownloadDetector,
         openAILogsExportMassDownloadDetector,
+        aiAnalyzeRouter,
     } = deps;
+
+    app.use("/api/ai", aiAnalyzeRouter || createAiAnalyzeRouter({}));
 
     app.use("/api/auth", authRouter);
 
