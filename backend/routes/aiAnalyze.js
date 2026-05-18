@@ -17,9 +17,9 @@ export function createAiAnalyzeRouter(deps) {
         makeSourceHash,
         makeFingerprint,
         findPersistedDiagnosisByFingerprint,
+        upgradePersistedDiagnosisOutput,
         normalizeClinicalAnalysis,
         isPlaceholderClinicalAnalysis,
-        DiagnosisResult,
         getMockForDiagnosis,
         persistOrReuseDiagnosis,
         canCallOpenAI,
@@ -238,12 +238,10 @@ export function createAiAnalyzeRouter(deps) {
                         JSON.stringify(normalizedCachedOutput);
 
                     if (cacheNeedsUpgrade) {
-                        DiagnosisResult.updateOne(
-                            { fingerprint },
-                            { $set: { output: normalizedCachedOutput } }
-                        ).catch((err) => {
-                            console.warn("⚠️ AI cache upgrade failed", err?.message);
-                        });
+                        upgradePersistedDiagnosisOutput(
+                            fingerprint,
+                            normalizedCachedOutput
+                        );
                     }
 
                     console.log("AI_CACHE_HIT", {

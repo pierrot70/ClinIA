@@ -12,7 +12,6 @@ import {
     normalizeClinicalAnalysis,
 } from "./utils/clinicalAnalysis.js";
 import { getMockForDiagnosis } from "./utils/mockLoader.js";
-import { DiagnosisResult } from "./models/DiagnosisResult.js";
 import { UiTranslationCache } from "./models/UiTranslationCache.js";
 import {
     buildBlockingIncidentResponse,
@@ -48,6 +47,11 @@ import {
 import { configureCoreMiddleware } from "./app/configureCoreMiddleware.js";
 import { registerRoutes } from "./app/registerRoutes.js";
 import { createAiAnalyzeRouter } from "./routes/aiAnalyze.js";
+import {
+    findPersistedDiagnosisByFingerprint,
+    persistOrReuseDiagnosis,
+    upgradePersistedDiagnosisOutput,
+} from "./services/diagnosisPersistence.js";
 
 dotenv.config();
 
@@ -321,67 +325,6 @@ async function warmTranslationMemoryCache() {
     console.log(`[i18n] memory cache warmed with ${warmed} entries`);
 }
 
-async function persistOrReuseDiagnosis(payload) {
-    try {
-        const created = await DiagnosisResult.create(payload);
-        return { ok: true, doc: created };
-    } catch (err) {
-        if (err.code === 11000) {
-            const existing = await DiagnosisResult.findOne({
-                fingerprint: payload.fingerprint,
-            });
-
-            if (existing) {
-                const existingIsPlaceholderReal =
-                    existing.mode === "real" &&
-                    isPlaceholderClinicalAnalysis(existing.output);
-                const incomingIsMeaningfulReal =
-                    payload.mode === "real" &&
-                    !isPlaceholderClinicalAnalysis(payload.output);
-                const shouldReplaceExistingReal =
-                    payload.mode === "real" &&
-                    existing.mode === "real" &&
-                    payload.replaceExisting === true;
-
-                if (
-                    (payload.mode === "real" && existing.mode === "mock") ||
-                    (existingIsPlaceholderReal && incomingIsMeaningfulReal) ||
-                    shouldReplaceExistingReal
-                ) {
-                    existing.input = payload.input;
-                    existing.output = payload.output;
-                    existing.mode = payload.mode;
-                    existing.model = payload.model;
-                    await existing.save();
-                    return { ok: true, doc: existing.toObject() };
-                }
-
-                return { ok: true, doc: existing.toObject() };
-            }
-        }
-
-        console.error("❌ Mongo persist error:", err.message);
-        return {
-            ok: false,
-            error: {
-                code: "PERSISTENCE_FAILED",
-                message:
-                    "Analyse générée mais sauvegarde impossible.",
-                retryable: false,
-            },
-        };
-    }
-}
-
-async function findPersistedDiagnosisByFingerprint(fingerprint) {
-    try {
-        return await DiagnosisResult.findOne({ fingerprint }).lean();
-    } catch (err) {
-        console.error("❌ Mongo lookup error:", err.message);
-        return null;
-    }
-}
-
 async function respondWithSecurityIncident({
     res,
     phase,
@@ -473,9 +416,9 @@ const aiAnalyzeRouter = createAiAnalyzeRouter({
     makeSourceHash,
     makeFingerprint,
     findPersistedDiagnosisByFingerprint,
+    upgradePersistedDiagnosisOutput,
     normalizeClinicalAnalysis,
     isPlaceholderClinicalAnalysis,
-    DiagnosisResult,
     getMockForDiagnosis,
     persistOrReuseDiagnosis,
     canCallOpenAI,
