@@ -5,6 +5,7 @@ import { clinicalDemoRateLimiter } from "../middleware/clinicalDemoRateLimiter.j
 import { openAIAnalyzeQuotaGuard, getOpenAIAnalyzeQuotaStatus } from "../middleware/openaiAnalyzeQuotaGuard.js";
 import { resolveCachedDiagnosisState } from "../services/aiAnalyzeCacheService.js";
 import { resolvePreCloudSecurityState } from "../services/aiAnalyzePreCloudService.js";
+import { executeOpenAIAnalyze } from "../services/aiAnalyzeOpenAIService.js";
 
 export function createAiAnalyzeRouter(deps) {
     const {
@@ -271,165 +272,37 @@ export function createAiAnalyzeRouter(deps) {
                     });
                 }
 
-                const baseRequest = {
+                const openAIResult = await executeOpenAIAnalyze({
+                    openai,
                     model,
-                    messages: [
-                        {
-                            role: "system",
-                            content:
-                                "You are ClinIA, a clinical decision support AI. Provide structured therapeutic options, monitoring, red flags, and a clinician-facing summary for the primary clinical concern or confirmed diagnosis supplied by the user. Do not issue a final diagnosis, do not prescribe autonomously, and return valid JSON only.",
-                        },
-                        {
-                            role: "user",
-                            content:
-                                `Primary clinical concern or confirmed diagnosis: ${diagnosis}. Provide evidence-based therapeutic options, monitoring considerations, contraindications, red flags, and a concise patient summary for this clinical context only. The final medical decision remains with the clinician.\nFull patient data: ${JSON.stringify(patient)}`,
-                        },
-                    ],
-                    temperature: 0.1,
-                };
+                    diagnosis,
+                    patient,
+                    symptoms,
+                    reqAuth: req.auth,
+                    req,
+                    fingerprint,
+                    forceRealSafe,
+                    neutralizationMeta,
+                    supportsJsonResponseFormat,
+                    recordOpenAIRequestAuditEvent,
+                    finalizeOpenAIRequestAuditEvent,
+                    getRequestIp,
+                    makeSourceHash,
+                    detectNonSecureContent,
+                    respondWithSecurityIncident,
+                    safeParseMedicalAI,
+                    normalizeClinicalAnalysis,
+                    isPlaceholderClinicalAnalysis,
+                    recordOpenAISuccess,
+                    recordOpenAIFailure,
+                    res,
+                });
 
-                const request = supportsJsonResponseFormat(model)
-                    ? {
-                        ...baseRequest,
-                        response_format: { type: "json_object" },
-                    }
-                    : baseRequest;
-
-                let normalized;
-                let rawContent = "";
-                let openAIRequestAudit = null;
-
-                try {
-                    const requestPayloadText = JSON.stringify(request);
-                    openAIRequestAudit = await recordOpenAIRequestAuditEvent({
-                        action: "AI_ANALYZE_REQUEST",
-                        outcome: "SENT",
-                        actorUserId: req.auth?.userId ?? null,
-                        actorUsername: req.auth?.username ?? null,
-                        actorRole: req.auth?.role ?? null,
-                        ip: getRequestIp(req),
-                        requestPath: "/api/ai/analyze",
-                        model,
-                        payloadHash: makeSourceHash(request),
-                        payloadSizeBytes: Buffer.byteLength(requestPayloadText, "utf8"),
-                        requestContext: {
-                            fingerprint,
-                            diagnosisHash: makeSourceHash({ diagnosis }),
-                            symptomCount: Array.isArray(symptoms)
-                                ? symptoms.length
-                                : 0,
-                            medicalHistoryCount: Array.isArray(patient.medical_history)
-                                ? patient.medical_history.length
-                                : 0,
-                            currentMedicationCount: Array.isArray(
-                                patient.current_medications
-                            )
-                                ? patient.current_medications.length
-                                : 0,
-                            forceReal: forceRealSafe,
-                            neutralized: neutralizationMeta?.neutralized === true,
-                        },
-                        acknowledgmentIncidentId:
-                            neutralizationMeta?.acknowledgmentIncidentId ?? null,
-                        neutralized: neutralizationMeta?.neutralized === true,
-                    });
-
-                    const completion =
-                        await openai.chat.completions.create(
-                            request
-                        );
-
-                    rawContent =
-                        completion?.choices?.[0]?.message?.content || "";
-
-                    console.log("=== RAW OpenAI RESPONSE ===\n", rawContent, "\n===========================");
-
-                    const postCloudScan = detectNonSecureContent(rawContent);
-                    if (postCloudScan.hasMatches) {
-                        await finalizeOpenAIRequestAuditEvent(
-                            openAIRequestAudit?._id,
-                            {
-                                outcome: "FAILED",
-                                upstreamRequestId: completion?.id || null,
-                                errorCode: "POST_CLOUD_IDENTIFIER_DETECTED",
-                            }
-                        );
-                        return respondWithSecurityIncident({
-                            res,
-                            phase: "post_cloud",
-                            reason:
-                                "Non-secure patient identifiers detected after cloud transmission.",
-                            requestPath: "/api/ai/analyze",
-                            matches: postCloudScan.matches,
-                            context: {
-                                model,
-                                direction: "response",
-                            },
-                        });
-                    }
-
-                    const parsed = safeParseMedicalAI(
-                        rawContent
-                    );
-
-                    normalized = normalizeClinicalAnalysis(parsed, {
-                        model,
-                        primaryConcern: diagnosis,
-                    });
-
-                    if (isPlaceholderClinicalAnalysis(normalized)) {
-                        await finalizeOpenAIRequestAuditEvent(
-                            openAIRequestAudit?._id,
-                            {
-                                outcome: "FAILED",
-                                upstreamRequestId: completion?.id || null,
-                                errorCode: "OPENAI_INVALID_RESPONSE",
-                            }
-                        );
-                        console.error("❌ OpenAI returned an unusable clinical payload", {
-                            model,
-                            diagnosis,
-                            rawContentLength: rawContent.length,
-                        });
-
-                        return res.status(502).json({
-                            error: {
-                                code: "OPENAI_INVALID_RESPONSE",
-                                message:
-                                    "Le service OpenAI a retourne une reponse clinique inutilisable. Reessayez plus tard.",
-                                retryable: true,
-                            },
-                        });
-                    }
-
-                    recordOpenAISuccess();
-                    await finalizeOpenAIRequestAuditEvent(
-                        openAIRequestAudit?._id,
-                        {
-                            outcome: "SUCCESS",
-                            upstreamRequestId: completion?.id || null,
-                        }
-                    );
-                } catch (err) {
-                    await finalizeOpenAIRequestAuditEvent(
-                        openAIRequestAudit?._id,
-                        {
-                            outcome: "FAILED",
-                            errorCode: "OPENAI_UPSTREAM_FAILED",
-                        }
-                    );
-                    console.error("❌ OpenAI error:", err.message);
-                    recordOpenAIFailure();
-
-                    return res.status(502).json({
-                        error: {
-                            code: "OPENAI_UPSTREAM_FAILED",
-                            message:
-                                "Le service OpenAI est indisponible. Corrigez le contenu ou reessayez plus tard.",
-                            retryable: true,
-                        },
-                    });
+                if (!openAIResult.ok) {
+                    return openAIResult.response;
                 }
+
+                const normalized = openAIResult.normalized;
 
                 const persist = await persistOrReuseDiagnosis({
                     fingerprint,
