@@ -3,6 +3,7 @@ import express from "express";
 import { attachOptionalAuth } from "../middleware/attachOptionalAuth.js";
 import { clinicalDemoRateLimiter } from "../middleware/clinicalDemoRateLimiter.js";
 import { openAIAnalyzeQuotaGuard, getOpenAIAnalyzeQuotaStatus } from "../middleware/openaiAnalyzeQuotaGuard.js";
+import { resolveCachedDiagnosisState } from "../services/aiAnalyzeCacheService.js";
 
 export function createAiAnalyzeRouter(deps) {
     const {
@@ -198,24 +199,20 @@ export function createAiAnalyzeRouter(deps) {
                 const cachedDiagnosis = await findPersistedDiagnosisByFingerprint(
                     fingerprint
                 );
-                const cachedPrimaryConcern = extractPrimaryClinicalConcern({
-                    diagnosis: cachedDiagnosis?.input?.diagnosis,
-                    symptoms: cachedDiagnosis?.input?.symptoms,
+                const {
+                    normalizedCachedOutput,
+                    cachedDiagnosisIsPlaceholderReal,
+                    canReuseCachedDiagnosis,
+                    cacheNeedsUpgrade,
+                } = resolveCachedDiagnosisState({
+                    cachedDiagnosis,
+                    model,
+                    forceRealSafe,
+                    useMock,
+                    extractPrimaryClinicalConcern,
+                    normalizeClinicalAnalysis,
+                    isPlaceholderClinicalAnalysis,
                 });
-                const normalizedCachedOutput = cachedDiagnosis?.output
-                    ? normalizeClinicalAnalysis(cachedDiagnosis.output, {
-                        model: cachedDiagnosis.model ?? model ?? "cache",
-                        primaryConcern: cachedPrimaryConcern,
-                    })
-                    : null;
-                const cachedDiagnosisIsPlaceholderReal =
-                    cachedDiagnosis?.mode === "real" &&
-                    isPlaceholderClinicalAnalysis(normalizedCachedOutput);
-                const canReuseCachedDiagnosis =
-                    normalizedCachedOutput &&
-                    !cachedDiagnosisIsPlaceholderReal &&
-                    !(forceRealSafe && cachedDiagnosis?.mode === "real") &&
-                    (cachedDiagnosis.mode !== "mock" || useMock);
 
                 if (cachedDiagnosisIsPlaceholderReal) {
                     console.log("AI_CACHE_SKIP_PLACEHOLDER_REAL", {
@@ -233,10 +230,6 @@ export function createAiAnalyzeRouter(deps) {
                 }
 
                 if (canReuseCachedDiagnosis) {
-                    const cacheNeedsUpgrade =
-                        JSON.stringify(cachedDiagnosis.output) !==
-                        JSON.stringify(normalizedCachedOutput);
-
                     if (cacheNeedsUpgrade) {
                         upgradePersistedDiagnosisOutput(
                             fingerprint,
