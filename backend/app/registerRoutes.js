@@ -7,6 +7,7 @@ import openaiLogsRouter from "../routes/openaiLogs.js";
 import clinicianCommentsRouter from "../routes/clinicianComments.js";
 import authRouter from "../routes/auth.js";
 import translationRouter from "../routes/translation.js";
+import mocksRouter from "../routes/mocks.js";
 
 import { verifyJWT } from "../middleware/verifyJWT.js";
 import { attachOptionalAuth } from "../middleware/attachOptionalAuth.js";
@@ -88,6 +89,12 @@ export function registerRoutes(app, deps) {
         attachOptionalAuth,
         loi25DataLeakGuard,
         clinicianCommentsRouter
+    );
+    app.use(
+        "/api/mocks",
+        verifyJWT,
+        requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+        mocksRouter
     );
     app.use(
         "/api/auth",
