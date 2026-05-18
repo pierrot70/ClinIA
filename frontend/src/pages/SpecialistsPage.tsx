@@ -283,6 +283,7 @@ export function SpecialistsPage() {
         null
     );
     const [viewMode, setViewMode] = useState<"create" | "list">("list");
+    const [expandedSpecialistId, setExpandedSpecialistId] = useState<string | null>(null);
 
     useEffect(() => {
         void loadSpecialists();
@@ -337,6 +338,11 @@ export function SpecialistsPage() {
 
         setSpecialists(response.data.data);
         setTotalPages(response.data.meta.totalPages);
+        setExpandedSpecialistId((current) =>
+            response.data.data.some((specialist) => specialist._id === current)
+                ? current
+                : null
+        );
         setLoading(false);
     }
 
@@ -574,6 +580,7 @@ export function SpecialistsPage() {
 
     async function handleEdit(specialist: Specialist) {
         setViewMode("create");
+        setExpandedSpecialistId(null);
         setEditingId(specialist._id);
         // clinic_associer peut être string | null | undefined
         let clinicId: string = "";
@@ -658,11 +665,12 @@ export function SpecialistsPage() {
         }
 
         setBusyIds((p) => ({ ...p, [id]: false }));
+        setExpandedSpecialistId((current) => (current === id ? null : current));
         await loadSpecialists();
     }
 
     return (
-        <div className="max-w-6xl mx-auto p-6 space-y-6">
+        <div className="max-w-6xl mx-auto px-4 py-6 sm:p-6 space-y-6 overflow-x-hidden">
             <h1 className="text-2xl font-semibold">{pageLabels.title}</h1>
 
             <div className="flex flex-wrap gap-2">
@@ -1267,8 +1275,149 @@ export function SpecialistsPage() {
                         </div>
                     </div>
 
-                    <div className="border rounded overflow-hidden">
-                        <table className="w-full text-sm">
+                    <div className="md:hidden border rounded divide-y bg-white">
+                        {loading && (
+                            <div className="p-3 text-sm text-gray-500">
+                                {pageLabels.tableLoading}
+                            </div>
+                        )}
+                        {!loading && specialists.length === 0 && (
+                            <div className="p-3 text-sm text-gray-500">
+                                {pageLabels.tableEmpty}
+                            </div>
+                        )}
+                        {!loading &&
+                            specialists.map((sp) => {
+                                const isExpanded = expandedSpecialistId === sp._id;
+                                const associatedClinique = sp.clinique_associer
+                                    ? cliniqueMap[sp.clinique_associer]
+                                    : undefined;
+                                const specialtyLabel = sp.specialite?.trim() || "—";
+                                const clinicLabel = associatedClinique?.nom || "—";
+                                const clinicTelephone = associatedClinique?.telephone || "—";
+                                const clinicCourriel = associatedClinique?.courriel || "—";
+                                const disponibilitesLabel = formatDisponibilites(sp.disponibilites);
+                                const isRowHighlighted = highlightedId === sp._id;
+
+                                return (
+                                    <div
+                                        key={sp._id}
+                                        className={`p-3 ${
+                                            isRowHighlighted
+                                                ? "bg-gradient-to-r from-emerald-50 via-white to-white"
+                                                : ""
+                                        }`}
+                                    >
+                                        <button
+                                            type="button"
+                                            className="grid w-full grid-cols-3 gap-2 text-left"
+                                            onClick={() =>
+                                                setExpandedSpecialistId((current) =>
+                                                    current === sp._id ? null : sp._id
+                                                )
+                                            }
+                                        >
+                                            <div className="min-w-0">
+                                                <div className="text-[11px] uppercase tracking-wide text-gray-500">
+                                                    {pageLabels.tableLastName}
+                                                </div>
+                                                <div className="truncate text-sm font-medium text-gray-900">
+                                                    {sp.nom}
+                                                </div>
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="text-[11px] uppercase tracking-wide text-gray-500">
+                                                    {pageLabels.tableFirstName}
+                                                </div>
+                                                <div className="truncate text-sm text-gray-900">
+                                                    {sp.prenom}
+                                                </div>
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="text-[11px] uppercase tracking-wide text-gray-500">
+                                                    {pageLabels.tableSpecialty}
+                                                </div>
+                                                <div className="truncate text-sm text-gray-900">
+                                                    {specialtyLabel}
+                                                </div>
+                                            </div>
+                                        </button>
+
+                                        {isExpanded && (
+                                            <div className="mt-3 space-y-3 rounded-lg border bg-gray-50 p-3">
+                                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                    <div>
+                                                        <div className="text-[11px] uppercase tracking-wide text-gray-500">
+                                                            {pageLabels.tableDoctorNumber}
+                                                        </div>
+                                                        <div className="text-sm text-gray-900">
+                                                            {sp.numero_medecin}
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[11px] uppercase tracking-wide text-gray-500">
+                                                            {pageLabels.tableClinic}
+                                                        </div>
+                                                        <div className="text-sm text-gray-900">
+                                                            {clinicLabel}
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[11px] uppercase tracking-wide text-gray-500">
+                                                            {pageLabels.tablePhone}
+                                                        </div>
+                                                        <div className="text-sm text-gray-900 break-words">
+                                                            {clinicTelephone}
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[11px] uppercase tracking-wide text-gray-500">
+                                                            {pageLabels.tableEmail}
+                                                        </div>
+                                                        <div className="text-sm text-gray-900 break-all">
+                                                            {clinicCourriel}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-[11px] uppercase tracking-wide text-gray-500">
+                                                        {pageLabels.tableAvailability}
+                                                    </div>
+                                                    <div className="text-sm text-gray-900">
+                                                        {disponibilitesLabel}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-[11px] uppercase tracking-wide text-gray-500">
+                                                        {pageLabels.tableActions}
+                                                    </div>
+                                                    <div className="mt-2 flex flex-wrap gap-2">
+                                                        <button
+                                                            className="px-3 py-2 border rounded whitespace-nowrap"
+                                                            type="button"
+                                                            onClick={() => handleEdit(sp)}
+                                                        >
+                                                            {pageLabels.tableEdit}
+                                                        </button>
+                                                        <button
+                                                            className="px-3 py-2 border rounded text-red-600 whitespace-nowrap"
+                                                            type="button"
+                                                            disabled={busyIds[sp._id]}
+                                                            onClick={() => handleDelete(sp._id)}
+                                                        >
+                                                            {pageLabels.tableDelete}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                    </div>
+
+                    <div className="hidden md:block border rounded overflow-x-auto">
+                        <table className="w-full min-w-[920px] text-sm">
                             <thead className="bg-gray-100 text-gray-700">
                         <tr>
                             <th className="text-left p-2">
@@ -1295,7 +1444,7 @@ export function SpecialistsPage() {
                             <th className="text-left p-2">
                                 {pageLabels.tableAvailability}
                             </th>
-                            <th className="text-left p-2">
+                            <th className="text-left p-2 sticky right-0 bg-gray-100 z-10 min-w-[140px]">
                                 {pageLabels.tableActions}
                             </th>
                         </tr>
@@ -1380,32 +1529,34 @@ export function SpecialistsPage() {
                                                 <td className="p-2">
                                                     {disponibilitesLabel}
                                                 </td>
-                                                <td className="p-2 flex gap-2">
-                                                    <button
-                                                        className="px-2 py-1 border rounded"
-                                                        type="button"
-                                                        onClick={() =>
-                                                            handleEdit(sp)
-                                                        }
-                                                    >
-                                                        {pageLabels.tableEdit}
-                                                    </button>
-                                                    <button
-                                                        className="px-2 py-1 border rounded text-red-600"
-                                                        type="button"
-                                                        disabled={
-                                                            busyIds[
-                                                                sp._id
-                                                            ]
-                                                        }
-                                                        onClick={() =>
-                                                            handleDelete(
-                                                                sp._id
-                                                            )
-                                                        }
-                                                    >
-                                                        {pageLabels.tableDelete}
-                                                    </button>
+                                                <td className="p-2 align-top sticky right-0 bg-white z-10 shadow-[-8px_0_12px_-12px_rgba(0,0,0,0.35)]">
+                                                    <div className="flex flex-col gap-2 min-w-[132px]">
+                                                        <button
+                                                            className="px-2 py-1 border rounded whitespace-nowrap"
+                                                            type="button"
+                                                            onClick={() =>
+                                                                handleEdit(sp)
+                                                            }
+                                                        >
+                                                            {pageLabels.tableEdit}
+                                                        </button>
+                                                        <button
+                                                            className="px-2 py-1 border rounded text-red-600 whitespace-nowrap"
+                                                            type="button"
+                                                            disabled={
+                                                                busyIds[
+                                                                    sp._id
+                                                                ]
+                                                            }
+                                                            onClick={() =>
+                                                                handleDelete(
+                                                                    sp._id
+                                                                )
+                                                            }
+                                                        >
+                                                            {pageLabels.tableDelete}
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
