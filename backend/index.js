@@ -46,6 +46,7 @@ import {
 } from "./audit/openaiRequestAudit.js";
 import { configureCoreMiddleware } from "./app/configureCoreMiddleware.js";
 import { registerRoutes } from "./app/registerRoutes.js";
+import { createStartServer } from "./app/startServer.js";
 import { createAiAnalyzeRouter } from "./routes/aiAnalyze.js";
 import { createRespondWithSecurityIncident } from "./services/aiSecurityResponseService.js";
 import {
@@ -175,6 +176,11 @@ async function warmTranslationMemoryCache() {
     return homeTranslationService.warmTranslationMemoryCache();
 }
 
+const startServer = createStartServer({
+    mongoose,
+    initShutdownState,
+});
+
 const respondWithSecurityIncident = createRespondWithSecurityIncident({
     createSecurityIncident,
     recordOpenAIRequestAuditEvent,
@@ -232,42 +238,6 @@ const aiAnalyzeRouter = createAiAnalyzeRouter({
 
 app.post("/api/i18n/home-translate", homeTranslationService.handleHomeTranslate);
 
-/* ------------------------------------------------------------------ */
-/* Mongo / Server                                                     */
-/* ------------------------------------------------------------------ */
-
-mongoose
-    .connect(process.env.MONGO_URI, {
-        serverSelectionTimeoutMS: 2000, // ⏱️ max 2 secondes si Mongo est down
-    })
-    .then(async () => {
-        console.log("✅ MongoDB connecté (ClinIA)");
-        console.log(
-            "CLINIA_MOCK_AI =",
-            process.env.CLINIA_MOCK_AI
-        );
-        console.log(
-            "OPENAI_MODEL =",
-            process.env.OPENAI_MODEL
-        );
-
-        try {
-            await warmTranslationMemoryCache();
-        } catch (err) {
-            console.warn("⚠️ I18N warmup failed", err?.message);
-        }
-
-        try {
-            await initShutdownState();
-            console.log("✅ Maintenance state chargé depuis MongoDB");
-        } catch (err) {
-            console.warn("⚠️ initShutdownState failed", err?.message);
-        }
-    })
-    .catch((err) => {
-        console.error("❌ Mongo connection error (FAIL-FAST):", err.message);
-    });
-
 registerRoutes(app, {
     massDownloadRestrictionGuard,
     patientsMassDownloadDetector,
@@ -289,8 +259,7 @@ app.use((err, _req, res, next) => {
     return next(err);
 });
 
-app.listen(4000, () =>
-    console.log(
-        "🚀 ClinIA backend ready on http://localhost:4000"
-    )
-);
+startServer({
+    app,
+    warmTranslationMemoryCache,
+});
