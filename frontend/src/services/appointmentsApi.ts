@@ -1,6 +1,7 @@
 import type { ApiResponse } from "../types/api";
 import { withSecurityIncidentGuard } from "./securityIncidentGuard";
 import { API_URL } from "./config";
+import { authFetch } from "./authService";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -97,7 +98,7 @@ export async function fetchAppointmentsPaginated(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(
+                const response = await authFetch(
                     `${API_URL}/api/appointments?${query.toString()}`
                 );
                 return (await safeJson(response)) as ApiResponse<PaginatedAppointments>;
@@ -124,7 +125,7 @@ export async function createAppointment(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(`${API_URL}/api/appointments`, {
+                const response = await authFetch(`${API_URL}/api/appointments`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
@@ -154,7 +155,7 @@ export async function fetchAvailableSlots(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(
+                const response = await authFetch(
                     `${API_URL}/api/appointments/slots?specialist=${encodeURIComponent(
                         specialist
                     )}&date=${encodeURIComponent(date)}`
@@ -183,7 +184,7 @@ export async function cancelAppointment(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(
+                const response = await authFetch(
                     `${API_URL}/api/appointments/${id}`,
                     { method: "DELETE" }
                 );
@@ -212,7 +213,7 @@ export async function updateAppointmentStatus(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(
+                const response = await authFetch(
                     `${API_URL}/api/appointments/${id}/status`,
                     {
                         method: "PATCH",
@@ -245,7 +246,7 @@ export async function updateAppointmentSchedule(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(
+                const response = await authFetch(
                     `${API_URL}/api/appointments/${id}/schedule`,
                     {
                         method: "PATCH",
