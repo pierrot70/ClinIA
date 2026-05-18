@@ -4,6 +4,7 @@ import { attachOptionalAuth } from "../middleware/attachOptionalAuth.js";
 import { clinicalDemoRateLimiter } from "../middleware/clinicalDemoRateLimiter.js";
 import { openAIAnalyzeQuotaGuard, getOpenAIAnalyzeQuotaStatus } from "../middleware/openaiAnalyzeQuotaGuard.js";
 import { resolveCachedDiagnosisState } from "../services/aiAnalyzeCacheService.js";
+import { resolvePreCloudSecurityState } from "../services/aiAnalyzePreCloudService.js";
 
 export function createAiAnalyzeRouter(deps) {
     const {
@@ -132,68 +133,32 @@ export function createAiAnalyzeRouter(deps) {
                     isProd,
                 });
 
-                const preCloudScan = detectNonSecureContent(patient);
-                if (preCloudScan.hasMatches) {
-                    const ackedIncident = incidentAckId
-                        ? await getAcknowledgedSecurityIncident(incidentAckId)
-                        : null;
+                const preCloudState = await resolvePreCloudSecurityState({
+                    patient,
+                    incidentAckId,
+                    model,
+                    reqAuth: req.auth,
+                    req,
+                    fingerprint,
+                    diagnosis,
+                    symptoms,
+                    detectNonSecureContent,
+                    getAcknowledgedSecurityIncident,
+                    respondWithSecurityIncident,
+                    getRequestIp,
+                    makeSourceHash,
+                    sanitizeNonSecureContent,
+                    res,
+                    forceRealSafe,
+                });
 
-                    if (!ackedIncident) {
-                        return respondWithSecurityIncident({
-                            res,
-                            phase: "pre_cloud",
-                            reason:
-                                "Non-secure patient identifiers detected before cloud transmission.",
-                            requestPath: "/api/ai/analyze",
-                            matches: preCloudScan.matches,
-                            context: {
-                                model,
-                                direction: "request",
-                            },
-                            auditEvent: {
-                                actorUserId: req.auth?.userId ?? null,
-                                actorUsername: req.auth?.username ?? null,
-                                actorRole: req.auth?.role ?? null,
-                                ip: getRequestIp(req),
-                                model,
-                                payloadHash: makeSourceHash(patient),
-                                payloadSizeBytes: Buffer.byteLength(
-                                    JSON.stringify(patient),
-                                    "utf8"
-                                ),
-                                requestContext: {
-                                    fingerprint,
-                                    diagnosisHash: makeSourceHash({ diagnosis }),
-                                    symptomCount: Array.isArray(symptoms)
-                                        ? symptoms.length
-                                        : 0,
-                                    medicalHistoryCount: Array.isArray(
-                                        patient.medical_history
-                                    )
-                                        ? patient.medical_history.length
-                                        : 0,
-                                    currentMedicationCount: Array.isArray(
-                                        patient.current_medications
-                                    )
-                                        ? patient.current_medications.length
-                                        : 0,
-                                    forceReal: forceRealSafe,
-                                    direction: "request",
-                                },
-                            },
-                        });
-                    }
+                if (preCloudState.blocked) {
+                    return preCloudState.response;
+                }
 
-                    const sanitizedPatient = sanitizeNonSecureContent(patient);
-                    neutralizationMeta = {
-                        neutralized: true,
-                        acknowledgmentIncidentId: String(ackedIncident._id),
-                        originalMatches: preCloudScan.matches,
-                        message:
-                            "Requete contenant des donnees sensibles neutralisee apres acknowledgment explicite du clinicien.",
-                    };
-
-                    Object.assign(patient, sanitizedPatient);
+                if (preCloudState.sanitizedPatient) {
+                    neutralizationMeta = preCloudState.neutralizationMeta;
+                    Object.assign(patient, preCloudState.sanitizedPatient);
                 }
 
                 const cachedDiagnosis = await findPersistedDiagnosisByFingerprint(
