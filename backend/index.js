@@ -45,6 +45,7 @@ import {
     recordOpenAIRequestAuditEvent,
 } from "./audit/openaiRequestAudit.js";
 import { configureCoreMiddleware } from "./app/configureCoreMiddleware.js";
+import { registerErrorHandlers } from "./app/registerErrorHandlers.js";
 import { registerRoutes } from "./app/registerRoutes.js";
 import { createStartServer } from "./app/startServer.js";
 import { createAiAnalyzeRouter } from "./routes/aiAnalyze.js";
@@ -245,19 +246,7 @@ registerRoutes(app, {
     aiAnalyzeRouter,
 });
 
-app.use((err, _req, res, next) => {
-    if (err?.code === "CORS_ORIGIN_DENIED") {
-        return res.status(403).json({
-            error: {
-                code: "CORS_ORIGIN_DENIED",
-                message: "Origine CORS non autorisee.",
-                retryable: false,
-            },
-        });
-    }
-
-    return next(err);
-});
+registerErrorHandlers(app);
 
 startServer({
     app,
