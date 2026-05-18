@@ -6,6 +6,11 @@ import { openAIAnalyzeQuotaGuard, getOpenAIAnalyzeQuotaStatus } from "../middlew
 import { resolveCachedDiagnosisState } from "../services/aiAnalyzeCacheService.js";
 import { resolvePreCloudSecurityState } from "../services/aiAnalyzePreCloudService.js";
 import { executeOpenAIAnalyze } from "../services/aiAnalyzeOpenAIService.js";
+import {
+    buildDegradedAnalyzeResponse,
+    buildMockAnalyzeResponse,
+    buildPersistedRealAnalyzeResponse,
+} from "../services/aiAnalyzeResponseService.js";
 
 export function createAiAnalyzeRouter(deps) {
     const {
@@ -229,47 +234,32 @@ export function createAiAnalyzeRouter(deps) {
                 }
 
                 if (useMock) {
-                    const mock = getMockForDiagnosis(diagnosisSeed || diagnosis);
-                    const analysis = normalizeClinicalAnalysis(mock, {
-                        model: "mock",
-                        primaryConcern: diagnosis,
-                    });
-
-                    const persist = await persistOrReuseDiagnosis({
+                    const mockResult = await buildMockAnalyzeResponse({
+                        diagnosisSeed,
+                        diagnosis,
                         fingerprint,
-                        input: patient,
-                        output: analysis,
-                        mode: "mock",
-                        model: "mock",
+                        patient,
+                        neutralizationMeta,
+                        getMockForDiagnosis,
+                        normalizeClinicalAnalysis,
+                        persistOrReuseDiagnosis,
                     });
 
-                    if (!persist.ok) {
-                        return res.json({ error: persist.error });
+                    if (!mockResult.ok) {
+                        return res.json({ error: mockResult.error });
                     }
 
-                    return res.json({
-                        data: persist.doc.output,
-                        meta: {
-                            source: "mock",
-                            model: "mock",
-                            ...neutralizationMeta,
-                        },
-                    });
+                    return res.json(mockResult.responsePayload);
                 }
 
                 if (!canCallOpenAI() && !forceRealSafe) {
-                    const degraded = normalizeClinicalAnalysis({}, {
-                        model: "fallback",
-                        primaryConcern: diagnosis,
-                    });
-                    return res.json({
-                        data: degraded,
-                        meta: {
-                            source: "degraded",
-                            model: "fallback",
-                            ...neutralizationMeta,
-                        },
-                    });
+                    return res.json(
+                        buildDegradedAnalyzeResponse({
+                            diagnosis,
+                            neutralizationMeta,
+                            normalizeClinicalAnalysis,
+                        })
+                    );
                 }
 
                 const openAIResult = await executeOpenAIAnalyze({
@@ -304,35 +294,21 @@ export function createAiAnalyzeRouter(deps) {
 
                 const normalized = openAIResult.normalized;
 
-                const persist = await persistOrReuseDiagnosis({
+                const finalResult = await buildPersistedRealAnalyzeResponse({
                     fingerprint,
-                    input: patient,
-                    output: normalized,
-                    mode: "real",
-                    model: model ?? "unknown",
-                    replaceExisting: forceRealSafe,
-                });
-
-                console.log("AI_RESPONSE From OpenAI", {
+                    patient,
+                    normalized,
                     model,
-                    source: "real",
-                    hasDiagnosis: Boolean(normalized?.diagnosis?.suspected),
+                    forceRealSafe,
+                    neutralizationMeta,
+                    persistOrReuseDiagnosis,
                 });
 
-                if (!persist.ok) {
-                    return res.status(500).json({ error: persist.error });
+                if (!finalResult.ok) {
+                    return res.status(500).json({ error: finalResult.error });
                 }
 
-                const responsePayload = {
-                    data: persist.doc.output,
-                    meta: {
-                        source: "real",
-                        model,
-                        ...neutralizationMeta,
-                    },
-                };
-                console.log("=== RESPONSE TO FRONTEND ===\n", JSON.stringify(responsePayload, null, 2), "\n============================");
-                return res.json(responsePayload);
+                return res.json(finalResult.responsePayload);
             } catch (err) {
                 console.error("🔥 FATAL /api/ai/analyze ERROR", err);
                 return res.status(500).json({
