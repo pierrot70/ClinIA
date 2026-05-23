@@ -562,6 +562,7 @@ export function ClinicalAnalyzePage() {
                             treatment_options: result?.treatment_options,
                             follow_up_and_monitoring: result?.follow_up_and_monitoring,
                             other_ai_fields: result?.other_ai_fields,
+                            relevanceByAgeChart: demoScenario.relevanceByAgeChart,
                         }}
                         sourceMode={serviceMode || undefined}
                         realAI={forceReal}

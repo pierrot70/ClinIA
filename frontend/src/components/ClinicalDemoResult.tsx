@@ -2,8 +2,7 @@ import React from "react";
 import AITreatmentTable from "./AITreatmentTable";
 import TreatmentCard from "./TreatmentCard";
 import QuestionCard from "./QuestionCard";
-
-
+import ClinicalRelevanceByAgeChart from "./ClinicalRelevanceByAgeChart";
 
 import { ClinicalAnalysis } from "../types/clinical";
 
@@ -13,6 +12,21 @@ type ClinicalDemoResultData = Partial<ClinicalAnalysis> & {
   summary?: string;
   error?: string;
   errorCode?: string;
+  relevanceByAgeChart?: {
+    title: string;
+    subtitle: string;
+    interpretationNote: string;
+    ageBuckets: string[];
+    levelLabels: Record<1 | 2 | 3 | 4 | 5, string>;
+    series: Array<{
+      name: string;
+      values: Array<1 | 2 | 3 | 4 | 5>;
+    }>;
+    sources: Array<{
+      label: string;
+      url: string;
+    }>;
+  };
 };
 
 interface ClinicalDemoResultProps {
@@ -68,6 +82,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
     treatment_options,
     follow_up_and_monitoring,
     other_ai_fields,
+    relevanceByAgeChart,
   } = demoData || {};
   const top = treatments && treatments[0];
   const patientSummaryLabel = buildPatientSummaryLabel(patientDisplayName);
@@ -349,6 +364,18 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
           <TreatmentCard key={i} treatment={t} />
         ))}
       </section>
+
+      {relevanceByAgeChart && (
+        <ClinicalRelevanceByAgeChart
+          title={relevanceByAgeChart.title}
+          subtitle={relevanceByAgeChart.subtitle}
+          interpretationNote={relevanceByAgeChart.interpretationNote}
+          ageBuckets={relevanceByAgeChart.ageBuckets}
+          levelLabels={relevanceByAgeChart.levelLabels}
+          series={relevanceByAgeChart.series}
+          sources={relevanceByAgeChart.sources}
+        />
+      )}
 
       {/* Questions fréquentes */}
       <section>

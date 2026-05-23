@@ -15,5 +15,18 @@ describe("clinical demo scenarios", () => {
             "Reevaluation d'une option GLP-1"
         );
         expect(scenario.treatments.map((item) => item.name)).not.toContain("Amlodipine");
+        expect(scenario.relevanceByAgeChart?.ageBuckets).toEqual([
+            "<40",
+            "40-49",
+            "50-59",
+            "60-69",
+            "70+",
+        ]);
+        expect(
+            scenario.relevanceByAgeChart?.series.find(
+                (item) => item.name === "Metformine"
+            )?.values
+        ).toEqual([5, 5, 5, 4, 4]);
+        expect(scenario.relevanceByAgeChart?.sources).toHaveLength(4);
     });
 });

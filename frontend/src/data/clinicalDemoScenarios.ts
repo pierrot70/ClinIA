@@ -7,9 +7,32 @@ type DemoQuestion = {
     answer: string;
 };
 
+type ClinicalRelevanceLevel = 1 | 2 | 3 | 4 | 5;
+
+type ClinicalRelevanceSeries = {
+    name: string;
+    values: ClinicalRelevanceLevel[];
+};
+
+type ClinicalRelevanceSource = {
+    label: string;
+    url: string;
+};
+
+type ClinicalRelevanceByAgeChart = {
+    title: string;
+    subtitle: string;
+    interpretationNote: string;
+    ageBuckets: string[];
+    levelLabels: Record<ClinicalRelevanceLevel, string>;
+    series: ClinicalRelevanceSeries[];
+    sources: ClinicalRelevanceSource[];
+};
+
 type ClinicalDemoScenario = {
     treatments: Treatment[];
     questions: DemoQuestion[];
+    relevanceByAgeChart?: ClinicalRelevanceByAgeChart;
 };
 
 const cataractTreatments: Treatment[] = [
@@ -338,6 +361,62 @@ const diabetesQuestions: DemoQuestion[] = [
     },
 ];
 
+const diabetesRelevanceByAgeChart: ClinicalRelevanceByAgeChart = {
+    title: "Pertinence clinique relative selon l'age",
+    subtitle:
+        "Synthese ClinIA originale inspiree de lignes directrices reconnues. Ne represente pas une mesure quantitative d'efficacite.",
+    interpretationNote:
+        "L'age seul ne permet pas de choisir un traitement. Cette visualisation doit etre interpretee avec le poids, le risque cardiovasculaire, la fonction renale, la fragilite, la tolerance et les objectifs glycemiques.",
+    ageBuckets: ["<40", "40-49", "50-59", "60-69", "70+"],
+    levelLabels: {
+        1: "Faible pertinence",
+        2: "A considerer",
+        3: "Pertinence moderee",
+        4: "Souvent pertinente",
+        5: "Pertinence contextuelle elevee",
+    },
+    series: [
+        {
+            name: "Metformine",
+            values: [5, 5, 5, 4, 4],
+        },
+        {
+            name: "Poursuite prudente de la strategie actuelle",
+            values: [2, 2, 3, 4, 4],
+        },
+        {
+            name: "Inhibiteur SGLT2",
+            values: [2, 3, 4, 4, 4],
+        },
+        {
+            name: "Option GLP-1",
+            values: [2, 3, 4, 4, 4],
+        },
+        {
+            name: "Mode de vie",
+            values: [5, 5, 5, 4, 4],
+        },
+    ],
+    sources: [
+        {
+            label: "ADA Standards of Care 2025 - Older Adults",
+            url: "https://diabetesjournals.org/care/article/48/Supplement_1/S266/157556/13-Older-Adults-Standards-of-Care-in-Diabetes-2025",
+        },
+        {
+            label: "Diabetes Canada 2024 - Pharmacologic Glycemic Management",
+            url: "https://guidelines.diabetes.ca/cpg/chapter-13-2024-update",
+        },
+        {
+            label: "Diabetes Canada - Older People",
+            url: "https://www.diabetes.ca/health-care-providers/clinical-practice-guidelines/chapter-37",
+        },
+        {
+            label: "NICE NG28 - Type 2 diabetes in adults",
+            url: "https://www.nice.org.uk/guidance/ng28",
+        },
+    ],
+};
+
 const scenarios: Record<string, ClinicalDemoScenario> = {
     hypertension: {
         treatments: hypertensionTreatments,
@@ -362,6 +441,7 @@ const scenarios: Record<string, ClinicalDemoScenario> = {
     diabetesType2: {
         treatments: diabetesTreatments,
         questions: diabetesQuestions,
+        relevanceByAgeChart: diabetesRelevanceByAgeChart,
     },
 };
 
