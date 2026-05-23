@@ -2,12 +2,29 @@ import React from "react";
 import { useParams, Link } from "react-router-dom";
 import { hypertensionTreatments } from "../data/hypertension";
 
+function getClinicalRelevanceLabel(flags: string[] = []) {
+  if (flags.includes("wellTolerated") && flags.includes("monitoring")) {
+    return "A evaluer selon le contexte";
+  }
+
+  if (flags.includes("wellTolerated")) {
+    return "Option courante";
+  }
+
+  if (flags.includes("monitoring")) {
+    return "Option a surveiller";
+  }
+
+  return "A discuter";
+}
+
 const TreatmentDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const treatment = hypertensionTreatments.find(
     (t) => t.id === decodeURIComponent(id || "")
   );
   const flags = Array.isArray(treatment?.flags) ? treatment.flags : [];
+  const relevanceLabel = getClinicalRelevanceLabel(flags);
 
   if (!treatment) {
     return (
@@ -36,18 +53,21 @@ const TreatmentDetails: React.FC = () => {
 
       <section className="grid sm:grid-cols-3 gap-4 text-sm">
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
-          <div className="text-xs text-gray-500">Efficacité simulée</div>
-          <div className="text-2xl font-semibold text-primary">
-            {Math.round(treatment.efficacy * 100)}%
-          </div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
-          <div className="text-xs text-gray-500">Score effets secondaires</div>
-          <div className="text-2xl font-semibold text-amber-600">
-            {treatment.sideEffectScore}
+          <div className="text-xs text-gray-500">Pertinence clinique</div>
+          <div className="text-lg font-semibold text-primary">
+            {relevanceLabel}
           </div>
           <p className="text-[11px] text-gray-500 mt-1">
-            Score synthétique fictif (plus élevé = plus d&apos;effets).
+            Repère qualitatif simulé, non quantifié.
+          </p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+          <div className="text-xs text-gray-500">Surveillance</div>
+          <div className="text-sm font-semibold text-amber-600">
+            {flags.includes("monitoring") ? "Requise selon le profil" : "Standard"}
+          </div>
+          <p className="text-[11px] text-gray-500 mt-1">
+            Formulation textuelle simulée, plus crédible qu&apos;un score arbitraire.
           </p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">

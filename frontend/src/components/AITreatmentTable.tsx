@@ -4,7 +4,6 @@ export interface Treatment {
     name: string;
     justification: string;
     contraindications: string[] | string;
-    efficacy: number;
 }
 
 interface AITreatmentTableProps {
@@ -24,7 +23,6 @@ const AITreatmentTable: React.FC<AITreatmentTableProps> = ({ treatments }) => {
                     <th className="p-3 border">Traitement</th>
                     <th className="p-3 border">Justification</th>
                     <th className="p-3 border">Contre-indications</th>
-                    <th className="p-3 border">Efficacité</th>
                 </tr>
                 </thead>
 
@@ -38,7 +36,6 @@ const AITreatmentTable: React.FC<AITreatmentTableProps> = ({ treatments }) => {
                                 ? t.contraindications.join(", ")
                                 : t.contraindications}
                         </td>
-                        <td className="p-3 border">{t.efficacy}%</td>
                     </tr>
                 ))}
                 </tbody>

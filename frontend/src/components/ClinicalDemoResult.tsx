@@ -1,7 +1,6 @@
 import React from "react";
 import AITreatmentTable from "./AITreatmentTable";
 import TreatmentCard from "./TreatmentCard";
-import ChartCard from "./ChartCard";
 import QuestionCard from "./QuestionCard";
 
 
@@ -230,7 +229,6 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
     name: t.name || t.shortName || "-",
     shortName: t.shortName ?? t.name ?? "IA",
     class: t.class ?? "",
-    efficacy: typeof t.efficacy === "number" ? Math.round(t.efficacy * 100) : 0,
     flags: Array.isArray(t.flags) ? t.flags : [],
     indication: t.indication ?? t.justification ?? "",
     dosage: t.dosage ?? "",
@@ -327,12 +325,14 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
             <div>
               <h2 className="text-sm font-semibold text-gray-800 mb-1">Traitement suggéré</h2>
               <p className="text-sm text-gray-700">
-                <span className="font-semibold">{mappedTreatments[0]?.name}</span> est proposé comme agent de première ligne.
+                <span className="font-semibold">{mappedTreatments[0]?.name}</span> est présenté comme option prioritaire à discuter selon le contexte clinique.
               </p>
             </div>
-            <div className="text-right text-sm">
-              <div className="text-xs text-gray-500">Efficacité</div>
-              <div className="text-3xl font-semibold text-primary">{mappedTreatments[0]?.efficacy ?? 0}%</div>
+            <div className="text-right text-sm max-w-[16rem]">
+              <div className="text-xs text-gray-500">Repère clinique</div>
+              <div className="text-base font-semibold text-primary">
+                Données simulées sans score chiffré
+              </div>
             </div>
           </section>
 
@@ -348,11 +348,6 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
         {(mappedTreatments ?? []).map((t, i) => (
           <TreatmentCard key={i} treatment={t} />
         ))}
-      </section>
-
-      {/* Graphiques d'efficacité et d'effets secondaires */}
-      <section>
-        <ChartCard treatments={mappedTreatments ?? []} />
       </section>
 
       {/* Questions fréquentes */}

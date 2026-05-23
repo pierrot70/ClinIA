@@ -7,8 +7,27 @@ interface Props {
   treatment: Treatment;
 }
 
+function getClinicalRelevanceLabel(treatment: Treatment) {
+  const flags = Array.isArray(treatment.flags) ? treatment.flags : [];
+
+  if (flags.includes("wellTolerated") && flags.includes("monitoring")) {
+    return "A evaluer selon le contexte";
+  }
+
+  if (flags.includes("wellTolerated")) {
+    return "Option courante";
+  }
+
+  if (flags.includes("monitoring")) {
+    return "Option a surveiller";
+  }
+
+  return "A discuter";
+}
+
 const TreatmentCard: React.FC<Props> = ({ treatment }) => {
   const flags = Array.isArray(treatment.flags) ? treatment.flags : [];
+  const relevanceLabel = getClinicalRelevanceLabel(treatment);
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3 shadow-sm">
@@ -19,10 +38,10 @@ const TreatmentCard: React.FC<Props> = ({ treatment }) => {
           </h3>
           <p className="text-xs text-gray-500">{treatment.class}</p>
         </div>
-        <div className="text-right">
-          <div className="text-xs uppercase text-gray-400">Efficacité</div>
-          <div className="text-lg font-semibold text-primary">
-            {Math.round(treatment.efficacy * 100)}%
+        <div className="text-right max-w-[11rem]">
+          <div className="text-xs uppercase text-gray-400">Pertinence clinique</div>
+          <div className="text-sm font-semibold text-primary">
+            {relevanceLabel}
           </div>
         </div>
       </div>
