@@ -7,6 +7,13 @@
 export type Sex = "male" | "female" | "other";
 export type AIServiceSource = "real" | "mock" | "degraded";
 
+export interface DiabetesClinicalContext {
+    cardiovascular_risk?: string;
+    renal_function?: string;
+    fragility?: string;
+    tolerance?: string;
+    glycemic_goals?: string;
+}
 
 export interface ClinicalPayload {
     age: number;
@@ -24,6 +31,7 @@ export interface ClinicalPayload {
     symptoms: string[];
     medical_history: string[];
     current_medications: string[];
+    diabetes_context?: DiabetesClinicalContext;
 
     // Champs frontend pour pilotage IA
     forceReal?: boolean;

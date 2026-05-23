@@ -2,7 +2,11 @@ import { useEffect, useState, useContext } from "react";
 import { useTranslation } from "../../hooks/useTranslation";
 import { HomeI18nContext } from "../../contexts/HomeI18nContext";
 import { labels } from "../../i18n/uiLabels";
-import type { ClinicalPayload, Sex } from "../../types/clinical";
+import type {
+    ClinicalPayload,
+    DiabetesClinicalContext,
+    Sex,
+} from "../../types/clinical";
 
 const CACHE_KEY = "clinia_last_clinical_payload";
 
@@ -13,6 +17,14 @@ const EMPTY_FORM: ClinicalPayload = {
     symptoms: [],
     medical_history: [],
     current_medications: [],
+};
+
+const DEFAULT_DIABETES_CONTEXT: DiabetesClinicalContext = {
+    cardiovascular_risk: "Modere a eleve",
+    renal_function: "Preservee ou legerement reduite",
+    fragility: "Faible",
+    tolerance: "Bonne tolerance a la metformine",
+    glycemic_goals: "HbA1c < 7 % si securitaire et realiste",
 };
 
 const EXAMPLE_CASES: Record<string, ClinicalPayload> = {
@@ -79,6 +91,7 @@ const EXAMPLE_CASES: Record<string, ClinicalPayload> = {
         symptoms: ["Polydipsie", "Polyurie", "Fatigue"],
         medical_history: ["Hypertension arterielle"],
         current_medications: ["Metformine"],
+        diabetes_context: { ...DEFAULT_DIABETES_CONTEXT },
     },
 };
 
@@ -88,10 +101,21 @@ function clonePayload(payload: ClinicalPayload): ClinicalPayload {
         blood_pressure: payload.blood_pressure
             ? { ...payload.blood_pressure }
             : undefined,
+        diabetes_context: payload.diabetes_context
+            ? { ...payload.diabetes_context }
+            : undefined,
         symptoms: [...payload.symptoms],
         medical_history: [...payload.medical_history],
         current_medications: [...payload.current_medications],
     };
+}
+
+function normalize(value: string | undefined) {
+    return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
 }
 
 function formatList(values: string[] | undefined) {
@@ -161,6 +185,22 @@ export function ClinicalForm({
         initialData ?? loadCachedForm() ?? EMPTY_FORM
     );
     const [selectedExampleCase, setSelectedExampleCase] = useState("");
+    const [isDiabetesModalOpen, setIsDiabetesModalOpen] = useState(false);
+    const [diabetesModalValues, setDiabetesModalValues] = useState<{
+        weight: string;
+        cardiovascular_risk: string;
+        renal_function: string;
+        fragility: string;
+        tolerance: string;
+        glycemic_goals: string;
+    }>({
+        weight: "",
+        cardiovascular_risk: DEFAULT_DIABETES_CONTEXT.cardiovascular_risk ?? "",
+        renal_function: DEFAULT_DIABETES_CONTEXT.renal_function ?? "",
+        fragility: DEFAULT_DIABETES_CONTEXT.fragility ?? "",
+        tolerance: DEFAULT_DIABETES_CONTEXT.tolerance ?? "",
+        glycemic_goals: DEFAULT_DIABETES_CONTEXT.glycemic_goals ?? "",
+    });
     const [listInputs, setListInputs] = useState(() => ({
         symptoms: formatList((initialData ?? loadCachedForm() ?? EMPTY_FORM).symptoms),
         medical_history: formatList(
@@ -219,6 +259,7 @@ export function ClinicalForm({
         clearCachedForm();
         applyFormData(EMPTY_FORM);
         setSelectedExampleCase("");
+        setIsDiabetesModalOpen(false);
     }
 
     function handleExampleCaseChange(caseId: string) {
@@ -232,6 +273,62 @@ export function ClinicalForm({
         if (selectedCase) {
             applyFormData(selectedCase);
         }
+    }
+
+    function isType2DiabetesContext() {
+        const diagnosis = normalize(form.diagnosis);
+
+        return (
+            selectedExampleCase === "diabetesType255" ||
+            diagnosis.includes("diabete de type 2") ||
+            diagnosis.includes("diabete type 2") ||
+            diagnosis.includes("type 2") ||
+            diagnosis.includes("diabetes")
+        );
+    }
+
+    function openDiabetesModal() {
+        setDiabetesModalValues({
+            weight: String(form.weight ?? EXAMPLE_CASES.diabetesType255.weight ?? ""),
+            cardiovascular_risk:
+                form.diabetes_context?.cardiovascular_risk ??
+                DEFAULT_DIABETES_CONTEXT.cardiovascular_risk ??
+                "",
+            renal_function:
+                form.diabetes_context?.renal_function ??
+                DEFAULT_DIABETES_CONTEXT.renal_function ??
+                "",
+            fragility:
+                form.diabetes_context?.fragility ??
+                DEFAULT_DIABETES_CONTEXT.fragility ??
+                "",
+            tolerance:
+                form.diabetes_context?.tolerance ??
+                DEFAULT_DIABETES_CONTEXT.tolerance ??
+                "",
+            glycemic_goals:
+                form.diabetes_context?.glycemic_goals ??
+                DEFAULT_DIABETES_CONTEXT.glycemic_goals ??
+                "",
+        });
+        setIsDiabetesModalOpen(true);
+    }
+
+    function saveDiabetesModal() {
+        setForm((prev) => ({
+            ...prev,
+            weight: diabetesModalValues.weight
+                ? Number(diabetesModalValues.weight)
+                : prev.weight,
+            diabetes_context: {
+                cardiovascular_risk: diabetesModalValues.cardiovascular_risk.trim(),
+                renal_function: diabetesModalValues.renal_function.trim(),
+                fragility: diabetesModalValues.fragility.trim(),
+                tolerance: diabetesModalValues.tolerance.trim(),
+                glycemic_goals: diabetesModalValues.glycemic_goals.trim(),
+            },
+        }));
+        setIsDiabetesModalOpen(false);
     }
 
 
@@ -275,6 +372,16 @@ export function ClinicalForm({
     const { translated: analyzeButtonLabel } = useTranslation({ text: "Analyser", targetLang });
     const { translated: analyzingButtonLabel } = useTranslation({ text: "Analyse…", targetLang });
     const { translated: clearPatientDataLabel } = useTranslation({ text: "Effacer les donnees patient", targetLang });
+    const { translated: diabetesModalButtonLabel } = useTranslation({ text: "Parametres diabete type 2", targetLang });
+    const { translated: diabetesModalTitleLabel } = useTranslation({ text: "Parametres cliniques supplementaires - Diabete Type 2", targetLang });
+    const { translated: diabetesModalDescriptionLabel } = useTranslation({ text: "Ajustez ces parametres pour enrichir l'analyse sans alourdir les donnees cliniques principales.", targetLang });
+    const { translated: cardiovascularRiskLabel } = useTranslation({ text: "Risque cardiovasculaire", targetLang });
+    const { translated: renalFunctionLabel } = useTranslation({ text: "Fonction renale", targetLang });
+    const { translated: fragilityLabel } = useTranslation({ text: "Fragilite", targetLang });
+    const { translated: toleranceLabel } = useTranslation({ text: "Tolerance", targetLang });
+    const { translated: glycemicGoalsLabel } = useTranslation({ text: "Objectifs glycemiques", targetLang });
+    const { translated: saveLabel } = useTranslation({ text: "Enregistrer", targetLang });
+    const { translated: cancelLabel } = useTranslation({ text: "Annuler", targetLang });
 
     const sexOptions: Array<{ value: Sex; label: string }> = [
         { value: "male", label: maleLabel },
@@ -294,33 +401,44 @@ export function ClinicalForm({
 
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <h2 className="text-lg font-semibold">{clinicalDataLabel}</h2>
-                <div className="w-full md:w-80 space-y-1">
-                    <label htmlFor="clinical-example-case" className="text-sm font-medium text-gray-700">
-                        {exampleCaseFieldLabel}
-                    </label>
-                    <div className="group relative">
-                        <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 hidden w-80 -translate-x-1/2 rounded-xl border border-sky-200 bg-cyan-50 p-3 text-left text-xs font-normal leading-5 text-cyan-950 shadow-xl group-hover:block">
-                            {exampleCaseTooltipLabel}
-                            <span
-                                className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-sky-200 bg-cyan-50"
-                                aria-hidden="true"
-                            />
-                        </span>
-                        <select
-                            id="clinical-example-case"
-                            className="input w-full"
-                            value={selectedExampleCase}
-                            onChange={(e) => handleExampleCaseChange(e.target.value)}
-                        >
-                            <option value="">{noExampleCaseLabel}</option>
-                            <option value="hypertension55">{patient1Label}</option>
-                            <option value="gastricCancer59">{patient2Label}</option>
-                            <option value="mononucleosis35">{patient3Label}</option>
-                            <option value="cataract72">{patient4Label}</option>
-                            <option value="majorDepression42">{patient5Label}</option>
-                            <option value="diabetesType255">{patient6Label}</option>
-                        </select>
+                <div className="w-full md:w-auto flex flex-col gap-3 md:flex-row md:items-end">
+                    <div className="w-full md:w-80 space-y-1">
+                        <label htmlFor="clinical-example-case" className="text-sm font-medium text-gray-700">
+                            {exampleCaseFieldLabel}
+                        </label>
+                        <div className="group relative">
+                            <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 hidden w-80 -translate-x-1/2 rounded-xl border border-sky-200 bg-cyan-50 p-3 text-left text-xs font-normal leading-5 text-cyan-950 shadow-xl group-hover:block">
+                                {exampleCaseTooltipLabel}
+                                <span
+                                    className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-sky-200 bg-cyan-50"
+                                    aria-hidden="true"
+                                />
+                            </span>
+                            <select
+                                id="clinical-example-case"
+                                className="input w-full"
+                                value={selectedExampleCase}
+                                onChange={(e) => handleExampleCaseChange(e.target.value)}
+                            >
+                                <option value="">{noExampleCaseLabel}</option>
+                                <option value="hypertension55">{patient1Label}</option>
+                                <option value="gastricCancer59">{patient2Label}</option>
+                                <option value="mononucleosis35">{patient3Label}</option>
+                                <option value="cataract72">{patient4Label}</option>
+                                <option value="majorDepression42">{patient5Label}</option>
+                                <option value="diabetesType255">{patient6Label}</option>
+                            </select>
+                        </div>
                     </div>
+                    {isType2DiabetesContext() && (
+                        <button
+                            type="button"
+                            onClick={openDiabetesModal}
+                            className="rounded border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-100"
+                        >
+                            {diabetesModalButtonLabel}
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -519,6 +637,127 @@ export function ClinicalForm({
                     {clearPatientDataLabel}
                 </button>
             </div>
+
+            {isDiabetesModalOpen && (
+                <div
+                    className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 px-4"
+                    aria-modal="true"
+                    role="dialog"
+                >
+                    <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
+                        <h2 className="text-lg font-semibold text-gray-900">
+                            {diabetesModalTitleLabel}
+                        </h2>
+                        <p className="mt-2 text-sm text-gray-600">
+                            {diabetesModalDescriptionLabel}
+                        </p>
+
+                        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <label className="space-y-1 text-sm text-gray-700">
+                                <span className="font-medium">{weightLabel}</span>
+                                <input
+                                    type="number"
+                                    className="input w-full"
+                                    value={diabetesModalValues.weight}
+                                    onChange={(e) =>
+                                        setDiabetesModalValues((prev) => ({
+                                            ...prev,
+                                            weight: e.target.value,
+                                        }))
+                                    }
+                                />
+                            </label>
+
+                            <label className="space-y-1 text-sm text-gray-700">
+                                <span className="font-medium">{cardiovascularRiskLabel}</span>
+                                <input
+                                    className="input w-full"
+                                    value={diabetesModalValues.cardiovascular_risk}
+                                    onChange={(e) =>
+                                        setDiabetesModalValues((prev) => ({
+                                            ...prev,
+                                            cardiovascular_risk: e.target.value,
+                                        }))
+                                    }
+                                />
+                            </label>
+
+                            <label className="space-y-1 text-sm text-gray-700">
+                                <span className="font-medium">{renalFunctionLabel}</span>
+                                <input
+                                    className="input w-full"
+                                    value={diabetesModalValues.renal_function}
+                                    onChange={(e) =>
+                                        setDiabetesModalValues((prev) => ({
+                                            ...prev,
+                                            renal_function: e.target.value,
+                                        }))
+                                    }
+                                />
+                            </label>
+
+                            <label className="space-y-1 text-sm text-gray-700">
+                                <span className="font-medium">{fragilityLabel}</span>
+                                <input
+                                    className="input w-full"
+                                    value={diabetesModalValues.fragility}
+                                    onChange={(e) =>
+                                        setDiabetesModalValues((prev) => ({
+                                            ...prev,
+                                            fragility: e.target.value,
+                                        }))
+                                    }
+                                />
+                            </label>
+
+                            <label className="space-y-1 text-sm text-gray-700">
+                                <span className="font-medium">{toleranceLabel}</span>
+                                <input
+                                    className="input w-full"
+                                    value={diabetesModalValues.tolerance}
+                                    onChange={(e) =>
+                                        setDiabetesModalValues((prev) => ({
+                                            ...prev,
+                                            tolerance: e.target.value,
+                                        }))
+                                    }
+                                />
+                            </label>
+
+                            <label className="space-y-1 text-sm text-gray-700">
+                                <span className="font-medium">{glycemicGoalsLabel}</span>
+                                <input
+                                    className="input w-full"
+                                    value={diabetesModalValues.glycemic_goals}
+                                    onChange={(e) =>
+                                        setDiabetesModalValues((prev) => ({
+                                            ...prev,
+                                            glycemic_goals: e.target.value,
+                                        }))
+                                    }
+                                />
+                            </label>
+                        </div>
+
+                        <div className="mt-6 flex gap-3">
+                            <button
+                                type="button"
+                                onClick={saveDiabetesModal}
+                                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                            >
+                                {saveLabel}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsDiabetesModalOpen(false)}
+                                className="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                                {cancelLabel}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

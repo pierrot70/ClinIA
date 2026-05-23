@@ -92,4 +92,57 @@ describe("ClinicalForm", () => {
         );
         expect(screen.getByLabelText("Medication actuelle")).toHaveValue("Metformine");
     });
+
+    it("opens the diabetes modal with default values and saves them into the payload", () => {
+        const onSubmit = vi.fn();
+
+        render(
+            <ClinicalForm
+                onSubmit={onSubmit}
+                loading={false}
+                initialData={{
+                    age: 55,
+                    sex: "male",
+                    diagnosis: "",
+                    symptoms: [],
+                    medical_history: [],
+                    current_medications: [],
+                }}
+            />
+        );
+
+        fireEvent.change(screen.getByLabelText("Cas exemple"), {
+            target: { value: "diabetesType255" },
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "Parametres diabete type 2" }));
+
+        expect(
+            screen.getByRole("heading", {
+                name: "Parametres cliniques supplementaires - Diabete Type 2",
+            })
+        ).toBeInTheDocument();
+
+        expect(screen.getAllByLabelText("Poids du patient (kg)")[1]).toHaveValue(94);
+        expect(screen.getByLabelText("Risque cardiovasculaire")).toHaveValue(
+            "Modere a eleve"
+        );
+
+        fireEvent.change(screen.getByLabelText("Tolerance"), {
+            target: { value: "Tolerance digestive a reevaluer" },
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
+        fireEvent.click(screen.getByRole("button", { name: "Analyser" }));
+
+        expect(onSubmit).toHaveBeenCalledWith(
+            expect.objectContaining({
+                weight: 94,
+                diabetes_context: expect.objectContaining({
+                    cardiovascular_risk: "Modere a eleve",
+                    tolerance: "Tolerance digestive a reevaluer",
+                }),
+            })
+        );
+    });
 });
