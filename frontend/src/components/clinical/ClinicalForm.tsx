@@ -70,6 +70,16 @@ const EXAMPLE_CASES: Record<string, ClinicalPayload> = {
         medical_history: ["Anxiete generalisee"],
         current_medications: ["Aucune"],
     },
+    diabetesType255: {
+        age: 55,
+        sex: "male",
+        diagnosis: "Diabete de type 2",
+        weight: 94,
+        height: 176,
+        symptoms: ["Polydipsie", "Polyurie", "Fatigue"],
+        medical_history: ["Hypertension arterielle"],
+        current_medications: ["Metformine"],
+    },
 };
 
 function clonePayload(payload: ClinicalPayload): ClinicalPayload {
@@ -242,6 +252,7 @@ export function ClinicalForm({
     const { translated: patient3Label } = useTranslation({ text: "Mononucleose", targetLang });
     const { translated: patient4Label } = useTranslation({ text: "Cataracte", targetLang });
     const { translated: patient5Label } = useTranslation({ text: "Trouble depressif majeur", targetLang });
+    const { translated: patient6Label } = useTranslation({ text: "Diabete Type 2", targetLang });
     const { translated: ageLabel } = useTranslation({ text: "Age du patient", targetLang });
     const { translated: sexLabel } = useTranslation({ text: "Sexe", targetLang });
     const { translated: maleLabel } = useTranslation({ text: "Homme", targetLang });
@@ -307,6 +318,7 @@ export function ClinicalForm({
                             <option value="mononucleosis35">{patient3Label}</option>
                             <option value="cataract72">{patient4Label}</option>
                             <option value="majorDepression42">{patient5Label}</option>
+                            <option value="diabetesType255">{patient6Label}</option>
                         </select>
                     </div>
                 </div>

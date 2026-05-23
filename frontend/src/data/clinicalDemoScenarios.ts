@@ -252,6 +252,92 @@ const depressionQuestions: DemoQuestion[] = [
     },
 ];
 
+const diabetesTreatments: Treatment[] = [
+    {
+        id: "metformin",
+        name: "Metformine",
+        shortName: "Metformine",
+        class: "Biguanide",
+        efficacy: 0.9,
+        sideEffectScore: 20,
+        summary:
+            "Traitement de premiere intention frequemment utilise dans le diabete de type 2, surtout en presence de surpoids ou d'insulinoresistance.",
+        details:
+            "Donnees simulees : la metformine aide a reduire la glycémie et possede une bonne experience d'utilisation. Une vigilance est requise si la fonction renale est alteree.",
+        flags: ["wellTolerated", "monitoring"],
+    },
+    {
+        id: "continue-current-strategy",
+        name: "Poursuite prudente de la strategie actuelle",
+        shortName: "Strategie actuelle",
+        class: "Reevaluation clinique",
+        efficacy: 0.68,
+        sideEffectScore: 6,
+        summary:
+            "Peut etre raisonnable si le controle glycemique est adequat, si la tolerance est bonne et si les objectifs cliniques sont atteints.",
+        details:
+            "Donnees simulees : avant d'intensifier, il est utile de revoir l'HbA1c, le poids, la tolerance a la metformine, les comorbidites et le risque cardio-metabolique global.",
+        flags: ["wellTolerated", "monitoring"],
+    },
+    {
+        id: "sglt2-inhibitor",
+        name: "Inhibiteur SGLT2",
+        shortName: "SGLT2",
+        class: "Antidiabetique oral",
+        efficacy: 0.76,
+        sideEffectScore: 28,
+        summary:
+            "Option utile selon le profil cardio-reno-metabolique, notamment en presence de risque cardiovasculaire ou d'insuffisance cardiaque.",
+        details:
+            "Donnees simulees : cette classe favorise l'excretion urinaire du glucose et peut apporter des benefices cardiorenaux selon le contexte clinique.",
+        flags: ["monitoring"],
+    },
+    {
+        id: "glp1-review",
+        name: "Reevaluation d'une option GLP-1",
+        shortName: "Option GLP-1",
+        class: "Reevaluation therapeutique",
+        efficacy: 0.74,
+        sideEffectScore: 26,
+        summary:
+            "Peut etre discutee selon le poids, le controle glycemique, le risque cardiovasculaire et la tolerance au traitement actuel.",
+        details:
+            "Donnees simulees : une option GLP-1 peut etre pertinente dans certains profils cardio-metaboliques, sans remplacer automatiquement la metformine ni le jugement clinique du medecin.",
+        flags: ["monitoring"],
+    },
+    {
+        id: "lifestyle-diabetes",
+        name: "Mesures de mode de vie",
+        shortName: "Mode de vie",
+        class: "Mesure non pharmacologique",
+        efficacy: 0.62,
+        sideEffectScore: 4,
+        summary:
+            "L'alimentation, l'activite physique et la perte de poids peuvent ameliorer significativement l'equilibre glycemique.",
+        details:
+            "Donnees simulees : une approche nutritionnelle adaptee, l'activite physique reguliere et le soutien a l'autogestion font partie de la prise en charge initiale.",
+        flags: ["wellTolerated"],
+    },
+];
+
+const diabetesQuestions: DemoQuestion[] = [
+    {
+        question: "Quand poursuivre la strategie actuelle peut-il etre raisonnable ?",
+        answer:
+            "Donnees simulees : si le controle glycemique est adequat, que la tolerance est bonne et que les objectifs cliniques sont atteints, il peut etre raisonnable de poursuivre la strategie actuelle avec surveillance.",
+    },
+    {
+        question: "Quand une reevaluation d'une option GLP-1 peut-elle etre discutee ?",
+        answer:
+            "Donnees simulees : selon le poids, le profil cardio-metabolique, le risque cardiovasculaire, la tolerance au traitement actuel et les objectifs de controle glycemique.",
+    },
+    {
+        question: "Quels elements de suivi sont utiles au moment de reevaluer le traitement ?",
+        answer:
+            "Donnees simulees : l'evolution de la glycemie, la tolerance digestive, le poids, la fonction renale et les facteurs de risque cardiovasculaire meritent une reevaluation.",
+    },
+];
+
 const scenarios: Record<string, ClinicalDemoScenario> = {
     hypertension: {
         treatments: hypertensionTreatments,
@@ -272,6 +358,10 @@ const scenarios: Record<string, ClinicalDemoScenario> = {
     majorDepression: {
         treatments: depressionTreatments,
         questions: depressionQuestions,
+    },
+    diabetesType2: {
+        treatments: diabetesTreatments,
+        questions: diabetesQuestions,
     },
 };
 
@@ -324,6 +414,16 @@ function matchScenarioKey(payload?: Partial<ClinicalPayload> | null) {
         return "majorDepression";
     }
 
+    if (
+        haystack.includes("diabete de type 2") ||
+        haystack.includes("diabete type 2") ||
+        haystack.includes("type 2") ||
+        haystack.includes("diabete") ||
+        haystack.includes("diabetes")
+    ) {
+        return "diabetesType2";
+    }
+
     if (haystack.includes("hypertension")) {
         return "hypertension";
     }
@@ -336,4 +436,3 @@ export function getClinicalDemoScenario(
 ): ClinicalDemoScenario {
     return scenarios[matchScenarioKey(payload)];
 }
-

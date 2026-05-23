@@ -37,6 +37,20 @@
           "Insuffisance rénale sévère"
         ],
         "efficacy": 90
+      },
+      {
+        "name": "Poursuite prudente de la stratégie actuelle",
+        "justification": "Peut être raisonnable si le contrôle glycémique est adéquat et la tolérance bonne.",
+        "contraindications": [],
+        "efficacy": 68
+      },
+      {
+        "name": "Réévaluation d'une option GLP-1",
+        "justification": "Peut être discutée selon le poids, le risque cardio-métabolique et les objectifs glycémiques, sans remplacer le jugement clinique.",
+        "contraindications": [
+          "Prudence si contexte clinique incomplet"
+        ],
+        "efficacy": 74
       }
     ]
   },

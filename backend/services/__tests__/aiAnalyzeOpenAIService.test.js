@@ -76,6 +76,59 @@ describe("aiAnalyzeOpenAIService", () => {
         expect(recordOpenAISuccess).toHaveBeenCalledTimes(1);
     });
 
+    it("adds type 2 diabetes comparison guardrails to the OpenAI prompt", async () => {
+        const res = createResponseDouble();
+        res.status.mockReturnValue(res);
+        const create = vi.fn().mockResolvedValue({
+            id: "upstream-1",
+            choices: [
+                {
+                    message: {
+                        content: '{"diagnosis":{"suspected":"Diabete de type 2"}}',
+                    },
+                },
+            ],
+        });
+
+        await executeOpenAIAnalyze({
+            openai: {
+                chat: {
+                    completions: { create },
+                },
+            },
+            model: "gpt-4.1-mini",
+            diagnosis: "Diabete de type 2",
+            patient: { medical_history: [], current_medications: ["Metformine"] },
+            symptoms: ["Polydipsie"],
+            reqAuth: { userId: "u1", username: "admin", role: "SUPERADMIN" },
+            req: { ip: "127.0.0.1", headers: {} },
+            fingerprint: "fp-1",
+            forceRealSafe: false,
+            neutralizationMeta: null,
+            supportsJsonResponseFormat: vi.fn(() => true),
+            recordOpenAIRequestAuditEvent: vi.fn().mockResolvedValue({ _id: "audit-1" }),
+            finalizeOpenAIRequestAuditEvent: vi.fn().mockResolvedValue({}),
+            getRequestIp: vi.fn(() => "127.0.0.1"),
+            makeSourceHash: vi.fn(() => "hash-123"),
+            detectNonSecureContent: vi.fn(() => ({ hasMatches: false })),
+            respondWithSecurityIncident: vi.fn(),
+            safeParseMedicalAI: vi.fn(() => ({
+                diagnosis: { suspected: "Diabete de type 2" },
+            })),
+            normalizeClinicalAnalysis: vi.fn((parsed) => parsed),
+            isPlaceholderClinicalAnalysis: vi.fn(() => false),
+            recordOpenAISuccess: vi.fn(),
+            recordOpenAIFailure: vi.fn(),
+            res,
+            logger: { log: vi.fn(), error: vi.fn() },
+        });
+
+        const request = create.mock.calls[0][0];
+        expect(request.messages[0].content).toContain("GLP-1 option may merit reevaluation");
+        expect(request.messages[0].content).toContain("Do not recommend prescribing");
+        expect(request.messages[1].content).toContain("compare continuing the current strategy");
+    });
+
     it("returns a blocking response when post-cloud scanning detects sensitive content", async () => {
         const res = createResponseDouble();
         res.status.mockReturnValue(res);

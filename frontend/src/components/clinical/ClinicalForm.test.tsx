@@ -62,4 +62,34 @@ describe("ClinicalForm", () => {
         );
         expect(screen.getByLabelText("Antecedents medicaux")).toHaveValue("Anemie");
     });
+
+    it("fills the form with the type 2 diabetes example case", () => {
+        render(
+            <ClinicalForm
+                onSubmit={() => {}}
+                loading={false}
+                initialData={{
+                    age: 55,
+                    sex: "male",
+                    diagnosis: "",
+                    symptoms: [],
+                    medical_history: [],
+                    current_medications: [],
+                }}
+            />
+        );
+
+        fireEvent.change(screen.getByLabelText("Cas exemple"), {
+            target: { value: "diabetesType255" },
+        });
+
+        expect(screen.getByLabelText("Age du patient")).toHaveValue(55);
+        expect(screen.getByLabelText("Diagnostic / motif clinique principal")).toHaveValue(
+            "Diabete de type 2"
+        );
+        expect(screen.getByLabelText("Antecedents medicaux")).toHaveValue(
+            "Hypertension arterielle"
+        );
+        expect(screen.getByLabelText("Medication actuelle")).toHaveValue("Metformine");
+    });
 });

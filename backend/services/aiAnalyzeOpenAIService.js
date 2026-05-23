@@ -24,18 +24,28 @@ export async function executeOpenAIAnalyze({
     res,
     logger = console,
 }) {
+    const diagnosisLower = String(diagnosis || "").toLowerCase();
+    const isType2DiabetesCase =
+        diagnosisLower.includes("diab") ||
+        diagnosisLower.includes("type 2") ||
+        diagnosisLower.includes("diabetes");
+
+    const diabetesInstruction = isType2DiabetesCase
+        ? "For type 2 diabetes cases, explicitly structure the response so the clinician can compare: current strategy, whether a GLP-1 option may merit reevaluation, key cardiometabolic factors to review, cautions, and a neutral conclusion. Do not recommend prescribing, do not instruct replacing metformin automatically, do not provide dosing, and keep the final decision explicitly with the clinician."
+        : "";
+
     const baseRequest = {
         model,
         messages: [
             {
                 role: "system",
                 content:
-                    "You are ClinIA, a clinical decision support AI. Provide structured therapeutic options, monitoring, red flags, and a clinician-facing summary for the primary clinical concern or confirmed diagnosis supplied by the user. Do not issue a final diagnosis, do not prescribe autonomously, and return valid JSON only.",
+                    `You are ClinIA, a clinical decision support AI. Provide structured therapeutic options, monitoring, red flags, and a clinician-facing summary for the primary clinical concern or confirmed diagnosis supplied by the user. Do not issue a final diagnosis, do not prescribe autonomously, and return valid JSON only. ${diabetesInstruction}`.trim(),
             },
             {
                 role: "user",
                 content:
-                    `Primary clinical concern or confirmed diagnosis: ${diagnosis}. Provide evidence-based therapeutic options, monitoring considerations, contraindications, red flags, and a concise patient summary for this clinical context only. The final medical decision remains with the clinician.\nFull patient data: ${JSON.stringify(patient)}`,
+                    `Primary clinical concern or confirmed diagnosis: ${diagnosis}. Provide evidence-based therapeutic options, monitoring considerations, contraindications, red flags, and a concise patient summary for this clinical context only. ${isType2DiabetesCase ? "If appropriate to the clinical context, compare continuing the current strategy with reevaluating a GLP-1 option, while remaining neutral and non-prescriptive." : ""} The final medical decision remains with the clinician.\nFull patient data: ${JSON.stringify(patient)}`,
             },
         ],
         temperature: 0.1,
