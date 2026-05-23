@@ -84,12 +84,8 @@ export async function verifyJWT(req, res, next) {
             throw new Error("Invalid JWT payload");
         }
 
-        const userQuery = AdminUser.findById(payload.sub)
+        const user = await AdminUser.findById(payload.sub)
             .select("_id username role isActive authTokenInvalidBefore sessionStartedAt lastActivityAt refreshTokenHash refreshTokenExpiresAt lastLogoutAt passwordResetRequired mustChangePasswordOnNextLogin");
-        const user =
-            typeof userQuery?.lean === "function"
-                ? await userQuery.lean()
-                : await userQuery;
 
         if (!user || user.isActive === false) {
             return res.status(401).json({

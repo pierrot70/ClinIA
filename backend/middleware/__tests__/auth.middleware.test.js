@@ -11,6 +11,11 @@ const { findById } = vi.hoisted(() => ({
     findById: vi.fn(),
 }));
 
+const { touchSessionActivity, validateSessionState } = vi.hoisted(() => ({
+    touchSessionActivity: vi.fn().mockResolvedValue(undefined),
+    validateSessionState: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("jsonwebtoken", () => ({
     default: {
         verify,
@@ -21,6 +26,11 @@ vi.mock("../../models/AdminUser.js", () => ({
     AdminUser: {
         findById,
     },
+}));
+
+vi.mock("../../services/auth.js", () => ({
+    touchSessionActivity,
+    validateSessionState,
 }));
 
 function makeRes() {
@@ -51,14 +61,12 @@ describe("verifyJWT middleware", () => {
             iat: Math.floor(Date.now() / 1000),
         });
         findById.mockReturnValue({
-            select: vi.fn().mockReturnValue({
-                lean: vi.fn().mockResolvedValue({
-                    _id: "user-1",
-                    role: "ADMIN",
-                    username: "admin",
-                    isActive: true,
-                    authTokenInvalidBefore: null,
-                }),
+            select: vi.fn().mockResolvedValue({
+                _id: "user-1",
+                role: "ADMIN",
+                username: "admin",
+                isActive: true,
+                authTokenInvalidBefore: null,
             }),
         });
 
@@ -88,6 +96,8 @@ describe("verifyJWT middleware", () => {
                 audience: "clinia-app",
             }
         );
+        expect(validateSessionState).toHaveBeenCalledTimes(1);
+        expect(touchSessionActivity).toHaveBeenCalledTimes(1);
         expect(next).toHaveBeenCalledTimes(1);
     });
 
@@ -100,15 +110,13 @@ describe("verifyJWT middleware", () => {
             iat: Math.floor(Date.now() / 1000),
         });
         findById.mockReturnValue({
-            select: vi.fn().mockReturnValue({
-                lean: vi.fn().mockResolvedValue({
-                    _id: "user-1",
-                    role: "ADMIN",
-                    username: "admin",
-                    isActive: true,
-                    authTokenInvalidBefore: null,
-                    passwordResetRequired: true,
-                }),
+            select: vi.fn().mockResolvedValue({
+                _id: "user-1",
+                role: "ADMIN",
+                username: "admin",
+                isActive: true,
+                authTokenInvalidBefore: null,
+                passwordResetRequired: true,
             }),
         });
 
@@ -144,15 +152,13 @@ describe("verifyJWT middleware", () => {
             iat: Math.floor(Date.now() / 1000),
         });
         findById.mockReturnValue({
-            select: vi.fn().mockReturnValue({
-                lean: vi.fn().mockResolvedValue({
-                    _id: "user-1",
-                    role: "ADMIN",
-                    username: "admin",
-                    isActive: true,
-                    authTokenInvalidBefore: null,
-                    passwordResetRequired: true,
-                }),
+            select: vi.fn().mockResolvedValue({
+                _id: "user-1",
+                role: "ADMIN",
+                username: "admin",
+                isActive: true,
+                authTokenInvalidBefore: null,
+                passwordResetRequired: true,
             }),
         });
 
@@ -187,16 +193,14 @@ describe("verifyJWT middleware", () => {
             iat: Math.floor(Date.now() / 1000),
         });
         findById.mockReturnValue({
-            select: vi.fn().mockReturnValue({
-                lean: vi.fn().mockResolvedValue({
-                    _id: "user-1",
-                    role: "ADMIN",
-                    username: "admin",
-                    isActive: true,
-                    authTokenInvalidBefore: null,
-                    passwordResetRequired: false,
-                    mustChangePasswordOnNextLogin: true,
-                }),
+            select: vi.fn().mockResolvedValue({
+                _id: "user-1",
+                role: "ADMIN",
+                username: "admin",
+                isActive: true,
+                authTokenInvalidBefore: null,
+                passwordResetRequired: false,
+                mustChangePasswordOnNextLogin: true,
             }),
         });
 
@@ -255,14 +259,12 @@ describe("verifyJWT middleware", () => {
             iat: Math.floor(new Date("2026-04-19T10:00:00.000Z").getTime() / 1000),
         });
         findById.mockReturnValue({
-            select: vi.fn().mockReturnValue({
-                lean: vi.fn().mockResolvedValue({
-                    _id: "user-1",
-                    role: "ADMIN",
-                    username: "admin",
-                    isActive: true,
-                    authTokenInvalidBefore: new Date("2026-04-19T10:00:01.000Z"),
-                }),
+            select: vi.fn().mockResolvedValue({
+                _id: "user-1",
+                role: "ADMIN",
+                username: "admin",
+                isActive: true,
+                authTokenInvalidBefore: new Date("2026-04-19T10:00:01.000Z"),
             }),
         });
 

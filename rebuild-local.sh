@@ -59,50 +59,87 @@ run_vitest_with_summary() {
   local suite_name="$1"
   shift
 
-  local json_file
-  json_file="$(mktemp)"
+  local log_file
+  log_file="$(mktemp)"
 
   set +e
-  npx vitest run --reporter=default --reporter=json --outputFile "$json_file" "$@"
+  npx vitest run "$@" >"$log_file" 2>&1
   local status=$?
   set -e
 
+  cat "$log_file"
+
   local summary_line
-  summary_line="$(node - "$json_file" <<'NODE'
+  summary_line="$(node - "$log_file" <<'NODE'
 const fs = require("fs");
 const filePath = process.argv[2];
-const payload = JSON.parse(fs.readFileSync(filePath, "utf8"));
-const results = Array.isArray(payload.testResults) ? payload.testResults : [];
-const normalized = results
-  .map((result) => ({
-    name: typeof result.name === "string" ? result.name : "",
-    status: result.status,
-  }))
-  .filter((result) => result.name && !result.name.includes("node_modules"));
-const failedEntries = normalized.filter((result) => result.status === "failed");
-const totalTests = typeof payload.numTotalTests === "number" ? payload.numTotalTests : 0;
-const failedTests = typeof payload.numFailedTests === "number" ? payload.numFailedTests : 0;
-const failedNames = failedEntries.map((result) => result.name).join("||");
-process.stdout.write(`${failedEntries.length}\n${failedNames}\n${totalTests}\n${failedTests}`);
+const text = fs
+  .readFileSync(filePath, "utf8")
+  .replace(/\u001b\[[0-9;]*m/g, "");
+const lines = text.split(/\r?\n/);
+
+const testFilesLine = [...lines].reverse().find((line) => line.includes("Test Files")) || "";
+const testsLine = [...lines].reverse().find((line) => /^\s*Tests\s+/.test(line)) || "";
+
+const testFilesMatch = testFilesLine.match(/Test Files\s+(\d+)\s+passed\s+\((\d+)\)/);
+const testFilesFailedMatch = testFilesLine.match(/Test Files\s+(\d+)\s+failed\s+\((\d+)\)/);
+const testsMatch = testsLine.match(/Tests\s+(\d+)\s+passed\s+\((\d+)\)/);
+const testsFailedMatch = testsLine.match(/Tests\s+(\d+)\s+failed\s+\((\d+)\)/);
+
+const totalFiles = testFilesMatch
+  ? Number(testFilesMatch[2])
+  : testFilesFailedMatch
+    ? Number(testFilesFailedMatch[2])
+    : 0;
+const failedFiles = testFilesMatch
+  ? totalFiles - Number(testFilesMatch[1])
+  : testFilesFailedMatch
+    ? Number(testFilesFailedMatch[1])
+    : 0;
+const totalTests = testsMatch
+  ? Number(testsMatch[2])
+  : testsFailedMatch
+    ? Number(testsFailedMatch[2])
+    : 0;
+const failedTests = testsMatch
+  ? totalTests - Number(testsMatch[1])
+  : testsFailedMatch
+    ? Number(testsFailedMatch[1])
+    : 0;
+
+const failedNames = lines
+  .filter((line) => /^\s*[×x]\s+/.test(line) || /^\s*FAIL\s+/.test(line))
+  .map((line) => line.replace(/^\s*[×x]\s+/, "").replace(/^\s*FAIL\s+/, "").trim())
+  .filter(Boolean)
+  .join("||");
+
+process.stdout.write(`${failedFiles}\n${failedNames}\n${totalTests}\n${failedTests}\n${totalFiles}`);
 NODE
 )"
 
-  rm -f "$json_file"
+  rm -f "$log_file"
 
-  local failed failed_names total_tests failed_tests
+  local failed failed_names total_tests failed_tests total_files
   failed="$(printf '%s\n' "$summary_line" | sed -n '1p')"
   failed_names="$(printf '%s\n' "$summary_line" | sed -n '2p')"
   total_tests="$(printf '%s\n' "$summary_line" | sed -n '3p')"
   failed_tests="$(printf '%s\n' "$summary_line" | sed -n '4p')"
+  total_files="$(printf '%s\n' "$summary_line" | sed -n '5p')"
 
   if [[ "$suite_name" == "frontend" ]]; then
-    TEST_SUMMARY_FRONTEND_TOTAL="${#TEST_SUMMARY_FRONTEND_FILES[@]}"
+    if [[ -z "$total_files" || "$total_files" -le 0 ]]; then
+      total_files="${#TEST_SUMMARY_FRONTEND_FILES[@]}"
+    fi
+    TEST_SUMMARY_FRONTEND_TOTAL="$total_files"
     TEST_SUMMARY_FRONTEND_FAILED="${failed:-0}"
     TEST_SUMMARY_FRONTEND_FAILED_NAMES="${failed_names//||/$'\n'}"
     TEST_SUMMARY_FRONTEND_TESTS_TOTAL="${total_tests:-0}"
     TEST_SUMMARY_FRONTEND_TESTS_FAILED="${failed_tests:-0}"
   else
-    TEST_SUMMARY_BACKEND_TOTAL="${#TEST_SUMMARY_BACKEND_FILES[@]}"
+    if [[ -z "$total_files" || "$total_files" -le 0 ]]; then
+      total_files="${#TEST_SUMMARY_BACKEND_FILES[@]}"
+    fi
+    TEST_SUMMARY_BACKEND_TOTAL="$total_files"
     TEST_SUMMARY_BACKEND_FAILED="${failed:-0}"
     TEST_SUMMARY_BACKEND_FAILED_NAMES="${failed_names//||/$'\n'}"
     TEST_SUMMARY_BACKEND_TESTS_TOTAL="${total_tests:-0}"
@@ -206,16 +243,17 @@ npx tsc --noEmit
 echo "> node ../scripts/verify-ui-labels.mjs"
 node ../scripts/verify-ui-labels.mjs
 
-echo "> npx vitest run src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/components/admin/AuthLogsModal.test.tsx src/components/admin/AuthGraphsModal.test.tsx src/components/admin/SecurityIncidentsModal.test.tsx src/components/admin/ClinicianInboxModal.test.tsx"
+echo "> npx vitest run src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/services/securityIncidentApi.test.ts src/components/admin/AuthLogsModal.test.tsx src/components/admin/AuthGraphsModal.test.tsx src/components/admin/SecurityIncidentsModal.test.tsx src/components/admin/ClinicianInboxModal.test.tsx"
 TEST_SUMMARY_FRONTEND_FILES=(
   "src/i18n/uiLabels.test.ts"
   "src/hooks/useTranslation.test.tsx"
+  "src/services/securityIncidentApi.test.ts"
   "src/components/admin/AuthLogsModal.test.tsx"
   "src/components/admin/AuthGraphsModal.test.tsx"
   "src/components/admin/SecurityIncidentsModal.test.tsx"
   "src/components/admin/ClinicianInboxModal.test.tsx"
 )
-run_vitest_with_summary frontend src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/components/admin/AuthLogsModal.test.tsx src/components/admin/AuthGraphsModal.test.tsx src/components/admin/SecurityIncidentsModal.test.tsx src/components/admin/ClinicianInboxModal.test.tsx || exit 1
+run_vitest_with_summary frontend src/i18n/uiLabels.test.ts src/hooks/useTranslation.test.tsx src/services/securityIncidentApi.test.ts src/components/admin/AuthLogsModal.test.tsx src/components/admin/AuthGraphsModal.test.tsx src/components/admin/SecurityIncidentsModal.test.tsx src/components/admin/ClinicianInboxModal.test.tsx || exit 1
 fail_if_test_failure_simulated
 
 echo "> npm run build"

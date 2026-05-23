@@ -1,7 +1,6 @@
 import { authFetch, SessionExpiredError } from "./authService";
 import { withSecurityIncidentGuard } from "./securityIncidentGuard";
 import type { ApiError, ApiResponse } from "../types/api";
-import { API_URL } from "./config";
 
 export const REQUIRED_ACK_ACTION = "J'ai lu et compris";
 
@@ -130,8 +129,8 @@ export async function acknowledgeSecurityIncident(
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const response = await fetch(
-                    `${API_URL}/api/security/incidents/acknowledge`,
+                const response = await authFetch(
+                    "/api/security/incidents/acknowledge",
                     {
                         method: "POST",
                         headers: {
@@ -141,7 +140,17 @@ export async function acknowledgeSecurityIncident(
                     }
                 );
                 return (await response.json()) as ApiResponse<SecurityIncidentAcknowledgeResult>;
-            } catch {
+            } catch (err) {
+                if (err instanceof SessionExpiredError) {
+                    return {
+                        error: {
+                            code: "INTERNAL_ERROR",
+                            message: "Session expiree.",
+                            retryable: false,
+                        },
+                    };
+                }
+
                 return {
                     error: {
                         code: "INTERNAL_ERROR",
