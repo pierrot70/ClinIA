@@ -70,6 +70,69 @@ function hasRenderableValue(value: unknown): boolean {
   return true;
 }
 
+function truncateText(value: string, maxLength = 220) {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+function buildDynamicQuestions({
+  summary,
+  treatments,
+}: {
+  summary?: string;
+  treatments?: Array<Record<string, any>>;
+}) {
+  if (!summary && (!Array.isArray(treatments) || treatments.length === 0)) {
+    return [];
+  }
+
+  const questions = [];
+  const topTreatment = Array.isArray(treatments) ? treatments[0] : null;
+
+  if (summary) {
+    questions.push({
+      question: "Quel est le profil clinique principal retenu ici ?",
+      answer: truncateText(summary),
+    });
+  }
+
+  if (topTreatment?.name) {
+    const justification =
+      topTreatment.justification ||
+      topTreatment.indication ||
+      topTreatment.summary ||
+      "Cette option ressort dans le contexte clinique actuel.";
+
+    questions.push({
+      question: `Pourquoi ${topTreatment.name} ressort-il comme option a discuter ?`,
+      answer: truncateText(String(justification)),
+    });
+  }
+
+  if (topTreatment?.monitoring && Array.isArray(topTreatment.monitoring) && topTreatment.monitoring.length > 0) {
+    questions.push({
+      question: "Quels points de surveillance devraient retenir l'attention ?",
+      answer: truncateText(topTreatment.monitoring.join(", ")),
+    });
+  }
+
+  if (
+    topTreatment?.contraindications &&
+    Array.isArray(topTreatment.contraindications) &&
+    topTreatment.contraindications.length > 0
+  ) {
+    questions.push({
+      question: "Quelles contre-indications ou limites doivent etre revues ?",
+      answer: truncateText(topTreatment.contraindications.join(", ")),
+    });
+  }
+
+  return questions.slice(0, 3);
+}
+
 const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   demoData,
   sourceMode,
@@ -98,6 +161,13 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   } = demoData || {};
   const top = treatments && treatments[0];
   const patientSummaryLabel = buildPatientSummaryLabel(patientDisplayName);
+  const dynamicQuestions = buildDynamicQuestions({
+    summary,
+    treatments: Array.isArray(treatments)
+      ? (treatments as Array<Record<string, any>>)
+      : [],
+  });
+  const renderedQuestions = dynamicQuestions.length > 0 ? dynamicQuestions : questions ?? [];
 
   // Gestion des erreurs IA
   if (error) {
@@ -426,9 +496,13 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
 
       {/* Questions fréquentes */}
       <section>
-        <h2 className="text-lg font-semibold mb-2">Questions fréquentes (simulation)</h2>
+        <h2 className="text-lg font-semibold mb-2">
+          {dynamicQuestions.length === 0
+            ? "Questions fréquentes (simulation)"
+            : "Questions cliniques contextuelles"}
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {(questions ?? []).map((q, i) => (
+          {(renderedQuestions ?? []).map((q, i) => (
             <QuestionCard key={i} question={q.question ?? q} answer={q.answer ?? ""} />
           ))}
         </div>
