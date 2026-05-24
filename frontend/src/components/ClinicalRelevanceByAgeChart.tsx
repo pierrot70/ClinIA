@@ -155,8 +155,9 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
       </div>
 
       <p className="mt-3 text-[11px] text-gray-500">
-        Aide visuelle clinique simulee. La decision therapeutique finale appartient
-        toujours au medecin.
+        Aide visuelle clinique contextuelle. Elle n'indique pas a elle seule une
+        baisse d'efficacite pharmacologique avec l'age. La decision therapeutique
+        finale appartient toujours au medecin.
       </p>
 
       <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">

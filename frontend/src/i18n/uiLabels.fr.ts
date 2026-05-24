@@ -345,6 +345,72 @@ export const UI_LABELS_FR = {
                 preferNotToSay: "Prefere ne pas repondre",
             },
         },
+        comparison: {
+            quickViewTitle: "Lecture rapide des differences cliniques",
+            quickViewHelp:
+                "Ce resume met en avant les ecarts les plus utiles pour orienter la lecture avant les details complets.",
+            quickViewAgeLabel: "Age",
+            quickViewSexLabel: "Sexe",
+            quickViewCardioRiskLabel: "Risque cardio-renal",
+            quickViewRenalLabel: "Fonction renale",
+            quickViewFragilityLabel: "Fragilite",
+            quickViewNotSpecified: "Non precise",
+            quickViewDifferenceBadge: "Difference nette",
+            quickViewMajorDifferenceBadge: "Contraste marque",
+            microSummaryTitle: "Micro-synthese scannable",
+            microSummaryHelp:
+                "Trois reperes tres courts pour comprendre rapidement le profil avant le texte detaille.",
+            microSummaryProfilePrefix: "Profil",
+            microSummaryPriorityPrefix: "Priorite",
+            microSummaryCautionPrefix: "Prudence",
+            microSummaryAgeOlder: "plus age",
+            microSummaryAgeYounger: "plus jeune",
+            microSummaryFragilityHigh: "fragile",
+            microSummaryFragilityLow: "peu fragile",
+            microSummaryFragilityNeutral: "fragilite a preciser",
+            microSummaryCardioHigh: "risque cardio-renal eleve",
+            microSummaryCardioModerate: "risque cardio-renal intermediaire",
+            microSummaryCardioNeutral: "risque cardio-renal a preciser",
+            microSummaryPriorityCardio:
+                "privilegier la lecture du benefice cardio-renal",
+            microSummaryPriorityFrailty:
+                "privilegier la lecture tolerance et securite",
+            microSummaryPriorityGlycemia:
+                "privilegier la lecture controle glycemique global",
+            primaryAlertTitle: "Point de vigilance principal",
+            primaryAlertKidneyIcon: "Renal",
+            primaryAlertFrailtyIcon: "Fragilite",
+            primaryAlertCardioIcon: "Cardio-renal",
+            primaryAlertGeneralIcon: "Contexte",
+            primaryAlertKidney:
+                "fonction renale a verifier en priorite avant de pondérer les options",
+            primaryAlertFrailty:
+                "fragilite elevee a garder au premier plan dans la lecture du cas",
+            primaryAlertCardio:
+                "risque cardio-renal dominant a garder au premier plan dans la lecture du cas",
+            primaryAlertGeneral:
+                "replacer les options dans le contexte clinique global avant de conclure",
+            reverifyAction: "Relancer pour verification (SUPERADMIN)",
+            reverifyLoading: "Verification OpenAI en cours...",
+            microSummaryCautionRenal:
+                "verifier la fonction renale avant d'interpreter les options",
+            microSummaryCautionFrailty:
+                "surveiller la fragilite et la tolerance globale",
+            microSummaryCautionGeneral:
+                "replacer les options dans le contexte clinique complet",
+            generatedSummaryTitle:
+                "Resume patient genere par ClinIA - comparaison visuelle",
+            generatedSummaryHelp:
+                "Deux profils cliniques sont analyses cote a cote pour comparer de visu le resume patient.",
+            relevanceChartTitle:
+                "Place clinique relative selon l'age et le contexte - comparaison visuelle",
+            relevanceChartHelp:
+                "Les deux profils affichent chacun leur tableau clinique, l'un au-dessous de l'autre, pour faciliter la comparaison de visu.",
+            caseOneLabel: "Cas 1",
+            caseTwoLabel: "Cas 2",
+            fallbackHeading: "Profil clinique",
+            summaryUnavailable: "Resume indisponible.",
+        },
         // ClinicalAnalyzePage.tsx - bloc commentaires et consultation des réponses.
         comments: {
             leaveComment: "Laisser un commentaire",

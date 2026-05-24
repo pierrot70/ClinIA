@@ -7,6 +7,7 @@ import {
 import { ClinicalForm } from "../components/clinical/ClinicalForm";
 // import { ClinicalResultPage } from "./ClinicalResultPage";
 import ClinicalDemoResult from "../components/ClinicalDemoResult";
+import ClinicalRelevanceByAgeChart from "../components/ClinicalRelevanceByAgeChart";
 import { useClinicalAnalysis } from "../hooks/useClinicalAnalysis";
 import { useSecurityIncident } from "../contexts/SecurityIncidentContext";
 import {
@@ -285,6 +286,34 @@ export function ClinicalAnalyzePage() {
         setReverifyLoading(false);
     }
 
+    async function handleReverifyComparison() {
+        if (!comparisonPayloads || user?.role !== "SUPERADMIN") {
+            return;
+        }
+
+        setReverifyLoading(true);
+        setApiError(null);
+        setBlockingIncident(null);
+        setBlockingActionableMessage(null);
+
+        await Promise.all([
+            analyzeComparisonOne({
+                ...comparisonPayloads.first,
+                reverifyRequested: true,
+                forceReal: true,
+                openaiModel,
+            }),
+            analyzeComparisonTwo({
+                ...comparisonPayloads.second,
+                reverifyRequested: true,
+                forceReal: true,
+                openaiModel,
+            }),
+        ]);
+
+        setReverifyLoading(false);
+    }
+
     async function handleCopyClinicalRequest() {
         if (!lastPayload) {
             return;
@@ -373,9 +402,133 @@ export function ClinicalAnalyzePage() {
     const comparisonScenarioTwo = getClinicalDemoScenario(comparisonPayloads?.second);
 
     function buildComparisonHeading(label: string, payload: ClinicalPayload) {
-        return `${label} - ${payload.diagnosis || "Profil clinique"}${
+        return `${label} - ${payload.diagnosis || comparisonLabels.fallbackHeading}${
             payload.age ? `, ${payload.age} ans` : ""
         }`;
+    }
+
+    function formatComparisonValue(value?: string | number) {
+        if (value === undefined || value === null || value === "") {
+            return comparisonLabels.quickViewNotSpecified;
+        }
+        return String(value);
+    }
+
+    function formatSexLabel(value?: ClinicalPayload["sex"]) {
+        if (value === "male") {
+            return "Homme";
+        }
+        if (value === "female") {
+            return "Femme";
+        }
+        if (value === "other") {
+            return "Autre";
+        }
+        return comparisonLabels.quickViewNotSpecified;
+    }
+
+    function buildQuickFact(
+        label: string,
+        first: string,
+        second: string,
+        options?: { majorDifference?: boolean }
+    ) {
+        const isDifferent = first !== second;
+        return {
+            label,
+            first,
+            second,
+            isDifferent,
+            badge: isDifferent
+                ? options?.majorDifference
+                    ? comparisonLabels.quickViewMajorDifferenceBadge
+                    : comparisonLabels.quickViewDifferenceBadge
+                : null,
+        };
+    }
+
+    function buildMicroSummary(payload: ClinicalPayload) {
+        const fragility = payload.diabetes_context?.fragility?.toLowerCase() || "";
+        const cardioRisk =
+            payload.diabetes_context?.cardiovascular_risk?.toLowerCase() || "";
+        const renalFunction =
+            payload.diabetes_context?.renal_function?.toLowerCase() || "";
+
+        const profileParts: string[] = [
+            payload.age >= 75
+                ? comparisonLabels.microSummaryAgeOlder
+                : comparisonLabels.microSummaryAgeYounger,
+        ];
+
+        if (fragility.includes("elev")) {
+            profileParts.push(comparisonLabels.microSummaryFragilityHigh);
+        } else if (fragility.includes("faible")) {
+            profileParts.push(comparisonLabels.microSummaryFragilityLow);
+        } else {
+            profileParts.push(comparisonLabels.microSummaryFragilityNeutral);
+        }
+
+        if (cardioRisk.includes("tres eleve") || cardioRisk.includes("haut")) {
+            profileParts.push(comparisonLabels.microSummaryCardioHigh);
+        } else if (cardioRisk.includes("modere") || cardioRisk.includes("eleve")) {
+            profileParts.push(comparisonLabels.microSummaryCardioModerate);
+        } else {
+            profileParts.push(comparisonLabels.microSummaryCardioNeutral);
+        }
+
+        let priority: string = comparisonLabels.microSummaryPriorityGlycemia;
+        if (cardioRisk.includes("tres eleve") || cardioRisk.includes("haut")) {
+            priority = comparisonLabels.microSummaryPriorityCardio;
+        } else if (fragility.includes("elev")) {
+            priority = comparisonLabels.microSummaryPriorityFrailty;
+        }
+
+        let caution: string = comparisonLabels.microSummaryCautionGeneral;
+        if (renalFunction.includes("reduction") || renalFunction.includes("moderee")) {
+            caution = comparisonLabels.microSummaryCautionRenal;
+        } else if (fragility.includes("elev")) {
+            caution = comparisonLabels.microSummaryCautionFrailty;
+        }
+
+        return [
+            `${comparisonLabels.microSummaryProfilePrefix}: ${profileParts.join(", ")}`,
+            `${comparisonLabels.microSummaryPriorityPrefix}: ${priority}`,
+            `${comparisonLabels.microSummaryCautionPrefix}: ${caution}`,
+        ];
+    }
+
+    function buildPrimaryAlert(payload: ClinicalPayload) {
+        const fragility = payload.diabetes_context?.fragility?.toLowerCase() || "";
+        const cardioRisk =
+            payload.diabetes_context?.cardiovascular_risk?.toLowerCase() || "";
+        const renalFunction =
+            payload.diabetes_context?.renal_function?.toLowerCase() || "";
+
+        if (renalFunction.includes("reduction") || renalFunction.includes("moderee")) {
+            return {
+                icon: comparisonLabels.primaryAlertKidneyIcon,
+                message: comparisonLabels.primaryAlertKidney,
+            };
+        }
+
+        if (fragility.includes("elev")) {
+            return {
+                icon: comparisonLabels.primaryAlertFrailtyIcon,
+                message: comparisonLabels.primaryAlertFrailty,
+            };
+        }
+
+        if (cardioRisk.includes("tres eleve") || cardioRisk.includes("haut")) {
+            return {
+                icon: comparisonLabels.primaryAlertCardioIcon,
+                message: comparisonLabels.primaryAlertCardio,
+            };
+        }
+
+        return {
+            icon: comparisonLabels.primaryAlertGeneralIcon,
+            message: comparisonLabels.primaryAlertGeneral,
+        };
     }
 
     /* ------------------------------------------------------------------ */
@@ -391,6 +544,55 @@ export function ClinicalAnalyzePage() {
     const { translated: backendErrorLabel, loading: loadingBackend, error: errorBackend } = useTranslation({ text: "Erreur backend brute (sans flafla)", targetLang, openaiModel });
     const { translated: loadingLabel } = useTranslation({ text: "Chargement...", targetLang, openaiModel });
     const commentLabels = labels.clinicalDemo.comments;
+    const comparisonLabels = labels.clinicalDemo.comparison;
+    const comparisonQuickFacts = comparisonPayloads
+        ? [
+              buildQuickFact(
+                  comparisonLabels.quickViewAgeLabel,
+                  formatComparisonValue(comparisonPayloads.first.age),
+                  formatComparisonValue(comparisonPayloads.second.age),
+                  {
+                      majorDifference:
+                          Math.abs(
+                              Number(comparisonPayloads.first.age) -
+                                  Number(comparisonPayloads.second.age)
+                          ) >= 15,
+                  }
+              ),
+              buildQuickFact(
+                  comparisonLabels.quickViewSexLabel,
+                  formatSexLabel(comparisonPayloads.first.sex),
+                  formatSexLabel(comparisonPayloads.second.sex)
+              ),
+              buildQuickFact(
+                  comparisonLabels.quickViewCardioRiskLabel,
+                  formatComparisonValue(
+                      comparisonPayloads.first.diabetes_context?.cardiovascular_risk
+                  ),
+                  formatComparisonValue(
+                      comparisonPayloads.second.diabetes_context?.cardiovascular_risk
+                  )
+              ),
+              buildQuickFact(
+                  comparisonLabels.quickViewRenalLabel,
+                  formatComparisonValue(
+                      comparisonPayloads.first.diabetes_context?.renal_function
+                  ),
+                  formatComparisonValue(
+                      comparisonPayloads.second.diabetes_context?.renal_function
+                  )
+              ),
+              buildQuickFact(
+                  comparisonLabels.quickViewFragilityLabel,
+                  formatComparisonValue(
+                      comparisonPayloads.first.diabetes_context?.fragility
+                  ),
+                  formatComparisonValue(
+                      comparisonPayloads.second.diabetes_context?.fragility
+                  )
+              ),
+          ]
+        : [];
     const { translated: leaveCommentLabel, loading: loadingLeaveComment, error: errorLeaveComment } = useTranslation({ text: commentLabels.leaveComment, targetLang, openaiModel });
     const { translated: leaveCommentTooltipLabel } = useTranslation({ text: commentLabels.leaveCommentTooltip, targetLang, openaiModel });
     const { translated: openaiModelTooltipLabel } = useTranslation({ text: commentLabels.openaiModelTooltip, targetLang, openaiModel });
@@ -646,13 +848,27 @@ export function ClinicalAnalyzePage() {
             {activeTab === "clinical" && (loading || comparisonLoading) && (
                 <div className="space-y-4">
                     <div className="flex justify-start">
-                        <button
-                            type="button"
-                            onClick={handleBackToClinicalDemo}
-                            className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                        >
-                            Retour a /clinical-demo
-                        </button>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                onClick={handleBackToClinicalDemo}
+                                className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                            >
+                                Retour a /clinical-demo
+                            </button>
+                            {user?.role === "SUPERADMIN" ? (
+                                <button
+                                    type="button"
+                                    onClick={handleReverifyComparison}
+                                    disabled={reverifyLoading}
+                                    className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
+                                >
+                                    {reverifyLoading
+                                        ? comparisonLabels.reverifyLoading
+                                        : comparisonLabels.reverifyAction}
+                                </button>
+                            ) : null}
+                        </div>
                     </div>
                     <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-lime-200 bg-lime-50/80 p-10 text-center">
                         <div className="clinia-neon-loader" aria-hidden="true" />
@@ -666,46 +882,246 @@ export function ClinicalAnalyzePage() {
             {activeTab === "clinical" && !loading && !comparisonLoading && isComparisonMode && comparisonPayloads && (
                 <div className="space-y-4">
                     <div className="flex justify-start">
-                        <button
-                            type="button"
-                            onClick={handleBackToClinicalDemo}
-                            className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                        >
-                            Retour a /clinical-demo
-                        </button>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                onClick={handleBackToClinicalDemo}
+                                className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                            >
+                                Retour a /clinical-demo
+                            </button>
+                            {user?.role === "SUPERADMIN" ? (
+                                <button
+                                    type="button"
+                                    onClick={handleReverifyComparison}
+                                    disabled={reverifyLoading}
+                                    className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
+                                >
+                                    {reverifyLoading
+                                        ? comparisonLabels.reverifyLoading
+                                        : comparisonLabels.reverifyAction}
+                                </button>
+                            ) : null}
+                        </div>
                     </div>
+                    <section className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm">
+                        <h2 className="text-lg font-semibold text-gray-900">
+                            {comparisonLabels.quickViewTitle}
+                        </h2>
+                        <p className="mt-1 text-sm text-gray-700">
+                            {comparisonLabels.quickViewHelp}
+                        </p>
+                        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+                            {comparisonQuickFacts.map((fact) => (
+                                <article
+                                    key={fact.label}
+                                    className={`rounded-xl border p-4 ${
+                                        fact.isDifferent
+                                            ? "border-amber-300 bg-amber-50/70"
+                                            : "border-emerald-200 bg-white"
+                                    }`}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <p
+                                            className={`text-xs font-semibold uppercase tracking-[0.18em] ${
+                                                fact.isDifferent
+                                                    ? "text-amber-800"
+                                                    : "text-emerald-700"
+                                            }`}
+                                        >
+                                            {fact.label}
+                                        </p>
+                                        {fact.badge ? (
+                                            <span className="rounded-full border border-amber-300 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-800">
+                                                {fact.badge}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    <div className="mt-3 space-y-2">
+                                        <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                            <p className="text-[11px] font-medium text-slate-500">
+                                                {comparisonLabels.caseOneLabel}
+                                            </p>
+                                            <p className="text-sm font-semibold text-slate-900">
+                                                {fact.first}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-lg bg-sky-50 px-3 py-2">
+                                            <p className="text-[11px] font-medium text-sky-600">
+                                                {comparisonLabels.caseTwoLabel}
+                                            </p>
+                                            <p className="text-sm font-semibold text-slate-900">
+                                                {fact.second}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </article>
+                            ))}
+                        </div>
+                    </section>
                     <section className="rounded-xl border border-sky-200 bg-white p-5 shadow-sm">
                         <h2 className="text-lg font-semibold text-gray-900">
-                            Resume patient genere par ClinIA - comparaison visuelle
+                            {comparisonLabels.generatedSummaryTitle}
                         </h2>
                         <p className="mt-1 text-sm text-gray-600">
-                            Deux profils cliniques sont analyses cote a cote pour comparer de visu le resume patient.
+                            {comparisonLabels.generatedSummaryHelp}
                         </p>
                         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
                             <article className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                                 <h3 className="text-sm font-semibold text-gray-900">
-                                    {buildComparisonHeading("Cas 1", comparisonPayloads.first)}
+                                    {buildComparisonHeading(
+                                        comparisonLabels.caseOneLabel,
+                                        comparisonPayloads.first
+                                    )}
                                 </h3>
+                                <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3">
+                                    <div className="flex items-start gap-3">
+                                        <div className="rounded-full bg-rose-600 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
+                                            {buildPrimaryAlert(comparisonPayloads.first).icon}
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-800">
+                                                {comparisonLabels.primaryAlertTitle}
+                                            </p>
+                                            <p className="mt-1 text-sm font-medium text-rose-900">
+                                                {buildPrimaryAlert(comparisonPayloads.first).message}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="mt-3 rounded-lg border border-sky-100 bg-white p-3">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
+                                        {comparisonLabels.microSummaryTitle}
+                                    </p>
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        {comparisonLabels.microSummaryHelp}
+                                    </p>
+                                    <ul className="mt-3 space-y-2 text-sm text-gray-700">
+                                        {buildMicroSummary(comparisonPayloads.first).map((item) => (
+                                            <li key={item} className="rounded-md bg-sky-50 px-3 py-2">
+                                                {item}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
                                 <p className="mt-3 text-sm text-gray-700 whitespace-pre-wrap">
                                     {comparisonResultOne?.patient_summary?.plain_language ||
                                         comparisonScenarioOne.questions?.[0]?.answer ||
                                         comparisonErrorOne ||
-                                        "Resume indisponible."}
+                                        comparisonLabels.summaryUnavailable}
                                 </p>
                             </article>
                             <article className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                                 <h3 className="text-sm font-semibold text-gray-900">
-                                    {buildComparisonHeading("Cas 2", comparisonPayloads.second)}
+                                    {buildComparisonHeading(
+                                        comparisonLabels.caseTwoLabel,
+                                        comparisonPayloads.second
+                                    )}
                                 </h3>
+                                <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3">
+                                    <div className="flex items-start gap-3">
+                                        <div className="rounded-full bg-rose-600 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
+                                            {buildPrimaryAlert(comparisonPayloads.second).icon}
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-800">
+                                                {comparisonLabels.primaryAlertTitle}
+                                            </p>
+                                            <p className="mt-1 text-sm font-medium text-rose-900">
+                                                {buildPrimaryAlert(comparisonPayloads.second).message}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="mt-3 rounded-lg border border-sky-100 bg-white p-3">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
+                                        {comparisonLabels.microSummaryTitle}
+                                    </p>
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        {comparisonLabels.microSummaryHelp}
+                                    </p>
+                                    <ul className="mt-3 space-y-2 text-sm text-gray-700">
+                                        {buildMicroSummary(comparisonPayloads.second).map((item) => (
+                                            <li key={item} className="rounded-md bg-sky-50 px-3 py-2">
+                                                {item}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
                                 <p className="mt-3 text-sm text-gray-700 whitespace-pre-wrap">
                                     {comparisonResultTwo?.patient_summary?.plain_language ||
                                         comparisonScenarioTwo.questions?.[0]?.answer ||
                                         comparisonErrorTwo ||
-                                        "Resume indisponible."}
+                                        comparisonLabels.summaryUnavailable}
                                 </p>
                             </article>
                         </div>
                     </section>
+                    {comparisonScenarioOne.relevanceByAgeChart &&
+                        comparisonScenarioTwo.relevanceByAgeChart && (
+                            <section className="rounded-xl border border-sky-200 bg-white p-5 shadow-sm">
+                                <h2 className="text-lg font-semibold text-gray-900">
+                                    {comparisonLabels.relevanceChartTitle}
+                                </h2>
+                                <p className="mt-1 text-sm text-gray-600">
+                                    {comparisonLabels.relevanceChartHelp}
+                                </p>
+                                <div className="mt-4 space-y-4">
+                                    <article className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                        <h3 className="mb-3 text-sm font-semibold text-gray-900">
+                                            {buildComparisonHeading(
+                                                comparisonLabels.caseOneLabel,
+                                                comparisonPayloads.first
+                                            )}
+                                        </h3>
+                                        <ClinicalRelevanceByAgeChart
+                                            title={comparisonScenarioOne.relevanceByAgeChart.title}
+                                            subtitle={comparisonScenarioOne.relevanceByAgeChart.subtitle}
+                                            interpretationNote={
+                                                comparisonScenarioOne.relevanceByAgeChart
+                                                    .interpretationNote
+                                            }
+                                            ageBuckets={
+                                                comparisonScenarioOne.relevanceByAgeChart.ageBuckets
+                                            }
+                                            levelLabels={
+                                                comparisonScenarioOne.relevanceByAgeChart.levelLabels
+                                            }
+                                            series={comparisonScenarioOne.relevanceByAgeChart.series}
+                                            sources={
+                                                comparisonScenarioOne.relevanceByAgeChart.sources
+                                            }
+                                        />
+                                    </article>
+                                    <article className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                        <h3 className="mb-3 text-sm font-semibold text-gray-900">
+                                            {buildComparisonHeading(
+                                                comparisonLabels.caseTwoLabel,
+                                                comparisonPayloads.second
+                                            )}
+                                        </h3>
+                                        <ClinicalRelevanceByAgeChart
+                                            title={comparisonScenarioTwo.relevanceByAgeChart.title}
+                                            subtitle={comparisonScenarioTwo.relevanceByAgeChart.subtitle}
+                                            interpretationNote={
+                                                comparisonScenarioTwo.relevanceByAgeChart
+                                                    .interpretationNote
+                                            }
+                                            ageBuckets={
+                                                comparisonScenarioTwo.relevanceByAgeChart.ageBuckets
+                                            }
+                                            levelLabels={
+                                                comparisonScenarioTwo.relevanceByAgeChart.levelLabels
+                                            }
+                                            series={comparisonScenarioTwo.relevanceByAgeChart.series}
+                                            sources={
+                                                comparisonScenarioTwo.relevanceByAgeChart.sources
+                                            }
+                                        />
+                                    </article>
+                                </div>
+                            </section>
+                        )}
                 </div>
             )}
 

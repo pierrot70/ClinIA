@@ -367,11 +367,11 @@ const diabetesQuestions: DemoQuestion[] = [
 ];
 
 const diabetesRelevanceByAgeChartBase: ClinicalRelevanceByAgeChart = {
-    title: "Pertinence clinique relative selon l'age",
+    title: "Place clinique relative selon l'age et le contexte",
     subtitle:
         "Synthese ClinIA originale inspiree de lignes directrices reconnues. Ne represente pas une mesure quantitative d'efficacite.",
     interpretationNote:
-        "L'age seul ne permet pas de choisir un traitement. Cette visualisation doit etre interpretee avec le poids, le risque cardiovasculaire, la fonction renale, la fragilite, la tolerance et les objectifs glycemiques.",
+        "Ce visuel n'indique pas une baisse directe d'efficacite pharmacologique avec l'age. Il illustre plutot comment la place clinique relative d'une option peut evoluer selon l'age, la fragilite, la fonction renale, la tolerance et le risque cardio-renal.",
     ageBuckets: ["<40", "40-49", "50-59", "60-69", "70+"],
     levelLabels: {
         1: "Faible pertinence",
@@ -447,7 +447,7 @@ function buildDiabetesRelevanceByAgeChart(
         chart.subtitle =
             "Synthese ClinIA originale pour un profil cardio-renal a haut risque. Ne represente pas une mesure quantitative d'efficacite.";
         chart.interpretationNote =
-            "Dans ce profil, le poids clinique du risque cardiovasculaire et renal est plus eleve. La visualisation reste contextuelle et doit etre lue avec la fragilite, la tolerance et les objectifs glycemiques.";
+            "Dans ce profil, le poids clinique du risque cardiovasculaire et renal est plus eleve. Ce visuel ne represente pas une baisse directe d'efficacite avec l'age et doit etre lu avec la fragilite, la tolerance et les objectifs glycemiques.";
         chart.series = chart.series.map((series) => {
             if (series.name === "Inhibiteur SGLT2") {
                 return { ...series, values: [3, 4, 5, 5, 5] };
@@ -466,7 +466,7 @@ function buildDiabetesRelevanceByAgeChart(
         chart.subtitle =
             "Synthese ClinIA originale pour un profil plus age et fragile. Ne represente pas une mesure quantitative d'efficacite.";
         chart.interpretationNote =
-            "Dans ce profil, la fragilite, la tolerance et la securite globale comptent davantage. La visualisation aide a contextualiser la prudence therapeutique, sans remplacer le jugement clinique.";
+            "Dans ce profil, la fragilite, la tolerance et la securite globale comptent davantage. Ce visuel aide a contextualiser la prudence therapeutique, sans suggerer a lui seul une baisse d'efficacite pharmacologique ni remplacer le jugement clinique.";
         chart.series = chart.series.map((series) => {
             if (series.name === "Metformine") {
                 return { ...series, values: [5, 5, 4, 3, 2] };
