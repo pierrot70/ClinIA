@@ -1,3 +1,21 @@
+const NON_CLINICAL_FINGERPRINT_KEYS = new Set([
+    "forceReal",
+    "openaiModel",
+    "incidentAckId",
+]);
+
+export function buildFingerprintPatientPayload(patient = {}) {
+    if (!patient || typeof patient !== "object" || Array.isArray(patient)) {
+        return {};
+    }
+
+    return Object.fromEntries(
+        Object.entries(patient).filter(
+            ([key]) => !NON_CLINICAL_FINGERPRINT_KEYS.has(key)
+        )
+    );
+}
+
 export function resolveCachedDiagnosisState({
     cachedDiagnosis,
     model,
@@ -26,7 +44,6 @@ export function resolveCachedDiagnosisState({
     const canReuseCachedDiagnosis =
         normalizedCachedOutput &&
         !cachedDiagnosisIsPlaceholderReal &&
-        !(forceRealSafe && cachedDiagnosis?.mode === "real") &&
         (cachedDiagnosis.mode !== "mock" || useMock);
 
     const cacheNeedsUpgrade =

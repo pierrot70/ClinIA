@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveCachedDiagnosisState } from "../aiAnalyzeCacheService.js";
+import {
+    buildFingerprintPatientPayload,
+    resolveCachedDiagnosisState,
+} from "../aiAnalyzeCacheService.js";
 
 describe("aiAnalyzeCacheService", () => {
     const extractPrimaryClinicalConcern = ({ diagnosis, symptoms }) =>
@@ -39,7 +42,7 @@ describe("aiAnalyzeCacheService", () => {
         });
     });
 
-    it("refuses reuse for placeholder real diagnoses and for forced real refreshes", () => {
+    it("refuses reuse for placeholder real diagnoses", () => {
         const placeholderResult = resolveCachedDiagnosisState({
             cachedDiagnosis: {
                 input: { diagnosis: "Unknown" },
@@ -57,22 +60,24 @@ describe("aiAnalyzeCacheService", () => {
 
         expect(placeholderResult.cachedDiagnosisIsPlaceholderReal).toBe(true);
         expect(placeholderResult.canReuseCachedDiagnosis).toBe(false);
+    });
 
-        const forcedRefreshResult = resolveCachedDiagnosisState({
-            cachedDiagnosis: {
-                input: { diagnosis: "Migraine" },
-                output: { diagnosis: { suspected: "Migraine" } },
-                mode: "real",
-                model: "gpt-4.1-mini",
-            },
-            model: "gpt-4.1-mini",
-            forceRealSafe: true,
-            useMock: false,
-            extractPrimaryClinicalConcern,
-            normalizeClinicalAnalysis,
-            isPlaceholderClinicalAnalysis,
+    it("removes non-clinical request controls from the fingerprint payload", () => {
+        expect(
+            buildFingerprintPatientPayload({
+                age: 55,
+                diagnosis: "Diabete de type 2",
+                current_medications: ["Metformine"],
+                diabetes_context: { fragility: "Faible" },
+                forceReal: false,
+                openaiModel: "gpt-4.1-mini",
+                incidentAckId: "incident-123",
+            })
+        ).toEqual({
+            age: 55,
+            diagnosis: "Diabete de type 2",
+            current_medications: ["Metformine"],
+            diabetes_context: { fragility: "Faible" },
         });
-
-        expect(forcedRefreshResult.canReuseCachedDiagnosis).toBe(false);
     });
 });

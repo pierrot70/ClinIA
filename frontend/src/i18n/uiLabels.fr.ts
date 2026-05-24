@@ -308,6 +308,25 @@ export const UI_LABELS_FR = {
             countryHelp:
                 "Le pays est preselectionne a partir des parametres du navigateur lorsque l'information est disponible.",
             detectedCountryPrefix: "Pays detecte par le navigateur :",
+            jsonImportLabel: "Importer un objet JSON",
+            jsonImportHelp:
+                "Collez ici un objet JSON compatible avec les donnees cliniques pour pre-remplir le formulaire.",
+            jsonImportPlaceholder:
+                '{ "age": 55, "sex": "male", "diagnosis": "Diabete de type 2" }',
+            jsonImportAction: "Charger le JSON dans le formulaire",
+            jsonImportSuccess: "Le formulaire a ete rempli a partir du JSON.",
+            jsonImportInvalid:
+                "JSON invalide ou incompatible. Verifiez la syntaxe et la structure de l'objet.",
+            comparisonToggle: "Mode comparaison visuelle",
+            comparisonHelp:
+                "Collez deux objets JSON pour comparer de visu deux resumes patient generes par ClinIA.",
+            comparisonCaseOneLabel: "JSON cas 1",
+            comparisonCaseTwoLabel: "JSON cas 2",
+            comparisonAction: "Comparer les 2 cas",
+            comparisonSuccess:
+                "Les deux cas ont ete charges pour comparaison.",
+            comparisonInvalid:
+                "Impossible de charger les deux cas. Verifiez les deux objets JSON.",
             ethnicityLabel: "Ethnicite du patient",
             ethnicityHelp:
                 "Selectionnez l'ethnicite la plus pertinente pour le contexte clinique si elle est connue.",

@@ -129,6 +129,74 @@ describe("aiAnalyzeOpenAIService", () => {
         expect(request.messages[1].content).toContain("compare continuing the current strategy");
     });
 
+    it("includes additional type 2 diabetes clinical context in the OpenAI prompt", async () => {
+        const res = createResponseDouble();
+        res.status.mockReturnValue(res);
+        const create = vi.fn().mockResolvedValue({
+            id: "upstream-1",
+            choices: [
+                {
+                    message: {
+                        content: '{"diagnosis":{"suspected":"Diabete de type 2"}}',
+                    },
+                },
+            ],
+        });
+
+        await executeOpenAIAnalyze({
+            openai: {
+                chat: {
+                    completions: { create },
+                },
+            },
+            model: "gpt-4.1-mini",
+            diagnosis: "Diabete de type 2",
+            patient: {
+                weight: 94,
+                medical_history: [],
+                current_medications: ["Metformine"],
+                diabetes_context: {
+                    cardiovascular_risk: "Modere a eleve",
+                    renal_function: "Preservee ou legerement reduite",
+                    fragility: "Faible",
+                    tolerance: "Bonne tolerance a la metformine",
+                    glycemic_goals: "HbA1c < 7 % si securitaire et realiste",
+                },
+            },
+            symptoms: ["Polydipsie"],
+            reqAuth: { userId: "u1", username: "admin", role: "SUPERADMIN" },
+            req: { ip: "127.0.0.1", headers: {} },
+            fingerprint: "fp-1",
+            forceRealSafe: false,
+            neutralizationMeta: null,
+            supportsJsonResponseFormat: vi.fn(() => true),
+            recordOpenAIRequestAuditEvent: vi.fn().mockResolvedValue({ _id: "audit-1" }),
+            finalizeOpenAIRequestAuditEvent: vi.fn().mockResolvedValue({}),
+            getRequestIp: vi.fn(() => "127.0.0.1"),
+            makeSourceHash: vi.fn(() => "hash-123"),
+            detectNonSecureContent: vi.fn(() => ({ hasMatches: false })),
+            respondWithSecurityIncident: vi.fn(),
+            safeParseMedicalAI: vi.fn(() => ({
+                diagnosis: { suspected: "Diabete de type 2" },
+            })),
+            normalizeClinicalAnalysis: vi.fn((parsed) => parsed),
+            isPlaceholderClinicalAnalysis: vi.fn(() => false),
+            recordOpenAISuccess: vi.fn(),
+            recordOpenAIFailure: vi.fn(),
+            res,
+            logger: { log: vi.fn(), error: vi.fn() },
+        });
+
+        const request = create.mock.calls[0][0];
+        expect(request.messages[1].content).toContain("Additional type 2 diabetes clinical context:");
+        expect(request.messages[1].content).toContain("- weight_kg: 94");
+        expect(request.messages[1].content).toContain("- cardiovascular_risk: Modere a eleve");
+        expect(request.messages[1].content).toContain("- renal_function: Preservee ou legerement reduite");
+        expect(request.messages[1].content).toContain("- fragility: Faible");
+        expect(request.messages[1].content).toContain("- tolerance: Bonne tolerance a la metformine");
+        expect(request.messages[1].content).toContain("- glycemic_goals: HbA1c < 7 % si securitaire et realiste");
+    });
+
     it("returns a blocking response when post-cloud scanning detects sensitive content", async () => {
         const res = createResponseDouble();
         res.status.mockReturnValue(res);

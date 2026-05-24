@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 
 const analyzeMock = vi.fn();
 const clinicalFormSpy = vi.fn();
@@ -38,6 +39,7 @@ vi.mock("../hooks/useClinicalAnalysis", () => ({
         loading: false,
         error: null,
         analyze: analyzeMock,
+        resetAnalysis: vi.fn(),
     }),
 }));
 
@@ -78,7 +80,11 @@ import { ClinicalAnalyzePage } from "./ClinicalAnalyzePage";
 
 describe("ClinicalAnalyzePage", () => {
     it("submits the exact user payload without injecting the demo case", () => {
-        render(<ClinicalAnalyzePage />);
+        render(
+            <MemoryRouter>
+                <ClinicalAnalyzePage />
+            </MemoryRouter>
+        );
 
         fireEvent.click(screen.getByRole("button", { name: "submit-clinical-form" }));
 

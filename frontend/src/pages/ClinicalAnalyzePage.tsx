@@ -42,7 +42,28 @@ export function ClinicalAnalyzePage() {
     const [activeTab, setActiveTab] =
         useState<"patient" | "clinical">("patient");
 
-    const { result, loading, error, errorCode, analyze, resetAnalysis } = useClinicalAnalysis();
+    const {
+        result,
+        loading,
+        error,
+        errorCode,
+        analyze,
+        resetAnalysis,
+    } = useClinicalAnalysis();
+    const {
+        result: comparisonResultOne,
+        loading: comparisonLoadingOne,
+        error: comparisonErrorOne,
+        analyze: analyzeComparisonOne,
+        resetAnalysis: resetComparisonOne,
+    } = useClinicalAnalysis();
+    const {
+        result: comparisonResultTwo,
+        loading: comparisonLoadingTwo,
+        error: comparisonErrorTwo,
+        analyze: analyzeComparisonTwo,
+        resetAnalysis: resetComparisonTwo,
+    } = useClinicalAnalysis();
 
     const [apiError, setApiError] = useState<ApiError | null>(null);
     const [blockingIncident, setBlockingIncident] =
@@ -58,6 +79,10 @@ export function ClinicalAnalyzePage() {
 
     const [lastPayload, setLastPayload] =
         useState<ClinicalPayload | null>(null);
+    const [comparisonPayloads, setComparisonPayloads] = useState<{
+        first: ClinicalPayload;
+        second: ClinicalPayload;
+    } | null>(null);
     const [replyLookupName, setReplyLookupName] = useState("");
     const [replyLookupCode, setReplyLookupCode] = useState("");
     const [replyLookupLoading, setReplyLookupLoading] = useState(false);
@@ -186,6 +211,9 @@ export function ClinicalAnalyzePage() {
     /* ------------------------------------------------------------------ */
 
     async function handleSubmit(payload: ClinicalPayload) {
+        setComparisonPayloads(null);
+        resetComparisonOne();
+        resetComparisonTwo();
         const safePayload = {
             ...payload,
             forceReal: isProd ? false : forceReal,
@@ -194,6 +222,40 @@ export function ClinicalAnalyzePage() {
         setLastPayload(safePayload);
         setActiveTab("clinical");
         await analyze(safePayload);
+    }
+
+    async function handleCompareSubmit(
+        firstPayload: ClinicalPayload,
+        secondPayload: ClinicalPayload
+    ) {
+        resetAnalysis();
+        setApiError(null);
+        setBlockingIncident(null);
+        setBlockingActionableMessage(null);
+        setServiceMode(null);
+
+        const safeFirstPayload = {
+            ...firstPayload,
+            forceReal: isProd ? false : forceReal,
+            openaiModel,
+        };
+        const safeSecondPayload = {
+            ...secondPayload,
+            forceReal: isProd ? false : forceReal,
+            openaiModel,
+        };
+
+        setComparisonPayloads({
+            first: safeFirstPayload,
+            second: safeSecondPayload,
+        });
+        setLastPayload(safeFirstPayload);
+        setActiveTab("clinical");
+
+        await Promise.all([
+            analyzeComparisonOne(safeFirstPayload),
+            analyzeComparisonTwo(safeSecondPayload),
+        ]);
     }
 
     /* ------------------------------------------------------------------ */
@@ -213,10 +275,13 @@ export function ClinicalAnalyzePage() {
 
     function handleBackToClinicalDemo() {
         resetAnalysis();
+        resetComparisonOne();
+        resetComparisonTwo();
         setApiError(null);
         setBlockingIncident(null);
         setBlockingActionableMessage(null);
         setServiceMode(null);
+        setComparisonPayloads(null);
         setActiveTab("patient");
     }
 
@@ -250,6 +315,17 @@ export function ClinicalAnalyzePage() {
             })
         );
     };
+
+    const comparisonLoading = comparisonLoadingOne || comparisonLoadingTwo;
+    const isComparisonMode = comparisonPayloads !== null;
+    const comparisonScenarioOne = getClinicalDemoScenario(comparisonPayloads?.first);
+    const comparisonScenarioTwo = getClinicalDemoScenario(comparisonPayloads?.second);
+
+    function buildComparisonHeading(label: string, payload: ClinicalPayload) {
+        return `${label} - ${payload.diagnosis || "Profil clinique"}${
+            payload.age ? `, ${payload.age} ans` : ""
+        }`;
+    }
 
     /* ------------------------------------------------------------------ */
     /* Render                                                             */
@@ -509,12 +585,14 @@ export function ClinicalAnalyzePage() {
                 <ClinicalForm
                     key={targetLang + openaiModel}
                     onSubmit={handleSubmit}
+                    onCompareSubmit={handleCompareSubmit}
                     loading={loading}
+                    compareLoading={comparisonLoading}
                 />
             )}
 
             {/* 📊 Résultat enrichi partagé */}
-            {activeTab === "clinical" && loading && (
+            {activeTab === "clinical" && (loading || comparisonLoading) && (
                 <div className="space-y-4">
                     <div className="flex justify-start">
                         <button
@@ -534,7 +612,53 @@ export function ClinicalAnalyzePage() {
                 </div>
             )}
 
-            {activeTab === "clinical" && !loading && (
+            {activeTab === "clinical" && !loading && !comparisonLoading && isComparisonMode && comparisonPayloads && (
+                <div className="space-y-4">
+                    <div className="flex justify-start">
+                        <button
+                            type="button"
+                            onClick={handleBackToClinicalDemo}
+                            className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                        >
+                            Retour a /clinical-demo
+                        </button>
+                    </div>
+                    <section className="rounded-xl border border-sky-200 bg-white p-5 shadow-sm">
+                        <h2 className="text-lg font-semibold text-gray-900">
+                            Resume patient genere par ClinIA - comparaison visuelle
+                        </h2>
+                        <p className="mt-1 text-sm text-gray-600">
+                            Deux profils cliniques sont analyses cote a cote pour comparer de visu le resume patient.
+                        </p>
+                        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                            <article className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                <h3 className="text-sm font-semibold text-gray-900">
+                                    {buildComparisonHeading("Cas 1", comparisonPayloads.first)}
+                                </h3>
+                                <p className="mt-3 text-sm text-gray-700 whitespace-pre-wrap">
+                                    {comparisonResultOne?.patient_summary?.plain_language ||
+                                        comparisonScenarioOne.questions?.[0]?.answer ||
+                                        comparisonErrorOne ||
+                                        "Resume indisponible."}
+                                </p>
+                            </article>
+                            <article className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                <h3 className="text-sm font-semibold text-gray-900">
+                                    {buildComparisonHeading("Cas 2", comparisonPayloads.second)}
+                                </h3>
+                                <p className="mt-3 text-sm text-gray-700 whitespace-pre-wrap">
+                                    {comparisonResultTwo?.patient_summary?.plain_language ||
+                                        comparisonScenarioTwo.questions?.[0]?.answer ||
+                                        comparisonErrorTwo ||
+                                        "Resume indisponible."}
+                                </p>
+                            </article>
+                        </div>
+                    </section>
+                </div>
+            )}
+
+            {activeTab === "clinical" && !loading && !comparisonLoading && !isComparisonMode && (
                 <div className="space-y-4">
                     <div className="flex justify-start">
                         <button

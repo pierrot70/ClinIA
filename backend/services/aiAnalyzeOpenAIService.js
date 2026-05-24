@@ -1,3 +1,29 @@
+function buildType2DiabetesContextPrompt(patient = {}) {
+    const context = patient?.diabetes_context;
+    if (!context || typeof context !== "object") {
+        return "";
+    }
+
+    const contextEntries = [
+        ["weight_kg", patient.weight],
+        ["cardiovascular_risk", context.cardiovascular_risk],
+        ["renal_function", context.renal_function],
+        ["fragility", context.fragility],
+        ["tolerance", context.tolerance],
+        ["glycemic_goals", context.glycemic_goals],
+    ].filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== "");
+
+    if (contextEntries.length === 0) {
+        return "";
+    }
+
+    const formattedContext = contextEntries
+        .map(([label, value]) => `- ${label}: ${value}`)
+        .join("\n");
+
+    return `\nAdditional type 2 diabetes clinical context:\n${formattedContext}\nUse this additional context when comparing therapeutic options, monitoring points, and cautions.`;
+}
+
 export async function executeOpenAIAnalyze({
     openai,
     model,
@@ -33,6 +59,9 @@ export async function executeOpenAIAnalyze({
     const diabetesInstruction = isType2DiabetesCase
         ? "For type 2 diabetes cases, explicitly structure the response so the clinician can compare: current strategy, whether a GLP-1 option may merit reevaluation, key cardiometabolic factors to review, cautions, and a neutral conclusion. Do not recommend prescribing, do not instruct replacing metformin automatically, do not provide dosing, and keep the final decision explicitly with the clinician."
         : "";
+    const diabetesContextPrompt = isType2DiabetesCase
+        ? buildType2DiabetesContextPrompt(patient)
+        : "";
 
     const baseRequest = {
         model,
@@ -45,7 +74,7 @@ export async function executeOpenAIAnalyze({
             {
                 role: "user",
                 content:
-                    `Primary clinical concern or confirmed diagnosis: ${diagnosis}. Provide evidence-based therapeutic options, monitoring considerations, contraindications, red flags, and a concise patient summary for this clinical context only. ${isType2DiabetesCase ? "If appropriate to the clinical context, compare continuing the current strategy with reevaluating a GLP-1 option, while remaining neutral and non-prescriptive." : ""} The final medical decision remains with the clinician.\nFull patient data: ${JSON.stringify(patient)}`,
+                    `Primary clinical concern or confirmed diagnosis: ${diagnosis}. Provide evidence-based therapeutic options, monitoring considerations, contraindications, red flags, and a concise patient summary for this clinical context only. ${isType2DiabetesCase ? "If appropriate to the clinical context, compare continuing the current strategy with reevaluating a GLP-1 option, while remaining neutral and non-prescriptive." : ""} The final medical decision remains with the clinician.${diabetesContextPrompt}\nFull patient data: ${JSON.stringify(patient)}`,
             },
         ],
         temperature: 0.1,

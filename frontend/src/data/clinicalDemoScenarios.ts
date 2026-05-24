@@ -35,6 +35,11 @@ type ClinicalDemoScenario = {
     relevanceByAgeChart?: ClinicalRelevanceByAgeChart;
 };
 
+type DiabetesChartProfile =
+    | "standard"
+    | "cardiorenal_high_risk"
+    | "older_frail";
+
 const cataractTreatments: Treatment[] = [
     {
         id: "artificial-tears",
@@ -361,7 +366,7 @@ const diabetesQuestions: DemoQuestion[] = [
     },
 ];
 
-const diabetesRelevanceByAgeChart: ClinicalRelevanceByAgeChart = {
+const diabetesRelevanceByAgeChartBase: ClinicalRelevanceByAgeChart = {
     title: "Pertinence clinique relative selon l'age",
     subtitle:
         "Synthese ClinIA originale inspiree de lignes directrices reconnues. Ne represente pas une mesure quantitative d'efficacite.",
@@ -417,6 +422,74 @@ const diabetesRelevanceByAgeChart: ClinicalRelevanceByAgeChart = {
     ],
 };
 
+function cloneChart(
+    chart: ClinicalRelevanceByAgeChart
+): ClinicalRelevanceByAgeChart {
+    return {
+        ...chart,
+        ageBuckets: [...chart.ageBuckets],
+        levelLabels: { ...chart.levelLabels },
+        series: chart.series.map((series) => ({
+            ...series,
+            values: [...series.values],
+        })),
+        sources: chart.sources.map((source) => ({ ...source })),
+    };
+}
+
+function buildDiabetesRelevanceByAgeChart(
+    payload?: Partial<ClinicalPayload> | null
+): ClinicalRelevanceByAgeChart {
+    const chart = cloneChart(diabetesRelevanceByAgeChartBase);
+    const profile = getDiabetesChartProfile(payload);
+
+    if (profile === "cardiorenal_high_risk") {
+        chart.subtitle =
+            "Synthese ClinIA originale pour un profil cardio-renal a haut risque. Ne represente pas une mesure quantitative d'efficacite.";
+        chart.interpretationNote =
+            "Dans ce profil, le poids clinique du risque cardiovasculaire et renal est plus eleve. La visualisation reste contextuelle et doit etre lue avec la fragilite, la tolerance et les objectifs glycemiques.";
+        chart.series = chart.series.map((series) => {
+            if (series.name === "Inhibiteur SGLT2") {
+                return { ...series, values: [3, 4, 5, 5, 5] };
+            }
+            if (series.name === "Option GLP-1") {
+                return { ...series, values: [3, 4, 5, 5, 4] };
+            }
+            if (series.name === "Poursuite prudente de la strategie actuelle") {
+                return { ...series, values: [1, 2, 2, 3, 3] };
+            }
+            return series;
+        });
+    }
+
+    if (profile === "older_frail") {
+        chart.subtitle =
+            "Synthese ClinIA originale pour un profil plus age et fragile. Ne represente pas une mesure quantitative d'efficacite.";
+        chart.interpretationNote =
+            "Dans ce profil, la fragilite, la tolerance et la securite globale comptent davantage. La visualisation aide a contextualiser la prudence therapeutique, sans remplacer le jugement clinique.";
+        chart.series = chart.series.map((series) => {
+            if (series.name === "Metformine") {
+                return { ...series, values: [5, 5, 4, 3, 2] };
+            }
+            if (series.name === "Poursuite prudente de la strategie actuelle") {
+                return { ...series, values: [2, 2, 3, 4, 5] };
+            }
+            if (series.name === "Inhibiteur SGLT2") {
+                return { ...series, values: [2, 3, 3, 3, 2] };
+            }
+            if (series.name === "Option GLP-1") {
+                return { ...series, values: [2, 3, 4, 3, 2] };
+            }
+            if (series.name === "Mode de vie") {
+                return { ...series, values: [5, 5, 5, 4, 3] };
+            }
+            return series;
+        });
+    }
+
+    return chart;
+}
+
 const scenarios: Record<string, ClinicalDemoScenario> = {
     hypertension: {
         treatments: hypertensionTreatments,
@@ -441,9 +514,52 @@ const scenarios: Record<string, ClinicalDemoScenario> = {
     diabetesType2: {
         treatments: diabetesTreatments,
         questions: diabetesQuestions,
-        relevanceByAgeChart: diabetesRelevanceByAgeChart,
     },
 };
+
+function normalizeOptional(value: unknown) {
+    return normalize(typeof value === "string" ? value : "");
+}
+
+function getDiabetesChartProfile(
+    payload?: Partial<ClinicalPayload> | null
+): DiabetesChartProfile {
+    const diabetesContext = payload?.diabetes_context;
+    const age = typeof payload?.age === "number" ? payload.age : 0;
+    const fragility = normalizeOptional(diabetesContext?.fragility);
+    const renalFunction = normalizeOptional(diabetesContext?.renal_function);
+    const cardiovascularRisk = normalizeOptional(
+        diabetesContext?.cardiovascular_risk
+    );
+    const tolerance = normalizeOptional(diabetesContext?.tolerance);
+
+    const isOlderFrailProfile =
+        age >= 75 ||
+        fragility.includes("elevee") ||
+        fragility.includes("fragile") ||
+        tolerance.includes("limitee") ||
+        tolerance.includes("reevaluer");
+
+    if (isOlderFrailProfile) {
+        return "older_frail";
+    }
+
+    const isCardiorenalHighRiskProfile =
+        cardiovascularRisk.includes("tres eleve") ||
+        cardiovascularRisk.includes("tres haute") ||
+        (cardiovascularRisk.includes("eleve") &&
+            (renalFunction.includes("moderee") ||
+                renalFunction.includes("importante") ||
+                renalFunction.includes("chronique"))) ||
+        renalFunction.includes("importante") ||
+        renalFunction.includes("chronique");
+
+    if (isCardiorenalHighRiskProfile) {
+        return "cardiorenal_high_risk";
+    }
+
+    return "standard";
+}
 
 function normalize(value: string) {
     return value
@@ -514,5 +630,15 @@ function matchScenarioKey(payload?: Partial<ClinicalPayload> | null) {
 export function getClinicalDemoScenario(
     payload?: Partial<ClinicalPayload> | null
 ): ClinicalDemoScenario {
-    return scenarios[matchScenarioKey(payload)];
+    const scenarioKey = matchScenarioKey(payload);
+    const scenario = scenarios[scenarioKey];
+
+    if (scenarioKey !== "diabetesType2") {
+        return scenario;
+    }
+
+    return {
+        ...scenario,
+        relevanceByAgeChart: buildDiabetesRelevanceByAgeChart(payload),
+    };
 }

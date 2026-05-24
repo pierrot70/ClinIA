@@ -107,6 +107,129 @@ describe("ClinicalForm", () => {
         expect(screen.getByLabelText("Antecedents medicaux")).toHaveValue("Anemie");
     });
 
+    it("imports a clinical payload from a pasted JSON object", () => {
+        render(
+            <ClinicalForm
+                onSubmit={() => {}}
+                loading={false}
+                initialData={{
+                    age: 55,
+                    sex: "male",
+                    diagnosis: "",
+                    symptoms: [],
+                    medical_history: [],
+                    current_medications: [],
+                }}
+            />
+        );
+
+        fireEvent.change(screen.getByLabelText("Importer un objet JSON"), {
+            target: {
+                value: JSON.stringify({
+                    age: 79,
+                    sex: "female",
+                    country: "CA",
+                    ethnicity: "asian",
+                    diagnosis: "Diabete de type 2",
+                    symptoms: ["Fatigue", "Hyperglycemie persistante"],
+                    medical_history: ["Insuffisance renale chronique"],
+                    current_medications: ["Metformine"],
+                    diabetes_context: {
+                        cardiovascular_risk: "Tres eleve",
+                        fragility: "Elevee",
+                    },
+                }),
+            },
+        });
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: "Charger le JSON dans le formulaire",
+            })
+        );
+
+        expect(
+            screen.getByText("Le formulaire a ete rempli a partir du JSON.")
+        ).toBeInTheDocument();
+        expect(screen.getByLabelText("Age du patient")).toHaveValue(79);
+        expect(screen.getByLabelText("Sexe")).toHaveValue("female");
+        expect(screen.getByLabelText("Pays du patient")).toHaveValue("CA");
+        expect(screen.getByLabelText("Ethnicite du patient")).toHaveValue("asian");
+        expect(screen.getByLabelText("Diagnostic / motif clinique principal")).toHaveValue(
+            "Diabete de type 2"
+        );
+        expect(screen.getByLabelText("Antecedents medicaux")).toHaveValue(
+            "Insuffisance renale chronique"
+        );
+    });
+
+    it("loads two pasted JSON payloads for visual comparison", async () => {
+        const onCompareSubmit = vi.fn();
+
+        render(
+            <ClinicalForm
+                onSubmit={() => {}}
+                onCompareSubmit={onCompareSubmit}
+                loading={false}
+                initialData={{
+                    age: 55,
+                    sex: "male",
+                    diagnosis: "",
+                    symptoms: [],
+                    medical_history: [],
+                    current_medications: [],
+                }}
+            />
+        );
+
+        fireEvent.click(screen.getByLabelText("Mode comparaison visuelle"));
+
+        fireEvent.change(screen.getByLabelText("JSON cas 1"), {
+            target: {
+                value: JSON.stringify({
+                    age: 55,
+                    sex: "male",
+                    diagnosis: "Diabete de type 2",
+                    symptoms: ["Polydipsie"],
+                    medical_history: [],
+                    current_medications: ["Metformine"],
+                }),
+            },
+        });
+        fireEvent.change(screen.getByLabelText("JSON cas 2"), {
+            target: {
+                value: JSON.stringify({
+                    age: 79,
+                    sex: "female",
+                    diagnosis: "Diabete de type 2",
+                    symptoms: ["Fatigue"],
+                    medical_history: ["Insuffisance renale chronique"],
+                    current_medications: ["Metformine"],
+                }),
+            },
+        });
+
+        fireEvent.click(
+            screen.getByRole("button", { name: "Comparer les 2 cas" })
+        );
+
+        expect(onCompareSubmit).toHaveBeenCalledWith(
+            expect.objectContaining({
+                age: 55,
+                sex: "male",
+                diagnosis: "Diabete de type 2",
+            }),
+            expect.objectContaining({
+                age: 79,
+                sex: "female",
+                diagnosis: "Diabete de type 2",
+            })
+        );
+        expect(
+            await screen.findByText("Les deux cas ont ete charges pour comparaison.")
+        ).toBeInTheDocument();
+    });
+
     it("fills the form with the type 2 diabetes example case", () => {
         render(
             <ClinicalForm

@@ -1,4 +1,5 @@
 import express from "express";
+import { buildFingerprintPatientPayload } from "../services/aiAnalyzeCacheService.js";
 
 import { attachOptionalAuth } from "../middleware/attachOptionalAuth.js";
 import { clinicalDemoRateLimiter } from "../middleware/clinicalDemoRateLimiter.js";
@@ -112,7 +113,10 @@ export function createAiAnalyzeRouter(deps) {
                 }) || diagnosisSeed || "To be determined by ClinIA";
                 const patient = safeBody;
                 let neutralizationMeta = null;
-                const fingerprint = makeFingerprint({ diagnosis, patient });
+                const fingerprint = makeFingerprint({
+                    diagnosis,
+                    patient: buildFingerprintPatientPayload(patient),
+                });
 
                 const isProd = process.env.NODE_ENV === "production";
                 const forceMock = process.env.CLINIA_FORCE_MOCK === "true";

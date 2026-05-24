@@ -150,6 +150,124 @@ function formatList(values: string[] | undefined) {
     return Array.isArray(values) ? values.join(", ") : "";
 }
 
+function normalizeStringArrayInput(value: unknown) {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+        .filter(Boolean);
+}
+
+function normalizeNumberInput(value: unknown) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value === "string" && value.trim() !== "") {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : undefined;
+    }
+
+    return undefined;
+}
+
+function normalizeOptionalStringInput(value: unknown) {
+    return typeof value === "string" ? value : undefined;
+}
+
+function buildPayloadFromImportedJson(
+    parsed: unknown,
+    fallbackCountry: string
+): ClinicalPayload | null {
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return null;
+    }
+
+    const source = parsed as Record<string, unknown>;
+    const age = normalizeNumberInput(source.age);
+    const sex =
+        source.sex === "male" || source.sex === "female" || source.sex === "other"
+            ? source.sex
+            : null;
+
+    if (!age || !sex) {
+        return null;
+    }
+
+    const bloodPressure =
+        source.blood_pressure &&
+        typeof source.blood_pressure === "object" &&
+        !Array.isArray(source.blood_pressure)
+            ? {
+                  systolic: normalizeNumberInput(
+                      (source.blood_pressure as Record<string, unknown>).systolic
+                  ),
+                  diastolic: normalizeNumberInput(
+                      (source.blood_pressure as Record<string, unknown>).diastolic
+                  ),
+              }
+            : undefined;
+
+    const diabetesContext =
+        source.diabetes_context &&
+        typeof source.diabetes_context === "object" &&
+        !Array.isArray(source.diabetes_context)
+            ? {
+                  cardiovascular_risk: normalizeOptionalStringInput(
+                      (source.diabetes_context as Record<string, unknown>)
+                          .cardiovascular_risk
+                  ),
+                  renal_function: normalizeOptionalStringInput(
+                      (source.diabetes_context as Record<string, unknown>)
+                          .renal_function
+                  ),
+                  fragility: normalizeOptionalStringInput(
+                      (source.diabetes_context as Record<string, unknown>).fragility
+                  ),
+                  tolerance: normalizeOptionalStringInput(
+                      (source.diabetes_context as Record<string, unknown>).tolerance
+                  ),
+                  glycemic_goals: normalizeOptionalStringInput(
+                      (source.diabetes_context as Record<string, unknown>)
+                          .glycemic_goals
+                  ),
+              }
+            : undefined;
+
+    return {
+        age,
+        sex,
+        country: typeof source.country === "string" ? source.country : fallbackCountry,
+        ethnicity:
+            source.ethnicity === "caucasian" ||
+            source.ethnicity === "black" ||
+            source.ethnicity === "asian" ||
+            source.ethnicity === "hispanic_latino" ||
+            source.ethnicity === "middle_eastern_north_african" ||
+            source.ethnicity === "indigenous" ||
+            source.ethnicity === "south_asian" ||
+            source.ethnicity === "southeast_asian" ||
+            source.ethnicity === "mixed" ||
+            source.ethnicity === "other" ||
+            source.ethnicity === "prefer_not_to_say"
+                ? source.ethnicity
+                : "prefer_not_to_say",
+        diagnosis: typeof source.diagnosis === "string" ? source.diagnosis : "",
+        weight: normalizeNumberInput(source.weight),
+        height: normalizeNumberInput(source.height),
+        blood_pressure:
+            bloodPressure?.systolic || bloodPressure?.diastolic
+                ? bloodPressure
+                : undefined,
+        symptoms: normalizeStringArrayInput(source.symptoms),
+        medical_history: normalizeStringArrayInput(source.medical_history),
+        current_medications: normalizeStringArrayInput(source.current_medications),
+        diabetes_context: diabetesContext,
+    };
+}
+
 function getBrowserCountryCode() {
     if (typeof navigator === "undefined") {
         return "";
@@ -248,13 +366,20 @@ function Field({
 // --------------------
 export function ClinicalForm({
                                  onSubmit,
+                                 onCompareSubmit,
                                  loading,
+                                 compareLoading = false,
                                  warningMessage,
                                  highlightFields = [],
                                  initialData,
                              }: {
     onSubmit: (payload: ClinicalPayload) => void;
+    onCompareSubmit?: (
+        firstPayload: ClinicalPayload,
+        secondPayload: ClinicalPayload
+    ) => void | Promise<void>;
     loading: boolean;
+    compareLoading?: boolean;
     warningMessage?: string;
     highlightFields?: string[];
     initialData?: ClinicalPayload | null;
@@ -265,6 +390,18 @@ export function ClinicalForm({
     const [selectedExampleCase, setSelectedExampleCase] = useState("");
     const [isDiabetesModalOpen, setIsDiabetesModalOpen] = useState(false);
     const [browserCountryCode, setBrowserCountryCode] = useState("");
+    const [jsonImportValue, setJsonImportValue] = useState("");
+    const [comparisonModeEnabled, setComparisonModeEnabled] = useState(false);
+    const [comparisonJsonCaseOne, setComparisonJsonCaseOne] = useState("");
+    const [comparisonJsonCaseTwo, setComparisonJsonCaseTwo] = useState("");
+    const [jsonImportFeedback, setJsonImportFeedback] = useState<{
+        type: "success" | "error";
+        message: string;
+    } | null>(null);
+    const [comparisonFeedback, setComparisonFeedback] = useState<{
+        type: "success" | "error";
+        message: string;
+    } | null>(null);
     const [diabetesModalValues, setDiabetesModalValues] = useState<{
         weight: string;
         cardiovascular_risk: string;
@@ -448,6 +585,58 @@ export function ClinicalForm({
         text: clinicalFormLabels.detectedCountryPrefix,
         targetLang,
     });
+    const { translated: jsonImportLabel } = useTranslation({
+        text: clinicalFormLabels.jsonImportLabel,
+        targetLang,
+    });
+    const { translated: jsonImportHelpLabel } = useTranslation({
+        text: clinicalFormLabels.jsonImportHelp,
+        targetLang,
+    });
+    const { translated: jsonImportPlaceholderLabel } = useTranslation({
+        text: clinicalFormLabels.jsonImportPlaceholder,
+        targetLang,
+    });
+    const { translated: jsonImportActionLabel } = useTranslation({
+        text: clinicalFormLabels.jsonImportAction,
+        targetLang,
+    });
+    const { translated: jsonImportSuccessLabel } = useTranslation({
+        text: clinicalFormLabels.jsonImportSuccess,
+        targetLang,
+    });
+    const { translated: jsonImportInvalidLabel } = useTranslation({
+        text: clinicalFormLabels.jsonImportInvalid,
+        targetLang,
+    });
+    const { translated: comparisonToggleLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonToggle,
+        targetLang,
+    });
+    const { translated: comparisonHelpLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonHelp,
+        targetLang,
+    });
+    const { translated: comparisonCaseOneLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonCaseOneLabel,
+        targetLang,
+    });
+    const { translated: comparisonCaseTwoLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonCaseTwoLabel,
+        targetLang,
+    });
+    const { translated: comparisonActionLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonAction,
+        targetLang,
+    });
+    const { translated: comparisonSuccessLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonSuccess,
+        targetLang,
+    });
+    const { translated: comparisonInvalidLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonInvalid,
+        targetLang,
+    });
     const { translated: ethnicityLabel } = useTranslation({
         text: clinicalFormLabels.ethnicityLabel,
         targetLang,
@@ -571,6 +760,70 @@ export function ClinicalForm({
         });
     }, []);
 
+    function handleJsonImport() {
+        try {
+            const parsed = JSON.parse(jsonImportValue);
+            const nextPayload = buildPayloadFromImportedJson(
+                parsed,
+                browserCountryCode
+            );
+
+            if (!nextPayload) {
+                setJsonImportFeedback({
+                    type: "error",
+                    message: jsonImportInvalidLabel,
+                });
+                return;
+            }
+
+            applyFormData(nextPayload);
+            setSelectedExampleCase("");
+            setJsonImportFeedback({
+                type: "success",
+                message: jsonImportSuccessLabel,
+            });
+        } catch {
+            setJsonImportFeedback({
+                type: "error",
+                message: jsonImportInvalidLabel,
+            });
+        }
+    }
+
+    async function handleComparisonImport() {
+        try {
+            const firstParsed = JSON.parse(comparisonJsonCaseOne);
+            const secondParsed = JSON.parse(comparisonJsonCaseTwo);
+            const firstPayload = buildPayloadFromImportedJson(
+                firstParsed,
+                browserCountryCode
+            );
+            const secondPayload = buildPayloadFromImportedJson(
+                secondParsed,
+                browserCountryCode
+            );
+
+            if (!firstPayload || !secondPayload || !onCompareSubmit) {
+                setComparisonFeedback({
+                    type: "error",
+                    message: comparisonInvalidLabel,
+                });
+                return;
+            }
+
+            await onCompareSubmit(firstPayload, secondPayload);
+            setComparisonFeedback({
+                type: "success",
+                message: comparisonSuccessLabel,
+            });
+        } catch {
+            setComparisonFeedback({
+                type: "error",
+                message: comparisonInvalidLabel,
+            });
+        }
+    }
+
     return (
         <div className="bg-white p-6 rounded border space-y-6">
             {warningMessage && (
@@ -623,6 +876,122 @@ export function ClinicalForm({
                     )}
                 </div>
             </div>
+
+            <Field highlight={isHighlighted("json_import")}>
+                <div className="space-y-2">
+                    <label htmlFor="clinical-json-import" className="text-sm font-medium text-gray-700">
+                        {jsonImportLabel}
+                    </label>
+                    <p className="text-xs text-gray-500">
+                        {jsonImportHelpLabel}
+                    </p>
+                    <textarea
+                        id="clinical-json-import"
+                        className="input min-h-36 w-full font-mono text-xs"
+                        placeholder={jsonImportPlaceholderLabel}
+                        value={jsonImportValue}
+                        onChange={(e) => {
+                            setJsonImportValue(e.target.value);
+                            if (jsonImportFeedback) {
+                                setJsonImportFeedback(null);
+                            }
+                        }}
+                    />
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                        <button
+                            type="button"
+                            onClick={handleJsonImport}
+                            className="rounded border border-sky-300 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-900 transition hover:bg-sky-100"
+                        >
+                            {jsonImportActionLabel}
+                        </button>
+                        {jsonImportFeedback ? (
+                            <p
+                                className={`text-xs ${
+                                    jsonImportFeedback.type === "success"
+                                        ? "text-emerald-700"
+                                        : "text-red-600"
+                                }`}
+                            >
+                                {jsonImportFeedback.message}
+                            </p>
+                        ) : null}
+                    </div>
+                </div>
+            </Field>
+
+            <Field highlight={isHighlighted("comparison_json_import")}>
+                <div className="space-y-3 rounded-xl border border-dashed border-sky-200 bg-sky-50/60 p-4">
+                    <label className="flex items-center gap-3 text-sm font-medium text-gray-700">
+                        <input
+                            type="checkbox"
+                            checked={comparisonModeEnabled}
+                            onChange={(e) => {
+                                setComparisonModeEnabled(e.target.checked);
+                                setComparisonFeedback(null);
+                            }}
+                        />
+                        {comparisonToggleLabel}
+                    </label>
+                    <p className="text-xs text-gray-600">{comparisonHelpLabel}</p>
+
+                    {comparisonModeEnabled ? (
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                <label className="space-y-1 text-sm text-gray-700">
+                                    <span className="font-medium">{comparisonCaseOneLabel}</span>
+                                    <textarea
+                                        className="input min-h-40 w-full font-mono text-xs"
+                                        placeholder={jsonImportPlaceholderLabel}
+                                        value={comparisonJsonCaseOne}
+                                        onChange={(e) => {
+                                            setComparisonJsonCaseOne(e.target.value);
+                                            if (comparisonFeedback) {
+                                                setComparisonFeedback(null);
+                                            }
+                                        }}
+                                    />
+                                </label>
+                                <label className="space-y-1 text-sm text-gray-700">
+                                    <span className="font-medium">{comparisonCaseTwoLabel}</span>
+                                    <textarea
+                                        className="input min-h-40 w-full font-mono text-xs"
+                                        placeholder={jsonImportPlaceholderLabel}
+                                        value={comparisonJsonCaseTwo}
+                                        onChange={(e) => {
+                                            setComparisonJsonCaseTwo(e.target.value);
+                                            if (comparisonFeedback) {
+                                                setComparisonFeedback(null);
+                                            }
+                                        }}
+                                    />
+                                </label>
+                            </div>
+                            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                                <button
+                                    type="button"
+                                    disabled={compareLoading}
+                                    onClick={handleComparisonImport}
+                                    className="rounded border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100 disabled:opacity-50"
+                                >
+                                    {comparisonActionLabel}
+                                </button>
+                                {comparisonFeedback ? (
+                                    <p
+                                        className={`text-xs ${
+                                            comparisonFeedback.type === "success"
+                                                ? "text-emerald-700"
+                                                : "text-red-600"
+                                        }`}
+                                    >
+                                        {comparisonFeedback.message}
+                                    </p>
+                                ) : null}
+                            </div>
+                        </div>
+                    ) : null}
+                </div>
+            </Field>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Field highlight={isHighlighted("age")}>
