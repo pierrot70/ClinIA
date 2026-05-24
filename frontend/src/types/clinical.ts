@@ -50,6 +50,7 @@ export interface ClinicalPayload {
     // Champs frontend pour pilotage IA
     forceReal?: boolean;
     openaiModel?: string;
+    reverifyRequested?: boolean;
 }
 
 /* ------------------------------------------------------------------ */

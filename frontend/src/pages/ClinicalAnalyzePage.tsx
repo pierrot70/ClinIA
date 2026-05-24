@@ -26,6 +26,7 @@ import type {
     ApiError,
     SecurityIncidentBlockingData,
 } from "../types/api";
+import { useAuth } from "../hooks/useAuth";
 
 type OpenAIModel = "gpt-4.1-mini" | "gpt-4-0613";
 
@@ -35,6 +36,7 @@ type OpenAIModel = "gpt-4.1-mini" | "gpt-4-0613";
 
 export function ClinicalAnalyzePage() {
     const COMMENT_TRACKING_STORAGE_KEY = "clinia_comment_tracking";
+    const { user } = useAuth();
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
     const [openaiModel, setOpenaiModel] = useState<OpenAIModel>("gpt-4.1-mini");
@@ -74,6 +76,8 @@ export function ClinicalAnalyzePage() {
         useState<string | null>(null);
     const [serviceMode, setServiceMode] =
         useState<"real" | "mock" | "degraded" | null>(null);
+    const [reverifyLoading, setReverifyLoading] = useState(false);
+    const [copyRequestFeedback, setCopyRequestFeedback] = useState<string | null>(null);
 
     const [forceReal, setForceReal] = useState(false);
 
@@ -211,6 +215,8 @@ export function ClinicalAnalyzePage() {
     /* ------------------------------------------------------------------ */
 
     async function handleSubmit(payload: ClinicalPayload) {
+        setReverifyLoading(false);
+        setCopyRequestFeedback(null);
         setComparisonPayloads(null);
         resetComparisonOne();
         resetComparisonTwo();
@@ -228,6 +234,7 @@ export function ClinicalAnalyzePage() {
         firstPayload: ClinicalPayload,
         secondPayload: ClinicalPayload
     ) {
+        setCopyRequestFeedback(null);
         resetAnalysis();
         setApiError(null);
         setBlockingIncident(null);
@@ -256,6 +263,50 @@ export function ClinicalAnalyzePage() {
             analyzeComparisonOne(safeFirstPayload),
             analyzeComparisonTwo(safeSecondPayload),
         ]);
+    }
+
+    async function handleReverifyAnalysis() {
+        if (!lastPayload || user?.role !== "SUPERADMIN") {
+            return;
+        }
+
+        setReverifyLoading(true);
+        setApiError(null);
+        setBlockingIncident(null);
+        setBlockingActionableMessage(null);
+
+        await analyze({
+            ...lastPayload,
+            reverifyRequested: true,
+            forceReal: true,
+            openaiModel,
+        });
+
+        setReverifyLoading(false);
+    }
+
+    async function handleCopyClinicalRequest() {
+        if (!lastPayload) {
+            return;
+        }
+
+        const {
+            forceReal: _forceReal,
+            openaiModel: _openaiModel,
+            reverifyRequested: _reverifyRequested,
+            ...debugPayload
+        } = lastPayload;
+
+        try {
+            await navigator.clipboard.writeText(
+                JSON.stringify(debugPayload, null, 2)
+            );
+            setCopyRequestFeedback("Requete JSON copiee dans le presse-papiers.");
+        } catch {
+            setCopyRequestFeedback(
+                "Impossible de copier automatiquement. Reessayez ou contactez un SUPERADMIN."
+            );
+        }
     }
 
     /* ------------------------------------------------------------------ */
@@ -690,6 +741,12 @@ export function ClinicalAnalyzePage() {
                         }}
                         sourceMode={serviceMode || undefined}
                         realAI={forceReal}
+                        canReverify={user?.role === "SUPERADMIN"}
+                        onReverify={handleReverifyAnalysis}
+                        reverifyLoading={reverifyLoading}
+                        canCopyRequest={Boolean(lastPayload)}
+                        onCopyRequest={handleCopyClinicalRequest}
+                        copyRequestFeedback={copyRequestFeedback}
                     />
                 </div>
             )}

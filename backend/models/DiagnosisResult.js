@@ -28,6 +28,41 @@ const DiagnosisResultSchema = new mongoose.Schema(
         model: {
             type: String,
         },
+
+        history: [
+            {
+                status: {
+                    type: String,
+                    enum: ["DELETE"],
+                    required: true,
+                },
+                archivedAt: {
+                    type: Date,
+                    required: true,
+                },
+                archivedBy: {
+                    userId: { type: String, default: null },
+                    username: { type: String, default: null },
+                    role: { type: String, default: null },
+                },
+                input: {
+                    type: Object,
+                    required: true,
+                },
+                output: {
+                    type: Object,
+                    required: true,
+                },
+                mode: {
+                    type: String,
+                    enum: ["mock", "real"],
+                    required: true,
+                },
+                model: {
+                    type: String,
+                },
+            },
+        ],
     },
     { timestamps: true }
 );

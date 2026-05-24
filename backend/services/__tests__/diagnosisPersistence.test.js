@@ -89,6 +89,77 @@ describe("diagnosisPersistence", () => {
         expect(result).toBeNull();
     });
 
+    it("archives the previous response as DELETE when a superadmin re-verifies a real result", async () => {
+        const save = vi.fn().mockResolvedValue(undefined);
+        const existing = {
+            mode: "real",
+            output: { diagnosis: { suspected: "Ancienne reponse" } },
+            input: { foo: "old" },
+            model: "old-model",
+            history: [],
+            save,
+            toObject: vi.fn(() => ({
+                mode: "real",
+                output: { diagnosis: { suspected: "Nouvelle reponse" } },
+                input: { foo: "new" },
+                model: "new-model",
+                history: [
+                    {
+                        status: "DELETE",
+                        archivedBy: {
+                            userId: "super-1",
+                            username: "root",
+                            role: "SUPERADMIN",
+                        },
+                    },
+                ],
+            })),
+        };
+
+        const duplicateError = new Error("duplicate");
+        duplicateError.code = 11000;
+
+        mockCreate.mockRejectedValue(duplicateError);
+        mockFindOne.mockResolvedValue(existing);
+
+        const result = await persistOrReuseDiagnosis(
+            {
+                fingerprint: "abc123",
+                input: { foo: "new" },
+                output: { diagnosis: { suspected: "Nouvelle reponse" } },
+                mode: "real",
+                model: "new-model",
+                replaceExisting: true,
+                archiveExistingAsDeleted: true,
+                archivedBy: {
+                    userId: "super-1",
+                    username: "root",
+                    role: "SUPERADMIN",
+                },
+            },
+            {
+                isPlaceholderClinicalAnalysis: () => false,
+                logger: { error: vi.fn() },
+            }
+        );
+
+        expect(existing.history).toHaveLength(1);
+        expect(existing.history[0]).toMatchObject({
+            status: "DELETE",
+            archivedBy: {
+                userId: "super-1",
+                username: "root",
+                role: "SUPERADMIN",
+            },
+            input: { foo: "old" },
+            output: { diagnosis: { suspected: "Ancienne reponse" } },
+            mode: "real",
+            model: "old-model",
+        });
+        expect(save).toHaveBeenCalledTimes(1);
+        expect(result.ok).toBe(true);
+    });
+
     it("upgrades persisted diagnosis output without exposing model calls to the route", async () => {
         mockUpdateOne.mockResolvedValue({ acknowledged: true });
 

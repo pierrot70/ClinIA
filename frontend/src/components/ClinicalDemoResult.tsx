@@ -34,6 +34,12 @@ interface ClinicalDemoResultProps {
   sourceMode?: string;
   realAI?: boolean;
   patientDisplayName?: string;
+  canReverify?: boolean;
+  onReverify?: () => void;
+  reverifyLoading?: boolean;
+  canCopyRequest?: boolean;
+  onCopyRequest?: () => void;
+  copyRequestFeedback?: string | null;
 }
 
 function buildPatientSummaryLabel(patientDisplayName?: string) {
@@ -69,6 +75,12 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   sourceMode,
   realAI,
   patientDisplayName,
+  canReverify,
+  onReverify,
+  reverifyLoading,
+  canCopyRequest,
+  onCopyRequest,
+  copyRequestFeedback,
 }) => {
   const {
     treatments,
@@ -259,7 +271,37 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
     <div className="space-y-6">
       {/* Résumé patient */}
       <section>
-        <h2 className="text-lg font-semibold mb-2">{patientSummaryLabel}</h2>
+        <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-semibold">{patientSummaryLabel}</h2>
+          <div className="flex flex-col gap-2 sm:items-end">
+            <div className="flex flex-wrap gap-2">
+              {canCopyRequest ? (
+                <button
+                  type="button"
+                  onClick={onCopyRequest}
+                  className="rounded border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-900 transition hover:bg-sky-100"
+                >
+                  Copier la requete JSON
+                </button>
+              ) : null}
+              {canReverify ? (
+                <button
+                  type="button"
+                  onClick={onReverify}
+                  disabled={reverifyLoading}
+                  className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
+                >
+                  {reverifyLoading
+                    ? "Verification OpenAI en cours..."
+                    : "Relancer pour verification (SUPERADMIN)"}
+                </button>
+              ) : null}
+            </div>
+            {copyRequestFeedback ? (
+              <p className="text-xs text-sky-700">{copyRequestFeedback}</p>
+            ) : null}
+          </div>
+        </div>
         <p className="text-gray-700 text-sm mb-4">{summary || patientSummaryLabel}</p>
         {clinical_summary && (
           <div className="bg-gray-50 border rounded-lg p-3 mb-2">
@@ -361,7 +403,12 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
       {/* Cartes de traitements */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {(mappedTreatments ?? []).map((t, i) => (
-          <TreatmentCard key={i} treatment={t} />
+          <TreatmentCard
+            key={i}
+            treatment={t}
+            sourceMode={sourceMode}
+            realAI={realAI}
+          />
         ))}
       </section>
 

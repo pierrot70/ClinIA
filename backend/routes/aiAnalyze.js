@@ -1,5 +1,6 @@
 import express from "express";
 import { buildFingerprintPatientPayload } from "../services/aiAnalyzeCacheService.js";
+import { AUTH_ROLES } from "../auth/constants.js";
 
 import { attachOptionalAuth } from "../middleware/attachOptionalAuth.js";
 import { clinicalDemoRateLimiter } from "../middleware/clinicalDemoRateLimiter.js";
@@ -83,7 +84,22 @@ export function createAiAnalyzeRouter(deps) {
                     forceReal,
                     openaiModel,
                     incidentAckId,
+                    reverifyRequested,
                 } = safeBody;
+
+                if (
+                    reverifyRequested === true &&
+                    req.auth?.role !== AUTH_ROLES.SUPERADMIN
+                ) {
+                    return res.status(403).json({
+                        error: {
+                            code: "INTERNAL_ERROR",
+                            message:
+                                "Seul un SUPERADMIN peut relancer une analyse verifiee.",
+                            retryable: false,
+                        },
+                    });
+                }
 
                 const diagnosisInput =
                     typeof safeBody.diagnosis === "string"
@@ -188,6 +204,8 @@ export function createAiAnalyzeRouter(deps) {
                     normalizeClinicalAnalysis,
                     isPlaceholderClinicalAnalysis,
                 });
+                const shouldBypassCacheForReverify =
+                    reverifyRequested === true;
 
                 if (cachedDiagnosisIsPlaceholderReal) {
                     console.log("AI_CACHE_SKIP_PLACEHOLDER_REAL", {
@@ -204,7 +222,7 @@ export function createAiAnalyzeRouter(deps) {
                     });
                 }
 
-                if (canReuseCachedDiagnosis) {
+                if (canReuseCachedDiagnosis && !shouldBypassCacheForReverify) {
                     if (cacheNeedsUpgrade) {
                         upgradePersistedDiagnosisOutput(
                             fingerprint,
@@ -304,6 +322,8 @@ export function createAiAnalyzeRouter(deps) {
                     normalized,
                     model,
                     forceRealSafe,
+                    reverifyRequested: reverifyRequested === true,
+                    reqAuth: req.auth,
                     neutralizationMeta,
                     persistOrReuseDiagnosis,
                 });

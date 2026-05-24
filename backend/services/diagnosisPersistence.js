@@ -32,6 +32,25 @@ export async function persistOrReuseDiagnosis(payload, deps = {}) {
                     (existingIsPlaceholderReal && incomingIsMeaningfulReal) ||
                     shouldReplaceExistingReal
                 ) {
+                    if (payload.archiveExistingAsDeleted === true) {
+                        existing.history = Array.isArray(existing.history)
+                            ? existing.history
+                            : [];
+                        existing.history.push({
+                            status: "DELETE",
+                            archivedAt: new Date(),
+                            archivedBy: {
+                                userId: payload.archivedBy?.userId ?? null,
+                                username: payload.archivedBy?.username ?? null,
+                                role: payload.archivedBy?.role ?? null,
+                            },
+                            input: existing.input,
+                            output: existing.output,
+                            mode: existing.mode,
+                            model: existing.model,
+                        });
+                    }
+
                     existing.input = payload.input;
                     existing.output = payload.output;
                     existing.mode = payload.mode;

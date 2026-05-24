@@ -68,6 +68,8 @@ export async function buildPersistedRealAnalyzeResponse({
     normalized,
     model,
     forceRealSafe,
+    reverifyRequested = false,
+    reqAuth,
     neutralizationMeta,
     persistOrReuseDiagnosis,
     logger = console,
@@ -78,7 +80,15 @@ export async function buildPersistedRealAnalyzeResponse({
         output: normalized,
         mode: "real",
         model: model ?? "unknown",
-        replaceExisting: forceRealSafe,
+        replaceExisting: forceRealSafe || reverifyRequested,
+        archiveExistingAsDeleted: reverifyRequested,
+        archivedBy: reverifyRequested
+            ? {
+                  userId: reqAuth?.userId ?? null,
+                  username: reqAuth?.username ?? null,
+                  role: reqAuth?.role ?? null,
+              }
+            : undefined,
     });
 
     logger.log("AI_RESPONSE From OpenAI", {
@@ -96,6 +106,7 @@ export async function buildPersistedRealAnalyzeResponse({
         meta: {
             source: "real",
             model,
+            ...(reverifyRequested === true ? { reverified: true } : {}),
             ...neutralizationMeta,
         },
     };
