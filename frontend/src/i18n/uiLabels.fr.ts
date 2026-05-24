@@ -302,6 +302,30 @@ export const UI_LABELS_FR = {
     },
     // ClinicalAnalyzePage.tsx - expérience /clinical-demo.
     clinicalDemo: {
+        form: {
+            countryLabel: "Pays du patient",
+            countryPlaceholder: "Selectionner un pays",
+            countryHelp:
+                "Le pays est preselectionne a partir des parametres du navigateur lorsque l'information est disponible.",
+            detectedCountryPrefix: "Pays detecte par le navigateur :",
+            ethnicityLabel: "Ethnicite du patient",
+            ethnicityHelp:
+                "Selectionnez l'ethnicite la plus pertinente pour le contexte clinique si elle est connue.",
+            ethnicityOptions: {
+                caucasian: "Caucasien",
+                black: "Noir",
+                asian: "Asiatique",
+                hispanicLatino: "Hispanique ou Latino",
+                middleEasternNorthAfrican:
+                    "Moyen-Oriental ou Nord-Africain",
+                indigenous: "Autochtone",
+                southAsian: "Sud-Asiatique",
+                southeastAsian: "Asie du Sud-Est",
+                mixed: "Mixte",
+                other: "Autre",
+                preferNotToSay: "Prefere ne pas repondre",
+            },
+        },
         // ClinicalAnalyzePage.tsx - bloc commentaires et consultation des réponses.
         comments: {
             leaveComment: "Laisser un commentaire",

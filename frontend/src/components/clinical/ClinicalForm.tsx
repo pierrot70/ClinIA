@@ -5,14 +5,40 @@ import { labels } from "../../i18n/uiLabels";
 import type {
     ClinicalPayload,
     DiabetesClinicalContext,
+    PatientEthnicity,
     Sex,
 } from "../../types/clinical";
 
 const CACHE_KEY = "clinia_last_clinical_payload";
+const COUNTRY_CODES = [
+    "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT",
+    "AU", "AW", "AX", "AZ", "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI",
+    "BJ", "BL", "BM", "BN", "BO", "BQ", "BR", "BS", "BT", "BV", "BW", "BY",
+    "BZ", "CA", "CC", "CD", "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN",
+    "CO", "CR", "CU", "CV", "CW", "CX", "CY", "CZ", "DE", "DJ", "DK", "DM",
+    "DO", "DZ", "EC", "EE", "EG", "EH", "ER", "ES", "ET", "FI", "FJ", "FK",
+    "FM", "FO", "FR", "GA", "GB", "GD", "GE", "GF", "GG", "GH", "GI", "GL",
+    "GM", "GN", "GP", "GQ", "GR", "GS", "GT", "GU", "GW", "GY", "HK", "HM",
+    "HN", "HR", "HT", "HU", "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR",
+    "IS", "IT", "JE", "JM", "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN",
+    "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC", "LI", "LK", "LR", "LS",
+    "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME", "MF", "MG", "MH", "MK",
+    "ML", "MM", "MN", "MO", "MP", "MQ", "MR", "MS", "MT", "MU", "MV", "MW",
+    "MX", "MY", "MZ", "NA", "NC", "NE", "NF", "NG", "NI", "NL", "NO", "NP",
+    "NR", "NU", "NZ", "OM", "PA", "PE", "PF", "PG", "PH", "PK", "PL", "PM",
+    "PN", "PR", "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RS", "RU", "RW",
+    "SA", "SB", "SC", "SD", "SE", "SG", "SH", "SI", "SJ", "SK", "SL", "SM",
+    "SN", "SO", "SR", "SS", "ST", "SV", "SX", "SY", "SZ", "TC", "TD", "TF",
+    "TG", "TH", "TJ", "TK", "TL", "TM", "TN", "TO", "TR", "TT", "TV", "TW",
+    "TZ", "UA", "UG", "UM", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI",
+    "VN", "VU", "WF", "WS", "YE", "YT", "ZA", "ZM", "ZW",
+] as const;
 
 const EMPTY_FORM: ClinicalPayload = {
     age: 55,
     sex: "male",
+    country: "",
+    ethnicity: "prefer_not_to_say",
     diagnosis: "",
     symptoms: [],
     medical_history: [],
@@ -104,6 +130,8 @@ function clonePayload(payload: ClinicalPayload): ClinicalPayload {
         diabetes_context: payload.diabetes_context
             ? { ...payload.diabetes_context }
             : undefined,
+        country: payload.country ?? "",
+        ethnicity: payload.ethnicity ?? "prefer_not_to_say",
         symptoms: [...payload.symptoms],
         medical_history: [...payload.medical_history],
         current_medications: [...payload.current_medications],
@@ -120,6 +148,56 @@ function normalize(value: string | undefined) {
 
 function formatList(values: string[] | undefined) {
     return Array.isArray(values) ? values.join(", ") : "";
+}
+
+function getBrowserCountryCode() {
+    if (typeof navigator === "undefined") {
+        return "";
+    }
+
+    const localeCandidates = [
+        ...(Array.isArray(navigator.languages) ? navigator.languages : []),
+        navigator.language,
+    ].filter(Boolean);
+
+    for (const locale of localeCandidates) {
+        const parts = String(locale)
+            .replace("_", "-")
+            .split("-");
+        const region = parts
+            .slice(1)
+            .find((part) => /^[A-Z]{2}$/.test(part.toUpperCase()));
+        if (region) {
+            return region.toUpperCase();
+        }
+    }
+
+    return "";
+}
+
+function buildCountryOptions(targetLang: string) {
+    const displayNames =
+        typeof Intl !== "undefined" && typeof Intl.DisplayNames === "function"
+            ? new Intl.DisplayNames([targetLang, "fr", "en"], { type: "region" })
+            : null;
+
+    return COUNTRY_CODES.map((code) => ({
+        value: code,
+        label: displayNames?.of(code) ?? code,
+    })).sort((a, b) => a.label.localeCompare(b.label, targetLang));
+}
+
+function getCountryLabel(code: string, targetLang: string) {
+    if (!code) {
+        return "";
+    }
+
+    const displayNames =
+        typeof Intl !== "undefined" && typeof Intl.DisplayNames === "function"
+            ? new Intl.DisplayNames([targetLang, "fr", "en"], { type: "region" })
+            : null;
+
+    return displayNames?.of(code) ?? code;
 }
 
 // --------------------
@@ -186,6 +264,7 @@ export function ClinicalForm({
     );
     const [selectedExampleCase, setSelectedExampleCase] = useState("");
     const [isDiabetesModalOpen, setIsDiabetesModalOpen] = useState(false);
+    const [browserCountryCode, setBrowserCountryCode] = useState("");
     const [diabetesModalValues, setDiabetesModalValues] = useState<{
         weight: string;
         cardiovascular_risk: string;
@@ -335,6 +414,7 @@ export function ClinicalForm({
     // Récupérer la langue courante
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
+    const clinicalFormLabels = labels.clinicalDemo.form;
     const commentLabels = labels.clinicalDemo.comments;
 
 
@@ -352,9 +432,73 @@ export function ClinicalForm({
     const { translated: patient6Label } = useTranslation({ text: "Diabete Type 2", targetLang });
     const { translated: ageLabel } = useTranslation({ text: "Age du patient", targetLang });
     const { translated: sexLabel } = useTranslation({ text: "Sexe", targetLang });
+    const { translated: countryLabel } = useTranslation({
+        text: clinicalFormLabels.countryLabel,
+        targetLang,
+    });
+    const { translated: countryHelpLabel } = useTranslation({
+        text: clinicalFormLabels.countryHelp,
+        targetLang,
+    });
+    const { translated: countryPlaceholderLabel } = useTranslation({
+        text: clinicalFormLabels.countryPlaceholder,
+        targetLang,
+    });
+    const { translated: detectedCountryPrefixLabel } = useTranslation({
+        text: clinicalFormLabels.detectedCountryPrefix,
+        targetLang,
+    });
+    const { translated: ethnicityLabel } = useTranslation({
+        text: clinicalFormLabels.ethnicityLabel,
+        targetLang,
+    });
+    const { translated: ethnicityHelpLabel } = useTranslation({
+        text: clinicalFormLabels.ethnicityHelp,
+        targetLang,
+    });
     const { translated: maleLabel } = useTranslation({ text: "Homme", targetLang });
     const { translated: femaleLabel } = useTranslation({ text: "Femme", targetLang });
     const { translated: otherLabel } = useTranslation({ text: "Autre", targetLang });
+    const { translated: caucasianLabel } = useTranslation({
+        text: clinicalFormLabels.ethnicityOptions.caucasian,
+        targetLang,
+    });
+    const { translated: blackLabel } = useTranslation({
+        text: clinicalFormLabels.ethnicityOptions.black,
+        targetLang,
+    });
+    const { translated: asianLabel } = useTranslation({
+        text: clinicalFormLabels.ethnicityOptions.asian,
+        targetLang,
+    });
+    const { translated: hispanicLatinoLabel } = useTranslation({
+        text: clinicalFormLabels.ethnicityOptions.hispanicLatino,
+        targetLang,
+    });
+    const { translated: middleEasternNorthAfricanLabel } = useTranslation({
+        text: clinicalFormLabels.ethnicityOptions.middleEasternNorthAfrican,
+        targetLang,
+    });
+    const { translated: indigenousLabel } = useTranslation({
+        text: clinicalFormLabels.ethnicityOptions.indigenous,
+        targetLang,
+    });
+    const { translated: southAsianLabel } = useTranslation({
+        text: clinicalFormLabels.ethnicityOptions.southAsian,
+        targetLang,
+    });
+    const { translated: southeastAsianLabel } = useTranslation({
+        text: clinicalFormLabels.ethnicityOptions.southeastAsian,
+        targetLang,
+    });
+    const { translated: mixedLabel } = useTranslation({
+        text: clinicalFormLabels.ethnicityOptions.mixed,
+        targetLang,
+    });
+    const { translated: preferNotToSayLabel } = useTranslation({
+        text: clinicalFormLabels.ethnicityOptions.preferNotToSay,
+        targetLang,
+    });
     const { translated: weightLabel } = useTranslation({ text: "Poids du patient (kg)", targetLang });
     const { translated: heightLabel } = useTranslation({ text: "Taille du patient (cm)", targetLang });
     const { translated: diagnosisLabel } = useTranslation({ text: "Diagnostic / motif clinique principal", targetLang });
@@ -388,6 +532,44 @@ export function ClinicalForm({
         { value: "female", label: femaleLabel },
         { value: "other", label: otherLabel },
     ];
+    const countryOptions = buildCountryOptions(targetLang);
+    const detectedCountryLabel = getCountryLabel(browserCountryCode, targetLang);
+    const ethnicityOptions: Array<{ value: PatientEthnicity; label: string }> = [
+        { value: "caucasian", label: caucasianLabel },
+        { value: "black", label: blackLabel },
+        { value: "asian", label: asianLabel },
+        { value: "hispanic_latino", label: hispanicLatinoLabel },
+        {
+            value: "middle_eastern_north_african",
+            label: middleEasternNorthAfricanLabel,
+        },
+        { value: "indigenous", label: indigenousLabel },
+        { value: "south_asian", label: southAsianLabel },
+        { value: "southeast_asian", label: southeastAsianLabel },
+        { value: "mixed", label: mixedLabel },
+        { value: "other", label: otherLabel },
+        { value: "prefer_not_to_say", label: preferNotToSayLabel },
+    ];
+
+    useEffect(() => {
+        const browserCountry = getBrowserCountryCode();
+        setBrowserCountryCode(browserCountry);
+
+        setForm((prev) => {
+            if (prev.country) {
+                return prev;
+            }
+
+            if (!browserCountry) {
+                return prev;
+            }
+
+            return {
+                ...prev,
+                country: browserCountry,
+            };
+        });
+    }, []);
 
     return (
         <div className="bg-white p-6 rounded border space-y-6">
@@ -482,6 +664,62 @@ export function ClinicalForm({
                             onChange={(e) => update("sex", e.target.value as Sex)}
                         >
                             {sexOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </Field>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Field highlight={isHighlighted("country")}>
+                    <div className="space-y-1">
+                        <label htmlFor="clinical-country" className="text-sm font-medium text-gray-700">
+                            {countryLabel}
+                        </label>
+                        <p className="text-xs text-gray-500">
+                            {countryHelpLabel}
+                        </p>
+                        {browserCountryCode ? (
+                            <p className="text-xs font-medium text-sky-700">
+                                {detectedCountryPrefixLabel} {detectedCountryLabel} ({browserCountryCode})
+                            </p>
+                        ) : null}
+                        <select
+                            id="clinical-country"
+                            className="input w-full"
+                            value={form.country ?? ""}
+                            onChange={(e) => update("country", e.target.value)}
+                        >
+                            <option value="">{countryPlaceholderLabel}</option>
+                            {countryOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </Field>
+
+                <Field highlight={isHighlighted("ethnicity")}>
+                    <div className="space-y-1">
+                        <label htmlFor="clinical-ethnicity" className="text-sm font-medium text-gray-700">
+                            {ethnicityLabel}
+                        </label>
+                        <p className="text-xs text-gray-500">
+                            {ethnicityHelpLabel}
+                        </p>
+                        <select
+                            id="clinical-ethnicity"
+                            className="input w-full"
+                            value={form.ethnicity ?? "prefer_not_to_say"}
+                            onChange={(e) =>
+                                update("ethnicity", e.target.value as PatientEthnicity)
+                            }
+                        >
+                            {ethnicityOptions.map((option) => (
                                 <option key={option.value} value={option.value}>
                                     {option.label}
                                 </option>

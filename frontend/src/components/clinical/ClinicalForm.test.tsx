@@ -12,6 +12,50 @@ vi.mock("../../hooks/useTranslation", () => ({
 }));
 
 describe("ClinicalForm", () => {
+    it("defaults the country from the browser locale and submits the selected ethnicity", () => {
+        const onSubmit = vi.fn();
+
+        Object.defineProperty(window.navigator, "languages", {
+            configurable: true,
+            value: ["fr-CA"],
+        });
+
+        render(
+            <ClinicalForm
+                onSubmit={onSubmit}
+                loading={false}
+                initialData={{
+                    age: 55,
+                    sex: "male",
+                    diagnosis: "",
+                    symptoms: [],
+                    medical_history: [],
+                    current_medications: [],
+                }}
+            />
+        );
+
+        expect(screen.getByLabelText("Pays du patient")).toHaveValue("CA");
+        expect(
+            screen.getByText("Pays detecte par le navigateur : Canada (CA)")
+        ).toBeInTheDocument();
+        expect(screen.getByLabelText("Ethnicite du patient")).toHaveValue(
+            "prefer_not_to_say"
+        );
+
+        fireEvent.change(screen.getByLabelText("Ethnicite du patient"), {
+            target: { value: "asian" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Analyser" }));
+
+        expect(onSubmit).toHaveBeenCalledWith(
+            expect.objectContaining({
+                country: "CA",
+                ethnicity: "asian",
+            })
+        );
+    });
+
     it("preserves spaces while typing in medical history", () => {
         render(
             <ClinicalForm

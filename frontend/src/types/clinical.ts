@@ -6,6 +6,18 @@
 
 export type Sex = "male" | "female" | "other";
 export type AIServiceSource = "real" | "mock" | "degraded";
+export type PatientEthnicity =
+    | "caucasian"
+    | "black"
+    | "asian"
+    | "hispanic_latino"
+    | "middle_eastern_north_african"
+    | "indigenous"
+    | "south_asian"
+    | "southeast_asian"
+    | "mixed"
+    | "other"
+    | "prefer_not_to_say";
 
 export interface DiabetesClinicalContext {
     cardiovascular_risk?: string;
@@ -18,6 +30,8 @@ export interface DiabetesClinicalContext {
 export interface ClinicalPayload {
     age: number;
     sex: Sex;
+    country?: string;
+    ethnicity?: PatientEthnicity;
     diagnosis?: string;
 
     weight?: number;
