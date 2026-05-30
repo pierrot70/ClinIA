@@ -248,20 +248,22 @@ describe("ClinicalAnalyzePage", () => {
             })
         ).toBeInTheDocument();
         expect(
-            screen.getByText("Lecture rapide des differences cliniques")
-        ).toBeInTheDocument();
+            screen.getAllByText("Lecture rapide des differences cliniques").length
+        ).toBeGreaterThanOrEqual(1);
+        expect(screen.getByText("Lecture mobile essentielle")).toBeInTheDocument();
+        expect(
+            screen.getAllByText(
+                "Ouvrez le detail complet pour consulter les differences cliniques, les points de vigilance et le raisonnement sous-jacent."
+            )
+        ).toHaveLength(2);
+        fireEvent.click(screen.getAllByRole("button", { name: /Lecture rapide des differences cliniques/i })[0]);
+        expect(screen.getByText("Differences majeures")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: /Lecture mobile essentielle/i }));
+        expect(screen.getAllByText("Cas 1").length).toBeGreaterThanOrEqual(1);
         expect(screen.getByText("Risque cardio-renal")).toBeInTheDocument();
         expect(screen.getByText("Contraste marque")).toBeInTheDocument();
         expect(screen.getAllByText("Point de vigilance principal")).toHaveLength(2);
-        expect(
-            screen.getByText(
-                "fonction renale a verifier en priorite avant de pondérer les options"
-            )
-        ).toBeInTheDocument();
-        expect(screen.getAllByText("Micro-synthese scannable")).toHaveLength(2);
-        expect(
-            screen.getByText("Priorite: privilegier la lecture du benefice cardio-renal")
-        ).toBeInTheDocument();
+        expect(screen.getAllByText("Micro-synthese scannable").length).toBeGreaterThanOrEqual(2);
         expect(
             screen.getByText(
                 "Place clinique relative selon l'age et le contexte - comparaison visuelle"

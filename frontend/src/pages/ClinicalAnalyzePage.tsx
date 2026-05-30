@@ -93,6 +93,9 @@ export function ClinicalAnalyzePage() {
     const [replyLookupLoading, setReplyLookupLoading] = useState(false);
     const [replyLookupError, setReplyLookupError] = useState("");
     const [replyLookupItems, setReplyLookupItems] = useState<ClinicianComment[]>([]);
+    const [mobileComparisonSection, setMobileComparisonSection] = useState<
+        "quick" | "focus" | null
+    >(null);
     const demoScenario = getClinicalDemoScenario(lastPayload);
 
     /* ------------------------------------------------------------------ */
@@ -593,6 +596,13 @@ export function ClinicalAnalyzePage() {
               ),
           ]
         : [];
+    const mobileQuickFacts = comparisonQuickFacts.slice(0, 3);
+
+    function toggleMobileComparisonSection(section: "quick" | "focus") {
+        setMobileComparisonSection((current) =>
+            current === section ? null : section
+        );
+    }
     const { translated: leaveCommentLabel, loading: loadingLeaveComment, error: errorLeaveComment } = useTranslation({ text: commentLabels.leaveComment, targetLang, openaiModel });
     const { translated: leaveCommentTooltipLabel } = useTranslation({ text: commentLabels.leaveCommentTooltip, targetLang, openaiModel });
     const { translated: openaiModelTooltipLabel } = useTranslation({ text: commentLabels.openaiModelTooltip, targetLang, openaiModel });
@@ -904,7 +914,7 @@ export function ClinicalAnalyzePage() {
                             ) : null}
                         </div>
                     </div>
-                    <section className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm">
+                    <section className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm md:block hidden">
                         <h2 className="text-lg font-semibold text-gray-900">
                             {comparisonLabels.quickViewTitle}
                         </h2>
@@ -959,7 +969,127 @@ export function ClinicalAnalyzePage() {
                             ))}
                         </div>
                     </section>
-                    <section className="rounded-xl border border-sky-200 bg-white p-5 shadow-sm">
+                    <section className="rounded-xl border border-sky-200 bg-white p-5 shadow-sm md:hidden">
+                        <div className="space-y-3">
+                            <article className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+                                <button
+                                    type="button"
+                                    onClick={() => toggleMobileComparisonSection("quick")}
+                                    aria-expanded={mobileComparisonSection === "quick"}
+                                    className="flex w-full items-start justify-between gap-3 text-left"
+                                >
+                                    <div>
+                                        <h2 className="text-lg font-semibold text-gray-900">
+                                            {comparisonLabels.quickViewTitle}
+                                        </h2>
+                                        <p className="mt-1 text-sm text-gray-700">
+                                            {comparisonLabels.mobileDrillDownHint}
+                                        </p>
+                                    </div>
+                                    <span className="rounded-full border border-emerald-300 bg-white px-2 py-1 text-[11px] font-semibold text-emerald-800">
+                                        {mobileComparisonSection === "quick"
+                                            ? comparisonLabels.mobileCollapse
+                                            : comparisonLabels.mobileExpand}
+                                    </span>
+                                </button>
+                                {mobileComparisonSection === "quick" ? (
+                                    <div className="mt-4 rounded-xl border border-emerald-200 bg-white p-3">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                                            {comparisonLabels.mobileDifferencesTitle}
+                                        </p>
+                                        <div className="mt-3 space-y-2">
+                                            {mobileQuickFacts.map((fact) => (
+                                                <div
+                                                    key={fact.label}
+                                                    className="rounded-lg border border-emerald-100 bg-emerald-50/50 px-3 py-2"
+                                                >
+                                                    <p className="text-xs font-semibold text-emerald-900">
+                                                        {fact.label}
+                                                    </p>
+                                                    <p className="mt-1 text-xs text-gray-700">
+                                                        {comparisonLabels.mobileFocusCaseOne}: {fact.first}
+                                                    </p>
+                                                    <p className="text-xs text-gray-700">
+                                                        {comparisonLabels.mobileFocusCaseTwo}: {fact.second}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : null}
+                            </article>
+                            <article className="rounded-xl border border-sky-200 bg-sky-50/70 p-4">
+                                <button
+                                    type="button"
+                                    onClick={() => toggleMobileComparisonSection("focus")}
+                                    aria-expanded={mobileComparisonSection === "focus"}
+                                    className="flex w-full items-start justify-between gap-3 text-left"
+                                >
+                                    <div>
+                                        <h2 className="text-lg font-semibold text-gray-900">
+                                            {comparisonLabels.mobileFocusTitle}
+                                        </h2>
+                                        <p className="mt-1 text-sm text-gray-700">
+                                            {comparisonLabels.mobileDrillDownHint}
+                                        </p>
+                                    </div>
+                                    <span className="rounded-full border border-sky-300 bg-white px-2 py-1 text-[11px] font-semibold text-sky-800">
+                                        {mobileComparisonSection === "focus"
+                                            ? comparisonLabels.mobileCollapse
+                                            : comparisonLabels.mobileExpand}
+                                    </span>
+                                </button>
+                                {mobileComparisonSection === "focus" ? (
+                                    <div className="mt-4 space-y-3">
+                                        <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+                                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-800">
+                                                {comparisonLabels.mobileFocusCaseOne}
+                                            </p>
+                                            <p className="mt-1 text-sm font-medium text-rose-900">
+                                                {buildPrimaryAlert(comparisonPayloads.first).message}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+                                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-800">
+                                                {comparisonLabels.mobileFocusCaseTwo}
+                                            </p>
+                                            <p className="mt-1 text-sm font-medium text-rose-900">
+                                                {buildPrimaryAlert(comparisonPayloads.second).message}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-lg border border-sky-100 bg-white p-3">
+                                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
+                                                {comparisonLabels.microSummaryTitle}
+                                            </p>
+                                            <ul className="mt-3 space-y-2 text-sm text-gray-700">
+                                                {buildMicroSummary(comparisonPayloads.first)
+                                                    .slice(0, 2)
+                                                    .map((item) => (
+                                                        <li
+                                                            key={`first-${item}`}
+                                                            className="rounded-md bg-sky-50 px-3 py-2"
+                                                        >
+                                                            {comparisonLabels.mobileFocusCaseOne}: {item}
+                                                        </li>
+                                                    ))}
+                                                {buildMicroSummary(comparisonPayloads.second)
+                                                    .slice(0, 2)
+                                                    .map((item) => (
+                                                        <li
+                                                            key={`second-${item}`}
+                                                            className="rounded-md bg-sky-50 px-3 py-2"
+                                                        >
+                                                            {comparisonLabels.mobileFocusCaseTwo}: {item}
+                                                        </li>
+                                                    ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                ) : null}
+                            </article>
+                        </div>
+                    </section>
+                    <section className="hidden rounded-xl border border-sky-200 bg-white p-5 shadow-sm md:block">
                         <h2 className="text-lg font-semibold text-gray-900">
                             {comparisonLabels.generatedSummaryTitle}
                         </h2>
@@ -1059,7 +1189,7 @@ export function ClinicalAnalyzePage() {
                     </section>
                     {comparisonScenarioOne.relevanceByAgeChart &&
                         comparisonScenarioTwo.relevanceByAgeChart && (
-                            <section className="rounded-xl border border-sky-200 bg-white p-5 shadow-sm">
+                            <section className="hidden rounded-xl border border-sky-200 bg-white p-5 shadow-sm md:block">
                                 <h2 className="text-lg font-semibold text-gray-900">
                                     {comparisonLabels.relevanceChartTitle}
                                 </h2>

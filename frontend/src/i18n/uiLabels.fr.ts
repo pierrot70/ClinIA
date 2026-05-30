@@ -349,6 +349,16 @@ export const UI_LABELS_FR = {
             quickViewTitle: "Lecture rapide des differences cliniques",
             quickViewHelp:
                 "Ce resume met en avant les ecarts les plus utiles pour orienter la lecture avant les details complets.",
+            mobileFocusTitle: "Lecture mobile essentielle",
+            mobileFocusHelp:
+                "Sur telephone, ClinIA garde seulement les reperes les plus utiles pour un balayage rapide.",
+            mobileDrillDownHint:
+                "Ouvrez le detail complet pour consulter les differences cliniques, les points de vigilance et le raisonnement sous-jacent.",
+            mobileExpand: "Touchez pour ouvrir",
+            mobileCollapse: "Touchez pour reduire",
+            mobileDifferencesTitle: "Differences majeures",
+            mobileFocusCaseOne: "Cas 1",
+            mobileFocusCaseTwo: "Cas 2",
             quickViewAgeLabel: "Age",
             quickViewSexLabel: "Sexe",
             quickViewCardioRiskLabel: "Risque cardio-renal",
