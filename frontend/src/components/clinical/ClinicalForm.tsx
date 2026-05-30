@@ -121,6 +121,50 @@ const EXAMPLE_CASES: Record<string, ClinicalPayload> = {
     },
 };
 
+const COMPARISON_CASE_ONE: ClinicalPayload = {
+    age: 58,
+    sex: "male",
+    country: "CA",
+    ethnicity: "caucasian",
+    diagnosis: "Diabete de type 2",
+    symptoms: ["Hyperglycemie persistante", "Prise de poids progressive", "Fatigue"],
+    medical_history: [
+        "Hypertension arterielle",
+        "Dyslipidemie",
+        "Maladie cardiovasculaire aterosclerotique",
+    ],
+    current_medications: ["Metformine"],
+    diabetes_context: {
+        cardiovascular_risk: "Eleve",
+        renal_function: "Preservee ou legerement reduite",
+        fragility: "Faible",
+        tolerance: "Bonne tolerance a la metformine",
+        glycemic_goals: "HbA1c < 7 % si securitaire et realiste",
+    },
+};
+
+const COMPARISON_CASE_TWO: ClinicalPayload = {
+    age: 58,
+    sex: "male",
+    country: "CA",
+    ethnicity: "caucasian",
+    diagnosis: "Diabete de type 2",
+    symptoms: ["Hyperglycemie persistante", "Prise de poids progressive", "Fatigue"],
+    medical_history: [
+        "Hypertension arterielle",
+        "Dyslipidemie",
+        "Maladie cardiovasculaire aterosclerotique",
+    ],
+    current_medications: ["Metformine", "Empagliflozine"],
+    diabetes_context: {
+        cardiovascular_risk: "Eleve",
+        renal_function: "Preservee ou legerement reduite",
+        fragility: "Faible",
+        tolerance: "Bonne tolerance a la combinaison actuelle",
+        glycemic_goals: "HbA1c < 7 % si securitaire et realiste",
+    },
+};
+
 function clonePayload(payload: ClinicalPayload): ClinicalPayload {
     return {
         ...payload,
@@ -338,6 +382,72 @@ function clearCachedForm() {
     localStorage.removeItem(CACHE_KEY);
 }
 
+type ComparisonCaseEditorState = {
+    age: string;
+    sex: Sex;
+    country: string;
+    ethnicity: PatientEthnicity;
+    diagnosis: string;
+    symptoms: string;
+    medical_history: string;
+    current_medications: string[];
+    cardiovascular_risk: string;
+    renal_function: string;
+    fragility: string;
+    tolerance: string;
+    glycemic_goals: string;
+};
+
+function buildComparisonCaseEditorState(
+    payload: ClinicalPayload
+): ComparisonCaseEditorState {
+    return {
+        age: String(payload.age ?? ""),
+        sex: payload.sex ?? "male",
+        country: payload.country ?? "",
+        ethnicity: payload.ethnicity ?? "prefer_not_to_say",
+        diagnosis: payload.diagnosis ?? "",
+        symptoms: formatList(payload.symptoms),
+        medical_history: formatList(payload.medical_history),
+        current_medications: [...payload.current_medications],
+        cardiovascular_risk: payload.diabetes_context?.cardiovascular_risk ?? "",
+        renal_function: payload.diabetes_context?.renal_function ?? "",
+        fragility: payload.diabetes_context?.fragility ?? "",
+        tolerance: payload.diabetes_context?.tolerance ?? "",
+        glycemic_goals: payload.diabetes_context?.glycemic_goals ?? "",
+    };
+}
+
+function buildClinicalPayloadFromComparisonCaseEditor(
+    state: ComparisonCaseEditorState
+): ClinicalPayload {
+    return {
+        age: Number(state.age) || 0,
+        sex: state.sex,
+        country: state.country,
+        ethnicity: state.ethnicity,
+        diagnosis: state.diagnosis,
+        symptoms: state.symptoms
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+        medical_history: state.medical_history
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+        current_medications: state.current_medications
+            .map((value) => value.trim())
+            .filter(Boolean),
+        diabetes_context: {
+            cardiovascular_risk: state.cardiovascular_risk,
+            renal_function: state.renal_function,
+            fragility: state.fragility,
+            tolerance: state.tolerance,
+            glycemic_goals: state.glycemic_goals,
+        },
+    };
+}
+
 // --------------------
 // UI helper
 // --------------------
@@ -394,6 +504,10 @@ export function ClinicalForm({
     const [comparisonModeEnabled, setComparisonModeEnabled] = useState(false);
     const [comparisonJsonCaseOne, setComparisonJsonCaseOne] = useState("");
     const [comparisonJsonCaseTwo, setComparisonJsonCaseTwo] = useState("");
+    const [comparisonJsonModalTarget, setComparisonJsonModalTarget] =
+        useState<"one" | "two" | null>(null);
+    const [comparisonCaseEditor, setComparisonCaseEditor] =
+        useState<ComparisonCaseEditorState | null>(null);
     const [jsonImportFeedback, setJsonImportFeedback] = useState<{
         type: "success" | "error";
         message: string;
@@ -446,6 +560,9 @@ export function ClinicalForm({
 
     function applyFormData(payload: ClinicalPayload) {
         const nextForm = clonePayload(payload);
+        if (!nextForm.country && browserCountryCode) {
+            nextForm.country = browserCountryCode;
+        }
         setForm(nextForm);
         setListInputs({
             symptoms: formatList(nextForm.symptoms),
@@ -609,6 +726,14 @@ export function ClinicalForm({
         text: clinicalFormLabels.jsonImportInvalid,
         targetLang,
     });
+    const { translated: exampleCaseRequiredHintLabel } = useTranslation({
+        text: clinicalFormLabels.exampleCaseRequiredHint,
+        targetLang,
+    });
+    const { translated: exampleCaseSelectionRequiredLabel } = useTranslation({
+        text: clinicalFormLabels.exampleCaseSelectionRequired,
+        targetLang,
+    });
     const { translated: comparisonToggleLabel } = useTranslation({
         text: clinicalFormLabels.comparisonToggle,
         targetLang,
@@ -623,6 +748,62 @@ export function ClinicalForm({
     });
     const { translated: comparisonCaseTwoLabel } = useTranslation({
         text: clinicalFormLabels.comparisonCaseTwoLabel,
+        targetLang,
+    });
+    const { translated: comparisonLoadCaseOneLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonLoadCaseOne,
+        targetLang,
+    });
+    const { translated: comparisonLoadCaseTwoLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonLoadCaseTwo,
+        targetLang,
+    });
+    const { translated: comparisonLoadHelpLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonLoadHelp,
+        targetLang,
+    });
+    const { translated: comparisonModalTitleCaseOneLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonModalTitleCaseOne,
+        targetLang,
+    });
+    const { translated: comparisonModalTitleCaseTwoLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonModalTitleCaseTwo,
+        targetLang,
+    });
+    const { translated: comparisonModalDescriptionLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonModalDescription,
+        targetLang,
+    });
+    const { translated: comparisonModalSaveLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonModalSave,
+        targetLang,
+    });
+    const { translated: comparisonMedicationLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonMedicationLabel,
+        targetLang,
+    });
+    const { translated: comparisonMedicationHelpLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonMedicationHelp,
+        targetLang,
+    });
+    const { translated: comparisonMedicationMetforminLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonMedicationOptions.metformin,
+        targetLang,
+    });
+    const { translated: comparisonMedicationGliclazideLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonMedicationOptions.gliclazide,
+        targetLang,
+    });
+    const { translated: comparisonMedicationEmpagliflozinLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonMedicationOptions.empagliflozin,
+        targetLang,
+    });
+    const { translated: comparisonMedicationSitagliptinLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonMedicationOptions.sitagliptin,
+        targetLang,
+    });
+    const { translated: comparisonMedicationSemaglutideLabel } = useTranslation({
+        text: clinicalFormLabels.comparisonMedicationOptions.semaglutide,
         targetLang,
     });
     const { translated: comparisonActionLabel } = useTranslation({
@@ -643,6 +824,22 @@ export function ClinicalForm({
     });
     const { translated: ethnicityHelpLabel } = useTranslation({
         text: clinicalFormLabels.ethnicityHelp,
+        targetLang,
+    });
+    const { translated: diabetesParamsTitleLabel } = useTranslation({
+        text: clinicalFormLabels.diabetesParamsTitle,
+        targetLang,
+    });
+    const { translated: diabetesParamsOpenHintLabel } = useTranslation({
+        text: clinicalFormLabels.diabetesParamsOpenHint,
+        targetLang,
+    });
+    const { translated: diabetesParamsEditableHintLabel } = useTranslation({
+        text: clinicalFormLabels.diabetesParamsEditableHint,
+        targetLang,
+    });
+    const { translated: diabetesParamsAnalyzeHintLabel } = useTranslation({
+        text: clinicalFormLabels.diabetesParamsAnalyzeHint,
         targetLang,
     });
     const { translated: maleLabel } = useTranslation({ text: "Homme", targetLang });
@@ -723,6 +920,7 @@ export function ClinicalForm({
     ];
     const countryOptions = buildCountryOptions(targetLang);
     const detectedCountryLabel = getCountryLabel(browserCountryCode, targetLang);
+    const hasSelectedExampleCase = Boolean(selectedExampleCase);
     const ethnicityOptions: Array<{ value: PatientEthnicity; label: string }> = [
         { value: "caucasian", label: caucasianLabel },
         { value: "black", label: blackLabel },
@@ -738,6 +936,13 @@ export function ClinicalForm({
         { value: "mixed", label: mixedLabel },
         { value: "other", label: otherLabel },
         { value: "prefer_not_to_say", label: preferNotToSayLabel },
+    ];
+    const comparisonMedicationOptions = [
+        comparisonMedicationMetforminLabel,
+        comparisonMedicationGliclazideLabel,
+        comparisonMedicationEmpagliflozinLabel,
+        comparisonMedicationSitagliptinLabel,
+        comparisonMedicationSemaglutideLabel,
     ];
 
     useEffect(() => {
@@ -777,7 +982,6 @@ export function ClinicalForm({
             }
 
             applyFormData(nextPayload);
-            setSelectedExampleCase("");
             setJsonImportFeedback({
                 type: "success",
                 message: jsonImportSuccessLabel,
@@ -824,6 +1028,36 @@ export function ClinicalForm({
         }
     }
 
+    function openComparisonExampleCaseModal(caseKey: "one" | "two") {
+        const payload =
+            caseKey === "one" ? COMPARISON_CASE_ONE : COMPARISON_CASE_TWO;
+        setComparisonJsonModalTarget(caseKey);
+        setComparisonCaseEditor(buildComparisonCaseEditorState(payload));
+    }
+
+    function saveComparisonJsonModal() {
+        if (!comparisonCaseEditor) {
+            return;
+        }
+        const payload = buildClinicalPayloadFromComparisonCaseEditor(
+            comparisonCaseEditor
+        );
+        const formatted = JSON.stringify(payload, null, 2);
+
+        if (comparisonJsonModalTarget === "one") {
+            setComparisonJsonCaseOne(formatted);
+        } else if (comparisonJsonModalTarget === "two") {
+            setComparisonJsonCaseTwo(formatted);
+        }
+
+        setComparisonJsonModalTarget(null);
+        setComparisonCaseEditor(null);
+
+        if (comparisonFeedback) {
+            setComparisonFeedback(null);
+        }
+    }
+
     return (
         <div className="bg-white p-6 rounded border space-y-6">
             {warningMessage && (
@@ -834,13 +1068,31 @@ export function ClinicalForm({
             )}
 
 
+            <div className="flex items-center justify-center gap-3">
+                <h2 className="text-center text-lg font-semibold">{clinicalDataLabel}</h2>
+                {hasSelectedExampleCase ? (
+                    <button
+                        disabled={loading}
+                        onClick={() => onSubmit(form)}
+                        className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    >
+                        {loading ? analyzingButtonLabel : analyzeButtonLabel}
+                    </button>
+                ) : null}
+            </div>
+
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-                <h2 className="text-lg font-semibold">{clinicalDataLabel}</h2>
                 <div className="w-full md:w-auto flex flex-col gap-3 md:flex-row md:items-end">
                     <div className="w-full md:w-80 space-y-1">
                         <label htmlFor="clinical-example-case" className="text-sm font-medium text-gray-700">
                             {exampleCaseFieldLabel}
                         </label>
+                        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                            {exampleCaseRequiredHintLabel}
+                        </p>
+                        <p className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+                            {exampleCaseSelectionRequiredLabel}
+                        </p>
                         <div className="group relative">
                             <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 hidden w-80 -translate-x-1/2 rounded-xl border border-sky-200 bg-cyan-50 p-3 text-left text-xs font-normal leading-5 text-cyan-950 shadow-xl group-hover:block">
                                 {exampleCaseTooltipLabel}
@@ -865,18 +1117,34 @@ export function ClinicalForm({
                             </select>
                         </div>
                     </div>
-                    {isType2DiabetesContext() && (
-                        <button
-                            type="button"
-                            onClick={openDiabetesModal}
-                            className="rounded border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-100"
-                        >
-                            {diabetesModalButtonLabel}
-                        </button>
+                    {hasSelectedExampleCase && isType2DiabetesContext() && (
+                        <div className="w-full md:w-[30rem] rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 shadow-sm">
+                            <p className="text-sm font-semibold text-emerald-950">
+                                {diabetesParamsTitleLabel}
+                            </p>
+                            <p className="mt-1 text-sm text-emerald-900">
+                                {diabetesParamsOpenHintLabel}
+                            </p>
+                            <p className="mt-1 text-xs text-emerald-800">
+                                {diabetesParamsEditableHintLabel}
+                            </p>
+                            <p className="mt-1 text-xs text-emerald-800">
+                                {diabetesParamsAnalyzeHintLabel}
+                            </p>
+                            <button
+                                type="button"
+                                onClick={openDiabetesModal}
+                                className="mt-3 inline-flex w-full items-center justify-center rounded border border-emerald-400 bg-white px-4 py-2 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100 md:w-auto"
+                            >
+                                {diabetesModalButtonLabel}
+                            </button>
+                        </div>
                     )}
                 </div>
             </div>
 
+            {!hasSelectedExampleCase ? null : (
+                <>
             <Field highlight={isHighlighted("json_import")}>
                 <div className="space-y-2">
                     <label htmlFor="clinical-json-import" className="text-sm font-medium text-gray-700">
@@ -937,6 +1205,27 @@ export function ClinicalForm({
 
                     {comparisonModeEnabled ? (
                         <div className="space-y-3">
+                            <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3">
+                                <p className="text-xs text-emerald-900">
+                                    {comparisonLoadHelpLabel}
+                                </p>
+                                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                                    <button
+                                        type="button"
+                                        onClick={() => openComparisonExampleCaseModal("one")}
+                                        className="rounded border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100"
+                                    >
+                                        {comparisonLoadCaseOneLabel}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => openComparisonExampleCaseModal("two")}
+                                        className="rounded border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100"
+                                    >
+                                        {comparisonLoadCaseTwoLabel}
+                                    </button>
+                                </div>
+                            </div>
                             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                 <label className="space-y-1 text-sm text-gray-700">
                                     <span className="font-medium">{comparisonCaseOneLabel}</span>
@@ -1229,14 +1518,6 @@ export function ClinicalForm({
 
             <div className="flex gap-3">
                 <button
-                    disabled={loading}
-                    onClick={() => onSubmit(form)}
-                    className="flex-1 bg-blue-600 text-white py-2 rounded disabled:opacity-50"
-                >
-                    {loading ? analyzingButtonLabel : analyzeButtonLabel}
-                </button>
-
-                <button
                     type="button"
                     onClick={resetPatient}
                     className="flex-1 bg-gray-100 text-gray-800 py-2 rounded border hover:bg-gray-200"
@@ -1364,6 +1645,286 @@ export function ClinicalForm({
                         </div>
                     </div>
                 </div>
+            )}
+            {comparisonJsonModalTarget ? (
+                <div
+                    className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 px-4"
+                    aria-modal="true"
+                    role="dialog"
+                >
+                    <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl">
+                        <h2 className="text-lg font-semibold text-gray-900">
+                            {comparisonJsonModalTarget === "one"
+                                ? comparisonModalTitleCaseOneLabel
+                                : comparisonModalTitleCaseTwoLabel}
+                        </h2>
+                        <p className="mt-2 text-sm text-gray-600">
+                            {comparisonModalDescriptionLabel}
+                        </p>
+                        {comparisonCaseEditor ? (
+                            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <label className="space-y-1 text-sm text-gray-700">
+                                    <span className="font-medium">{ageLabel}</span>
+                                    <input
+                                        type="number"
+                                        className="input w-full"
+                                        value={comparisonCaseEditor.age}
+                                        onChange={(e) =>
+                                            setComparisonCaseEditor((prev) =>
+                                                prev
+                                                    ? { ...prev, age: e.target.value }
+                                                    : prev
+                                            )
+                                        }
+                                    />
+                                </label>
+                                <label className="space-y-1 text-sm text-gray-700">
+                                    <span className="font-medium">{sexLabel}</span>
+                                    <select
+                                        className="input w-full"
+                                        value={comparisonCaseEditor.sex}
+                                        onChange={(e) =>
+                                            setComparisonCaseEditor((prev) =>
+                                                prev
+                                                    ? {
+                                                          ...prev,
+                                                          sex: e.target.value as Sex,
+                                                      }
+                                                    : prev
+                                            )
+                                        }
+                                    >
+                                        {sexOptions.map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                                <label className="space-y-1 text-sm text-gray-700">
+                                    <span className="font-medium">{countryLabel}</span>
+                                    <select
+                                        className="input w-full"
+                                        value={comparisonCaseEditor.country}
+                                        onChange={(e) =>
+                                            setComparisonCaseEditor((prev) =>
+                                                prev
+                                                    ? { ...prev, country: e.target.value }
+                                                    : prev
+                                            )
+                                        }
+                                    >
+                                        <option value="">{countryPlaceholderLabel}</option>
+                                        {countryOptions.map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                                <label className="space-y-1 text-sm text-gray-700">
+                                    <span className="font-medium">{ethnicityLabel}</span>
+                                    <select
+                                        className="input w-full"
+                                        value={comparisonCaseEditor.ethnicity}
+                                        onChange={(e) =>
+                                            setComparisonCaseEditor((prev) =>
+                                                prev
+                                                    ? {
+                                                          ...prev,
+                                                          ethnicity:
+                                                              e.target.value as PatientEthnicity,
+                                                      }
+                                                    : prev
+                                            )
+                                        }
+                                    >
+                                        {ethnicityOptions.map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                                <label className="space-y-1 text-sm text-gray-700 md:col-span-2">
+                                    <span className="font-medium">{diagnosisLabel}</span>
+                                    <input
+                                        className="input w-full"
+                                        value={comparisonCaseEditor.diagnosis}
+                                        onChange={(e) =>
+                                            setComparisonCaseEditor((prev) =>
+                                                prev
+                                                    ? { ...prev, diagnosis: e.target.value }
+                                                    : prev
+                                            )
+                                        }
+                                    />
+                                </label>
+                                <label className="space-y-1 text-sm text-gray-700 md:col-span-2">
+                                    <span className="font-medium">{symptomsLabel}</span>
+                                    <input
+                                        className="input w-full"
+                                        value={comparisonCaseEditor.symptoms}
+                                        onChange={(e) =>
+                                            setComparisonCaseEditor((prev) =>
+                                                prev
+                                                    ? { ...prev, symptoms: e.target.value }
+                                                    : prev
+                                            )
+                                        }
+                                    />
+                                </label>
+                                <label className="space-y-1 text-sm text-gray-700 md:col-span-2">
+                                    <span className="font-medium">{medicalHistoryLabel}</span>
+                                    <input
+                                        className="input w-full"
+                                        value={comparisonCaseEditor.medical_history}
+                                        onChange={(e) =>
+                                            setComparisonCaseEditor((prev) =>
+                                                prev
+                                                    ? {
+                                                          ...prev,
+                                                          medical_history: e.target.value,
+                                                      }
+                                                    : prev
+                                            )
+                                        }
+                                    />
+                                </label>
+                                <label className="space-y-1 text-sm text-gray-700 md:col-span-2">
+                                    <span className="font-medium">{comparisonMedicationLabel}</span>
+                                    <span className="block text-xs text-gray-500">
+                                        {comparisonMedicationHelpLabel}
+                                    </span>
+                                    <select
+                                        className="input min-h-32 w-full"
+                                        multiple
+                                        value={comparisonCaseEditor.current_medications}
+                                        onChange={(e) =>
+                                            setComparisonCaseEditor((prev) =>
+                                                prev
+                                                    ? {
+                                                          ...prev,
+                                                          current_medications: Array.from(
+                                                              e.target.selectedOptions,
+                                                              (option) => option.value
+                                                          ),
+                                                      }
+                                                    : prev
+                                            )
+                                        }
+                                    >
+                                        {comparisonMedicationOptions.map((option) => (
+                                            <option key={option} value={option}>
+                                                {option}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                                <label className="space-y-1 text-sm text-gray-700">
+                                    <span className="font-medium">{cardiovascularRiskLabel}</span>
+                                    <input
+                                        className="input w-full"
+                                        value={comparisonCaseEditor.cardiovascular_risk}
+                                        onChange={(e) =>
+                                            setComparisonCaseEditor((prev) =>
+                                                prev
+                                                    ? {
+                                                          ...prev,
+                                                          cardiovascular_risk: e.target.value,
+                                                      }
+                                                    : prev
+                                            )
+                                        }
+                                    />
+                                </label>
+                                <label className="space-y-1 text-sm text-gray-700">
+                                    <span className="font-medium">{renalFunctionLabel}</span>
+                                    <input
+                                        className="input w-full"
+                                        value={comparisonCaseEditor.renal_function}
+                                        onChange={(e) =>
+                                            setComparisonCaseEditor((prev) =>
+                                                prev
+                                                    ? {
+                                                          ...prev,
+                                                          renal_function: e.target.value,
+                                                      }
+                                                    : prev
+                                            )
+                                        }
+                                    />
+                                </label>
+                                <label className="space-y-1 text-sm text-gray-700">
+                                    <span className="font-medium">{fragilityLabel}</span>
+                                    <input
+                                        className="input w-full"
+                                        value={comparisonCaseEditor.fragility}
+                                        onChange={(e) =>
+                                            setComparisonCaseEditor((prev) =>
+                                                prev
+                                                    ? { ...prev, fragility: e.target.value }
+                                                    : prev
+                                            )
+                                        }
+                                    />
+                                </label>
+                                <label className="space-y-1 text-sm text-gray-700">
+                                    <span className="font-medium">{toleranceLabel}</span>
+                                    <input
+                                        className="input w-full"
+                                        value={comparisonCaseEditor.tolerance}
+                                        onChange={(e) =>
+                                            setComparisonCaseEditor((prev) =>
+                                                prev
+                                                    ? { ...prev, tolerance: e.target.value }
+                                                    : prev
+                                            )
+                                        }
+                                    />
+                                </label>
+                                <label className="space-y-1 text-sm text-gray-700 md:col-span-2">
+                                    <span className="font-medium">{glycemicGoalsLabel}</span>
+                                    <input
+                                        className="input w-full"
+                                        value={comparisonCaseEditor.glycemic_goals}
+                                        onChange={(e) =>
+                                            setComparisonCaseEditor((prev) =>
+                                                prev
+                                                    ? {
+                                                          ...prev,
+                                                          glycemic_goals: e.target.value,
+                                                      }
+                                                    : prev
+                                            )
+                                        }
+                                    />
+                                </label>
+                            </div>
+                        ) : null}
+                        <div className="mt-6 flex gap-3">
+                            <button
+                                type="button"
+                                onClick={saveComparisonJsonModal}
+                                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                            >
+                                {comparisonModalSaveLabel}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setComparisonJsonModalTarget(null);
+                                    setComparisonCaseEditor(null);
+                                }}
+                                className="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                                {cancelLabel}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+                </>
             )}
         </div>
     );

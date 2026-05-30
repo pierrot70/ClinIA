@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ClinicalForm } from "./ClinicalForm";
 
@@ -12,6 +12,46 @@ vi.mock("../../hooks/useTranslation", () => ({
 }));
 
 describe("ClinicalForm", () => {
+    beforeEach(() => {
+        window.localStorage.clear();
+    });
+
+    it("shows only the example case picker before a selection is made", () => {
+        const onSubmit = vi.fn();
+        Object.defineProperty(window.navigator, "languages", {
+            configurable: true,
+            value: ["fr-CA"],
+        });
+
+        render(
+            <ClinicalForm
+                onSubmit={onSubmit}
+                loading={false}
+                initialData={{
+                    age: 55,
+                    sex: "male",
+                    diagnosis: "",
+                    symptoms: [],
+                    medical_history: [],
+                    current_medications: [],
+                }}
+            />
+        );
+
+        expect(
+            screen.getByText(
+                "Commencez par choisir un cas dans Example case pour pre-remplir rapidement le formulaire, puis ajustez les champs selon votre patient."
+            )
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                "Le reste du formulaire apparaitra apres votre selection dans Example case."
+            )
+        ).toBeInTheDocument();
+        expect(screen.queryByLabelText("Pays du patient")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Analyser" })).not.toBeInTheDocument();
+    });
+
     it("defaults the country from the browser locale and submits the selected ethnicity", () => {
         const onSubmit = vi.fn();
 
@@ -34,6 +74,10 @@ describe("ClinicalForm", () => {
                 }}
             />
         );
+
+        fireEvent.change(screen.getByLabelText("Cas exemple"), {
+            target: { value: "hypertension55" },
+        });
 
         expect(screen.getByLabelText("Pays du patient")).toHaveValue("CA");
         expect(
@@ -71,6 +115,10 @@ describe("ClinicalForm", () => {
                 }}
             />
         );
+
+        fireEvent.change(screen.getByLabelText("Cas exemple"), {
+            target: { value: "hypertension55" },
+        });
 
         const input = screen.getByLabelText("Antecedents medicaux");
 
@@ -123,6 +171,10 @@ describe("ClinicalForm", () => {
             />
         );
 
+        fireEvent.change(screen.getByLabelText("Cas exemple"), {
+            target: { value: "hypertension55" },
+        });
+
         fireEvent.change(screen.getByLabelText("Importer un objet JSON"), {
             target: {
                 value: JSON.stringify({
@@ -148,9 +200,6 @@ describe("ClinicalForm", () => {
             })
         );
 
-        expect(
-            screen.getByText("Le formulaire a ete rempli a partir du JSON.")
-        ).toBeInTheDocument();
         expect(screen.getByLabelText("Age du patient")).toHaveValue(79);
         expect(screen.getByLabelText("Sexe")).toHaveValue("female");
         expect(screen.getByLabelText("Pays du patient")).toHaveValue("CA");
@@ -181,6 +230,10 @@ describe("ClinicalForm", () => {
                 }}
             />
         );
+
+        fireEvent.change(screen.getByLabelText("Cas exemple"), {
+            target: { value: "hypertension55" },
+        });
 
         fireEvent.click(screen.getByLabelText("Mode comparaison visuelle"));
 
@@ -230,6 +283,84 @@ describe("ClinicalForm", () => {
         ).toBeInTheDocument();
     });
 
+    it("opens a modal to edit example JSON before loading case 1 and case 2", () => {
+        render(
+            <ClinicalForm
+                onSubmit={() => {}}
+                onCompareSubmit={() => {}}
+                loading={false}
+                initialData={{
+                    age: 55,
+                    sex: "male",
+                    diagnosis: "",
+                    symptoms: [],
+                    medical_history: [],
+                    current_medications: [],
+                }}
+            />
+        );
+
+        fireEvent.change(screen.getByLabelText("Cas exemple"), {
+            target: { value: "hypertension55" },
+        });
+
+        fireEvent.click(screen.getByLabelText("Mode comparaison visuelle"));
+        fireEvent.click(screen.getByRole("button", { name: "Charger cas 1" }));
+        expect(
+            screen.getByRole("heading", { name: "Editer le JSON - Cas 1" })
+        ).toBeInTheDocument();
+        const caseOneDialog = screen.getByRole("dialog");
+        const medicationSelect = within(caseOneDialog).getByRole("listbox");
+        expect(medicationSelect).toBeInTheDocument();
+        fireEvent.change(within(caseOneDialog).getByRole("spinbutton", { name: "Age du patient" }), {
+            target: { value: "61" },
+        });
+        fireEvent.change(
+            within(caseOneDialog).getByRole("textbox", {
+                name: "Diagnostic / motif clinique principal",
+            }),
+            {
+                target: { value: "Diabete de type 2" },
+            }
+        );
+        const medicationOptions = within(caseOneDialog).getAllByRole("option");
+        const metforminOption = medicationOptions.find(
+            (option) => (option as HTMLOptionElement).value === "Metformine"
+        ) as HTMLOptionElement;
+        const semaglutideOption = medicationOptions.find(
+            (option) => (option as HTMLOptionElement).value === "Semaglutide"
+        ) as HTMLOptionElement;
+        metforminOption.selected = true;
+        semaglutideOption.selected = true;
+        fireEvent.change(medicationSelect);
+        fireEvent.click(screen.getByRole("button", { name: "Charger ce JSON" }));
+
+        fireEvent.click(screen.getByRole("button", { name: "Charger cas 2" }));
+        expect(
+            screen.getByRole("heading", { name: "Editer le JSON - Cas 2" })
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "Charger ce JSON" }));
+
+        expect(
+            (screen.getByLabelText("JSON cas 1") as HTMLTextAreaElement).value
+        ).toContain('"age": 61');
+        expect(
+            (screen.getByLabelText("JSON cas 1") as HTMLTextAreaElement).value
+        ).toContain('"diagnosis": "Diabete de type 2"');
+        expect(
+            (screen.getByLabelText("JSON cas 2") as HTMLTextAreaElement).value
+        ).toContain('"age": 58');
+        expect(
+            (screen.getByLabelText("JSON cas 2") as HTMLTextAreaElement).value
+        ).toContain('"current_medications": [');
+        expect(
+            (screen.getByLabelText("JSON cas 2") as HTMLTextAreaElement).value
+        ).toContain('"Empagliflozine"');
+        expect(
+            (screen.getByLabelText("JSON cas 1") as HTMLTextAreaElement).value
+        ).toContain('"Semaglutide"');
+    });
+
     it("fills the form with the type 2 diabetes example case", () => {
         render(
             <ClinicalForm
@@ -258,6 +389,21 @@ describe("ClinicalForm", () => {
             "Hypertension arterielle"
         );
         expect(screen.getByLabelText("Medication actuelle")).toHaveValue("Metformine");
+        expect(
+            screen.getByText(
+                "Cliquez sur ce bouton pour pre-remplir rapidement les parametres cliniques utiles au diabete de type 2."
+            )
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                "Vous pourrez ensuite modifier chaque champ avant l'analyse selon le profil reel du patient."
+            )
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                "Quand votre selection vous convient, cliquez sur Analyser pour transmettre ces parametres a OpenAI avec le reste du cas clinique."
+            )
+        ).toBeInTheDocument();
     });
 
     it("opens the diabetes modal with default values and saves them into the payload", () => {

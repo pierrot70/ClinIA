@@ -317,11 +317,34 @@ export const UI_LABELS_FR = {
             jsonImportSuccess: "Le formulaire a ete rempli a partir du JSON.",
             jsonImportInvalid:
                 "JSON invalide ou incompatible. Verifiez la syntaxe et la structure de l'objet.",
+            exampleCaseRequiredHint:
+                "Commencez par choisir un cas dans Example case pour pre-remplir rapidement le formulaire, puis ajustez les champs selon votre patient.",
+            exampleCaseSelectionRequired:
+                "Le reste du formulaire apparaitra apres votre selection dans Example case.",
             comparisonToggle: "Mode comparaison visuelle",
             comparisonHelp:
                 "Collez deux objets JSON pour comparer de visu deux resumes patient generes par ClinIA.",
             comparisonCaseOneLabel: "JSON cas 1",
             comparisonCaseTwoLabel: "JSON cas 2",
+            comparisonLoadCaseOne: "Charger cas 1",
+            comparisonLoadCaseTwo: "Charger cas 2",
+            comparisonLoadHelp:
+                "Utilisez ces boutons pour charger rapidement deux JSON exemples dans les zones Case 1 et Case 2 avant la comparaison.",
+            comparisonModalTitleCaseOne: "Editer le JSON - Cas 1",
+            comparisonModalTitleCaseTwo: "Editer le JSON - Cas 2",
+            comparisonModalDescription:
+                "Vous pouvez ajuster librement ce JSON avant de l'injecter dans la zone de comparaison correspondante.",
+            comparisonModalSave: "Charger ce JSON",
+            comparisonMedicationLabel: "Medication actuelle",
+            comparisonMedicationHelp:
+                "Vous pouvez choisir plusieurs traitements pour representer le meme patient.",
+            comparisonMedicationOptions: {
+                metformin: "Metformine",
+                gliclazide: "Gliclazide",
+                empagliflozin: "Empagliflozine",
+                sitagliptin: "Sitagliptine",
+                semaglutide: "Semaglutide",
+            },
             comparisonAction: "Comparer les 2 cas",
             comparisonSuccess:
                 "Les deux cas ont ete charges pour comparaison.",
@@ -344,6 +367,13 @@ export const UI_LABELS_FR = {
                 other: "Autre",
                 preferNotToSay: "Prefere ne pas repondre",
             },
+            diabetesParamsTitle: "Parametres rapides - Diabete de type 2",
+            diabetesParamsOpenHint:
+                "Cliquez sur ce bouton pour pre-remplir rapidement les parametres cliniques utiles au diabete de type 2.",
+            diabetesParamsEditableHint:
+                "Vous pourrez ensuite modifier chaque champ avant l'analyse selon le profil reel du patient.",
+            diabetesParamsAnalyzeHint:
+                "Quand votre selection vous convient, cliquez sur Analyser pour transmettre ces parametres a OpenAI avec le reste du cas clinique.",
         },
         comparison: {
             quickViewTitle: "Lecture rapide des differences cliniques",
