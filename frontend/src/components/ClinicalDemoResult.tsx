@@ -3,6 +3,7 @@ import AITreatmentTable from "./AITreatmentTable";
 import TreatmentCard from "./TreatmentCard";
 import QuestionCard from "./QuestionCard";
 import ClinicalRelevanceByAgeChart from "./ClinicalRelevanceByAgeChart";
+import ClinicalReferenceList from "./ClinicalReferenceList";
 
 import { ClinicalAnalysis } from "../types/clinical";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
@@ -86,6 +87,24 @@ function ResultAccordion({
       </button>
       {open ? <div className="border-t border-gray-100 px-4 py-4">{children}</div> : null}
     </section>
+  );
+}
+
+function SectionReferences({
+  title,
+  hint,
+  sources,
+}: {
+  title: string;
+  hint: string;
+  sources?: Array<{ label: string; url: string }>;
+}) {
+  if (!sources || sources.length === 0) {
+    return null;
+  }
+
+  return (
+    <ClinicalReferenceList title={title} hint={hint} sources={sources} />
   );
 }
 
@@ -203,6 +222,8 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   const { translated: questionsSectionHint } = useTranslation({ text: resultLabels.questionsHint, targetLang });
   const { translated: chartSectionTitle } = useTranslation({ text: resultLabels.chartTitle, targetLang });
   const { translated: chartSectionHint } = useTranslation({ text: resultLabels.chartHint, targetLang });
+  const { translated: referencesSectionTitle } = useTranslation({ text: resultLabels.referencesTitle, targetLang });
+  const { translated: referencesSectionHint } = useTranslation({ text: resultLabels.referencesHint, targetLang });
   const {
     treatments,
     questions,
@@ -266,6 +287,11 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
               <p className="text-xs text-gray-700 whitespace-pre-wrap">{clinical_summary}</p>
             </div>
           )}
+          <SectionReferences
+            title={referencesSectionTitle}
+            hint={referencesSectionHint}
+            sources={relevanceByAgeChart?.sources}
+          />
         </ResultAccordion>
 
         {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring) && (
@@ -349,6 +375,11 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
               </div>
             )}
             </div>
+            <SectionReferences
+              title={referencesSectionTitle}
+              hint={referencesSectionHint}
+              sources={relevanceByAgeChart?.sources}
+            />
           </ResultAccordion>
         )}
 
@@ -565,6 +596,11 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
             <QuestionCard key={i} question={q.question ?? q} answer={q.answer ?? ""} />
           ))}
         </div>
+        <SectionReferences
+          title={referencesSectionTitle}
+          hint={referencesSectionHint}
+          sources={relevanceByAgeChart?.sources}
+        />
       </ResultAccordion>
     </div>
   );

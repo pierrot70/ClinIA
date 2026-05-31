@@ -8,6 +8,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import ClinicalReferenceList from "./ClinicalReferenceList";
 
 type ClinicalRelevanceLevel = 1 | 2 | 3 | 4 | 5;
 
@@ -160,25 +161,10 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
         finale appartient toujours au medecin.
       </p>
 
-      <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-        <h3 className="text-xs font-semibold text-gray-800 mb-2">
-          Provenance clinique
-        </h3>
-        <ul className="space-y-1 text-[11px] text-gray-600">
-          {sources.map((source) => (
-            <li key={source.url}>
-              <a
-                href={source.url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-primary hover:underline"
-              >
-                {source.label}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <ClinicalReferenceList
+        title="Provenance clinique"
+        sources={sources}
+      />
     </section>
   );
 };

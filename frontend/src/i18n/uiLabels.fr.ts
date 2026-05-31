@@ -313,6 +313,9 @@ export const UI_LABELS_FR = {
             questionsHint: "Points de verification et lecture complementaire",
             chartTitle: "Place clinique relative selon l'age et le contexte",
             chartHint: "Lecture contextuelle, interpretation et references",
+            referencesTitle: "Sources cliniques consultables pour verification",
+            referencesHint:
+                "ClinIA ne presente pas ces resultats au hasard. Utilisez ces references cliniques pour verifier l'analyse et approfondir la lecture.",
         },
         intro: {
             tagline: "Accelerer. Comparer. Verifier.",
