@@ -256,7 +256,9 @@ describe("useTranslation", () => {
 
         expect(result.current.translated).toBe("Connexion médecin");
 
-        resolveEnglishTranslation?.("Doctor sign-in");
+        if (resolveEnglishTranslation) {
+            (resolveEnglishTranslation as (value: string) => void)("Doctor sign-in");
+        }
 
         await waitFor(() => {
             expect(result.current.translated).toBe("Connexion médecin");

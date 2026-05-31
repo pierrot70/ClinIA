@@ -1,10 +1,13 @@
-import React from "react";
+import React, { useContext, useState } from "react";
 import AITreatmentTable from "./AITreatmentTable";
 import TreatmentCard from "./TreatmentCard";
 import QuestionCard from "./QuestionCard";
 import ClinicalRelevanceByAgeChart from "./ClinicalRelevanceByAgeChart";
 
 import { ClinicalAnalysis } from "../types/clinical";
+import { HomeI18nContext } from "../contexts/HomeI18nContext";
+import { labels } from "../i18n/uiLabels";
+import { useTranslation } from "../hooks/useTranslation";
 
 // Type hybride pour compatibilité ascendante
 type ClinicalDemoResultData = Partial<ClinicalAnalysis> & {
@@ -40,6 +43,46 @@ interface ClinicalDemoResultProps {
   canCopyRequest?: boolean;
   onCopyRequest?: () => void;
   copyRequestFeedback?: string | null;
+}
+
+function ResultAccordion({
+  title,
+  hint,
+  defaultOpen = true,
+  children,
+}: {
+  title: string;
+  hint: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <section
+      className="rounded-xl border border-gray-200 bg-white shadow-sm"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between px-4 py-4 text-left"
+        aria-expanded={open}
+      >
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <p className="mt-1 text-xs uppercase tracking-[0.16em] text-gray-500">
+            {hint}
+          </p>
+        </div>
+        <span className="text-2xl font-semibold text-gray-500" aria-hidden="true">
+          {open ? "−" : "+"}
+        </span>
+      </button>
+      {open ? <div className="border-t border-gray-100 px-4 py-4">{children}</div> : null}
+    </section>
+  );
 }
 
 function buildPatientSummaryLabel(patientDisplayName?: string) {
@@ -145,6 +188,17 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   onCopyRequest,
   copyRequestFeedback,
 }) => {
+  const i18n = useContext(HomeI18nContext) || { locale: "fr" };
+  const targetLang = i18n.locale;
+  const resultLabels = labels.clinicalDemo.resultAccordions;
+  const { translated: summarySectionTitle } = useTranslation({ text: resultLabels.summaryTitle, targetLang });
+  const { translated: summarySectionHint } = useTranslation({ text: resultLabels.summaryHint, targetLang });
+  const { translated: recommendationsSectionTitle } = useTranslation({ text: resultLabels.recommendationsTitle, targetLang });
+  const { translated: recommendationsSectionHint } = useTranslation({ text: resultLabels.recommendationsHint, targetLang });
+  const { translated: questionsSectionTitle } = useTranslation({ text: resultLabels.questionsTitle, targetLang });
+  const { translated: questionsSectionHint } = useTranslation({ text: resultLabels.questionsHint, targetLang });
+  const { translated: chartSectionTitle } = useTranslation({ text: resultLabels.chartTitle, targetLang });
+  const { translated: chartSectionHint } = useTranslation({ text: resultLabels.chartHint, targetLang });
   const {
     treatments,
     questions,
@@ -199,8 +253,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   if ((!treatments || treatments.length === 0) && hasIADetails) {
     return (
       <div className="space-y-6">
-        {/* Résumé patient */}
-        <section>
+        <ResultAccordion title={summarySectionTitle} hint={summarySectionHint} defaultOpen={false}>
           <h2 className="text-lg font-semibold mb-2">{patientSummaryLabel}</h2>
           <p className="text-gray-700 text-sm mb-4">{summary || patientSummaryLabel}</p>
           {clinical_summary && (
@@ -209,11 +262,11 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
               <p className="text-xs text-gray-700 whitespace-pre-wrap">{clinical_summary}</p>
             </div>
           )}
-        </section>
+        </ResultAccordion>
 
-        {/* Recommandations IA détaillées et dynamiques */}
         {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring) && (
-          <section className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-sm mb-4">
+          <ResultAccordion title={recommendationsSectionTitle} hint={recommendationsSectionHint} defaultOpen={false}>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-sm">
             <h2 className="text-md font-semibold text-emerald-900 mb-2">Recommandations IA</h2>
             {/* Bloc générique pour recommendations */}
             {recommendations && (
@@ -291,12 +344,13 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                 )}
               </div>
             )}
-          </section>
+            </div>
+          </ResultAccordion>
         )}
 
-        {/* Affichage dynamique des champs IA inconnus */}
         {other_ai_fields && Object.keys(other_ai_fields).length > 0 && (
-          <section className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm mb-4">
+          <ResultAccordion title={questionsSectionTitle} hint={questionsSectionHint} defaultOpen={false}>
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm">
             <h2 className="text-md font-semibold text-blue-900 mb-2">Autres recommandations IA</h2>
             {Object.entries(other_ai_fields).map(([key, value]) => (
               <div key={key} className="mb-2">
@@ -314,7 +368,8 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                 )}
               </div>
             ))}
-          </section>
+            </div>
+          </ResultAccordion>
         )}
       </div>
     );
@@ -339,8 +394,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Résumé patient */}
-      <section>
+      <ResultAccordion title={summarySectionTitle} hint={summarySectionHint} defaultOpen={false}>
         <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold">{patientSummaryLabel}</h2>
           <div className="flex flex-col gap-2 sm:items-end">
@@ -379,9 +433,10 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
             <p className="text-xs text-gray-700 whitespace-pre-wrap">{clinical_summary}</p>
           </div>
         )}
-      </section>
+      </ResultAccordion>
 
-      {/* Recommandations IA détaillées */}
+      {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring || mappedTreatments.length > 0) && (
+        <ResultAccordion title={recommendationsSectionTitle} hint={recommendationsSectionHint} defaultOpen={false}>
         {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring) && (
         <section className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-sm mb-4">
           <h2 className="text-md font-semibold text-emerald-900 mb-2">Recommandations IA</h2>
@@ -444,10 +499,8 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
         </section>
       )}
 
-      {/* Traitement suggéré et table seulement si traitements non vides et pas de recommandations IA cancer */}
       {mappedTreatments.length > 0 && !hasIADetails && (
         <>
-          {/* Traitement suggéré */}
           <section className="bg-white border rounded-xl p-4 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-start">
             <div>
               <h2 className="text-sm font-semibold text-gray-800 mb-1">Traitement suggéré</h2>
@@ -463,7 +516,6 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
             </div>
           </section>
 
-          {/* Table des traitements */}
           <section>
             <AITreatmentTable treatments={mappedTreatments} />
           </section>
@@ -481,21 +533,24 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
           />
         ))}
       </section>
-
-      {relevanceByAgeChart && (
-        <ClinicalRelevanceByAgeChart
-          title={relevanceByAgeChart.title}
-          subtitle={relevanceByAgeChart.subtitle}
-          interpretationNote={relevanceByAgeChart.interpretationNote}
-          ageBuckets={relevanceByAgeChart.ageBuckets}
-          levelLabels={relevanceByAgeChart.levelLabels}
-          series={relevanceByAgeChart.series}
-          sources={relevanceByAgeChart.sources}
-        />
+      </ResultAccordion>
       )}
 
-      {/* Questions fréquentes */}
-      <section>
+      {relevanceByAgeChart && (
+        <ResultAccordion title={chartSectionTitle} hint={chartSectionHint} defaultOpen={false}>
+          <ClinicalRelevanceByAgeChart
+            title={relevanceByAgeChart.title}
+            subtitle={relevanceByAgeChart.subtitle}
+            interpretationNote={relevanceByAgeChart.interpretationNote}
+            ageBuckets={relevanceByAgeChart.ageBuckets}
+            levelLabels={relevanceByAgeChart.levelLabels}
+            series={relevanceByAgeChart.series}
+            sources={relevanceByAgeChart.sources}
+          />
+        </ResultAccordion>
+      )}
+
+      <ResultAccordion title={questionsSectionTitle} hint={questionsSectionHint} defaultOpen={false}>
         <h2 className="text-lg font-semibold mb-2">
           {dynamicQuestions.length === 0
             ? "Questions fréquentes (simulation)"
@@ -506,7 +561,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
             <QuestionCard key={i} question={q.question ?? q} answer={q.answer ?? ""} />
           ))}
         </div>
-      </section>
+      </ResultAccordion>
     </div>
   );
 };

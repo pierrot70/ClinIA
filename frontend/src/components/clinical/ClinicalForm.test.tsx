@@ -391,18 +391,14 @@ describe("ClinicalForm", () => {
         expect(screen.getByLabelText("Medication actuelle")).toHaveValue("Metformine");
         expect(
             screen.getByText(
-                "Cliquez sur ce bouton pour pre-remplir rapidement les parametres cliniques utiles au diabete de type 2."
+                "Pre-remplissez rapidement les parametres cliniques utiles au diabete de type 2."
             )
         ).toBeInTheDocument();
         expect(
-            screen.getByText(
-                "Vous pourrez ensuite modifier chaque champ avant l'analyse selon le profil reel du patient."
-            )
+            screen.getByText("Vous pouvez ensuite les ajuster selon le profil du patient.")
         ).toBeInTheDocument();
         expect(
-            screen.getByText(
-                "Quand votre selection vous convient, cliquez sur Analyser pour transmettre ces parametres a OpenAI avec le reste du cas clinique."
-            )
+            screen.getByText("Quand tout vous convient, cliquez sur Analyser.")
         ).toBeInTheDocument();
     });
 

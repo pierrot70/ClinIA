@@ -304,6 +304,16 @@ export const UI_LABELS_FR = {
     },
     // ClinicalAnalyzePage.tsx - expérience /clinical-demo.
     clinicalDemo: {
+        resultAccordions: {
+            summaryTitle: "Resume clinique du patient",
+            summaryHint: "Profil, resume IA et contexte principal",
+            recommendationsTitle: "Alternatives et recommandations",
+            recommendationsHint: "Options plausibles, comparaison et points de suivi",
+            questionsTitle: "Questions cliniques a explorer",
+            questionsHint: "Points de verification et lecture complementaire",
+            chartTitle: "Place clinique relative selon l'age et le contexte",
+            chartHint: "Lecture contextuelle, interpretation et references",
+        },
         intro: {
             tagline: "Accelerer. Comparer. Verifier.",
             subtitle:
@@ -376,11 +386,11 @@ export const UI_LABELS_FR = {
             },
             diabetesParamsTitle: "Parametres rapides - Diabete de type 2",
             diabetesParamsOpenHint:
-                "Cliquez sur ce bouton pour pre-remplir rapidement les parametres cliniques utiles au diabete de type 2.",
+                "Pre-remplissez rapidement les parametres cliniques utiles au diabete de type 2.",
             diabetesParamsEditableHint:
-                "Vous pourrez ensuite modifier chaque champ avant l'analyse selon le profil reel du patient.",
+                "Vous pouvez ensuite les ajuster selon le profil du patient.",
             diabetesParamsAnalyzeHint:
-                "Quand votre selection vous convient, cliquez sur Analyser pour transmettre ces parametres a OpenAI avec le reste du cas clinique.",
+                "Quand tout vous convient, cliquez sur Analyser.",
         },
         comparison: {
             quickViewTitle: "Lecture rapide des differences cliniques",
