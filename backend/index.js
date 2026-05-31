@@ -29,6 +29,7 @@ import {
     recordOpenAIFailure,
 } from "./utils/openaiCircuitBreaker.js";
 import {
+    buildCloudSafePatientPayload,
     detectPromptInjection,
     sanitizeRequestPayload,
 } from "./utils/requestSafety.js";
@@ -208,6 +209,7 @@ const homeTranslationService = createHomeTranslationService({
 
 const aiAnalyzeRouter = createAiAnalyzeRouter({
     openai,
+    buildCloudSafePatientPayload,
     sanitizeRequestPayload,
     detectPromptInjection,
     extractPrimaryClinicalConcern,

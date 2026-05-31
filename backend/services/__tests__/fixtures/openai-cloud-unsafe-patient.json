@@ -1,0 +1,33 @@
+{
+  "age": 57,
+  "sex": "male",
+  "diagnosis": "Diabete de type 2",
+  "country": "Canada",
+  "ethnicity": "caucasian",
+  "symptoms": [
+    "fatigue",
+    "polydipsie"
+  ],
+  "medical_history": [
+    "Hypertension",
+    "Dyslipidemie"
+  ],
+  "current_medications": [
+    "Metformine",
+    "Empagliflozine"
+  ],
+  "weight": 94,
+  "height": 175,
+  "blood_pressure": "138/84",
+  "forceReal": true,
+  "openaiModel": "gpt-4.1-mini",
+  "incidentAckId": "ack-1",
+  "reverifyRequested": true,
+  "diabetes_context": {
+    "cardiovascular_risk": "Modere a eleve",
+    "renal_function": "Preservee ou legerement reduite",
+    "fragility": "Faible",
+    "tolerance": "Bonne tolerance a la metformine",
+    "glycemic_goals": "HbA1c < 7 % si securitaire et realiste"
+  }
+}

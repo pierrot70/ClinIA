@@ -5,7 +5,8 @@ function buildType2DiabetesContextPrompt(patient = {}) {
     }
 
     const contextEntries = [
-        ["weight_kg", patient.weight],
+        ["weight_band", patient.weight_band],
+        ["age_band", patient.age_band],
         ["cardiovascular_risk", context.cardiovascular_risk],
         ["renal_function", context.renal_function],
         ["fragility", context.fragility],
@@ -105,6 +106,7 @@ export async function executeOpenAIAnalyze({
             requestContext: {
                 fingerprint,
                 diagnosisHash: makeSourceHash({ diagnosis }),
+                cloudPayloadProfile: "MINIMIZED_V1",
                 symptomCount: Array.isArray(symptoms) ? symptoms.length : 0,
                 medicalHistoryCount: Array.isArray(patient.medical_history)
                     ? patient.medical_history.length

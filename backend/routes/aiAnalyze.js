@@ -17,6 +17,7 @@ import {
 export function createAiAnalyzeRouter(deps) {
     const {
         openai,
+        buildCloudSafePatientPayload,
         sanitizeRequestPayload,
         detectPromptInjection,
         extractPrimaryClinicalConcern,
@@ -128,6 +129,7 @@ export function createAiAnalyzeRouter(deps) {
                     symptoms,
                 }) || diagnosisSeed || "To be determined by ClinIA";
                 const patient = safeBody;
+                let cloudSafePatient = buildCloudSafePatientPayload(patient);
                 let neutralizationMeta = null;
                 const fingerprint = makeFingerprint({
                     diagnosis,
@@ -185,6 +187,7 @@ export function createAiAnalyzeRouter(deps) {
                 if (preCloudState.sanitizedPatient) {
                     neutralizationMeta = preCloudState.neutralizationMeta;
                     Object.assign(patient, preCloudState.sanitizedPatient);
+                    cloudSafePatient = buildCloudSafePatientPayload(patient);
                 }
 
                 const cachedDiagnosis = await findPersistedDiagnosisByFingerprint(
@@ -288,7 +291,7 @@ export function createAiAnalyzeRouter(deps) {
                     openai,
                     model,
                     diagnosis,
-                    patient,
+                    patient: cloudSafePatient,
                     symptoms,
                     reqAuth: req.auth,
                     req,
