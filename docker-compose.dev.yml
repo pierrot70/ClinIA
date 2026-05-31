@@ -1,11 +1,15 @@
 services:
+  mongo:
+    networks:
+      - clinia-net
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
     container_name: clinia-backend-dev
     environment:
-      MONGO_URI: mongodb://root:example123@mongo:27017
+      MONGO_URI: mongodb://root:321eRRe!p@mongo:27017/clinia?authSource=admin
       JWT_SECRET: devsecret
       OPENAI_API_KEY: ${OPENAI_API_KEY}
     ports:
@@ -24,7 +28,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: clinia-frontend-dev
     environment:
-      VITE_API_URL: http://localhost:4000
+      VITE_API_URL: ""
     ports:
       - "5173:5173"
     volumes:
@@ -32,3 +36,7 @@ services:
       - /app/node_modules
     networks:
       - clinia-net
+
+networks:
+  clinia-net:
+    driver: bridge
