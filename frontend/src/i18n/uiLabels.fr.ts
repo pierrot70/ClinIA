@@ -66,7 +66,9 @@ export const UI_LABELS_FR = {
         landing: {
             title: "ClinIA",
             subtitle:
-                "Choisissez votre point d'entrée. La démo clinique est accessible sans connexion. Les accès médecin et admin utilisent les pages de connexion dédiées.",
+                "Accelerer la recherche. Comparer les alternatives. Verifier les references.",
+            supportingText:
+                "ClinIA utilise l'IA pour accelerer la recherche clinique, comparer des alternatives therapeutiques plausibles et presenter des references consultables.",
             clinicalDemoTitle: "Démo clinique",
             clinicalDemoBody: "Accéder directement à la démonstration ClinIA.",
             doctorLoginTitle: "Connexion médecin",
@@ -302,6 +304,11 @@ export const UI_LABELS_FR = {
     },
     // ClinicalAnalyzePage.tsx - expérience /clinical-demo.
     clinicalDemo: {
+        intro: {
+            tagline: "Accelerer. Comparer. Verifier.",
+            subtitle:
+                "Recherche clinique plus rapide. Alternatives comparables. References consultables.",
+        },
         form: {
             countryLabel: "Pays du patient",
             countryPlaceholder: "Selectionner un pays",

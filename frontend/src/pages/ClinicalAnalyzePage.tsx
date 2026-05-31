@@ -40,6 +40,7 @@ export function ClinicalAnalyzePage() {
     const { user } = useAuth();
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
+    const clinicalIntroLabels = labels.clinicalDemo.intro;
     const [openaiModel, setOpenaiModel] = useState<OpenAIModel>("gpt-4.1-mini");
     const isProd = !!import.meta.env.PROD;
     const [activeTab, setActiveTab] =
@@ -97,6 +98,16 @@ export function ClinicalAnalyzePage() {
         "quick" | "focus" | null
     >(null);
     const demoScenario = getClinicalDemoScenario(lastPayload);
+    const { translated: introTaglineLabel } = useTranslation({
+        text: clinicalIntroLabels.tagline,
+        targetLang,
+        openaiModel,
+    });
+    const { translated: introSubtitleLabel } = useTranslation({
+        text: clinicalIntroLabels.subtitle,
+        targetLang,
+        openaiModel,
+    });
 
     /* ------------------------------------------------------------------ */
     /* Nettoyage cache à l’entrée (1 seule fois)                          */
@@ -782,6 +793,15 @@ export function ClinicalAnalyzePage() {
                     {blockingActionableMessage}
                 </div>
             )}
+
+            <section className="rounded-xl border border-sky-200 bg-sky-50 px-5 py-4">
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-sky-900">
+                    {introTaglineLabel}
+                </p>
+                <p className="mt-1 text-sm text-sky-950">
+                    {introSubtitleLabel}
+                </p>
+            </section>
 
             {/* ⚙️ Sélection modèle */}
             <div className="flex items-center gap-3">

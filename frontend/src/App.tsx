@@ -47,6 +47,7 @@ function CoolifyLandingPage() {
     const targetLang = i18n.locale;
     const { translated: title } = useTranslation({ text: landingLabels.title, targetLang, namespace: "app-landing" });
     const { translated: subtitle } = useTranslation({ text: landingLabels.subtitle, targetLang, namespace: "app-landing" });
+    const { translated: supportingText } = useTranslation({ text: landingLabels.supportingText, targetLang, namespace: "app-landing" });
     const { translated: clinicalDemoTitle } = useTranslation({ text: landingLabels.clinicalDemoTitle, targetLang, namespace: "app-landing" });
     const { translated: clinicalDemoBody } = useTranslation({ text: landingLabels.clinicalDemoBody, targetLang, namespace: "app-landing" });
     const { translated: doctorLoginTitle } = useTranslation({ text: landingLabels.doctorLoginTitle, targetLang, namespace: "app-landing" });
@@ -104,6 +105,9 @@ function CoolifyLandingPage() {
                 </h1>
                 <p className="mx-auto max-w-2xl text-sm text-gray-600">
                     {subtitle}
+                </p>
+                <p className="mx-auto max-w-3xl text-sm text-gray-500">
+                    {supportingText}
                 </p>
             </div>
 
