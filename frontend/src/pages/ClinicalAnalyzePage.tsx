@@ -94,6 +94,7 @@ export function ClinicalAnalyzePage() {
     const [replyLookupLoading, setReplyLookupLoading] = useState(false);
     const [replyLookupError, setReplyLookupError] = useState("");
     const [replyLookupItems, setReplyLookupItems] = useState<ClinicianComment[]>([]);
+    const [replyLookupOpen, setReplyLookupOpen] = useState(false);
     const [mobileComparisonSection, setMobileComparisonSection] = useState<
         "quick" | "focus" | null
     >(null);
@@ -618,6 +619,8 @@ export function ClinicalAnalyzePage() {
     const { translated: leaveCommentTooltipLabel } = useTranslation({ text: commentLabels.leaveCommentTooltip, targetLang, openaiModel });
     const { translated: openaiModelTooltipLabel } = useTranslation({ text: commentLabels.openaiModelTooltip, targetLang, openaiModel });
     const { translated: replyLookupTitleLabel, loading: loadingReplyLookupTitle, error: errorReplyLookupTitle } = useTranslation({ text: commentLabels.replyLookupTitle, targetLang, openaiModel });
+    const { translated: replyLookupCollapsedHintLabel } = useTranslation({ text: commentLabels.replyLookupCollapsedHint, targetLang, openaiModel });
+    const { translated: replyLookupExpandedHintLabel } = useTranslation({ text: commentLabels.replyLookupExpandedHint, targetLang, openaiModel });
     const { translated: replyLookupDescriptionLabel, loading: loadingReplyLookupDescription, error: errorReplyLookupDescription } = useTranslation({ text: commentLabels.replyLookupDescription, targetLang, openaiModel });
     const { translated: namePlaceholderLabel } = useTranslation({ text: commentLabels.namePlaceholder, targetLang, openaiModel });
     const { translated: trackingCodePlaceholderLabel } = useTranslation({ text: commentLabels.trackingCodePlaceholder, targetLang, openaiModel });
@@ -711,81 +714,102 @@ export function ClinicalAnalyzePage() {
             </div>
 
             <section className="rounded-xl border border-amber-200 bg-amber-50 p-5">
-                <div className="mb-3">
-                    <h2 className="text-lg font-semibold text-amber-950">
-                        {renderLabel(replyLookupTitleLabel, loadingReplyLookupTitle, errorReplyLookupTitle ?? undefined)}
-                    </h2>
-                    <p className="mt-1 text-sm text-amber-900">
-                        {renderLabel(replyLookupDescriptionLabel, loadingReplyLookupDescription, errorReplyLookupDescription ?? undefined)}
-                    </p>
-                </div>
-                <form onSubmit={handleLookupReplies} className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
-                    <input
-                        className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
-                        placeholder={namePlaceholderLabel}
-                        value={replyLookupName}
-                        onChange={(event) => setReplyLookupName(event.target.value)}
-                    />
-                    <input
-                        className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm uppercase outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
-                        placeholder={trackingCodePlaceholderLabel}
-                        value={replyLookupCode}
-                        onChange={(event) => setReplyLookupCode(event.target.value.toUpperCase())}
-                        maxLength={8}
-                    />
-                    <div className="group relative inline-flex">
-                        <span className="pointer-events-none absolute bottom-full right-0 z-20 mb-3 hidden w-80 rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-xs font-normal leading-5 text-amber-950 shadow-xl group-hover:block">
-                            {viewRepliesTooltipLabel}
-                            <span
-                                className="absolute right-6 top-full h-3 w-3 -translate-y-1/2 rotate-45 border-b border-r border-amber-200 bg-amber-50"
-                                aria-hidden="true"
+                <button
+                    type="button"
+                    onClick={() => setReplyLookupOpen((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-xl border border-amber-300 bg-white px-4 py-4 text-left transition hover:bg-amber-100"
+                    aria-expanded={replyLookupOpen}
+                >
+                    <div>
+                        <h2 className="text-lg font-semibold text-amber-950">
+                            {renderLabel(replyLookupTitleLabel, loadingReplyLookupTitle, errorReplyLookupTitle ?? undefined)}
+                        </h2>
+                        <p className="mt-1 text-sm text-amber-900">
+                            {replyLookupOpen
+                                ? replyLookupExpandedHintLabel
+                                : replyLookupCollapsedHintLabel}
+                        </p>
+                    </div>
+                    <span className="text-2xl font-semibold text-amber-700" aria-hidden="true">
+                        {replyLookupOpen ? "−" : "+"}
+                    </span>
+                </button>
+                {replyLookupOpen ? (
+                    <>
+                        <div className="mb-3 mt-4">
+                            <p className="text-sm text-amber-900">
+                                {renderLabel(replyLookupDescriptionLabel, loadingReplyLookupDescription, errorReplyLookupDescription ?? undefined)}
+                            </p>
+                        </div>
+                        <form onSubmit={handleLookupReplies} className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
+                            <input
+                                className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                                placeholder={namePlaceholderLabel}
+                                value={replyLookupName}
+                                onChange={(event) => setReplyLookupName(event.target.value)}
                             />
-                        </span>
-                        <button
-                            type="submit"
-                            disabled={replyLookupLoading}
-                            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            {replyLookupLoading
-                                ? renderLabel(searchLoadingLabel, loadingSearchLoading, errorSearchLoading ?? undefined)
-                                : renderLabel(viewRepliesLabel, loadingViewReplies, errorViewReplies ?? undefined)}
-                        </button>
-                    </div>
-                </form>
-                {replyLookupError && (
-                    <div className="mt-3 rounded-lg bg-white/80 px-3 py-2 text-sm text-amber-900">
-                        {replyLookupError}
-                    </div>
-                )}
-                {replyLookupItems.length > 0 && (
-                    <div className="mt-4 space-y-3">
-                        {replyLookupItems.map((item) => (
-                            <article key={item.id} className="rounded-lg border border-amber-100 bg-white p-4">
-                                <div className="mb-2 text-xs text-gray-500">
-                                    {commentCreatedAtPrefixLabel}{" "}
-                                    {new Date(item.createdAt).toLocaleString(targetLang)}
-                                </div>
-                                <p className="whitespace-pre-wrap text-sm text-gray-800">
-                                    {item.comment}
-                                </p>
-                                <div className="mt-3 space-y-2 border-t border-gray-200 pt-3">
-                                    {item.replies.map((reply) => (
-                                        <div key={reply.id} className="rounded-lg bg-amber-50 p-3">
-                                            <div className="mb-1 text-xs text-gray-500">
-                                                {replyFromPrefixLabel} {reply.responderUsername}{" "}
-                                                {replyFromSeparatorLabel}{" "}
-                                                {new Date(reply.createdAt).toLocaleString(targetLang)}
-                                            </div>
-                                            <p className="whitespace-pre-wrap text-sm text-gray-800">
-                                                {reply.message}
-                                            </p>
+                            <input
+                                className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm uppercase outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                                placeholder={trackingCodePlaceholderLabel}
+                                value={replyLookupCode}
+                                onChange={(event) => setReplyLookupCode(event.target.value.toUpperCase())}
+                                maxLength={8}
+                            />
+                            <div className="group relative inline-flex">
+                                <span className="pointer-events-none absolute bottom-full right-0 z-20 mb-3 hidden w-80 rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-xs font-normal leading-5 text-amber-950 shadow-xl group-hover:block">
+                                    {viewRepliesTooltipLabel}
+                                    <span
+                                        className="absolute right-6 top-full h-3 w-3 -translate-y-1/2 rotate-45 border-b border-r border-amber-200 bg-amber-50"
+                                        aria-hidden="true"
+                                    />
+                                </span>
+                                <button
+                                    type="submit"
+                                    disabled={replyLookupLoading}
+                                    className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {replyLookupLoading
+                                        ? renderLabel(searchLoadingLabel, loadingSearchLoading, errorSearchLoading ?? undefined)
+                                        : renderLabel(viewRepliesLabel, loadingViewReplies, errorViewReplies ?? undefined)}
+                                </button>
+                            </div>
+                        </form>
+                        {replyLookupError && (
+                            <div className="mt-3 rounded-lg bg-white/80 px-3 py-2 text-sm text-amber-900">
+                                {replyLookupError}
+                            </div>
+                        )}
+                        {replyLookupItems.length > 0 && (
+                            <div className="mt-4 space-y-3">
+                                {replyLookupItems.map((item) => (
+                                    <article key={item.id} className="rounded-lg border border-amber-100 bg-white p-4">
+                                        <div className="mb-2 text-xs text-gray-500">
+                                            {commentCreatedAtPrefixLabel}{" "}
+                                            {new Date(item.createdAt).toLocaleString(targetLang)}
                                         </div>
-                                    ))}
-                                </div>
-                            </article>
-                        ))}
-                    </div>
-                )}
+                                        <p className="whitespace-pre-wrap text-sm text-gray-800">
+                                            {item.comment}
+                                        </p>
+                                        <div className="mt-3 space-y-2 border-t border-gray-200 pt-3">
+                                            {item.replies.map((reply) => (
+                                                <div key={reply.id} className="rounded-lg bg-amber-50 p-3">
+                                                    <div className="mb-1 text-xs text-gray-500">
+                                                        {replyFromPrefixLabel} {reply.responderUsername}{" "}
+                                                        {replyFromSeparatorLabel}{" "}
+                                                        {new Date(reply.createdAt).toLocaleString(targetLang)}
+                                                    </div>
+                                                    <p className="whitespace-pre-wrap text-sm text-gray-800">
+                                                        {reply.message}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </article>
+                                ))}
+                            </div>
+                        )}
+                    </>
+                ) : null}
             </section>
 
             {!blockingIncident && blockingActionableMessage && (

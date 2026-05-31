@@ -468,6 +468,8 @@ export const UI_LABELS_FR = {
             exampleCaseTooltip:
                 "Utilisez ce selecteur pour charger un cas clinique deja rempli. C'est utile pour decouvrir rapidement le fonctionnement de ClinIA sans saisir toutes les donnees a la main.",
             replyLookupTitle: "Voir les réponses à mes commentaires",
+            replyLookupCollapsedHint: "Touchez pour ouvrir",
+            replyLookupExpandedHint: "Touchez pour reduire",
             replyLookupDescription:
                 "Entrez exactement le nom ou pseudonyme utilisé lors du commentaire, ainsi que votre code de suivi. Si votre navigateur a conservé ces informations, elles sont pré-remplies automatiquement.",
             namePlaceholder: "Nom ou pseudonyme",
