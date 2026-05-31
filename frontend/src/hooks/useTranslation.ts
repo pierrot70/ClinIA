@@ -95,10 +95,10 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
   const isSourceLocale = baseLocale(targetLang) === baseLocale(sourceLocale);
   const [translated, setTranslated] = useState(text);
   const [loading, setLoading] = useState(!isSourceLocale);
-  const isMounted = useRef(true);
+  const requestVersionRef = useRef(0);
 
   useEffect(() => {
-    isMounted.current = true;
+    const requestVersion = ++requestVersionRef.current;
     setError(null);
     if (!shouldTranslateText(text)) {
       setTranslated(text);
@@ -136,7 +136,7 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
     setLoading(true);
     translateText({ text, targetLang, namespace, sourceLocale, openaiModel })
       .then((result) => {
-        if (isMounted.current) {
+        if (requestVersionRef.current === requestVersion) {
           let clean = result;
           if (typeof clean === "string" && clean.match(/^Le texte reste le m[êe]me/)) {
             clean = text;
@@ -147,7 +147,7 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
         }
       })
       .catch((err) => {
-        if (isMounted.current) {
+        if (requestVersionRef.current === requestVersion) {
           // Fallback local pour les labels critiques
           const fallback =
             criticalLabelFallbacks[text]?.[targetLang] ||
@@ -172,9 +172,6 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
           setLoading(false);
         }
       });
-    return () => {
-      isMounted.current = false;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, targetLang, namespace, sourceLocale]);
 

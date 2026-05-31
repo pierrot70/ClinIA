@@ -226,4 +226,40 @@ describe("useTranslation", () => {
         expect(result.current.translated).toBe("Doctor sign-in");
         expect(result.current.error).toBe("Translation API error");
     });
+
+    it("does not let an old English translation overwrite a newer French locale", async () => {
+        let resolveEnglishTranslation: ((value: string) => void) | null = null;
+        translateTextMock.mockImplementation(
+            () =>
+                new Promise<string>((resolve) => {
+                    resolveEnglishTranslation = resolve;
+                })
+        );
+
+        const { result, rerender } = renderHook(
+            ({ targetLang }) =>
+                useTranslation({
+                    text: labels.app.landing.doctorLoginTitle,
+                    targetLang,
+                    namespace: "app-landing",
+                }),
+            {
+                initialProps: { targetLang: "en-CA" },
+            }
+        );
+
+        rerender({ targetLang: "fr-CA" });
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        expect(result.current.translated).toBe("Connexion médecin");
+
+        resolveEnglishTranslation?.("Doctor sign-in");
+
+        await waitFor(() => {
+            expect(result.current.translated).toBe("Connexion médecin");
+        });
+    });
 });
