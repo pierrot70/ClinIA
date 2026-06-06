@@ -153,24 +153,23 @@ router.post("/login", loginRateLimiter, async (req, res) => {
 });
 
 router.post("/register-self", loginRateLimiter, async (req, res) => {
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.CLINIA_ALLOW_SELF_REGISTRATION !== "true") {
         return res.status(403).json({
             error: {
                 code: "SELF_REGISTER_DISABLED",
                 message:
-                    "L'inscription libre est desactivee en production. Contactez un administrateur.",
+                    "L'inscription libre est desactivee. Contactez un administrateur.",
                 retryable: false,
             },
         });
     }
 
-    const { email, password, role } = req.body ?? {};
+    const { email, password } = req.body ?? {};
 
     try {
         const data = await registerSelf({
             email,
             password,
-            role,
             req,
         });
 

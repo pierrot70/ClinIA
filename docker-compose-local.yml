@@ -40,6 +40,7 @@ services:
 
       # 🔑 ENV CLINIA (ESSENTIEL)
       CLINIA_MOCK_AI: "${CLINIA_MOCK_AI:-true}"
+      CLINIA_ALLOW_SELF_REGISTRATION: "true"
       OPENAI_MODEL: "gpt-4.1-mini"
 
       NODE_ENV: "${NODE_ENV:-development}"

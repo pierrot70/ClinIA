@@ -360,29 +360,35 @@ describe("auth service", () => {
         expect(mockCreate).not.toHaveBeenCalled();
     });
 
-    it("self-registers a MEDECIN with email/password", async () => {
+    it("self-registers only a USER with email/password", async () => {
         mockFindOne.mockResolvedValue(null);
         hash.mockResolvedValue("hashed-password");
         mockCreate.mockResolvedValue({
             _id: "507f1f77bcf86cd799439099",
             username: "drsmith",
             email: "drsmith@clinia.local",
-            role: "MEDECIN",
+            role: "USER",
         });
 
         const result = await registerSelf({
             email: "drsmith@clinia.local",
             password: "password123",
+            role: "SUPERADMIN",
             req: { headers: {}, ip: "127.0.0.1" },
         });
 
         expect(result.user.email).toBe("drsmith@clinia.local");
-        expect(result.user.role).toBe("MEDECIN");
-        expect(mockCreate).toHaveBeenCalled();
+        expect(result.user.role).toBe("USER");
+        expect(mockCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                role: "USER",
+            })
+        );
         expect(recordAuthAuditEvent).toHaveBeenCalledWith(
             expect.objectContaining({
                 action: "REGISTER",
                 outcome: "SUCCESS",
+                role: "USER",
                 reason: "SELF_REGISTER",
             })
         );

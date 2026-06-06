@@ -14,6 +14,7 @@ services:
       dockerfile: Dockerfile
     restart: always
     environment:
+      NODE_ENV: production
       MONGO_URI: "mongodb://root:321eRRe!p@mongo:27017/clinia?authSource=admin"
       JWT_SECRET: ${JWT_SECRET}
       OPENAI_API_KEY: ${OPENAI_API_KEY}

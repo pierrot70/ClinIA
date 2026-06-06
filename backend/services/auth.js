@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 
 import {
     ACCESS_TOKEN_EXPIRES_IN,
+    AUTH_ROLES,
     AUTH_ROLE_VALUES,
     LOCKOUT_DURATION_MS,
     MAX_LOGIN_ATTEMPTS,
@@ -713,14 +714,14 @@ export async function register({
     };
 }
 
-export async function registerSelf({ email, password, role, req }) {
+export async function registerSelf({ email, password, req }) {
     const ip = getRequestIp(req);
     const normalizedEmail = normalizeOptionalEmail(email);
     if (!normalizedEmail) {
         throw createAuthError("INVALID_INPUT", "Identifiant invalide.");
     }
 
-    const targetRole = AUTH_ROLE_VALUES.includes(role) ? role : "USER";
+    const targetRole = AUTH_ROLES.USER;
 
     const requestedUsername = makeUsernameFromEmail(normalizedEmail);
     const normalizedUsername = assertRegisterInput({

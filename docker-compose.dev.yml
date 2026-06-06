@@ -9,6 +9,8 @@ services:
       dockerfile: Dockerfile.dev
     container_name: clinia-backend-dev
     environment:
+      NODE_ENV: development
+      CLINIA_ALLOW_SELF_REGISTRATION: "true"
       MONGO_URI: mongodb://root:321eRRe!p@mongo:27017/clinia?authSource=admin
       JWT_SECRET: devsecret
       OPENAI_API_KEY: ${OPENAI_API_KEY}
