@@ -87,7 +87,7 @@ router.post("/", async (req, res) => {
     }
 
     try {
-        const patient = await createPatient(dto);
+        const patient = await createPatient(dto, req.auth);
 
         await recordPatientMutationAudit(req, {
             action: "PATIENT_CREATE",
@@ -157,7 +157,8 @@ router.get("/", async (req, res) => {
                 limit: req.query.limit,
                 sortBy: req.query.sortBy,
                 sortDir: req.query.sortDir,
-            }
+            },
+            req.auth
         );
 
         return res.status(200).json({
@@ -257,7 +258,8 @@ router.get(
 router.get("/:id/secure-request-documents", async (req, res) => {
     try {
         const documents = await listPatientSecureRequestDocuments(
-            req.params.id
+            req.params.id,
+            req.auth
         );
 
         return res.status(200).json({
@@ -307,7 +309,7 @@ router.get("/:id/secure-request-documents", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
     try {
-        const patient = await getPatientById(req.params.id);
+        const patient = await getPatientById(req.params.id, req.auth);
 
         return res.status(200).json({
             data: patient,
@@ -369,7 +371,7 @@ router.patch("/:id", async (req, res) => {
     }
 
     try {
-        const patient = await updatePatient(req.params.id, dto);
+        const patient = await updatePatient(req.params.id, dto, req.auth);
 
         await recordPatientMutationAudit(req, {
             action: "PATIENT_UPDATE",
@@ -437,55 +439,59 @@ router.patch("/:id", async (req, res) => {
 /* DELETE /api/patients/:id                                            */
 /* ------------------------------------------------------------------ */
 
-router.delete("/:id", async (req, res) => {
-    try {
-        const deleted = await deletePatient(req.params.id);
+router.delete(
+    "/:id",
+    requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+    async (req, res) => {
+        try {
+            const deleted = await deletePatient(req.params.id, req.auth);
 
-        await recordPatientMutationAudit(req, {
-            action: "PATIENT_DELETE",
-            patientId: deleted?._id ?? req.params.id,
-            changedFields: [],
-        });
+            await recordPatientMutationAudit(req, {
+                action: "PATIENT_DELETE",
+                patientId: deleted?._id ?? req.params.id,
+                changedFields: [],
+            });
 
-        return res.status(200).json({
-            data: deleted,
-            meta: {
-                source: "real",
-                model: "mongo",
-            },
-        });
-    } catch (err) {
-        if (err.code === "INVALID_ID") {
-            return res.status(400).json({
+            return res.status(200).json({
+                data: deleted,
+                meta: {
+                    source: "real",
+                    model: "mongo",
+                },
+            });
+        } catch (err) {
+            if (err.code === "INVALID_ID") {
+                return res.status(400).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            if (err.code === "NOT_FOUND") {
+                return res.status(404).json({
+                    error: {
+                        code: err.code,
+                        message: err.message,
+                        retryable: false,
+                    },
+                });
+            }
+
+            console.error("❌ Patient delete error:", err);
+
+            return res.status(500).json({
                 error: {
-                    code: err.code,
-                    message: err.message,
-                    retryable: false,
+                    code: "PERSISTENCE_FAILED",
+                    message:
+                        "Impossible de supprimer le patient.",
+                    retryable: true,
                 },
             });
         }
-
-        if (err.code === "NOT_FOUND") {
-            return res.status(404).json({
-                error: {
-                    code: err.code,
-                    message: err.message,
-                    retryable: false,
-                },
-            });
-        }
-
-        console.error("❌ Patient delete error:", err);
-
-        return res.status(500).json({
-            error: {
-                code: "PERSISTENCE_FAILED",
-                message:
-                    "Impossible de supprimer le patient.",
-                retryable: true,
-            },
-        });
     }
-});
+);
 
 export default router;

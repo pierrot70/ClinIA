@@ -157,6 +157,11 @@ const PatientSchema = new mongoose.Schema(
             default: "",
             trim: true,
         },
+        ownerUserId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "AdminUser",
+            index: true,
+        },
         texto: {
             type: Boolean,
             default: false,

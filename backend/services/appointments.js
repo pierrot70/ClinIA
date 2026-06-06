@@ -3,12 +3,13 @@ import { Specialist } from "../models/Specialist.js";
 import { Patient } from "../models/Patient.js";
 import mongoose from "mongoose";
 import { isValidRamq } from "../utils/validators.js";
+import { buildOwnerScope } from "../auth/resourceAccess.js";
 
 /* ------------------------------------------------------------------ */
 /* Service Appointment                                                 */
 /* ------------------------------------------------------------------ */
 
-export async function createAppointment(dto) {
+export async function createAppointment(dto, authUser) {
     /* ---------------- Validation métier ---------------- */
 
     const ALLOWED_PRIORITIES = ["normal", "urgent"];
@@ -52,7 +53,10 @@ export async function createAppointment(dto) {
         };
     }
 
-    const patient = await Patient.findById(dto.patient).lean();
+    const patient = await Patient.findOne({
+        _id: dto.patient,
+        ...buildOwnerScope(authUser),
+    }).lean();
     if (!patient) {
         throw {
             code: "INVALID_INPUT",
@@ -114,6 +118,7 @@ export async function createAppointment(dto) {
     return Appointment.create({
         ...dto,
         patientInsuranceNumber: patient.num_assurance_maladie,
+        ownerUserId: patient.ownerUserId || authUser.userId,
     });
 }
 
@@ -121,8 +126,8 @@ export async function createAppointment(dto) {
 /* GET appointments                                                    */
 /* ------------------------------------------------------------------ */
 
-export async function listAppointments(filters = {}) {
-    const query = {};
+export async function listAppointments(filters = {}, authUser) {
+    const query = buildOwnerScope(authUser);
 
     if (filters.specialist) query.specialist = filters.specialist;
     if (filters.date) query.date = filters.date;
@@ -139,7 +144,7 @@ export async function listAppointments(filters = {}) {
 /* GET appointment by id                                               */
 /* ------------------------------------------------------------------ */
 
-export async function getAppointmentById(id) {
+export async function getAppointmentById(id, authUser) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
             code: "INVALID_ID",
@@ -147,7 +152,10 @@ export async function getAppointmentById(id) {
         };
     }
 
-    const appointment = await Appointment.findById(id).lean();
+    const appointment = await Appointment.findOne({
+        _id: id,
+        ...buildOwnerScope(authUser),
+    }).lean();
 
     if (!appointment) {
         throw {
@@ -163,7 +171,7 @@ export async function getAppointmentById(id) {
 /* Cancel appointment (soft delete)                                   */
 /* ------------------------------------------------------------------ */
 
-export async function cancelAppointment(id) {
+export async function cancelAppointment(id, authUser) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
             code: "INVALID_ID",
@@ -171,7 +179,10 @@ export async function cancelAppointment(id) {
         };
     }
 
-    const appointment = await Appointment.findById(id);
+    const appointment = await Appointment.findOne({
+        _id: id,
+        ...buildOwnerScope(authUser),
+    });
 
     if (!appointment) {
         throw {
@@ -199,7 +210,7 @@ export async function cancelAppointment(id) {
 
 const ALLOWED_STATUSES = ["scheduled", "cancelled", "completed"];
 
-export async function updateAppointmentStatus(id, newStatus) {
+export async function updateAppointmentStatus(id, newStatus, authUser) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
             code: "INVALID_ID",
@@ -215,7 +226,10 @@ export async function updateAppointmentStatus(id, newStatus) {
         };
     }
 
-    const appointment = await Appointment.findById(id);
+    const appointment = await Appointment.findOne({
+        _id: id,
+        ...buildOwnerScope(authUser),
+    });
 
     if (!appointment) {
         throw {
@@ -253,7 +267,7 @@ export async function updateAppointmentStatus(id, newStatus) {
 /* Update appointment schedule (date/time)                             */
 /* ------------------------------------------------------------------ */
 
-export async function updateAppointmentSchedule(id, { date, time }) {
+export async function updateAppointmentSchedule(id, { date, time }, authUser) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
             code: "INVALID_ID",
@@ -284,7 +298,10 @@ export async function updateAppointmentSchedule(id, { date, time }) {
         };
     }
 
-    const appointment = await Appointment.findById(id);
+    const appointment = await Appointment.findOne({
+        _id: id,
+        ...buildOwnerScope(authUser),
+    });
 
     if (!appointment) {
         throw {
@@ -448,8 +465,9 @@ export async function listAppointmentsPaginated({
                                                     specialist,
                                                     status,
                                                     patientInsuranceNumber,
+                                                    authUser,
                                                 }) {
-    const query = {};
+    const query = buildOwnerScope(authUser);
 
     if (specialist) query.specialist = specialist;
     if (status) query.status = status;

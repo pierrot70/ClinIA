@@ -62,7 +62,7 @@ function getRouteHandler(method, path) {
         throw new Error(`Route ${method.toUpperCase()} ${path} not found`);
     }
 
-    return layer.route.stack[0].handle;
+    return layer.route.stack.at(-1).handle;
 }
 
 describe("patients routes audit", () => {

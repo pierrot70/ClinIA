@@ -15,6 +15,13 @@ const AppointmentSchema = new mongoose.Schema(
             index: true,
         },
 
+        /** Utilisateur autorisé à accéder au rendez-vous */
+        ownerUserId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "AdminUser",
+            index: true,
+        },
+
         /** Numéro RAMQ (dérivé du patient) */
         patientInsuranceNumber: {
             type: String,

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const patientFind = vi.fn();
 const patientCountDocuments = vi.fn();
-const patientFindById = vi.fn();
+const patientFindOne = vi.fn();
 const auditCountDocuments = vi.fn();
 const auditFind = vi.fn();
 
@@ -10,10 +10,9 @@ vi.mock("../../models/Patient.js", () => ({
     Patient: {
         find: patientFind,
         countDocuments: patientCountDocuments,
-        findOne: vi.fn(),
-        findById: patientFindById,
-        findByIdAndUpdate: vi.fn(),
-        findByIdAndDelete: vi.fn(),
+        findOne: patientFindOne,
+        findOneAndUpdate: vi.fn(),
+        findOneAndDelete: vi.fn(),
         create: vi.fn(),
     },
 }));
@@ -105,7 +104,7 @@ describe("patients service audit logs", () => {
     });
 
     it("returns the latest secure request document for each specialty", async () => {
-        patientFindById.mockReturnValue({
+        patientFindOne.mockReturnValue({
             lean: vi.fn().mockResolvedValue({
                 _id: "507f1f77bcf86cd799439012",
                 prenom: "Patient",
@@ -170,12 +169,17 @@ describe("patients service audit logs", () => {
         });
 
         const result = await listPatientSecureRequestDocuments(
-            "507f1f77bcf86cd799439012"
+            "507f1f77bcf86cd799439012",
+            {
+                userId: "507f1f77bcf86cd799439099",
+                role: "MEDECIN",
+            }
         );
 
-        expect(patientFindById).toHaveBeenCalledWith(
-            "507f1f77bcf86cd799439012"
-        );
+        expect(patientFindOne).toHaveBeenCalledWith({
+            _id: "507f1f77bcf86cd799439012",
+            ownerUserId: "507f1f77bcf86cd799439099",
+        });
         expect(auditFind).toHaveBeenCalledWith({
             patientId: "507f1f77bcf86cd799439012",
             action: "PATIENT_UPDATE",

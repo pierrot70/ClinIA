@@ -6,9 +6,9 @@ import {
     cancelAppointment,
     updateAppointmentStatus,
     updateAppointmentSchedule,
+    listAppointmentsPaginated,
 } from "../services/appointments.js";
 import { toCreateAppointmentDTO } from "../dto/appointment.dto.js";
-import { Appointment } from "../models/Appointment.js"; // ✅ IMPORT MANQUANT
 import mongoose from "mongoose";
 import { isValidRamq } from "../utils/validators.js";
 
@@ -73,7 +73,7 @@ router.post("/", async (req, res) => {
     }
 
     try {
-        const appointment = await createAppointment(dto);
+        const appointment = await createAppointment(dto, req.auth);
 
         return res.status(201).json({
             data: appointment,
@@ -139,7 +139,6 @@ router.post("/", async (req, res) => {
 router.get("/", async (req, res) => {
     const page = Math.max(parseInt(req.query.page) || 1, 1);
     const limit = Math.min(parseInt(req.query.limit) || 10, 50);
-    const skip = (page - 1) * limit;
 
     const filters = {};
 
@@ -174,23 +173,18 @@ router.get("/", async (req, res) => {
     }
 
     try {
-        const [data, total] = await Promise.all([
-            Appointment.find(filters)
-                .sort({ date: 1, time: 1 })
-                .skip(skip)
-                .limit(limit)
-                .lean(),
-            Appointment.countDocuments(filters),
-        ]);
+        const { data, meta } = await listAppointmentsPaginated({
+            ...filters,
+            page,
+            limit,
+            authUser: req.auth,
+        });
 
         return res.status(200).json({
             data: {
                 data,
                 meta: {
-                    page,
-                    limit,
-                    total,
-                    totalPages: Math.ceil(total / limit),
+                    ...meta,
                     source: "real",
                     model: "mongo",
                 },
@@ -220,7 +214,7 @@ router.get("/", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
     try {
-        const appointment = await getAppointmentById(req.params.id);
+        const appointment = await getAppointmentById(req.params.id, req.auth);
 
         return res.status(200).json({
             data: appointment,
@@ -269,7 +263,7 @@ router.get("/:id", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
     try {
-        const appointment = await cancelAppointment(req.params.id);
+        const appointment = await cancelAppointment(req.params.id, req.auth);
 
         return res.status(200).json({
             data: appointment,
@@ -334,7 +328,7 @@ router.patch("/:id/status", async (req, res) => {
 
     try {
         const appointment =
-            await updateAppointmentStatus(req.params.id, status);
+            await updateAppointmentStatus(req.params.id, status, req.auth);
 
         return res.status(200).json({
             data: appointment,
@@ -406,7 +400,8 @@ router.patch("/:id/schedule", async (req, res) => {
     try {
         const appointment = await updateAppointmentSchedule(
             req.params.id,
-            { date, time }
+            { date, time },
+            req.auth
         );
 
         return res.status(200).json({

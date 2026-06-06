@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { Patient } from "../models/Patient.js";
 import { PatientAuditLog } from "../models/PatientAuditLog.js";
 import { geocodeFreeAddress } from "../utils/geocode.js";
+import { buildOwnerScope } from "../auth/resourceAccess.js";
 
 /* ------------------------------------------------------------------ */
 /* Service Patient                                                     */
@@ -51,7 +52,9 @@ async function ensureUniqueRamqNumber() {
     };
 }
 
-export async function createPatient(dto) {
+export async function createPatient(dto, authUser) {
+    buildOwnerScope(authUser);
+
     if (!dto.nom || !dto.prenom) {
         throw {
             code: "INVALID_INPUT",
@@ -75,11 +78,14 @@ export async function createPatient(dto) {
         }
     }
 
-    return Patient.create(dto);
+    return Patient.create({
+        ...dto,
+        ownerUserId: authUser.userId,
+    });
 }
 
-export async function listPatients(filters = {}, opts = {}) {
-    const query = {};
+export async function listPatients(filters = {}, opts = {}, authUser) {
+    const query = buildOwnerScope(authUser);
 
     if (filters.nom) {
         query.nom = { $regex: filters.nom, $options: "i" };
@@ -275,7 +281,7 @@ export async function listPatientAuditLogs({
     };
 }
 
-export async function listPatientSecureRequestDocuments(patientId) {
+export async function listPatientSecureRequestDocuments(patientId, authUser) {
     if (!mongoose.Types.ObjectId.isValid(patientId)) {
         throw {
             code: "INVALID_ID",
@@ -283,7 +289,10 @@ export async function listPatientSecureRequestDocuments(patientId) {
         };
     }
 
-    const patient = await Patient.findById(patientId).lean();
+    const patient = await Patient.findOne({
+        _id: patientId,
+        ...buildOwnerScope(authUser),
+    }).lean();
 
     if (!patient) {
         throw {
@@ -345,7 +354,7 @@ export async function listPatientSecureRequestDocuments(patientId) {
     return Array.from(latestBySpecialty.values());
 }
 
-export async function getPatientById(id) {
+export async function getPatientById(id, authUser) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
             code: "INVALID_ID",
@@ -353,7 +362,10 @@ export async function getPatientById(id) {
         };
     }
 
-    const patient = await Patient.findById(id).lean();
+    const patient = await Patient.findOne({
+        _id: id,
+        ...buildOwnerScope(authUser),
+    }).lean();
 
     if (!patient) {
         throw {
@@ -365,7 +377,7 @@ export async function getPatientById(id) {
     return patient;
 }
 
-export async function updatePatient(id, updates) {
+export async function updatePatient(id, updates, authUser) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
             code: "INVALID_ID",
@@ -373,7 +385,11 @@ export async function updatePatient(id, updates) {
         };
     }
 
-    const existing = await Patient.findById(id).lean();
+    const ownerScope = buildOwnerScope(authUser);
+    const existing = await Patient.findOne({
+        _id: id,
+        ...ownerScope,
+    }).lean();
     if (!existing) {
         throw {
             code: "NOT_FOUND",
@@ -406,8 +422,8 @@ export async function updatePatient(id, updates) {
         }
     }
 
-    const patient = await Patient.findByIdAndUpdate(
-        id,
+    const patient = await Patient.findOneAndUpdate(
+        { _id: id, ...ownerScope },
         { $set: updates },
         { new: true, runValidators: true }
     );
@@ -422,7 +438,7 @@ export async function updatePatient(id, updates) {
     return patient;
 }
 
-export async function deletePatient(id) {
+export async function deletePatient(id, authUser) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
             code: "INVALID_ID",
@@ -430,7 +446,10 @@ export async function deletePatient(id) {
         };
     }
 
-    const deleted = await Patient.findByIdAndDelete(id);
+    const deleted = await Patient.findOneAndDelete({
+        _id: id,
+        ...buildOwnerScope(authUser),
+    });
 
     if (!deleted) {
         throw {
