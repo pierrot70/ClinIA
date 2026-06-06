@@ -3,8 +3,8 @@ services:
     image: mongo:7
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: "321eRRe!p"
+      MONGO_INITDB_ROOT_USERNAME: "${MONGO_INITDB_ROOT_USERNAME:?Set MONGO_INITDB_ROOT_USERNAME in .env}"
+      MONGO_INITDB_ROOT_PASSWORD: "${MONGO_INITDB_ROOT_PASSWORD:?Set MONGO_INITDB_ROOT_PASSWORD in .env}"
     ports:
       - "27017:27017"
     volumes:
@@ -14,11 +14,11 @@ services:
     image: mongo-express:1
     restart: unless-stopped
     environment:
-      ME_CONFIG_BASICAUTH_USERNAME: plasante
-      ME_CONFIG_BASICAUTH_PASSWORD: "321eRRe!p"
+      ME_CONFIG_BASICAUTH_USERNAME: "${MONGO_EXPRESS_USERNAME:?Set MONGO_EXPRESS_USERNAME in .env}"
+      ME_CONFIG_BASICAUTH_PASSWORD: "${MONGO_EXPRESS_PASSWORD:?Set MONGO_EXPRESS_PASSWORD in .env}"
 
       # Forcer une URL explicite (évite les surprises d'authSource)
-      ME_CONFIG_MONGODB_URL: "mongodb://root:321eRRe!p@mongo:27017/?authSource=admin"
+      ME_CONFIG_MONGODB_URL: "${MONGO_ADMIN_URI_DOCKER:?Set MONGO_ADMIN_URI_DOCKER in .env}"
 
       # Optionnel mais utile
       ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
@@ -36,7 +36,7 @@ services:
     env_file:
       - .env
     environment:
-      MONGO_URI: "mongodb://root:321eRRe!p@mongo:27017/clinia?authSource=admin"
+      MONGO_URI: "${MONGO_URI_DOCKER:?Set MONGO_URI_DOCKER in .env}"
 
       # 🔑 ENV CLINIA (ESSENTIEL)
       CLINIA_MOCK_AI: "${CLINIA_MOCK_AI:-true}"

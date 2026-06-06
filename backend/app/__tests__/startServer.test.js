@@ -68,4 +68,35 @@ describe("startServer", () => {
             "mongo down"
         );
     });
+
+    it("refuses a root Mongo account in production", async () => {
+        const connect = vi.fn();
+        const mongoose = { connect };
+        const initShutdownState = vi.fn();
+        const logger = {
+            log: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
+        };
+        const listen = vi.fn();
+        const app = { listen };
+        const warmTranslationMemoryCache = vi.fn();
+
+        const startServer = createStartServer({
+            mongoose,
+            initShutdownState,
+            logger,
+            mongoUri: "mongodb://root:secret@mongo:27017/clinia?authSource=admin",
+            nodeEnv: "production",
+        });
+
+        await startServer({ app, warmTranslationMemoryCache });
+
+        expect(connect).not.toHaveBeenCalled();
+        expect(listen).not.toHaveBeenCalled();
+        expect(logger.error).toHaveBeenCalledWith(
+            "❌ Mongo connection error (FAIL-FAST):",
+            "Production MONGO_URI must use a dedicated non-root application user."
+        );
+    });
 });

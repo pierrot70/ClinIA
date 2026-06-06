@@ -1,3 +1,31 @@
+function getMongoUsername(mongoUri) {
+    const match = String(mongoUri || "").match(
+        /^mongodb(?:\+srv)?:\/\/([^:@/]+)(?::[^@]*)?@/i
+    );
+
+    if (!match) {
+        return null;
+    }
+
+    try {
+        return decodeURIComponent(match[1]).trim().toLowerCase();
+    } catch {
+        return match[1].trim().toLowerCase();
+    }
+}
+
+export function assertProductionMongoLeastPrivilege({ mongoUri, nodeEnv }) {
+    if (!mongoUri) {
+        throw new Error("MONGO_URI is required.");
+    }
+
+    if (nodeEnv === "production" && getMongoUsername(mongoUri) === "root") {
+        throw new Error(
+            "Production MONGO_URI must use a dedicated non-root application user."
+        );
+    }
+}
+
 export function createStartServer(deps) {
     const {
         mongoose,
@@ -11,10 +39,14 @@ export function createStartServer(deps) {
     } = deps;
 
     return async function startServer({ app, warmTranslationMemoryCache }) {
-        return mongoose
+        return Promise.resolve()
+            .then(() => {
+                assertProductionMongoLeastPrivilege({ mongoUri, nodeEnv });
+            })
+            .then(() => mongoose
             .connect(mongoUri, {
                 serverSelectionTimeoutMS: 2000,
-            })
+            }))
             .then(async () => {
                 logger.log("✅ MongoDB connecté (ClinIA)");
                 logger.log("CLINIA_MOCK_AI =", mockAi);

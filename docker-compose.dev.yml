@@ -11,9 +11,9 @@ services:
     environment:
       NODE_ENV: development
       CLINIA_ALLOW_SELF_REGISTRATION: "true"
-      MONGO_URI: mongodb://root:321eRRe!p@mongo:27017/clinia?authSource=admin
-      JWT_SECRET: devsecret
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      MONGO_URI: "${MONGO_URI_DOCKER:?Set MONGO_URI_DOCKER in .env}"
+      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:?Set OPENAI_API_KEY in .env}"
     ports:
       - "4000:4000"
     volumes:

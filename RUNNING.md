@@ -21,7 +21,8 @@ git push origin $(git rev-parse --abbrev-ref HEAD)
 
 ```bash
 cp .env.example .env
-# Edit .env and fill OPENAI_API_KEY, JWT_SECRET, MONGO_INITDB_ROOT_PASSWORD, etc.
+# Edit .env and fill all required values. Keep root, app, and Mongo Express
+# passwords distinct. See docs/mongo-credential-rotation.md.
 ```
 
 3) Start local development stack

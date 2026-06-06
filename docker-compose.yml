@@ -3,8 +3,8 @@ services:
     image: mongo:7
     restart: always
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: "321eRRe!p"
+      MONGO_INITDB_ROOT_USERNAME: "${MONGO_INITDB_ROOT_USERNAME:?Set MONGO_INITDB_ROOT_USERNAME in Coolify secrets}"
+      MONGO_INITDB_ROOT_PASSWORD: "${MONGO_INITDB_ROOT_PASSWORD:?Set MONGO_INITDB_ROOT_PASSWORD in Coolify secrets}"
     volumes:
       - mongo_data:/data/db
 
@@ -15,9 +15,9 @@ services:
     restart: always
     environment:
       NODE_ENV: production
-      MONGO_URI: "mongodb://root:321eRRe!p@mongo:27017/clinia?authSource=admin"
-      JWT_SECRET: ${JWT_SECRET}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      MONGO_URI: "${MONGO_URI:?Set a non-root MONGO_URI in Coolify secrets}"
+      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in Coolify secrets}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:?Set OPENAI_API_KEY in Coolify secrets}"
       OPENAI_MODEL: gpt-4.1-mini
       CLINIA_MOCK_AI: "false"
     ports:

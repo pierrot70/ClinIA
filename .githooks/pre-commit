@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+./scripts/check-tracked-secrets.sh
+
 # Validate syntax of staged shell scripts before commit.
 STAGED_SHELL_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\\.(sh|bash)$' || true)
 
