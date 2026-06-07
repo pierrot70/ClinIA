@@ -84,6 +84,36 @@ const AdminUserSchema = new mongoose.Schema({
         default: false,
         index: true,
     },
+    passwordRecoveryCodeHash: {
+        type: String,
+        default: null,
+        select: false,
+    },
+    passwordRecoveryCodeExpiresAt: {
+        type: Date,
+        default: null,
+        select: false,
+    },
+    passwordRecoveryCodeAttempts: {
+        type: Number,
+        default: 0,
+        select: false,
+    },
+    passwordRecoveryRequestedAt: {
+        type: Date,
+        default: null,
+        select: false,
+    },
+    passwordRecoveryGrantHash: {
+        type: String,
+        default: null,
+        select: false,
+    },
+    passwordRecoveryGrantExpiresAt: {
+        type: Date,
+        default: null,
+        select: false,
+    },
 }, { timestamps: true });
 
 export const AdminUser = mongoose.model("AdminUser", AdminUserSchema);

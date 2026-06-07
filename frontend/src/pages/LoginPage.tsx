@@ -5,11 +5,19 @@ import { useAuth } from "../hooks/useAuth";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { useTranslation } from "../hooks/useTranslation";
 import { labels } from "../i18n/uiLabels";
-import { consumeAuthSecurityNotice, type AuthSecurityNotice } from "../services/authService";
+import {
+    completePasswordRecovery,
+    consumeAuthSecurityNotice,
+    requestPasswordRecovery,
+    type AuthSecurityNotice,
+    verifyPasswordRecoveryCode,
+} from "../services/authService";
 
 type LoginPageProps = {
     adminOnly?: boolean;
 };
+
+type RecoveryStep = "request" | "verify" | "complete";
 
 function useLoginLabel(text: string) {
     const { locale } = useHomeI18n();
@@ -28,6 +36,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     const [error, setError] = useState<string | null>(null);
     const [securityNotice, setSecurityNotice] = useState<AuthSecurityNotice | null>(null);
     const [loading, setLoading] = useState(false);
+    const [recoveryMode, setRecoveryMode] = useState(false);
+    const [recoveryStep, setRecoveryStep] = useState<RecoveryStep>("request");
+    const [recoveryCode, setRecoveryCode] = useState("");
+    const [recoveryGrant, setRecoveryGrant] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [success, setSuccess] = useState<string | null>(null);
 
     const location = useLocation();
     const navigate = useNavigate();
@@ -142,6 +157,59 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
         }
     };
 
+    const resetRecovery = () => {
+        setRecoveryMode(false);
+        setRecoveryStep("request");
+        setRecoveryCode("");
+        setRecoveryGrant("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setError(null);
+        setSuccess(null);
+    };
+
+    const handleRecoverySubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        setLoading(true);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            if (recoveryStep === "request") {
+                await requestPasswordRecovery(email);
+                setRecoveryStep("verify");
+                setSuccess("Si ce compte existe, un code a ete envoye par courriel.");
+                return;
+            }
+
+            if (recoveryStep === "verify") {
+                const grant = await verifyPasswordRecoveryCode(email, recoveryCode);
+                setRecoveryGrant(grant);
+                setRecoveryStep("complete");
+                setSuccess("Code confirme. Choisissez maintenant un nouveau mot de passe.");
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                setError("Les mots de passe ne correspondent pas.");
+                return;
+            }
+
+            await completePasswordRecovery(email, recoveryGrant, newPassword);
+            resetRecovery();
+            setEmail(email);
+            setSuccess("Mot de passe modifie. Vous pouvez maintenant vous connecter.");
+        } catch (err: unknown) {
+            setError(
+                err instanceof Error && err.message
+                    ? err.message
+                    : "Impossible de poursuivre la reinitialisation."
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="max-w-md mx-auto px-4 py-12">
             <h1 className="text-2xl font-semibold mb-2 text-gray-900">
@@ -180,7 +248,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                 </div>
             )}
 
-            {!adminOnly && (
+            {!adminOnly && !recoveryMode && (
                 <button
                     type="button"
                     onClick={() => setRegisterMode((prev) => !prev)}
@@ -198,6 +266,111 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                 </div>
             )}
 
+            {success && (
+                <div className="mb-4 rounded bg-emerald-50 p-3 text-sm text-emerald-700">
+                    {success}
+                </div>
+            )}
+
+            {recoveryMode ? (
+                <form onSubmit={handleRecoverySubmit} className="space-y-4">
+                    <div>
+                        <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="recovery-email">
+                            Courriel du compte
+                        </label>
+                        <input
+                            id="recovery-email"
+                            type="email"
+                            className="w-full rounded-lg border px-3 py-2 text-sm"
+                            value={email}
+                            onChange={(event) => setEmail(event.target.value)}
+                            autoComplete="email"
+                            disabled={recoveryStep !== "request"}
+                            required
+                        />
+                    </div>
+
+                    {recoveryStep === "verify" && (
+                        <div>
+                            <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="recovery-code">
+                                Code de verification
+                            </label>
+                            <input
+                                id="recovery-code"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]{6}"
+                                maxLength={6}
+                                className="w-full rounded-lg border px-3 py-2 text-sm"
+                                value={recoveryCode}
+                                onChange={(event) =>
+                                    setRecoveryCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                                }
+                                autoComplete="one-time-code"
+                                required
+                            />
+                        </div>
+                    )}
+
+                    {recoveryStep === "complete" && (
+                        <>
+                            <div>
+                                <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="recovery-new-password">
+                                    Nouveau mot de passe
+                                </label>
+                                <input
+                                    id="recovery-new-password"
+                                    type="password"
+                                    minLength={8}
+                                    maxLength={128}
+                                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                                    value={newPassword}
+                                    onChange={(event) => setNewPassword(event.target.value)}
+                                    autoComplete="new-password"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="recovery-confirm-password">
+                                    Confirmer le nouveau mot de passe
+                                </label>
+                                <input
+                                    id="recovery-confirm-password"
+                                    type="password"
+                                    minLength={8}
+                                    maxLength={128}
+                                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                                    value={confirmPassword}
+                                    onChange={(event) => setConfirmPassword(event.target.value)}
+                                    autoComplete="new-password"
+                                    required
+                                />
+                            </div>
+                        </>
+                    )}
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                        {loading
+                            ? "Traitement..."
+                            : recoveryStep === "request"
+                                ? "Envoyer le code"
+                                : recoveryStep === "verify"
+                                    ? "Verifier le code"
+                                    : "Modifier le mot de passe"}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={resetRecovery}
+                        className="w-full text-sm text-blue-600 hover:text-blue-700"
+                    >
+                        Retour a la connexion
+                    </button>
+                </form>
+            ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1" htmlFor="email">
@@ -265,7 +438,22 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                             ? createAccountLabel
                             : loginActionLabel}
                 </button>
+                {!registerMode && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setRecoveryMode(true);
+                            setRecoveryStep("request");
+                            setError(null);
+                            setSuccess(null);
+                        }}
+                        className="w-full text-sm text-blue-600 hover:text-blue-700"
+                    >
+                        Mot de passe oublie?
+                    </button>
+                )}
             </form>
+            )}
         </div>
     );
 };

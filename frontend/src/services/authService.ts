@@ -349,6 +349,64 @@ export async function registerSelf(credentials: LoginCredentials): Promise<AuthS
     return session;
 }
 
+export async function requestPasswordRecovery(email: string): Promise<void> {
+    const response = await postJson("/api/auth/password-recovery/request", {
+        email,
+    });
+    const data = await safeBasicJson(response);
+
+    if (!response.ok) {
+        throw new Error(
+            data?.error?.message ||
+                data?.message ||
+                "Impossible d'envoyer le code de verification."
+        );
+    }
+}
+
+export async function verifyPasswordRecoveryCode(
+    email: string,
+    code: string
+): Promise<string> {
+    const response = await postJson("/api/auth/password-recovery/verify", {
+        email,
+        code,
+    });
+    const data = await safeJson(response);
+    const payload = getResponsePayload(data) as LoginApiResponse & {
+        recoveryGrant?: string;
+    };
+
+    if (!response.ok || !payload.recoveryGrant) {
+        throw new Error(
+            getErrorMessage(data, "Le code est invalide ou expire.")
+        );
+    }
+
+    return payload.recoveryGrant;
+}
+
+export async function completePasswordRecovery(
+    email: string,
+    recoveryGrant: string,
+    newPassword: string
+): Promise<void> {
+    const response = await postJson("/api/auth/password-recovery/complete", {
+        email,
+        recoveryGrant,
+        newPassword,
+    });
+    const data = await safeBasicJson(response);
+
+    if (!response.ok) {
+        throw new Error(
+            data?.error?.message ||
+                data?.message ||
+                "Impossible de modifier le mot de passe."
+        );
+    }
+}
+
 export async function logout(): Promise<void> {
     const token = inMemoryAccessToken;
 

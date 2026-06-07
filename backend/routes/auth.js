@@ -41,6 +41,15 @@ import {
     SENSITIVE_REAUTH_COOKIE_NAME,
 } from "../auth/sessionCookies.js";
 import { enforceTrustedOrigin } from "../security/originProtection.js";
+import {
+    completePasswordRecovery,
+    requestPasswordRecoveryCode,
+    verifyPasswordRecoveryCode,
+} from "../services/passwordRecovery.js";
+import {
+    passwordRecoveryRequestRateLimiter,
+    passwordRecoveryVerifyRateLimiter,
+} from "../middleware/passwordRecoveryRateLimiter.js";
 
 const router = express.Router();
 const enforceSensitiveAuthOrigin = enforceTrustedOrigin();
@@ -206,6 +215,122 @@ router.post("/register-self", loginRateLimiter, async (req, res) => {
             error: {
                 code: "AUTH_REGISTER_SELF_FAILED",
                 message: "Impossible de creer le compte pour le moment.",
+                retryable: true,
+            },
+        });
+    }
+});
+
+router.post("/password-recovery/request", passwordRecoveryRequestRateLimiter, async (req, res) => {
+    try {
+        await requestPasswordRecoveryCode({
+            email: req.body?.email,
+        });
+
+        return res.status(202).json({
+            data: {
+                accepted: true,
+                message:
+                    "Si ce compte existe, un code de verification a ete envoye.",
+            },
+            meta: {
+                source: "real",
+                model: "auth",
+            },
+        });
+    } catch (err) {
+        console.error(
+            "Auth password recovery request error:",
+            err?.code || err?.message
+        );
+        return res.status(500).json({
+            error: {
+                code: "PASSWORD_RECOVERY_REQUEST_FAILED",
+                message: "Impossible de traiter la demande pour le moment.",
+                retryable: true,
+            },
+        });
+    }
+});
+
+router.post("/password-recovery/verify", passwordRecoveryVerifyRateLimiter, async (req, res) => {
+    try {
+        const data = await verifyPasswordRecoveryCode({
+            email: req.body?.email,
+            code: req.body?.code,
+        });
+
+        return res.status(200).json({
+            data,
+            meta: {
+                source: "real",
+                model: "auth",
+            },
+        });
+    } catch (err) {
+        if (err.code === "INVALID_RECOVERY_CODE") {
+            return res.status(400).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        console.error(
+            "Auth password recovery verify error:",
+            err?.code || err?.message
+        );
+        return res.status(500).json({
+            error: {
+                code: "PASSWORD_RECOVERY_VERIFY_FAILED",
+                message: "Impossible de verifier le code pour le moment.",
+                retryable: true,
+            },
+        });
+    }
+});
+
+router.post("/password-recovery/complete", passwordRecoveryVerifyRateLimiter, async (req, res) => {
+    try {
+        const data = await completePasswordRecovery({
+            email: req.body?.email,
+            recoveryGrant: req.body?.recoveryGrant,
+            newPassword: req.body?.newPassword,
+            ip:
+                req.headers?.["cf-connecting-ip"] ||
+                req.ip ||
+                req.socket?.remoteAddress ||
+                null,
+        });
+
+        return res.status(200).json({
+            data,
+            meta: {
+                source: "real",
+                model: "auth",
+            },
+        });
+    } catch (err) {
+        if (err.code === "INVALID_PASSWORD_RECOVERY") {
+            return res.status(400).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        console.error(
+            "Auth password recovery complete error:",
+            err?.code || err?.message
+        );
+        return res.status(500).json({
+            error: {
+                code: "PASSWORD_RECOVERY_COMPLETE_FAILED",
+                message: "Impossible de modifier le mot de passe pour le moment.",
                 retryable: true,
             },
         });
