@@ -10,6 +10,7 @@ import {
   hasValidHomeStringsShape,
   type HomeStrings,
 } from "../i18n/homeStrings";
+import { authFetch } from "./authService";
 
 const RAW_API_URL = (import.meta.env.VITE_API_URL as string | undefined) || "";
 const API_URL = RAW_API_URL.endsWith("/")
@@ -104,7 +105,7 @@ export async function translateHomeStrings(
 
   if (normalizedTarget === "en") {
     try {
-      const response = await fetch(`${API_URL}/api/i18n/home-translate`, {
+      const response = await authFetch(`${API_URL}/api/i18n/home-translate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -146,7 +147,7 @@ export async function translateHomeStrings(
   }
 
   try {
-    const response = await fetch(`${API_URL}/api/i18n/home-translate`, {
+    const response = await authFetch(`${API_URL}/api/i18n/home-translate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

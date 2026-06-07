@@ -141,4 +141,73 @@ describe("homeTranslationService", () => {
             "[i18n] memory cache warmed with 1 entries"
         );
     });
+
+    it("allows anonymous users to read a cached home translation", async () => {
+        const cachedPayload = {
+            home: { title: "Hello" },
+            search: { submit: "Search" },
+            options: sourceStrings.options,
+        };
+        const deps = createBaseDeps();
+        deps.UiTranslationCache.findOne.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                _id: "cache-1",
+                namespace: "home",
+                targetLang: "en",
+                sourceHash: "hash-123",
+                payload: cachedPayload,
+                model: "gpt-4.1-mini",
+                voiceAck: "ack:en",
+                voicePrompts: { dictationInstruction: "prompt:en" },
+            }),
+        });
+        const { handleHomeTranslate } = createHomeTranslationService(deps);
+        const res = createResponseDouble();
+        res.json.mockReturnValue(res);
+
+        await handleHomeTranslate(
+            { body: { targetLang: "en", sourceStrings } },
+            res
+        );
+
+        expect(res.json).toHaveBeenCalledWith({
+            data: cachedPayload,
+            meta: {
+                source: "cache",
+                lang: "en",
+                model: "gpt-4.1-mini",
+                voiceAck: "ack:en",
+                voicePrompts: { dictationInstruction: "prompt:en" },
+            },
+        });
+        expect(deps.openai.chat.completions.create).not.toHaveBeenCalled();
+    });
+
+    it("blocks anonymous cache misses before calling OpenAI", async () => {
+        const deps = createBaseDeps();
+        deps.UiTranslationCache.findOne.mockReturnValue({
+            lean: vi.fn().mockResolvedValue(null),
+        });
+        const { handleHomeTranslate } = createHomeTranslationService(deps);
+        const res = createResponseDouble();
+        res.status.mockReturnValue(res);
+        res.json.mockReturnValue(res);
+
+        await handleHomeTranslate(
+            { body: { targetLang: "de", sourceStrings } },
+            res
+        );
+
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "TRANSLATION_CACHE_MISS",
+                message:
+                    "Authentification requise pour creer une nouvelle traduction.",
+                retryable: false,
+            },
+        });
+        expect(deps.openai.chat.completions.create).not.toHaveBeenCalled();
+        expect(deps.UiTranslationCache.create).not.toHaveBeenCalled();
+    });
 });

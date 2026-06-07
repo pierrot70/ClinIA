@@ -218,6 +218,17 @@ export function createHomeTranslationService(deps) {
                 sourceHash,
             });
 
+            if (!req.auth?.userId) {
+                return res.status(401).json({
+                    error: {
+                        code: "TRANSLATION_CACHE_MISS",
+                        message:
+                            "Authentification requise pour creer une nouvelle traduction.",
+                        retryable: false,
+                    },
+                });
+            }
+
             const model = getModel();
             const systemPrompt =
                 "You are a UI localization engine for a medical assistant application. " +

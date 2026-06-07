@@ -64,6 +64,7 @@ import {
 } from "./services/voicePromptsService.js";
 import { createTranslationCacheService } from "./services/translationCacheService.js";
 import { createHomeTranslationService } from "./services/homeTranslationService.js";
+import { attachOptionalAuth } from "./middleware/attachOptionalAuth.js";
 
 dotenv.config();
 
@@ -239,7 +240,11 @@ const aiAnalyzeRouter = createAiAnalyzeRouter({
 /* /api/i18n/home-translate                                           */
 /* ================================================================== */
 
-app.post("/api/i18n/home-translate", homeTranslationService.handleHomeTranslate);
+app.post(
+    "/api/i18n/home-translate",
+    attachOptionalAuth,
+    homeTranslationService.handleHomeTranslate
+);
 
 registerRoutes(app, {
     massDownloadRestrictionGuard,
