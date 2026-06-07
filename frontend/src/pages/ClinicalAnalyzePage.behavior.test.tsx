@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 const analyzeMock = vi.fn();
@@ -132,6 +132,10 @@ vi.mock("../hooks/useAuth", () => ({
 import { ClinicalAnalyzePage } from "./ClinicalAnalyzePage";
 
 describe("ClinicalAnalyzePage", () => {
+    beforeEach(() => {
+        authUser = null;
+    });
+
     function configureClinicalAnalysisSlots(...slots: any[]) {
         useClinicalAnalysisCallIndex = 0;
         hookSlots.length = 0;
@@ -141,6 +145,7 @@ describe("ClinicalAnalyzePage", () => {
     it("submits the exact user payload without injecting the demo case", () => {
         analyzeMock.mockReset();
         clinicalFormSpy.mockReset();
+        authUser = { role: "MEDECIN" };
         configureClinicalAnalysisSlots(
             {
                 result: null,
@@ -178,6 +183,10 @@ describe("ClinicalAnalyzePage", () => {
 
         expect(clinicalFormSpy).toHaveBeenCalled();
         expect(clinicalFormSpy.mock.calls[0][0].initialData).toBeUndefined();
+        expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", { name: "Mode simulation" })
+        ).not.toBeInTheDocument();
         expect(analyzeMock).toHaveBeenCalledWith({
             age: 55,
             sex: "male",
@@ -188,6 +197,69 @@ describe("ClinicalAnalyzePage", () => {
             forceReal: false,
             openaiModel: "gpt-4.1-mini",
         });
+    });
+
+    it("shows model and simulation controls to administrators", () => {
+        authUser = { role: "ADMIN" };
+        configureClinicalAnalysisSlots(
+            {
+                result: null,
+                loading: false,
+                error: null,
+                errorCode: null,
+                analyze: vi.fn(),
+                resetAnalysis: vi.fn(),
+            },
+            {
+                result: null,
+                loading: false,
+                error: null,
+                errorCode: null,
+                analyze: vi.fn(),
+                resetAnalysis: vi.fn(),
+            },
+            {
+                result: null,
+                loading: false,
+                error: null,
+                errorCode: null,
+                analyze: vi.fn(),
+                resetAnalysis: vi.fn(),
+            }
+        );
+
+        render(
+            <MemoryRouter>
+                <ClinicalAnalyzePage />
+            </MemoryRouter>
+        );
+
+        expect(screen.getByRole("combobox")).toHaveValue("gpt-4.1-mini");
+        expect(
+            screen.getByRole("button", { name: "Mode simulation" })
+        ).toBeInTheDocument();
+
+        const commentToggle = screen.getByRole("button", {
+            name: "Laisser un commentaire",
+        });
+        const repliesToggle = screen.getByRole("button", {
+            name: "Voir les réponses à mes commentaires",
+        });
+
+        expect(commentToggle).toHaveAttribute("aria-expanded", "false");
+        expect(repliesToggle).toHaveAttribute("aria-expanded", "false");
+        expect(
+            screen.queryByRole("link", { name: "Laisser un commentaire" })
+        ).not.toBeInTheDocument();
+
+        fireEvent.click(commentToggle);
+        fireEvent.click(repliesToggle);
+
+        expect(commentToggle).toHaveAttribute("aria-expanded", "true");
+        expect(repliesToggle).toHaveAttribute("aria-expanded", "true");
+        expect(
+            screen.getByRole("link", { name: "Laisser un commentaire" })
+        ).toBeInTheDocument();
     });
 
     it("shows two age relevance charts in visual comparison mode", async () => {

@@ -28,8 +28,10 @@ import type {
     SecurityIncidentBlockingData,
 } from "../types/api";
 import { useAuth } from "../hooks/useAuth";
+import { isAdminRole } from "../auth/roles";
 
 type OpenAIModel = "gpt-4.1-mini" | "gpt-4-0613";
+const DEFAULT_OPENAI_MODEL: OpenAIModel = "gpt-4.1-mini";
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -38,10 +40,12 @@ type OpenAIModel = "gpt-4.1-mini" | "gpt-4-0613";
 export function ClinicalAnalyzePage() {
     const COMMENT_TRACKING_STORAGE_KEY = "clinia_comment_tracking";
     const { user } = useAuth();
+    const canConfigureAi = isAdminRole(user?.role);
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
     const clinicalIntroLabels = labels.clinicalDemo.intro;
-    const [openaiModel, setOpenaiModel] = useState<OpenAIModel>("gpt-4.1-mini");
+    const [openaiModel, setOpenaiModel] = useState<OpenAIModel>(DEFAULT_OPENAI_MODEL);
+    const effectiveOpenaiModel = canConfigureAi ? openaiModel : DEFAULT_OPENAI_MODEL;
     const isProd = !!import.meta.env.PROD;
     const [activeTab, setActiveTab] =
         useState<"patient" | "clinical">("patient");
@@ -94,6 +98,7 @@ export function ClinicalAnalyzePage() {
     const [replyLookupLoading, setReplyLookupLoading] = useState(false);
     const [replyLookupError, setReplyLookupError] = useState("");
     const [replyLookupItems, setReplyLookupItems] = useState<ClinicianComment[]>([]);
+    const [commentPanelOpen, setCommentPanelOpen] = useState(false);
     const [replyLookupOpen, setReplyLookupOpen] = useState(false);
     const [mobileComparisonSection, setMobileComparisonSection] = useState<
         "quick" | "focus" | null
@@ -102,12 +107,12 @@ export function ClinicalAnalyzePage() {
     const { translated: introTaglineLabel } = useTranslation({
         text: clinicalIntroLabels.tagline,
         targetLang,
-        openaiModel,
+        openaiModel: effectiveOpenaiModel,
     });
     const { translated: introSubtitleLabel } = useTranslation({
         text: clinicalIntroLabels.subtitle,
         targetLang,
-        openaiModel,
+        openaiModel: effectiveOpenaiModel,
     });
 
     /* ------------------------------------------------------------------ */
@@ -138,6 +143,12 @@ export function ClinicalAnalyzePage() {
         }
     }, []);
     useEffect(() => {
+        if (!canConfigureAi) {
+            localStorage.removeItem("clinia_force_real");
+            setForceReal(false);
+            setOpenaiModel(DEFAULT_OPENAI_MODEL);
+            return;
+        }
         if (isProd) {
             localStorage.removeItem("clinia_force_real");
             setForceReal(false);
@@ -162,7 +173,7 @@ export function ClinicalAnalyzePage() {
                 handleForceRealChange
             );
         };
-    }, [isProd]);
+    }, [canConfigureAi, isProd]);
 
     /* ------------------------------------------------------------------ */
     /* 🔁 Changement de modèle → retour au formulaire                     */
@@ -238,8 +249,8 @@ export function ClinicalAnalyzePage() {
         resetComparisonTwo();
         const safePayload = {
             ...payload,
-            forceReal: isProd ? false : forceReal,
-            openaiModel,
+            forceReal: isProd || !canConfigureAi ? false : forceReal,
+            openaiModel: effectiveOpenaiModel,
         };
         setLastPayload(safePayload);
         setActiveTab("clinical");
@@ -259,13 +270,13 @@ export function ClinicalAnalyzePage() {
 
         const safeFirstPayload = {
             ...firstPayload,
-            forceReal: isProd ? false : forceReal,
-            openaiModel,
+            forceReal: isProd || !canConfigureAi ? false : forceReal,
+            openaiModel: effectiveOpenaiModel,
         };
         const safeSecondPayload = {
             ...secondPayload,
-            forceReal: isProd ? false : forceReal,
-            openaiModel,
+            forceReal: isProd || !canConfigureAi ? false : forceReal,
+            openaiModel: effectiveOpenaiModel,
         };
 
         setComparisonPayloads({
@@ -401,6 +412,9 @@ export function ClinicalAnalyzePage() {
     }
 
     const toggleForceReal = () => {
+        if (!canConfigureAi || isProd) {
+            return;
+        }
         const next = !forceReal;
         setForceReal(next);
         localStorage.setItem("clinia_force_real", String(next));
@@ -551,13 +565,13 @@ export function ClinicalAnalyzePage() {
     /* ------------------------------------------------------------------ */
 
     // Traductions dynamiques
-    const { translated: modelLabel, loading: loadingModel, error: errorModel } = useTranslation({ text: "Modèle OpenAI", targetLang, openaiModel });
-    const { translated: gptMiniLabel, loading: loadingMini, error: errorMini } = useTranslation({ text: "gpt-4.1-mini (JSON natif)", targetLang, openaiModel });
-    const { translated: gptLegacyLabel, loading: loadingLegacy, error: errorLegacy } = useTranslation({ text: "gpt-4-0613 (legacy)", targetLang, openaiModel });
-    const { translated: realIaLabel, loading: loadingReal, error: errorReal } = useTranslation({ text: "IA réelle activée", targetLang, openaiModel });
-    const { translated: simModeLabel, loading: loadingSim, error: errorSim } = useTranslation({ text: "Mode simulation", targetLang, openaiModel });
-    const { translated: backendErrorLabel, loading: loadingBackend, error: errorBackend } = useTranslation({ text: "Erreur backend brute (sans flafla)", targetLang, openaiModel });
-    const { translated: loadingLabel } = useTranslation({ text: "Chargement...", targetLang, openaiModel });
+    const { translated: modelLabel, loading: loadingModel, error: errorModel } = useTranslation({ text: "Modèle OpenAI", targetLang, openaiModel: effectiveOpenaiModel });
+    const { translated: gptMiniLabel, loading: loadingMini, error: errorMini } = useTranslation({ text: "gpt-4.1-mini (JSON natif)", targetLang, openaiModel: effectiveOpenaiModel });
+    const { translated: gptLegacyLabel, loading: loadingLegacy, error: errorLegacy } = useTranslation({ text: "gpt-4-0613 (legacy)", targetLang, openaiModel: effectiveOpenaiModel });
+    const { translated: realIaLabel, loading: loadingReal, error: errorReal } = useTranslation({ text: "IA réelle activée", targetLang, openaiModel: effectiveOpenaiModel });
+    const { translated: simModeLabel, loading: loadingSim, error: errorSim } = useTranslation({ text: "Mode simulation", targetLang, openaiModel: effectiveOpenaiModel });
+    const { translated: backendErrorLabel, loading: loadingBackend, error: errorBackend } = useTranslation({ text: "Erreur backend brute (sans flafla)", targetLang, openaiModel: effectiveOpenaiModel });
+    const { translated: loadingLabel } = useTranslation({ text: "Chargement...", targetLang, openaiModel: effectiveOpenaiModel });
     const commentLabels = labels.clinicalDemo.comments;
     const comparisonLabels = labels.clinicalDemo.comparison;
     const comparisonQuickFacts = comparisonPayloads
@@ -619,8 +633,6 @@ export function ClinicalAnalyzePage() {
     const { translated: leaveCommentTooltipLabel } = useTranslation({ text: commentLabels.leaveCommentTooltip, targetLang, openaiModel });
     const { translated: openaiModelTooltipLabel } = useTranslation({ text: commentLabels.openaiModelTooltip, targetLang, openaiModel });
     const { translated: replyLookupTitleLabel, loading: loadingReplyLookupTitle, error: errorReplyLookupTitle } = useTranslation({ text: commentLabels.replyLookupTitle, targetLang, openaiModel });
-    const { translated: replyLookupCollapsedHintLabel } = useTranslation({ text: commentLabels.replyLookupCollapsedHint, targetLang, openaiModel });
-    const { translated: replyLookupExpandedHintLabel } = useTranslation({ text: commentLabels.replyLookupExpandedHint, targetLang, openaiModel });
     const { translated: replyLookupDescriptionLabel, loading: loadingReplyLookupDescription, error: errorReplyLookupDescription } = useTranslation({ text: commentLabels.replyLookupDescription, targetLang, openaiModel });
     const { translated: namePlaceholderLabel } = useTranslation({ text: commentLabels.namePlaceholder, targetLang, openaiModel });
     const { translated: trackingCodePlaceholderLabel } = useTranslation({ text: commentLabels.trackingCodePlaceholder, targetLang, openaiModel });
@@ -695,48 +707,63 @@ export function ClinicalAnalyzePage() {
                 </div>
             )}
 
-            <div className="flex justify-end">
-                <div className="group relative inline-flex">
-                    <span className="pointer-events-none absolute bottom-full right-0 z-20 mb-3 hidden w-80 rounded-xl border border-sky-200 bg-cyan-50 p-3 text-left text-xs font-normal leading-5 text-cyan-950 shadow-xl group-hover:block">
-                        {leaveCommentTooltipLabel}
-                        <span
-                            className="absolute right-6 top-full h-3 w-3 -translate-y-1/2 rotate-45 border-b border-r border-sky-200 bg-cyan-50"
-                            aria-hidden="true"
-                        />
-                    </span>
-                    <Link
-                        to="/comments"
-                        className="inline-flex rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-800 transition hover:bg-sky-100"
-                    >
-                        {renderLabel(leaveCommentLabel, loadingLeaveComment, errorLeaveComment ?? undefined)}
-                    </Link>
-                </div>
-            </div>
+            <section className="rounded-xl border border-sky-200 bg-sky-50 px-5 py-4">
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-sky-900">
+                    {introTaglineLabel}
+                </p>
+                <p className="mt-1 text-sm text-sky-950">
+                    {introSubtitleLabel}
+                </p>
+            </section>
 
-            <section className="rounded-xl border border-amber-200 bg-amber-50 p-5">
+            <section className="overflow-hidden rounded-xl border border-sky-200 bg-sky-50">
+                <button
+                    type="button"
+                    onClick={() => setCommentPanelOpen((prev) => !prev)}
+                    className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-sky-100"
+                    aria-expanded={commentPanelOpen}
+                >
+                    <span className="text-sm font-semibold text-sky-900">
+                        {renderLabel(leaveCommentLabel, loadingLeaveComment, errorLeaveComment ?? undefined)}
+                    </span>
+                    <span className="text-xl font-semibold text-sky-700" aria-hidden="true">
+                        {commentPanelOpen ? "−" : "+"}
+                    </span>
+                </button>
+                {commentPanelOpen && (
+                    <div className="border-t border-sky-200 bg-white px-4 py-4">
+                        <p className="text-sm text-sky-950">
+                            {leaveCommentTooltipLabel}
+                        </p>
+                        <Link
+                            to="/comments"
+                            className="mt-3 inline-flex rounded-lg bg-sky-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-800"
+                        >
+                            {renderLabel(leaveCommentLabel, loadingLeaveComment, errorLeaveComment ?? undefined)}
+                        </Link>
+                    </div>
+                )}
+            </section>
+
+            <section className="overflow-hidden rounded-xl border border-amber-200 bg-amber-50">
                 <button
                     type="button"
                     onClick={() => setReplyLookupOpen((prev) => !prev)}
-                    className="flex w-full items-center justify-between rounded-xl border border-amber-300 bg-white px-4 py-4 text-left transition hover:bg-amber-100"
+                    className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-amber-100"
                     aria-expanded={replyLookupOpen}
                 >
                     <div>
-                        <h2 className="text-lg font-semibold text-amber-950">
+                        <h2 className="text-sm font-semibold text-amber-950">
                             {renderLabel(replyLookupTitleLabel, loadingReplyLookupTitle, errorReplyLookupTitle ?? undefined)}
                         </h2>
-                        <p className="mt-1 text-sm text-amber-900">
-                            {replyLookupOpen
-                                ? replyLookupExpandedHintLabel
-                                : replyLookupCollapsedHintLabel}
-                        </p>
                     </div>
-                    <span className="text-2xl font-semibold text-amber-700" aria-hidden="true">
+                    <span className="text-xl font-semibold text-amber-700" aria-hidden="true">
                         {replyLookupOpen ? "−" : "+"}
                     </span>
                 </button>
                 {replyLookupOpen ? (
-                    <>
-                        <div className="mb-3 mt-4">
+                    <div className="border-t border-amber-200 bg-white px-4 py-4">
+                        <div className="mb-3">
                             <p className="text-sm text-amber-900">
                                 {renderLabel(replyLookupDescriptionLabel, loadingReplyLookupDescription, errorReplyLookupDescription ?? undefined)}
                             </p>
@@ -808,7 +835,7 @@ export function ClinicalAnalyzePage() {
                                 ))}
                             </div>
                         )}
-                    </>
+                    </div>
                 ) : null}
             </section>
 
@@ -818,50 +845,42 @@ export function ClinicalAnalyzePage() {
                 </div>
             )}
 
-            <section className="rounded-xl border border-sky-200 bg-sky-50 px-5 py-4">
-                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-sky-900">
-                    {introTaglineLabel}
-                </p>
-                <p className="mt-1 text-sm text-sky-950">
-                    {introSubtitleLabel}
-                </p>
-            </section>
+            {canConfigureAi && (
+                <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium">
+                        {renderLabel(modelLabel, loadingModel, errorModel ?? undefined)}
+                    </label>
 
-            {/* ⚙️ Sélection modèle */}
-            <div className="flex items-center gap-3">
-                <label className="text-sm font-medium">
-                    {renderLabel(modelLabel, loadingModel, errorModel ?? undefined)}
-                </label>
-
-                <div className="group relative inline-flex">
-                    <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 hidden w-80 -translate-x-1/2 rounded-xl border border-sky-200 bg-cyan-50 p-3 text-left text-xs font-normal leading-5 text-cyan-950 shadow-xl group-hover:block">
-                        {openaiModelTooltipLabel}
-                        <span
-                            className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-sky-200 bg-cyan-50"
-                            aria-hidden="true"
-                        />
-                    </span>
-                    <select
-                        value={openaiModel}
-                        onChange={(e) =>
-                            handleModelChange(
-                                e.target.value as OpenAIModel
-                            )
-                        }
-                        className="border rounded px-2 py-1 text-sm"
-                    >
-                        <option value="gpt-4.1-mini">
-                            {renderLabel(gptMiniLabel, loadingMini, errorMini ?? undefined)}
-                        </option>
-                        <option value="gpt-4-0613">
-                            {renderLabel(gptLegacyLabel, loadingLegacy, errorLegacy ?? undefined)}
-                        </option>
-                    </select>
+                    <div className="group relative inline-flex">
+                        <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 hidden w-80 -translate-x-1/2 rounded-xl border border-sky-200 bg-cyan-50 p-3 text-left text-xs font-normal leading-5 text-cyan-950 shadow-xl group-hover:block">
+                            {openaiModelTooltipLabel}
+                            <span
+                                className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-sky-200 bg-cyan-50"
+                                aria-hidden="true"
+                            />
+                        </span>
+                        <select
+                            value={openaiModel}
+                            onChange={(e) =>
+                                handleModelChange(
+                                    e.target.value as OpenAIModel
+                                )
+                            }
+                            className="border rounded px-2 py-1 text-sm"
+                        >
+                            <option value="gpt-4.1-mini">
+                                {renderLabel(gptMiniLabel, loadingMini, errorMini ?? undefined)}
+                            </option>
+                            <option value="gpt-4-0613">
+                                {renderLabel(gptLegacyLabel, loadingLegacy, errorLegacy ?? undefined)}
+                            </option>
+                        </select>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* 🔀 Toggle IA réelle */}
-            {!isProd && (
+            {canConfigureAi && !isProd && (
                 <div className="flex items-center gap-3">
                     <button
                         type="button"
@@ -1330,7 +1349,7 @@ export function ClinicalAnalyzePage() {
                             relevanceByAgeChart: demoScenario.relevanceByAgeChart,
                         }}
                         sourceMode={serviceMode || undefined}
-                        realAI={forceReal}
+                        realAI={canConfigureAi && forceReal}
                         canReverify={user?.role === "SUPERADMIN"}
                         onReverify={handleReverifyAnalysis}
                         reverifyLoading={reverifyLoading}

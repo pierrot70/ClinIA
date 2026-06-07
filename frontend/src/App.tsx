@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from "react";
-import { Routes, Route, Navigate, Link } from "react-router-dom";
+import { Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
 
 import DemoPage from "./pages/DemoPage";
 import Results from "./pages/Results";
@@ -40,6 +40,22 @@ const SUPERADMIN_ROLES = ["SUPERADMIN"] as const;
 const APP_STATUS_REFRESH_MS = 10_000;
 const HOME_DEMO_TIP_STORAGE_KEY = "clinia_home_demo_tip_seen";
 const HOME_DEMO_TIP_EVENT = "clinia:show-demo-tooltip";
+
+function DevRouteIndicator() {
+    const location = useLocation();
+
+    if (!import.meta.env.DEV) {
+        return null;
+    }
+
+    return (
+        <div className="border-b border-gray-200 bg-gray-50 px-4 py-1.5">
+            <div className="mx-auto max-w-6xl font-mono text-xs text-gray-500">
+                {location.pathname}
+            </div>
+        </div>
+    );
+}
 
 function CoolifyLandingPage() {
     const landingLabels = labels.app.landing;
@@ -250,6 +266,7 @@ const App: React.FC = () => {
                     {maintenanceLabel}
                 </div>
             )}
+            <DevRouteIndicator />
             <main className="flex-1">
                 <Routes>
                     <Route

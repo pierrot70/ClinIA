@@ -1249,7 +1249,28 @@ const Header: React.FC = () => {
                     {showFullHeaderNav ? (
                         <>
                             <div className="justify-self-center">
-                                <VoiceNavButton />
+                                {canAccessAdmin ? (
+                                    <VoiceNavButton />
+                                ) : (
+                                    <label className="flex items-center gap-2 text-gray-600">
+                                        <span className="sr-only">
+                                            <HeaderLabel text={headerLabels.controls.language} />
+                                        </span>
+                                        <select
+                                            className="max-w-[9rem] rounded border border-gray-300 bg-white px-2 py-1 text-xs"
+                                            value={locale}
+                                            onChange={onLanguageChange}
+                                            disabled={isTranslating}
+                                            aria-label={headerLabels.controls.language}
+                                        >
+                                            {languageOptions.map((option) => (
+                                                <option key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                )}
                             </div>
 
                             <button
@@ -1401,7 +1422,7 @@ const Header: React.FC = () => {
                 </div>
 
                 <nav className="mt-3 hidden items-center gap-4 text-sm lg:flex">
-                    {showFullHeaderNav && <VoiceNavButton />}
+                    {showFullHeaderNav && canAccessAdmin && <VoiceNavButton />}
 
                     <div className="relative">
                         {showPublicLanguageTip && (
@@ -1751,7 +1772,7 @@ const Header: React.FC = () => {
                         </div>
 
                         <div className="flex items-center justify-between gap-2">
-                            <VoiceNavButton />
+                            {canAccessAdmin && <VoiceNavButton />}
                             <label className="flex items-center gap-2 text-gray-600">
                                 <span className="text-xs"><HeaderLabel text={headerLabels.controls.language} /></span>
                                 <select
