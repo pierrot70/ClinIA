@@ -323,6 +323,10 @@ export const UI_LABELS_FR = {
                 "Recherche clinique plus rapide. Alternatives comparables. References consultables.",
         },
         form: {
+            clinicalParametersTitle:
+                "Definir les parametres cliniques de l'analyse",
+            clinicalParametersHelp:
+                "ClinIA utilise ces parametres pour preparer une requete clinique minimisee transmise a OpenAI.",
             countryLabel: "Pays du patient",
             countryPlaceholder: "Selectionner un pays",
             countryHelp:

@@ -2,6 +2,7 @@ import { useEffect, useState, useContext } from "react";
 import { useTranslation } from "../../hooks/useTranslation";
 import { HomeI18nContext } from "../../contexts/HomeI18nContext";
 import { labels } from "../../i18n/uiLabels";
+import { getClinicalFormReviewedStrings } from "../../i18n/clinicalFormStrings";
 import type {
     ClinicalPayload,
     DiabetesClinicalContext,
@@ -670,10 +671,12 @@ export function ClinicalForm({
     const targetLang = i18n.locale;
     const clinicalFormLabels = labels.clinicalDemo.form;
     const commentLabels = labels.clinicalDemo.comments;
+    const reviewedStrings = getClinicalFormReviewedStrings(targetLang);
 
 
     // Traductions dynamiques
-    const { translated: clinicalDataLabel } = useTranslation({ text: "Données cliniques", targetLang });
+    const clinicalParametersTitleLabel = reviewedStrings.clinicalParametersTitle;
+    const clinicalParametersHelpLabel = reviewedStrings.clinicalParametersHelp;
     const { translated: incompleteDataLabel } = useTranslation({ text: "Données cliniques incomplètes", targetLang });
     const { translated: exampleCaseFieldLabel } = useTranslation({ text: "Cas exemple", targetLang });
     const { translated: exampleCaseTooltipLabel } = useTranslation({ text: commentLabels.exampleCaseTooltip, targetLang });
@@ -726,14 +729,9 @@ export function ClinicalForm({
         text: clinicalFormLabels.jsonImportInvalid,
         targetLang,
     });
-    const { translated: exampleCaseRequiredHintLabel } = useTranslation({
-        text: clinicalFormLabels.exampleCaseRequiredHint,
-        targetLang,
-    });
-    const { translated: exampleCaseSelectionRequiredLabel } = useTranslation({
-        text: clinicalFormLabels.exampleCaseSelectionRequired,
-        targetLang,
-    });
+    const exampleCaseRequiredHintLabel = reviewedStrings.exampleCaseRequiredHint;
+    const exampleCaseSelectionRequiredLabel =
+        reviewedStrings.exampleCaseSelectionRequired;
     const { translated: comparisonToggleLabel } = useTranslation({
         text: clinicalFormLabels.comparisonToggle,
         targetLang,
@@ -1068,13 +1066,18 @@ export function ClinicalForm({
             )}
 
 
-            <div className="flex items-center justify-center gap-3">
-                <h2 className="text-center text-lg font-semibold">{clinicalDataLabel}</h2>
+            <div className="flex flex-col items-center justify-center gap-2 text-center">
+                <h2 className="text-lg font-semibold text-gray-900">
+                    {clinicalParametersTitleLabel}
+                </h2>
+                <p className="max-w-2xl text-sm leading-6 text-gray-600">
+                    {clinicalParametersHelpLabel}
+                </p>
                 {hasSelectedExampleCase ? (
                     <button
                         disabled={loading}
                         onClick={() => onSubmit(form)}
-                        className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                        className="mt-1 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                     >
                         {loading ? analyzingButtonLabel : analyzeButtonLabel}
                     </button>
@@ -1295,7 +1298,7 @@ export function ClinicalForm({
                             id="clinical-age"
                             type="number"
                             className="input w-full"
-                            placeholder="Ex: 55"
+                            placeholder={reviewedStrings.agePlaceholder}
                             value={form.age ?? ""}
                             onChange={(e) =>
                                 update(
@@ -1398,7 +1401,7 @@ export function ClinicalForm({
                     <input
                         id="clinical-diagnosis"
                         className="input w-full"
-                        placeholder="Ex: cancer gastrique"
+                        placeholder={reviewedStrings.diagnosisPlaceholder}
                         value={form.diagnosis ?? ""}
                         onChange={(e) => update("diagnosis", e.target.value)}
                     />
@@ -1418,7 +1421,7 @@ export function ClinicalForm({
                             id="clinical-weight"
                             type="number"
                             className="input w-full"
-                            placeholder="Ex: 92"
+                            placeholder={reviewedStrings.weightPlaceholder}
                             value={form.weight ?? ""}
                             onChange={(e) =>
                                 update(
@@ -1442,7 +1445,7 @@ export function ClinicalForm({
                             id="clinical-height"
                             type="number"
                             className="input w-full"
-                            placeholder="Ex: 175"
+                            placeholder={reviewedStrings.heightPlaceholder}
                             value={form.height ?? ""}
                             onChange={(e) =>
                                 update(
@@ -1466,7 +1469,7 @@ export function ClinicalForm({
                     <input
                         id="clinical-symptoms"
                         className="input w-full"
-                        placeholder="Ex: fatigue, polyurie"
+                        placeholder={reviewedStrings.symptomsPlaceholder}
                         value={listInputs.symptoms}
                         onChange={(e) =>
                             updateListField("symptoms", e.target.value)
@@ -1487,7 +1490,7 @@ export function ClinicalForm({
                     <input
                         id="clinical-medical-history"
                         className="input w-full"
-                        placeholder="Ex: diabète, hypertension"
+                        placeholder={reviewedStrings.medicalHistoryPlaceholder}
                         value={listInputs.medical_history}
                         onChange={(e) =>
                             updateListField("medical_history", e.target.value)
@@ -1507,7 +1510,7 @@ export function ClinicalForm({
                     <input
                         id="clinical-current-medications"
                         className="input w-full"
-                        placeholder="Ex: metformine, insuline"
+                        placeholder={reviewedStrings.medicationsPlaceholder}
                         value={listInputs.current_medications}
                         onChange={(e) =>
                             updateListField("current_medications", e.target.value)

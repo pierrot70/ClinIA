@@ -707,13 +707,18 @@ export function ClinicalAnalyzePage() {
                 </div>
             )}
 
-            <section className="rounded-xl border border-sky-200 bg-sky-50 px-5 py-4">
-                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-sky-900">
-                    {introTaglineLabel}
-                </p>
-                <p className="mt-1 text-sm text-sky-950">
-                    {introSubtitleLabel}
-                </p>
+            <section className="overflow-hidden rounded-lg border border-sky-950 bg-sky-950 shadow-md">
+                <div className="flex items-stretch">
+                    <div className="w-2 shrink-0 bg-lime-400" aria-hidden="true" />
+                    <div className="px-5 py-5 md:px-7 md:py-6">
+                        <h1 className="text-xl font-semibold text-white md:text-2xl">
+                            {introTaglineLabel}
+                        </h1>
+                        <p className="mt-2 max-w-3xl text-sm leading-6 text-sky-100 md:text-base">
+                            {introSubtitleLabel}
+                        </p>
+                    </div>
+                </div>
             </section>
 
             <section className="overflow-hidden rounded-xl border border-sky-200 bg-sky-50">

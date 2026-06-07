@@ -40,12 +40,12 @@ describe("ClinicalForm", () => {
 
         expect(
             screen.getByText(
-                "Commencez par choisir un cas dans Example case pour pre-remplir rapidement le formulaire, puis ajustez les champs selon votre patient."
+                "Commencez par choisir un cas exemple pour préremplir rapidement le formulaire, puis ajustez les champs selon votre patient."
             )
         ).toBeInTheDocument();
         expect(
             screen.getByText(
-                "Le reste du formulaire apparaitra apres votre selection dans Example case."
+                "Le reste du formulaire apparaîtra après la sélection d'un cas exemple."
             )
         ).toBeInTheDocument();
         expect(screen.queryByLabelText("Pays du patient")).not.toBeInTheDocument();
