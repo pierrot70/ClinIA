@@ -101,6 +101,30 @@ describe("clinicianCommentRateLimiter", () => {
         expect(next).toHaveBeenCalledTimes(6);
     });
 
+    it("uses Cloudflare's stable client IP instead of a rotating proxy IP", () => {
+        vi.spyOn(Date, "now").mockReturnValue(25_000);
+
+        const next = vi.fn();
+        const responses = [];
+
+        for (let i = 0; i < 6; i += 1) {
+            const res = createRes();
+            responses.push(res);
+            clinicianCommentRateLimiter(
+                {
+                    headers: { "cf-connecting-ip": "203.0.113.20" },
+                    originalUrl: "/api/clinician-comments",
+                    ip: `172.16.0.${i + 1}`,
+                },
+                res,
+                next
+            );
+        }
+
+        expect(next).toHaveBeenCalledTimes(5);
+        expect(responses[5].status).toHaveBeenCalledWith(429);
+    });
+
     it("isolates authenticated users even when they share an IP", () => {
         vi.spyOn(Date, "now").mockReturnValue(30_000);
 

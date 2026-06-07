@@ -9,7 +9,9 @@ function getRateLimitKey(req) {
         return `user:${req.auth.userId}`;
     }
 
+    const cloudflareIp = req.headers?.["cf-connecting-ip"];
     const clientIp =
+        (typeof cloudflareIp === "string" && cloudflareIp.trim()) ||
         req.ip ||
         req.socket?.remoteAddress ||
         req.connection?.remoteAddress ||
