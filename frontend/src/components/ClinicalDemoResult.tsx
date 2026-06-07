@@ -256,10 +256,35 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
         : "Merci de verifier les donnees cliniques et reessayer.";
 
     return (
-      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-6 rounded-xl text-center">
-        <h2 className="text-lg font-semibold mb-2">Erreur d'analyse IA</h2>
-        <p className="mb-2">{error}</p>
-        <p>{helpMessage}</p>
+      <div className="space-y-6">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-6 rounded-xl text-center">
+          <h2 className="text-lg font-semibold mb-2">Erreur d'analyse IA</h2>
+          <p className="mb-2">{error}</p>
+          <p>{helpMessage}</p>
+        </div>
+
+        <ResultAccordion title={summarySectionTitle} hint={summarySectionHint}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">{patientSummaryLabel}</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                La requete clinique demeure disponible pour faciliter le signalement de l'erreur.
+              </p>
+            </div>
+            {canCopyRequest ? (
+              <button
+                type="button"
+                onClick={onCopyRequest}
+                className="shrink-0 rounded border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-900 transition hover:bg-sky-100"
+              >
+                Copier la requete JSON
+              </button>
+            ) : null}
+          </div>
+          {copyRequestFeedback ? (
+            <p className="mt-3 text-xs text-sky-700">{copyRequestFeedback}</p>
+          ) : null}
+        </ResultAccordion>
       </div>
     );
   }

@@ -29,6 +29,7 @@ import type {
 } from "../types/api";
 import { useAuth } from "../hooks/useAuth";
 import { isAdminRole } from "../auth/roles";
+import { copyToClipboard } from "../utils/copyToClipboard";
 
 type OpenAIModel = "gpt-4.1-mini" | "gpt-4-0613";
 const DEFAULT_OPENAI_MODEL: OpenAIModel = "gpt-4.1-mini";
@@ -353,9 +354,7 @@ export function ClinicalAnalyzePage() {
         } = lastPayload;
 
         try {
-            await navigator.clipboard.writeText(
-                JSON.stringify(debugPayload, null, 2)
-            );
+            await copyToClipboard(JSON.stringify(debugPayload, null, 2));
             setCopyRequestFeedback("Requete JSON copiee dans le presse-papiers.");
         } catch {
             setCopyRequestFeedback(

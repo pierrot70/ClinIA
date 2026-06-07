@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import ClinicalDemoResult from "./ClinicalDemoResult";
@@ -58,6 +58,11 @@ describe("ClinicalDemoResult", () => {
             />
         );
 
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /Resume clinique du patient/i,
+            })
+        );
         expect(
             screen.getByRole("button", {
                 name: "Relancer pour verification (SUPERADMIN)",
@@ -98,6 +103,11 @@ describe("ClinicalDemoResult", () => {
             />
         );
 
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: /Questions cliniques a explorer/i,
+            })
+        );
         expect(
             screen.getByText("Questions cliniques contextuelles")
         ).toBeInTheDocument();
@@ -110,5 +120,32 @@ describe("ClinicalDemoResult", () => {
         expect(
             screen.queryByText("Questions fréquentes (simulation)")
         ).not.toBeInTheDocument();
+    });
+
+    it("keeps the JSON copy action available when the OpenAI request fails", () => {
+        const onCopyRequest = vi.fn();
+
+        render(
+            <ClinicalDemoResult
+                demoData={{
+                    error: "OpenAI indisponible",
+                    errorCode: "OPENAI_ANALYZE_SATURATED",
+                }}
+                canCopyRequest={true}
+                onCopyRequest={onCopyRequest}
+            />
+        );
+
+        expect(screen.getByText("Erreur d'analyse IA")).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", {
+                name: /Resume clinique du patient/i,
+            })
+        ).toHaveAttribute("aria-expanded", "true");
+
+        fireEvent.click(
+            screen.getByRole("button", { name: "Copier la requete JSON" })
+        );
+        expect(onCopyRequest).toHaveBeenCalledTimes(1);
     });
 });
