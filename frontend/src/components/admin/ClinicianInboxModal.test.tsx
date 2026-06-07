@@ -43,6 +43,7 @@ const labels = {
 describe("ClinicianInboxModal", () => {
     it("renders empty state and forwards refresh action", () => {
         const onRefresh = vi.fn();
+        const onClose = vi.fn();
 
         render(
             <ClinicianInboxModal
@@ -63,7 +64,7 @@ describe("ClinicianInboxModal", () => {
                 replyMessage=""
                 replying={false}
                 replySuccess=""
-                onClose={() => {}}
+                onClose={onClose}
                 onRefresh={onRefresh}
                 onActorFilterChange={() => {}}
                 onCategoryFilterChange={() => {}}
@@ -84,5 +85,12 @@ describe("ClinicianInboxModal", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Rafraichir" }));
         expect(onRefresh).toHaveBeenCalledTimes(1);
+
+        expect(screen.getByTestId("clinician-inbox-sticky-header")).toHaveClass(
+            "sticky",
+            "top-0"
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Fermer" }));
+        expect(onClose).toHaveBeenCalledTimes(1);
     });
 });

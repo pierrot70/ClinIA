@@ -949,6 +949,7 @@ const Header: React.FC = () => {
     };
 
     const openClinicianInboxModal = async () => {
+        setIsMobileMenuOpen(false);
         setShowClinicianInboxModal(true);
         await loadClinicianInbox(1, true);
     };

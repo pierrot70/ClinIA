@@ -124,10 +124,13 @@ export function ClinicianInboxModal({
     }
 
     return (
-        <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/40 px-4 py-4 sm:py-6">
+        <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/40 p-0 sm:px-4 sm:py-6">
             <div className="mx-auto flex min-h-full w-full max-w-5xl items-start sm:items-center">
-                <div className="w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
-                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div className="h-[100dvh] w-full overflow-y-auto bg-white p-5 shadow-2xl sm:h-auto sm:max-h-[calc(100vh-3rem)] sm:rounded-xl">
+                    <div
+                        data-testid="clinician-inbox-sticky-header"
+                        className="sticky top-0 z-20 -mx-5 -mt-5 mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 bg-white px-5 py-4 shadow-sm"
+                    >
                         <div>
                             <h2 className="text-lg font-semibold text-gray-900">
                                 {labels.title}
@@ -147,7 +150,7 @@ export function ClinicianInboxModal({
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                                className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-100"
                             >
                                 {labels.close}
                             </button>
