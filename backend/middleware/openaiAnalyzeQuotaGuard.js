@@ -1,23 +1,33 @@
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 5;
 
-const quotaState = {
-    windowStartedAt: 0,
-    requestCount: 0,
-    locked: false,
-    lockedAt: 0,
-};
+const quotaBuckets = new Map();
 
 function isProduction() {
     return process.env.NODE_ENV === "production";
 }
 
-function buildLockedResponse(res) {
-    return res.status(503).json({
+function getQuotaKey(req) {
+    if (req.auth?.userId) {
+        return `user:${req.auth.userId}`;
+    }
+
+    const forwardedFor = req.headers?.["x-forwarded-for"];
+    const ip =
+        typeof forwardedFor === "string" && forwardedFor.trim()
+            ? forwardedFor.split(",")[0].trim()
+            : req.ip || req.connection?.remoteAddress || "unknown";
+
+    return `ip:${ip}`;
+}
+
+function buildRateLimitedResponse(res, retryAfterSeconds) {
+    res.setHeader("Retry-After", String(retryAfterSeconds));
+    return res.status(429).json({
         error: {
-            code: "OPENAI_ANALYZE_SATURATED",
+            code: "OPENAI_ANALYZE_RATE_LIMITED",
             message:
-                "clinique-ai.ca est sature pour l'analyse clinique. Reessayez plus tard.",
+                "Trop d'analyses cliniques. Reessayez dans quelques instants.",
             retryable: true,
         },
     });
@@ -26,61 +36,55 @@ function buildLockedResponse(res) {
 export function getOpenAIAnalyzeQuotaStatus() {
     return {
         enabled: isProduction(),
-        state: quotaState.locked ? "locked" : "open",
-        locked: quotaState.locked,
-        requestCount: quotaState.requestCount,
+        state: "open",
+        locked: false,
+        activeBuckets: quotaBuckets.size,
         maxRequestsPerWindow: MAX_REQUESTS_PER_WINDOW,
         windowMs: WINDOW_MS,
-        windowStartedAt: quotaState.windowStartedAt
-            ? new Date(quotaState.windowStartedAt).toISOString()
-            : null,
-        lockedAt: quotaState.lockedAt
-            ? new Date(quotaState.lockedAt).toISOString()
-            : null,
     };
 }
 
 export function openAIAnalyzeQuotaGuard(req, res, next) {
-    if (!isProduction()) {
+    if (!isProduction() || !req.auth?.userId) {
         return next();
     }
 
-    if (quotaState.locked) {
-        return buildLockedResponse(res);
-    }
-
     const now = Date.now();
+    const key = getQuotaKey(req);
+    let bucket = quotaBuckets.get(key);
 
     if (
-        quotaState.windowStartedAt === 0 ||
-        now - quotaState.windowStartedAt >= WINDOW_MS
+        !bucket ||
+        now - bucket.windowStartedAt >= WINDOW_MS
     ) {
-        quotaState.windowStartedAt = now;
-        quotaState.requestCount = 0;
+        bucket = {
+            windowStartedAt: now,
+            requestCount: 0,
+        };
+        quotaBuckets.set(key, bucket);
     }
 
-    quotaState.requestCount += 1;
+    bucket.requestCount += 1;
 
-    if (quotaState.requestCount > MAX_REQUESTS_PER_WINDOW) {
-        quotaState.locked = true;
-        quotaState.lockedAt = now;
+    if (bucket.requestCount > MAX_REQUESTS_PER_WINDOW) {
+        const retryAfterSeconds = Math.max(
+            1,
+            Math.ceil((bucket.windowStartedAt + WINDOW_MS - now) / 1000)
+        );
 
-        console.error("🚨 OPENAI_ANALYZE_QUOTA_LOCKED", {
-            requestCount: quotaState.requestCount,
-            windowStartedAt: new Date(quotaState.windowStartedAt).toISOString(),
-            lockedAt: new Date(quotaState.lockedAt).toISOString(),
+        console.warn("OPENAI_ANALYZE_RATE_LIMITED", {
+            key,
+            requestCount: bucket.requestCount,
+            windowStartedAt: new Date(bucket.windowStartedAt).toISOString(),
             path: req.originalUrl || req.url || "/api/ai/analyze",
         });
 
-        return buildLockedResponse(res);
+        return buildRateLimitedResponse(res, retryAfterSeconds);
     }
 
     return next();
 }
 
 export function resetOpenAIAnalyzeQuotaGuardForTests() {
-    quotaState.windowStartedAt = 0;
-    quotaState.requestCount = 0;
-    quotaState.locked = false;
-    quotaState.lockedAt = 0;
+    quotaBuckets.clear();
 }

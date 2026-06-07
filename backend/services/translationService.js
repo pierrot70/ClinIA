@@ -14,6 +14,7 @@ export async function getOrCreateTranslation({
   targetLang,
   text,
   openaiModel,
+  allowCreate = true,
 }) {
   const sourceHash = hashSourceText(text);
   let cache = await UiTranslationCache.findOne({
@@ -24,6 +25,12 @@ export async function getOrCreateTranslation({
   });
   if (cache) {
     return cache.payload;
+  }
+  if (!allowCreate) {
+    throw {
+      code: "TRANSLATION_CACHE_MISS",
+      message: "Authentification requise pour creer une nouvelle traduction.",
+    };
   }
   // Call OpenAI for translation
   const model = openaiModel || process.env.OPENAI_MODEL || "gpt-4.1-mini";

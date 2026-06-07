@@ -7,6 +7,7 @@ import {
 
 function createRes() {
     return {
+        setHeader: vi.fn(),
         status: vi.fn().mockReturnThis(),
         json: vi.fn().mockReturnThis(),
     };
@@ -35,11 +36,28 @@ describe("openAIAnalyzeQuotaGuard", () => {
         expect(res.status).not.toHaveBeenCalled();
     });
 
-    it("locks the analyze route after more than 5 requests in one minute in production", () => {
+    it("ignores anonymous demo requests because they cannot call OpenAI", () => {
+        process.env.NODE_ENV = "production";
+        const req = { originalUrl: "/api/ai/analyze" };
+        const res = createRes();
+        const next = vi.fn();
+
+        for (let i = 0; i < 10; i += 1) {
+            openAIAnalyzeQuotaGuard(req, res, next);
+        }
+
+        expect(next).toHaveBeenCalledTimes(10);
+        expect(res.status).not.toHaveBeenCalled();
+    });
+
+    it("rate limits one user without locking other users", () => {
         process.env.NODE_ENV = "production";
         vi.spyOn(Date, "now").mockReturnValue(1_000);
 
-        const req = { originalUrl: "/api/ai/analyze" };
+        const req = {
+            auth: { userId: "user-a" },
+            originalUrl: "/api/ai/analyze",
+        };
         const res = createRes();
         const next = vi.fn();
 
@@ -52,31 +70,56 @@ describe("openAIAnalyzeQuotaGuard", () => {
 
         openAIAnalyzeQuotaGuard(req, res, next);
 
-        expect(res.status).toHaveBeenCalledWith(503);
+        expect(res.setHeader).toHaveBeenCalledWith("Retry-After", "60");
+        expect(res.status).toHaveBeenCalledWith(429);
         expect(res.json).toHaveBeenCalledWith({
             error: {
-                code: "OPENAI_ANALYZE_SATURATED",
+                code: "OPENAI_ANALYZE_RATE_LIMITED",
                 message:
-                    "clinique-ai.ca est sature pour l'analyse clinique. Reessayez plus tard.",
+                    "Trop d'analyses cliniques. Reessayez dans quelques instants.",
                 retryable: true,
             },
         });
 
-        const lockedRes = createRes();
-        openAIAnalyzeQuotaGuard(req, lockedRes, next);
-
-        expect(lockedRes.status).toHaveBeenCalledWith(503);
-        expect(next).toHaveBeenCalledTimes(5);
+        const otherUserNext = vi.fn();
+        openAIAnalyzeQuotaGuard(
+            {
+                auth: { userId: "user-b" },
+                originalUrl: "/api/ai/analyze",
+            },
+            createRes(),
+            otherUserNext
+        );
+        expect(otherUserNext).toHaveBeenCalledTimes(1);
 
         expect(getOpenAIAnalyzeQuotaStatus()).toEqual({
             enabled: true,
-            state: "locked",
-            locked: true,
-            requestCount: 6,
+            state: "open",
+            locked: false,
+            activeBuckets: 2,
             maxRequestsPerWindow: 5,
             windowMs: 60_000,
-            windowStartedAt: "1970-01-01T00:00:01.000Z",
-            lockedAt: "1970-01-01T00:00:01.000Z",
         });
+    });
+
+    it("automatically allows a user again after the window resets", () => {
+        process.env.NODE_ENV = "production";
+        const now = vi.spyOn(Date, "now").mockReturnValue(1_000);
+        const req = {
+            auth: { userId: "user-a" },
+            originalUrl: "/api/ai/analyze",
+        };
+        const res = createRes();
+        const next = vi.fn();
+
+        for (let i = 0; i < 6; i += 1) {
+            openAIAnalyzeQuotaGuard(req, res, next);
+        }
+
+        now.mockReturnValue(61_001);
+        const resetNext = vi.fn();
+        openAIAnalyzeQuotaGuard(req, createRes(), resetNext);
+
+        expect(resetNext).toHaveBeenCalledTimes(1);
     });
 });

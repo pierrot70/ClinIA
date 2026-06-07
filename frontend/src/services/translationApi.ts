@@ -1,4 +1,5 @@
 import { API_URL } from "./config";
+import { authFetch } from "./authService";
 
 
 export async function translateText({ text, targetLang, namespace = "clinical-demo", sourceLocale = "fr", openaiModel }: {
@@ -8,7 +9,7 @@ export async function translateText({ text, targetLang, namespace = "clinical-de
   sourceLocale?: string;
   openaiModel?: string;
 }) {
-  const response = await fetch(`${API_URL}/api/translation`, {
+  const response = await authFetch(`${API_URL}/api/translation`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, targetLang, namespace, sourceLocale, ...(openaiModel ? { openaiModel } : {}) }),
@@ -29,7 +30,7 @@ export async function saveLocalTranslation({ text, translated, targetLang, names
   sourceLocale?: string;
 }) {
   // On utilise un endpoint spécial ou une option 'forceSave' à ajouter côté backend si besoin
-  const response = await fetch(`${API_URL}/api/translation`, {
+  const response = await authFetch(`${API_URL}/api/translation`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, targetLang, namespace, sourceLocale, translated, forceSave: true }),

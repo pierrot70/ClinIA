@@ -13,6 +13,8 @@ import {
     buildMockAnalyzeResponse,
     buildPersistedRealAnalyzeResponse,
 } from "../services/aiAnalyzeResponseService.js";
+import { resolveAnalyzeExecutionMode } from "../services/aiAnalyzeAccessService.js";
+import { requireRole } from "../middleware/requireRole.js";
 
 export function createAiAnalyzeRouter(deps) {
     const {
@@ -45,15 +47,20 @@ export function createAiAnalyzeRouter(deps) {
 
     const router = express.Router();
 
-    router.get("/analyze-status", (_req, res) => {
-        return res.status(200).json({
-            data: getOpenAIAnalyzeQuotaStatus(),
-            meta: {
-                source: "real",
-                model: "quota_guard",
-            },
-        });
-    });
+    router.get(
+        "/analyze-status",
+        attachOptionalAuth,
+        requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+        (_req, res) => {
+            return res.status(200).json({
+                data: getOpenAIAnalyzeQuotaStatus(),
+                meta: {
+                    source: "real",
+                    model: "quota_guard",
+                },
+            });
+        }
+    );
 
     router.post(
         "/analyze",
@@ -139,13 +146,22 @@ export function createAiAnalyzeRouter(deps) {
                 const isProd = process.env.NODE_ENV === "production";
                 const forceMock = process.env.CLINIA_FORCE_MOCK === "true";
                 const mockEnabled = process.env.CLINIA_MOCK_AI === "true";
-                const forceRealSafe = !forceMock && forceReal === true;
+                const {
+                    authenticated,
+                    forceRealSafe,
+                    useMock,
+                } = resolveAnalyzeExecutionMode({
+                    authUser: req.auth,
+                    forceMock,
+                    mockEnabled,
+                    forceReal,
+                });
 
-                if (forceMock && forceReal === true) {
+                if (!authenticated && forceReal === true) {
+                    console.warn("⚠️ anonymous forceReal ignored");
+                } else if (forceMock && forceReal === true) {
                     console.warn("⚠️ forceReal ignored because CLINIA_FORCE_MOCK=true");
                 }
-
-                const useMock = (forceMock || mockEnabled) && !forceRealSafe;
 
                 const model =
                     openaiModel || process.env.OPENAI_MODEL;
