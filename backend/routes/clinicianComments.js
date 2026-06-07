@@ -11,6 +11,7 @@ import { verifyJWT } from "../middleware/verifyJWT.js";
 import { requireRole } from "../middleware/requireRole.js";
 import { AUTH_ROLES } from "../auth/constants.js";
 import { clinicianCommentRateLimiter } from "../middleware/clinicianCommentRateLimiter.js";
+import { clinicianReplyLookupRateLimiter } from "../middleware/clinicianReplyLookupRateLimiter.js";
 
 const router = express.Router();
 
@@ -111,7 +112,7 @@ router.post(
     }
 );
 
-router.get("/lookup-replies", async (req, res) => {
+router.get("/lookup-replies", clinicianReplyLookupRateLimiter, async (req, res) => {
     try {
         const data = await lookupClinicianReplies({
             actorUsername: req.query.actorUsername,
