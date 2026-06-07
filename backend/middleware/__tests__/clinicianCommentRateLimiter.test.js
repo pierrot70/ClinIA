@@ -8,6 +8,7 @@ function createRes() {
     return {
         status: vi.fn().mockReturnThis(),
         json: vi.fn().mockReturnThis(),
+        setHeader: vi.fn(),
     };
 }
 
@@ -20,7 +21,10 @@ describe("clinicianCommentRateLimiter", () => {
     it("allows up to 5 comments within 15 minutes", () => {
         vi.spyOn(Date, "now").mockReturnValue(1_000);
 
-        const req = { originalUrl: "/api/clinician-comments" };
+        const req = {
+            originalUrl: "/api/clinician-comments",
+            ip: "203.0.113.10",
+        };
         const res = createRes();
         const next = vi.fn();
 
@@ -36,7 +40,10 @@ describe("clinicianCommentRateLimiter", () => {
         const nowSpy = vi.spyOn(Date, "now");
         nowSpy.mockReturnValue(10_000);
 
-        const req = { originalUrl: "/api/clinician-comments" };
+        const req = {
+            originalUrl: "/api/clinician-comments",
+            ip: "203.0.113.10",
+        };
         const res = createRes();
         const next = vi.fn();
 
@@ -47,6 +54,7 @@ describe("clinicianCommentRateLimiter", () => {
         clinicianCommentRateLimiter(req, res, next);
 
         expect(res.status).toHaveBeenCalledWith(429);
+        expect(res.setHeader).toHaveBeenCalledWith("Retry-After", "900");
         expect(res.json).toHaveBeenCalledWith({
             error: {
                 code: "CLINICIAN_COMMENTS_RATE_LIMITED",
@@ -66,6 +74,56 @@ describe("clinicianCommentRateLimiter", () => {
         nowSpy.mockReturnValue(10_000 + 15 * 60 * 1000 + 1);
         clinicianCommentRateLimiter(req, unlockedRes, next);
         expect(unlockedRes.status).not.toHaveBeenCalled();
+        expect(next).toHaveBeenCalledTimes(6);
+    });
+
+    it("does not block another anonymous IP", () => {
+        vi.spyOn(Date, "now").mockReturnValue(20_000);
+
+        const abusiveReq = {
+            originalUrl: "/api/clinician-comments",
+            ip: "203.0.113.10",
+        };
+        const otherReq = {
+            originalUrl: "/api/clinician-comments",
+            ip: "198.51.100.24",
+        };
+        const next = vi.fn();
+
+        for (let i = 0; i < 6; i += 1) {
+            clinicianCommentRateLimiter(abusiveReq, createRes(), next);
+        }
+
+        const otherRes = createRes();
+        clinicianCommentRateLimiter(otherReq, otherRes, next);
+
+        expect(otherRes.status).not.toHaveBeenCalled();
+        expect(next).toHaveBeenCalledTimes(6);
+    });
+
+    it("isolates authenticated users even when they share an IP", () => {
+        vi.spyOn(Date, "now").mockReturnValue(30_000);
+
+        const abusiveReq = {
+            auth: { userId: "user-a" },
+            originalUrl: "/api/clinician-comments",
+            ip: "203.0.113.10",
+        };
+        const otherReq = {
+            auth: { userId: "user-b" },
+            originalUrl: "/api/clinician-comments",
+            ip: "203.0.113.10",
+        };
+        const next = vi.fn();
+
+        for (let i = 0; i < 6; i += 1) {
+            clinicianCommentRateLimiter(abusiveReq, createRes(), next);
+        }
+
+        const otherRes = createRes();
+        clinicianCommentRateLimiter(otherReq, otherRes, next);
+
+        expect(otherRes.status).not.toHaveBeenCalled();
         expect(next).toHaveBeenCalledTimes(6);
     });
 });

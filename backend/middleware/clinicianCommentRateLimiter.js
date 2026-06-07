@@ -1,13 +1,39 @@
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_COMMENTS_PER_WINDOW = 5;
+const MAX_BUCKETS_BEFORE_CLEANUP = 1_000;
 
-const rateLimitState = {
-    windowStartedAt: 0,
-    requestCount: 0,
-    lockedUntil: 0,
-};
+const rateLimitBuckets = new Map();
 
-function buildLimitedResponse(res) {
+function getRateLimitKey(req) {
+    if (req.auth?.userId) {
+        return `user:${req.auth.userId}`;
+    }
+
+    const clientIp =
+        req.ip ||
+        req.socket?.remoteAddress ||
+        req.connection?.remoteAddress ||
+        "unknown";
+
+    return `ip:${clientIp}`;
+}
+
+function cleanupExpiredBuckets(now) {
+    if (rateLimitBuckets.size < MAX_BUCKETS_BEFORE_CLEANUP) {
+        return;
+    }
+
+    for (const [key, bucket] of rateLimitBuckets.entries()) {
+        if (now >= bucket.resetAt) {
+            rateLimitBuckets.delete(key);
+        }
+    }
+}
+
+function buildLimitedResponse(res, resetAt, now) {
+    const retryAfterSeconds = Math.max(1, Math.ceil((resetAt - now) / 1000));
+    res.setHeader("Retry-After", String(retryAfterSeconds));
+
     return res.status(429).json({
         error: {
             code: "CLINICIAN_COMMENTS_RATE_LIMITED",
@@ -20,45 +46,35 @@ function buildLimitedResponse(res) {
 
 export function clinicianCommentRateLimiter(req, res, next) {
     const now = Date.now();
+    const key = getRateLimitKey(req);
+    const bucket = rateLimitBuckets.get(key);
 
-    if (rateLimitState.lockedUntil && now < rateLimitState.lockedUntil) {
-        return buildLimitedResponse(res);
+    cleanupExpiredBuckets(now);
+
+    if (!bucket || now >= bucket.resetAt) {
+        rateLimitBuckets.set(key, {
+            requestCount: 1,
+            resetAt: now + WINDOW_MS,
+        });
+        return next();
     }
 
-    if (rateLimitState.lockedUntil && now >= rateLimitState.lockedUntil) {
-        rateLimitState.windowStartedAt = 0;
-        rateLimitState.requestCount = 0;
-        rateLimitState.lockedUntil = 0;
-    }
+    bucket.requestCount += 1;
 
-    if (
-        rateLimitState.windowStartedAt === 0 ||
-        now - rateLimitState.windowStartedAt >= WINDOW_MS
-    ) {
-        rateLimitState.windowStartedAt = now;
-        rateLimitState.requestCount = 0;
-    }
-
-    rateLimitState.requestCount += 1;
-
-    if (rateLimitState.requestCount > MAX_COMMENTS_PER_WINDOW) {
-        rateLimitState.lockedUntil = now + WINDOW_MS;
-
+    if (bucket.requestCount > MAX_COMMENTS_PER_WINDOW) {
         console.warn("🚨 CLINICIAN_COMMENTS_RATE_LIMITED", {
-            requestCount: rateLimitState.requestCount,
-            windowStartedAt: new Date(rateLimitState.windowStartedAt).toISOString(),
-            lockedUntil: new Date(rateLimitState.lockedUntil).toISOString(),
+            key,
+            requestCount: bucket.requestCount,
+            resetAt: new Date(bucket.resetAt).toISOString(),
             path: req.originalUrl || req.url || "/api/clinician-comments",
         });
 
-        return buildLimitedResponse(res);
+        return buildLimitedResponse(res, bucket.resetAt, now);
     }
 
     return next();
 }
 
 export function resetClinicianCommentRateLimiterForTests() {
-    rateLimitState.windowStartedAt = 0;
-    rateLimitState.requestCount = 0;
-    rateLimitState.lockedUntil = 0;
+    rateLimitBuckets.clear();
 }
