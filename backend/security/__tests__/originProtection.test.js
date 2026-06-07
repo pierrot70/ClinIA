@@ -39,6 +39,39 @@ describe("origin protection helpers", () => {
         ).toBe(false);
     });
 
+    it("allows LAN and Tailscale frontend origins only in development", () => {
+        const allowedOrigins = new Set();
+
+        expect(
+            isOriginAllowed(
+                "http://10.0.0.18:5173",
+                allowedOrigins,
+                { NODE_ENV: "development" }
+            )
+        ).toBe(true);
+        expect(
+            isOriginAllowed(
+                "http://100.71.13.112:5173",
+                allowedOrigins,
+                { NODE_ENV: "development" }
+            )
+        ).toBe(true);
+        expect(
+            isOriginAllowed(
+                "http://100.71.13.112:5173",
+                allowedOrigins,
+                { NODE_ENV: "production" }
+            )
+        ).toBe(false);
+        expect(
+            isOriginAllowed(
+                "http://100.71.13.112:4000",
+                allowedOrigins,
+                { NODE_ENV: "development" }
+            )
+        ).toBe(false);
+    });
+
     it("extracts request origin from origin or referer headers", () => {
         expect(
             getRequestOrigin({

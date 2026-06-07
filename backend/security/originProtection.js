@@ -17,6 +17,51 @@ function normalizeOrigin(candidate) {
     }
 }
 
+function isPrivateIpv4(hostname) {
+    const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(
+        hostname
+    );
+    if (!match) {
+        return false;
+    }
+
+    const octets = match.slice(1).map(Number);
+    if (octets.some((octet) => octet < 0 || octet > 255)) {
+        return false;
+    }
+
+    const [first, second] = octets;
+    return (
+        first === 10 ||
+        (first === 172 && second >= 16 && second <= 31) ||
+        (first === 192 && second === 168) ||
+        (first === 100 && second >= 64 && second <= 127)
+    );
+}
+
+function isDevelopmentNetworkOrigin(origin, env = process.env) {
+    if (env.NODE_ENV === "production") {
+        return false;
+    }
+
+    try {
+        const url = new URL(origin);
+        const port = url.port || (url.protocol === "https:" ? "443" : "80");
+        if (!["3000", "5173"].includes(port)) {
+            return false;
+        }
+
+        return (
+            url.hostname === "localhost" ||
+            url.hostname === "127.0.0.1" ||
+            url.hostname === "::1" ||
+            isPrivateIpv4(url.hostname)
+        );
+    } catch {
+        return false;
+    }
+}
+
 export function getAllowedOriginsFromEnv(env = process.env) {
     const configuredOrigins = String(env.CLINIA_ALLOWED_ORIGINS || "")
         .split(",")
@@ -30,13 +75,20 @@ export function getAllowedOriginsFromEnv(env = process.env) {
     return new Set(DEFAULT_ALLOWED_ORIGINS);
 }
 
-export function isOriginAllowed(origin, allowedOrigins = getAllowedOriginsFromEnv()) {
+export function isOriginAllowed(
+    origin,
+    allowedOrigins = getAllowedOriginsFromEnv(),
+    env = process.env
+) {
     const normalizedOrigin = normalizeOrigin(origin);
     if (!normalizedOrigin) {
         return false;
     }
 
-    return allowedOrigins.has(normalizedOrigin);
+    return (
+        allowedOrigins.has(normalizedOrigin) ||
+        isDevelopmentNetworkOrigin(normalizedOrigin, env)
+    );
 }
 
 export function createCorsOriginDelegate(
