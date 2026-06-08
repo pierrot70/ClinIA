@@ -9,13 +9,16 @@ interface ClinicalReferenceListProps {
   sources: ClinicalReference[];
   title: string;
   hint?: string;
+  language?: "fr" | "en";
 }
 
 const ClinicalReferenceList: React.FC<ClinicalReferenceListProps> = ({
   sources,
   title,
   hint,
+  language = "fr",
 }) => {
+  const english = language === "en";
   const [activeSource, setActiveSource] = useState<ClinicalReference | null>(null);
 
   if (!sources || sources.length === 0) {
@@ -55,7 +58,9 @@ const ClinicalReferenceList: React.FC<ClinicalReferenceListProps> = ({
                   {activeSource.label}
                 </h2>
                 <p className="mt-1 text-xs text-gray-500">
-                  Fermez cette fenetre pour revenir immediatement a ClinIA.
+                  {english
+                    ? "Close this window to return immediately to ClinIA."
+                    : "Fermez cette fenetre pour revenir immediatement a ClinIA."}
                 </p>
               </div>
               <div className="ml-4 flex items-center gap-2">
@@ -65,14 +70,14 @@ const ClinicalReferenceList: React.FC<ClinicalReferenceListProps> = ({
                   rel="noreferrer"
                   className="rounded border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-900 transition hover:bg-sky-100"
                 >
-                  Ouvrir dans un nouvel onglet
+                  {english ? "Open in a new tab" : "Ouvrir dans un nouvel onglet"}
                 </a>
                 <button
                   type="button"
                   onClick={() => setActiveSource(null)}
                   className="rounded border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
                 >
-                  Fermer
+                  {english ? "Close" : "Fermer"}
                 </button>
               </div>
             </div>

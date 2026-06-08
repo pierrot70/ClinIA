@@ -159,7 +159,9 @@ PATTERNS='nom|prénom|ramq|téléphone|email|adresse|date de naissance'
 headline "Scan sécurité Loi 25/PIPEDA : logs/réponses API (nom, prénom, RAMQ, téléphone, email, adresse, date de naissance)"
 PATTERNS='nom|prénom|ramq|téléphone|email|adresse|date de naissance'
 LOG_API_PATTERNS='console\.log|logger|res\.json|res\.send|res\.status|throw|Error'
-if grep -iErn "$LOG_API_PATTERNS" backend/ frontend/ | grep -iE "$PATTERNS" | grep -vE 'Patient|Clinique|Specialist|DTO|type|interface|mock|test|fixture|example|README|.md|.json|.d.ts|.test.ts|.test.js|.spec.ts|.spec.js|.snap|.yml|.yaml|.env|.gitignore|node_modules|dist|build|coverage|\.next|\.cache|\.vscode|\.idea|\.DS_Store|package-lock.json|yarn.lock|pnpm-lock.yaml|LICENSE|CHANGELOG|Dockerfile|docker-compose|vite.config|tailwind.config|postcss.config|tsconfig|\.iml|\.log|\.svg|\.png|\.jpg|\.jpeg|\.webp|\.ico|\.pdf|\.docx|\.xlsx|\.csv|\.zip|\.tar|\.gz|\.tgz|\.bak|\.old|\.orig|\.swp|\.swo|\.tmp|\.bak|\.old|\.orig|\.swp|\.swo|\.tmp' > .security_scan_tmp; then
+if grep -iErn "$LOG_API_PATTERNS" backend/ frontend/ |
+  perl -ne 'print if /^[^:]+:\d+:(.*)$/ && $1 =~ /(nom|prénom|ramq|téléphone|email|adresse|date de naissance)/i' |
+  grep -vE 'Patient|Clinique|Specialist|DTO|type|interface|mock|test|fixture|example|README|.md|.json|.d.ts|.test.ts|.test.js|.spec.ts|.spec.js|.snap|.yml|.yaml|.env|.gitignore|node_modules|dist|build|coverage|\.next|\.cache|\.vscode|\.idea|\.DS_Store|package-lock.json|yarn.lock|pnpm-lock.yaml|LICENSE|CHANGELOG|Dockerfile|docker-compose|vite.config|tailwind.config|postcss.config|tsconfig|\.iml|\.log|\.svg|\.png|\.jpg|\.jpeg|\.webp|\.ico|\.pdf|\.docx|\.xlsx|\.csv|\.zip|\.tar|\.gz|\.tgz|\.bak|\.old|\.orig|\.swp|\.swo|\.tmp|\.bak|\.old|\.orig|\.swp|\.swo|\.tmp' > .security_scan_tmp; then
   echo "❌ Fuite potentielle de données identifiables détectée dans les logs ou réponses API :"
   cat .security_scan_tmp
   rm -f .security_scan_tmp
@@ -227,13 +229,24 @@ npm ci --prefer-offline
 if [ -d dist ]; then
   echo "> Correction des permissions sur dist/ (chown $USER)"
   chown -R "$USER:$USER" dist 2>/dev/null || true
+  if [ ! -w dist ]; then
+    frontend_container="$(
+      docker ps \
+        --filter label=com.docker.compose.project=clinia_local \
+        --filter label=com.docker.compose.service=frontend \
+        --format '{{.Names}}' |
+        head -n 1
+    )"
+    if [ -n "$frontend_container" ]; then
+      echo "> Correction des permissions via le conteneur frontend"
+      docker exec -u root "$frontend_container" \
+        chown -R "$(id -u):$(id -g)" /app/dist 2>/dev/null || true
+    fi
+  fi
   echo "> Suppression du dossier dist/ (clean build)"
   rm -rf dist || {
-    echo "> Échec de rm -rf dist, tentative avec sudo..."
-    sudo rm -rf dist || {
-      echo "❌ Impossible de supprimer dist/ même avec sudo. Abandon."
-      exit 1
-    }
+    echo "❌ Impossible de supprimer dist/ sans interaction. Abandon."
+    exit 1
   }
 fi
 

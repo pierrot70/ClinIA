@@ -7,8 +7,13 @@ import ClinicalReferenceList from "./ClinicalReferenceList";
 
 import { ClinicalAnalysis } from "../types/clinical";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
+import { getClinicalResultStrings } from "../i18n/clinicalResultStrings";
 import { labels } from "../i18n/uiLabels";
 import { useTranslation } from "../hooks/useTranslation";
+import {
+  getImmediateEnglishClinicalContent,
+  shouldHideFrenchSourceInEnglish,
+} from "../i18n/clinicalContentEnglish";
 
 // Type hybride pour compatibilité ascendante
 type ClinicalDemoResultData = Partial<ClinicalAnalysis> & {
@@ -94,26 +99,97 @@ function SectionReferences({
   title,
   hint,
   sources,
+  language = "fr",
 }: {
   title: string;
   hint: string;
   sources?: Array<{ label: string; url: string }>;
+  language?: "fr" | "en";
 }) {
   if (!sources || sources.length === 0) {
     return null;
   }
 
   return (
-    <ClinicalReferenceList title={title} hint={hint} sources={sources} />
+    <ClinicalReferenceList title={title} hint={hint} sources={sources} language={language} />
   );
 }
 
-function buildPatientSummaryLabel(patientDisplayName?: string) {
+function TranslatedContentText({
+  text,
+  language,
+  className,
+}: {
+  text: string;
+  language: "fr" | "en";
+  className?: string;
+}) {
+  const translation = useTranslation({ text, targetLang: language });
+  const translated =
+    language === "en" &&
+    (translation.loading ||
+      translation.translated === text ||
+      shouldHideFrenchSourceInEnglish(translation.translated))
+      ? getImmediateEnglishClinicalContent(text) || "Clinical details are available in the source analysis."
+      : translation.translated;
+
+  return <p className={className}>{translated}</p>;
+}
+
+function TranslatedContentSpan({
+  text,
+  language,
+}: {
+  text: string;
+  language: "fr" | "en";
+}) {
+  const translation = useTranslation({ text, targetLang: language });
+  const translated =
+    language === "en" &&
+    (translation.loading ||
+      translation.translated === text ||
+      shouldHideFrenchSourceInEnglish(translation.translated))
+      ? getImmediateEnglishClinicalContent(text) || "Clinical details are available in the source analysis."
+      : translation.translated;
+
+  return <>{translated}</>;
+}
+
+function SuggestedTreatmentDescription({
+  treatmentName,
+  language,
+}: {
+  treatmentName: string;
+  language: "fr" | "en";
+}) {
+  const nameTranslation = useTranslation({
+    text: treatmentName,
+    targetLang: language,
+  });
+  const displayedName =
+    language === "en" &&
+    (nameTranslation.loading ||
+      nameTranslation.translated === treatmentName ||
+      shouldHideFrenchSourceInEnglish(nameTranslation.translated))
+      ? getImmediateEnglishClinicalContent(treatmentName) || "Clinical option"
+      : nameTranslation.translated;
+
+  return (
+    <>
+      <span className="font-semibold">{displayedName}</span>
+      {language === "en"
+        ? " is presented as a priority option to discuss according to the clinical context."
+        : " est présenté comme option prioritaire à discuter selon le contexte clinique."}
+    </>
+  );
+}
+
+function buildPatientSummaryLabel(baseLabel: string, patientDisplayName?: string) {
   if (!patientDisplayName) {
-    return "Résumé patient généré par ClinIA.";
+    return baseLabel;
   }
 
-  return `Résumé patient (${patientDisplayName}) généré par ClinIA.`;
+  return `${baseLabel.replace(/\.$/, "")} (${patientDisplayName}).`;
 }
 
 function hasRenderableValue(value: unknown): boolean {
@@ -147,9 +223,11 @@ function truncateText(value: string, maxLength = 220) {
 function buildDynamicQuestions({
   summary,
   treatments,
+  language,
 }: {
   summary?: string;
   treatments?: Array<Record<string, any>>;
+  language: "fr" | "en";
 }) {
   if (!summary && (!Array.isArray(treatments) || treatments.length === 0)) {
     return [];
@@ -160,7 +238,10 @@ function buildDynamicQuestions({
 
   if (summary) {
     questions.push({
-      question: "Quel est le profil clinique principal retenu ici ?",
+      question:
+        language === "fr"
+          ? "Quel est le profil clinique principal retenu ici ?"
+          : "What is the main clinical profile identified here?",
       answer: truncateText(summary),
     });
   }
@@ -170,17 +251,25 @@ function buildDynamicQuestions({
       topTreatment.justification ||
       topTreatment.indication ||
       topTreatment.summary ||
-      "Cette option ressort dans le contexte clinique actuel.";
+      (language === "fr"
+        ? "Cette option ressort dans le contexte clinique actuel."
+        : "This option stands out in the current clinical context.");
 
     questions.push({
-      question: `Pourquoi ${topTreatment.name} ressort-il comme option a discuter ?`,
+      question:
+        language === "fr"
+          ? `Pourquoi ${topTreatment.name} ressort-il comme option a discuter ?`
+          : `Why does ${topTreatment.name} stand out as an option to discuss?`,
       answer: truncateText(String(justification)),
     });
   }
 
   if (topTreatment?.monitoring && Array.isArray(topTreatment.monitoring) && topTreatment.monitoring.length > 0) {
     questions.push({
-      question: "Quels points de surveillance devraient retenir l'attention ?",
+      question:
+        language === "fr"
+          ? "Quels points de surveillance devraient retenir l'attention ?"
+          : "Which monitoring points require attention?",
       answer: truncateText(topTreatment.monitoring.join(", ")),
     });
   }
@@ -191,7 +280,10 @@ function buildDynamicQuestions({
     topTreatment.contraindications.length > 0
   ) {
     questions.push({
-      question: "Quelles contre-indications ou limites doivent etre revues ?",
+      question:
+        language === "fr"
+          ? "Quelles contre-indications ou limites doivent etre revues ?"
+          : "Which contraindications or limitations should be reviewed?",
       answer: truncateText(topTreatment.contraindications.join(", ")),
     });
   }
@@ -213,17 +305,32 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
 }) => {
   const i18n = useContext(HomeI18nContext) || { locale: "fr" };
   const targetLang = i18n.locale;
+  const baseTargetLang = targetLang.toLowerCase().split("-")[0];
+  const hasReviewedResultStrings = ["fr", "en", "es", "ja", "zh", "he", "ko", "vi", "no"].includes(baseTargetLang);
+  const resultStrings = getClinicalResultStrings(targetLang);
+  const contentLanguage: "fr" | "en" = baseTargetLang === "fr" ? "fr" : "en";
+  const contentStrings = getClinicalResultStrings(contentLanguage);
   const resultLabels = labels.clinicalDemo.resultAccordions;
-  const { translated: summarySectionTitle } = useTranslation({ text: resultLabels.summaryTitle, targetLang });
-  const { translated: summarySectionHint } = useTranslation({ text: resultLabels.summaryHint, targetLang });
-  const { translated: recommendationsSectionTitle } = useTranslation({ text: resultLabels.recommendationsTitle, targetLang });
-  const { translated: recommendationsSectionHint } = useTranslation({ text: resultLabels.recommendationsHint, targetLang });
-  const { translated: questionsSectionTitle } = useTranslation({ text: resultLabels.questionsTitle, targetLang });
-  const { translated: questionsSectionHint } = useTranslation({ text: resultLabels.questionsHint, targetLang });
-  const { translated: chartSectionTitle } = useTranslation({ text: resultLabels.chartTitle, targetLang });
-  const { translated: chartSectionHint } = useTranslation({ text: resultLabels.chartHint, targetLang });
-  const { translated: referencesSectionTitle } = useTranslation({ text: resultLabels.referencesTitle, targetLang });
-  const { translated: referencesSectionHint } = useTranslation({ text: resultLabels.referencesHint, targetLang });
+  const { translated: translatedSummaryTitle } = useTranslation({ text: resultLabels.summaryTitle, targetLang });
+  const { translated: translatedSummaryHint } = useTranslation({ text: resultLabels.summaryHint, targetLang });
+  const { translated: translatedRecommendationsTitle } = useTranslation({ text: resultLabels.recommendationsTitle, targetLang });
+  const { translated: translatedRecommendationsHint } = useTranslation({ text: resultLabels.recommendationsHint, targetLang });
+  const { translated: translatedQuestionsTitle } = useTranslation({ text: resultLabels.questionsTitle, targetLang });
+  const { translated: translatedQuestionsHint } = useTranslation({ text: resultLabels.questionsHint, targetLang });
+  const { translated: translatedChartTitle } = useTranslation({ text: resultLabels.chartTitle, targetLang });
+  const { translated: translatedChartHint } = useTranslation({ text: resultLabels.chartHint, targetLang });
+  const { translated: translatedReferencesTitle } = useTranslation({ text: resultLabels.referencesTitle, targetLang });
+  const { translated: translatedReferencesHint } = useTranslation({ text: resultLabels.referencesHint, targetLang });
+  const summarySectionTitle = hasReviewedResultStrings ? resultStrings.summaryTitle : translatedSummaryTitle;
+  const summarySectionHint = hasReviewedResultStrings ? resultStrings.summaryHint : translatedSummaryHint;
+  const recommendationsSectionTitle = hasReviewedResultStrings ? resultStrings.recommendationsTitle : translatedRecommendationsTitle;
+  const recommendationsSectionHint = hasReviewedResultStrings ? resultStrings.recommendationsHint : translatedRecommendationsHint;
+  const questionsSectionTitle = hasReviewedResultStrings ? resultStrings.questionsTitle : translatedQuestionsTitle;
+  const questionsSectionHint = hasReviewedResultStrings ? resultStrings.questionsHint : translatedQuestionsHint;
+  const chartSectionTitle = hasReviewedResultStrings ? resultStrings.chartTitle : translatedChartTitle;
+  const chartSectionHint = hasReviewedResultStrings ? resultStrings.chartHint : translatedChartHint;
+  const referencesSectionTitle = hasReviewedResultStrings ? resultStrings.referencesTitle : translatedReferencesTitle;
+  const referencesSectionHint = hasReviewedResultStrings ? resultStrings.referencesHint : translatedReferencesHint;
   const {
     treatments,
     questions,
@@ -239,12 +346,13 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
     relevanceByAgeChart,
   } = demoData || {};
   const top = treatments && treatments[0];
-  const patientSummaryLabel = buildPatientSummaryLabel(patientDisplayName);
+  const patientSummaryLabel = buildPatientSummaryLabel(contentStrings.patientSummary, patientDisplayName);
   const dynamicQuestions = buildDynamicQuestions({
     summary,
     treatments: Array.isArray(treatments)
       ? (treatments as Array<Record<string, any>>)
       : [],
+    language: contentLanguage,
   });
   const renderedQuestions = dynamicQuestions.length > 0 ? dynamicQuestions : questions ?? [];
 
@@ -305,35 +413,50 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
       <div className="space-y-6">
         <ResultAccordion title={summarySectionTitle} hint={summarySectionHint} defaultOpen={false}>
           <h2 className="text-lg font-semibold mb-2">{patientSummaryLabel}</h2>
-          <p className="text-gray-700 text-sm mb-4">{summary || patientSummaryLabel}</p>
+          <TranslatedContentText
+            text={summary || patientSummaryLabel}
+            language={contentLanguage}
+            className="text-gray-700 text-sm mb-4"
+          />
           {clinical_summary && (
             <div className="bg-gray-50 border rounded-lg p-3 mb-2">
-              <h3 className="font-semibold text-sm mb-1">Résumé clinique IA</h3>
-              <p className="text-xs text-gray-700 whitespace-pre-wrap">{clinical_summary}</p>
+              <h3 className="font-semibold text-sm mb-1">{contentStrings.aiClinicalSummary}</h3>
+              <TranslatedContentText
+                text={clinical_summary}
+                language={contentLanguage}
+                className="text-xs text-gray-700 whitespace-pre-wrap"
+              />
             </div>
           )}
           <SectionReferences
             title={referencesSectionTitle}
             hint={referencesSectionHint}
             sources={relevanceByAgeChart?.sources}
+            language={contentLanguage}
           />
         </ResultAccordion>
 
         {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring) && (
           <ResultAccordion title={recommendationsSectionTitle} hint={recommendationsSectionHint} defaultOpen={false}>
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-sm">
-            <h2 className="text-md font-semibold text-emerald-900 mb-2">Recommandations IA</h2>
+            <h2 className="text-md font-semibold text-emerald-900 mb-2">{contentStrings.aiRecommendations}</h2>
             {/* Bloc générique pour recommendations */}
             {recommendations && (
               <div className="mb-2">
-                <h3 className="font-semibold text-sm mb-1">Recommandations</h3>
+                <h3 className="font-semibold text-sm mb-1">{contentStrings.recommendations}</h3>
                 {typeof recommendations === 'string' && (
-                  <div className="text-xs text-gray-800 mb-1">{recommendations}</div>
+                  <div className="text-xs text-gray-800 mb-1">
+                    <TranslatedContentSpan text={recommendations} language={contentLanguage} />
+                  </div>
                 )}
                 {Array.isArray(recommendations) && (
                   <ul className="list-disc pl-5 text-xs text-gray-800">
                     {recommendations.map((item: any, i: number) => (
-                      <li key={i}>{typeof item === 'string' ? item : JSON.stringify(item)}</li>
+                      <li key={i}>
+                        {typeof item === 'string'
+                          ? <TranslatedContentSpan text={item} language={contentLanguage} />
+                          : JSON.stringify(item)}
+                      </li>
                     ))}
                   </ul>
                 )}
@@ -345,14 +468,20 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
             {/* Bloc générique pour initial_evaluation_recommendations */}
             {initial_evaluation_recommendations && (
               <div className="mb-2">
-                <h3 className="font-semibold text-sm mb-1">Évaluation initiale</h3>
+                <h3 className="font-semibold text-sm mb-1">{contentStrings.initialEvaluation}</h3>
                 {typeof initial_evaluation_recommendations === 'string' && (
-                  <div className="text-xs text-gray-800 mb-1">{initial_evaluation_recommendations}</div>
+                  <div className="text-xs text-gray-800 mb-1">
+                    <TranslatedContentSpan text={initial_evaluation_recommendations} language={contentLanguage} />
+                  </div>
                 )}
                 {Array.isArray(initial_evaluation_recommendations) && (
                   <ul className="list-disc pl-5 text-xs text-gray-800">
                     {initial_evaluation_recommendations.map((item: any, i: number) => (
-                      <li key={i}>{typeof item === 'string' ? item : JSON.stringify(item)}</li>
+                      <li key={i}>
+                        {typeof item === 'string'
+                          ? <TranslatedContentSpan text={item} language={contentLanguage} />
+                          : JSON.stringify(item)}
+                      </li>
                     ))}
                   </ul>
                 )}
@@ -364,14 +493,20 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
             {/* Bloc générique pour treatment_options */}
             {treatment_options && (
               <div className="mb-2">
-                <h3 className="font-semibold text-sm mb-1">Options thérapeutiques</h3>
+                <h3 className="font-semibold text-sm mb-1">{contentStrings.treatmentOptions}</h3>
                 {typeof treatment_options === 'string' && (
-                  <div className="text-xs text-gray-800 mb-1">{treatment_options}</div>
+                  <div className="text-xs text-gray-800 mb-1">
+                    <TranslatedContentSpan text={treatment_options} language={contentLanguage} />
+                  </div>
                 )}
                 {Array.isArray(treatment_options) && (
                   <ul className="list-disc pl-5 text-xs text-gray-800">
                     {treatment_options.map((item: any, i: number) => (
-                      <li key={i}>{typeof item === 'string' ? item : JSON.stringify(item)}</li>
+                      <li key={i}>
+                        {typeof item === 'string'
+                          ? <TranslatedContentSpan text={item} language={contentLanguage} />
+                          : JSON.stringify(item)}
+                      </li>
                     ))}
                   </ul>
                 )}
@@ -383,14 +518,20 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
             {/* Bloc générique pour follow_up_and_monitoring */}
             {follow_up_and_monitoring && (
               <div className="mb-2">
-                <h3 className="font-semibold text-sm mb-1">Suivi et surveillance</h3>
+                <h3 className="font-semibold text-sm mb-1">{contentStrings.followUpAndMonitoring}</h3>
                 {typeof follow_up_and_monitoring === 'string' && (
-                  <div className="text-xs text-gray-800 mb-1">{follow_up_and_monitoring}</div>
+                  <div className="text-xs text-gray-800 mb-1">
+                    <TranslatedContentSpan text={follow_up_and_monitoring} language={contentLanguage} />
+                  </div>
                 )}
                 {Array.isArray(follow_up_and_monitoring) && (
                   <ul className="list-disc pl-5 text-xs text-gray-800">
                     {follow_up_and_monitoring.map((item: any, i: number) => (
-                      <li key={i}>{typeof item === 'string' ? item : JSON.stringify(item)}</li>
+                      <li key={i}>
+                        {typeof item === 'string'
+                          ? <TranslatedContentSpan text={item} language={contentLanguage} />
+                          : JSON.stringify(item)}
+                      </li>
                     ))}
                   </ul>
                 )}
@@ -404,6 +545,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
               title={referencesSectionTitle}
               hint={referencesSectionHint}
               sources={relevanceByAgeChart?.sources}
+              language={contentLanguage}
             />
           </ResultAccordion>
         )}
@@ -411,15 +553,23 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
         {other_ai_fields && Object.keys(other_ai_fields).length > 0 && (
           <ResultAccordion title={questionsSectionTitle} hint={questionsSectionHint} defaultOpen={false}>
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm">
-            <h2 className="text-md font-semibold text-blue-900 mb-2">Autres recommandations IA</h2>
+            <h2 className="text-md font-semibold text-blue-900 mb-2">{contentStrings.otherAiRecommendations}</h2>
             {Object.entries(other_ai_fields).map(([key, value]) => (
               <div key={key} className="mb-2">
                 <div className="font-semibold text-xs text-blue-800 mb-1">{key.replace(/_/g, ' ')}</div>
-                {typeof value === 'string' && <div className="text-xs text-gray-800 mb-1">{value}</div>}
+                {typeof value === 'string' && (
+                  <div className="text-xs text-gray-800 mb-1">
+                    <TranslatedContentSpan text={value} language={contentLanguage} />
+                  </div>
+                )}
                 {Array.isArray(value) && (
                   <ul className="list-disc pl-5 text-xs text-gray-800">
                     {value.map((item: any, i: number) => (
-                      <li key={i}>{typeof item === 'string' ? item : JSON.stringify(item)}</li>
+                      <li key={i}>
+                        {typeof item === 'string'
+                          ? <TranslatedContentSpan text={item} language={contentLanguage} />
+                          : JSON.stringify(item)}
+                      </li>
                     ))}
                   </ul>
                 )}
@@ -486,11 +636,19 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
             ) : null}
           </div>
         </div>
-        <p className="text-gray-700 text-sm mb-4">{summary || patientSummaryLabel}</p>
+        <TranslatedContentText
+          text={summary || patientSummaryLabel}
+          language={contentLanguage}
+          className="text-gray-700 text-sm mb-4"
+        />
         {clinical_summary && (
           <div className="bg-gray-50 border rounded-lg p-3 mb-2">
-            <h3 className="font-semibold text-sm mb-1">Résumé clinique IA</h3>
-            <p className="text-xs text-gray-700 whitespace-pre-wrap">{clinical_summary}</p>
+            <h3 className="font-semibold text-sm mb-1">{contentStrings.aiClinicalSummary}</h3>
+            <TranslatedContentText
+              text={clinical_summary}
+              language={contentLanguage}
+              className="text-xs text-gray-700 whitespace-pre-wrap"
+            />
           </div>
         )}
       </ResultAccordion>
@@ -499,17 +657,23 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
         <ResultAccordion title={recommendationsSectionTitle} hint={recommendationsSectionHint} defaultOpen={false}>
         {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring) && (
         <section className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-sm mb-4">
-          <h2 className="text-md font-semibold text-emerald-900 mb-2">Recommandations IA</h2>
+          <h2 className="text-md font-semibold text-emerald-900 mb-2">{contentStrings.aiRecommendations}</h2>
           {recommendations && (
             <div className="mb-2">
-              <h3 className="font-semibold text-sm mb-1">Recommandations</h3>
+              <h3 className="font-semibold text-sm mb-1">{contentStrings.recommendations}</h3>
               {typeof recommendations === 'string' && (
-                <div className="text-xs text-gray-800 mb-1">{recommendations}</div>
+                <div className="text-xs text-gray-800 mb-1">
+                  <TranslatedContentSpan text={recommendations} language={contentLanguage} />
+                </div>
               )}
               {Array.isArray(recommendations) && (
                 <ul className="list-disc pl-5 text-xs text-gray-800">
                   {recommendations.map((item: any, i: number) => (
-                    <li key={i}>{typeof item === 'string' ? item : JSON.stringify(item)}</li>
+                    <li key={i}>
+                      {typeof item === 'string'
+                        ? <TranslatedContentSpan text={item} language={contentLanguage} />
+                        : JSON.stringify(item)}
+                    </li>
                   ))}
                 </ul>
               )}
@@ -520,25 +684,30 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
           )}
           {initial_evaluation_recommendations && (
             <div className="mb-2">
-              <h3 className="font-semibold text-sm mb-1">Évaluation initiale</h3>
+              <h3 className="font-semibold text-sm mb-1">{contentStrings.initialEvaluation}</h3>
               <ul className="list-disc pl-5 text-xs text-gray-800">
                 {initial_evaluation_recommendations.map((item: string, i: number) => (
-                  <li key={i}>{item}</li>
+                  <li key={i}><TranslatedContentSpan text={item} language={contentLanguage} /></li>
                 ))}
               </ul>
             </div>
           )}
           {treatment_options && (
             <div className="mb-2">
-              <h3 className="font-semibold text-sm mb-1">Options thérapeutiques</h3>
+              <h3 className="font-semibold text-sm mb-1">{contentStrings.treatmentOptions}</h3>
               {Object.entries(treatment_options).map(([key, value]: [string, any], i) => (
                 <div key={key} className="mb-2">
                   <div className="font-semibold text-xs text-emerald-800 mb-1">{key.replace(/_/g, ' ')}</div>
-                  <div className="text-xs text-gray-800 mb-1">{value.recommendation}</div>
+                  <div className="text-xs text-gray-800 mb-1">
+                    <TranslatedContentSpan
+                      text={String(value.recommendation || "")}
+                      language={contentLanguage}
+                    />
+                  </div>
                   {Array.isArray(value.details) && (
                     <ul className="list-disc pl-5 text-xs text-gray-800">
                       {value.details.map((d: string, j: number) => (
-                        <li key={j}>{d}</li>
+                      <li key={j}><TranslatedContentSpan text={d} language={contentLanguage} /></li>
                       ))}
                     </ul>
                   )}
@@ -548,10 +717,10 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
           )}
           {follow_up_and_monitoring && (
             <div className="mb-2">
-              <h3 className="font-semibold text-sm mb-1">Suivi et surveillance</h3>
+              <h3 className="font-semibold text-sm mb-1">{contentStrings.followUpAndMonitoring}</h3>
               <ul className="list-disc pl-5 text-xs text-gray-800">
                 {follow_up_and_monitoring.map((item: string, i: number) => (
-                  <li key={i}>{item}</li>
+                  <li key={i}><TranslatedContentSpan text={item} language={contentLanguage} /></li>
                 ))}
               </ul>
             </div>
@@ -563,21 +732,24 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
         <>
           <section className="bg-white border rounded-xl p-4 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-start">
             <div>
-              <h2 className="text-sm font-semibold text-gray-800 mb-1">Traitement suggéré</h2>
+              <h2 className="text-sm font-semibold text-gray-800 mb-1">{contentStrings.suggestedTreatment}</h2>
               <p className="text-sm text-gray-700">
-                <span className="font-semibold">{mappedTreatments[0]?.name}</span> est présenté comme option prioritaire à discuter selon le contexte clinique.
+                <SuggestedTreatmentDescription
+                  treatmentName={mappedTreatments[0]?.name || ""}
+                  language={contentLanguage}
+                />
               </p>
             </div>
             <div className="text-right text-sm max-w-[16rem]">
-              <div className="text-xs text-gray-500">Repère clinique</div>
+              <div className="text-xs text-gray-500">{contentStrings.clinicalReference}</div>
               <div className="text-base font-semibold text-primary">
-                Données simulées sans score chiffré
+                {contentStrings.simulatedDataWithoutScore}
               </div>
             </div>
           </section>
 
           <section>
-            <AITreatmentTable treatments={mappedTreatments} />
+            <AITreatmentTable treatments={mappedTreatments} language={contentLanguage} />
           </section>
         </>
       )}
@@ -590,6 +762,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
             treatment={t}
             sourceMode={sourceMode}
             realAI={realAI}
+            language={contentLanguage}
           />
         ))}
       </section>
@@ -606,6 +779,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
             levelLabels={relevanceByAgeChart.levelLabels}
             series={relevanceByAgeChart.series}
             sources={relevanceByAgeChart.sources}
+            language={contentLanguage}
           />
         </ResultAccordion>
       )}
@@ -613,18 +787,24 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
       <ResultAccordion title={questionsSectionTitle} hint={questionsSectionHint} defaultOpen={false}>
         <h2 className="text-lg font-semibold mb-2">
           {dynamicQuestions.length === 0
-            ? "Questions fréquentes (simulation)"
-            : "Questions cliniques contextuelles"}
+            ? contentStrings.frequentQuestions
+            : contentStrings.contextualQuestions}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {(renderedQuestions ?? []).map((q, i) => (
-            <QuestionCard key={i} question={q.question ?? q} answer={q.answer ?? ""} />
+            <QuestionCard
+              key={i}
+              question={q.question ?? q}
+              answer={q.answer ?? ""}
+              language={contentLanguage}
+            />
           ))}
         </div>
         <SectionReferences
           title={referencesSectionTitle}
           hint={referencesSectionHint}
           sources={relevanceByAgeChart?.sources}
+          language={contentLanguage}
         />
       </ResultAccordion>
     </div>

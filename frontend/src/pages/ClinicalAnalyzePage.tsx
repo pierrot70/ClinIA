@@ -20,6 +20,7 @@ import { useTranslation } from "../hooks/useTranslation";
 import { getClinicalDemoScenario } from "../data/clinicalDemoScenarios";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { labels } from "../i18n/uiLabels";
+import { getClinicalResultStrings } from "../i18n/clinicalResultStrings";
 
 import type { ClinicalPayload } from "../types/clinical";
 import type {
@@ -44,6 +45,7 @@ export function ClinicalAnalyzePage() {
     const canConfigureAi = isAdminRole(user?.role);
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
+    const clinicalResultStrings = getClinicalResultStrings(targetLang);
     const clinicalIntroLabels = labels.clinicalDemo.intro;
     const [openaiModel, setOpenaiModel] = useState<OpenAIModel>(DEFAULT_OPENAI_MODEL);
     const effectiveOpenaiModel = canConfigureAi ? openaiModel : DEFAULT_OPENAI_MODEL;
@@ -1330,7 +1332,7 @@ export function ClinicalAnalyzePage() {
                             onClick={handleBackToClinicalDemo}
                             className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                         >
-                            Retour a /clinical-demo
+                            {clinicalResultStrings.backToClinicalDemo} /clinical-demo
                         </button>
                     </div>
                     <ClinicalDemoResult

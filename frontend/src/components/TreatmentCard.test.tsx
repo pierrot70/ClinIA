@@ -65,4 +65,34 @@ describe("TreatmentCard", () => {
         ).toBeInTheDocument();
         expect(screen.getByText("Base sur des donnees simulees")).toBeInTheDocument();
     });
+
+    it("never exposes known French scenario content when English is selected", () => {
+        render(
+            <MemoryRouter>
+                <TreatmentCard
+                    language="en"
+                    sourceMode="mock"
+                    treatment={{
+                        id: "metformin",
+                        name: "Metformine",
+                        shortName: "Metformine",
+                        class: "Reevaluation clinique",
+                        efficacy: 0.8,
+                        sideEffectScore: 10,
+                        summary:
+                            "Peut etre raisonnable si le controle glycemique est adequat, si la tolerance est bonne et si les objectifs cliniques sont atteints.",
+                        details: "Details",
+                        flags: [],
+                    }}
+                />
+            </MemoryRouter>
+        );
+
+        expect(screen.getByText("Metformin")).toBeInTheDocument();
+        expect(screen.getByText("Clinical reassessment")).toBeInTheDocument();
+        expect(
+            screen.getByText(/May be reasonable when glycemic control is adequate/)
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/Peut etre raisonnable/)).not.toBeInTheDocument();
+    });
 });

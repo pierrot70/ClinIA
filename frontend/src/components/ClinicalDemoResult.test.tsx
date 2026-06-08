@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import ClinicalDemoResult from "./ClinicalDemoResult";
+import { HomeI18nContext } from "../contexts/HomeI18nContext";
 
 vi.mock("./AITreatmentTable", () => ({
     default: () => <div data-testid="ai-treatment-table" />,
@@ -31,6 +32,88 @@ vi.mock("./ClinicalRelevanceByAgeChart", () => ({
 }));
 
 describe("ClinicalDemoResult", () => {
+    it("renders result titles in Spanish", () => {
+        render(
+            <HomeI18nContext.Provider value={{ locale: "es" } as any}>
+                <ClinicalDemoResult
+                    demoData={{
+                        summary: "Resumen generado",
+                        treatments: [],
+                        questions: [],
+                    }}
+                />
+            </HomeI18nContext.Provider>
+        );
+
+        expect(
+            screen.getByRole("button", { name: /Resumen clínico del paciente/i })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: /Preguntas clínicas para explorar/i })
+        ).toBeInTheDocument();
+    });
+
+    it("uses English inside opened sections for a non-French locale", () => {
+        render(
+            <HomeI18nContext.Provider value={{ locale: "es" } as any}>
+                <ClinicalDemoResult
+                    demoData={{
+                        clinical_summary: "Clinical content",
+                        recommendations: "Recommendation content",
+                        other_ai_fields: { note: "Additional content" },
+                    }}
+                />
+            </HomeI18nContext.Provider>
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", { name: /Resumen clínico del paciente/i })
+        );
+        expect(screen.getByText("AI clinical summary")).toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole("button", { name: /Alternativas y recomendaciones/i })
+        );
+        expect(screen.getByText("AI recommendations")).toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole("button", { name: /Preguntas clínicas para explorar/i })
+        );
+        expect(screen.getByText("Other AI recommendations")).toBeInTheDocument();
+    });
+
+    it("uses deterministic English labels for simulated result content", () => {
+        render(
+            <HomeI18nContext.Provider value={{ locale: "en-CA" } as any}>
+                <ClinicalDemoResult
+                    demoData={{
+                        treatments: [
+                            {
+                                name: "Metformine",
+                                indication: "Option clinique.",
+                                dosage: "Selon le contexte",
+                                duration: "A discuter",
+                                contraindications: [],
+                                monitoring: [],
+                                evidence_level: "A",
+                            },
+                        ],
+                        questions: [],
+                    }}
+                />
+            </HomeI18nContext.Provider>
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", { name: /Alternatives and recommendations/i })
+        );
+        expect(screen.getByText("Suggested treatment")).toBeInTheDocument();
+        expect(
+            screen.getByText(/is presented as a priority option to discuss/)
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/est présenté comme option prioritaire/)).not.toBeInTheDocument();
+    });
+
     it("shows the reverify button only when allowed", () => {
         const demoData = {
             summary: "Resume genere",
@@ -60,7 +143,7 @@ describe("ClinicalDemoResult", () => {
 
         fireEvent.click(
             screen.getByRole("button", {
-                name: /Resume clinique du patient/i,
+                name: /Résumé clinique du patient/i,
             })
         );
         expect(
@@ -105,7 +188,7 @@ describe("ClinicalDemoResult", () => {
 
         fireEvent.click(
             screen.getByRole("button", {
-                name: /Questions cliniques a explorer/i,
+                name: /Questions cliniques à explorer/i,
             })
         );
         expect(
@@ -139,7 +222,7 @@ describe("ClinicalDemoResult", () => {
         expect(screen.getByText("Erreur d'analyse IA")).toBeInTheDocument();
         expect(
             screen.getByRole("button", {
-                name: /Resume clinique du patient/i,
+                name: /Résumé clinique du patient/i,
             })
         ).toHaveAttribute("aria-expanded", "true");
 

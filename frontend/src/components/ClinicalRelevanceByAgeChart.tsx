@@ -9,6 +9,8 @@ import {
   YAxis,
 } from "recharts";
 import ClinicalReferenceList from "./ClinicalReferenceList";
+import { useTranslation } from "../hooks/useTranslation";
+import { shouldHideFrenchSourceInEnglish } from "../i18n/clinicalContentEnglish";
 
 type ClinicalRelevanceLevel = 1 | 2 | 3 | 4 | 5;
 
@@ -30,6 +32,7 @@ interface ClinicalRelevanceByAgeChartProps {
   levelLabels: Record<ClinicalRelevanceLevel, string>;
   series: ClinicalRelevanceSeries[];
   sources: ClinicalRelevanceSource[];
+  language?: "fr" | "en";
 }
 
 const SERIES_COLORS = [
@@ -40,6 +43,23 @@ const SERIES_COLORS = [
   "#65a30d",
 ];
 
+const ENGLISH_CHART_LABELS: Record<string, string> = {
+  "Faible pertinence": "Low relevance",
+  "A considerer": "Consider",
+  "Pertinence moderee": "Moderate relevance",
+  "Souvent pertinente": "Often relevant",
+  "Pertinence contextuelle elevee": "High contextual relevance",
+  "Metformine": "Metformin",
+  "Poursuite prudente de la strategie actuelle": "Careful continuation of the current strategy",
+  "Inhibiteur SGLT2": "SGLT2 inhibitor",
+  "Option GLP-1": "GLP-1 option",
+  "Mode de vie": "Lifestyle measures",
+};
+
+function displayChartLabel(value: string, language: "fr" | "en") {
+  return language === "en" ? ENGLISH_CHART_LABELS[value] || value : value;
+}
+
 const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = ({
   title,
   subtitle,
@@ -48,14 +68,34 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
   levelLabels,
   series,
   sources,
+  language = "fr",
 }) => {
+  const english = language === "en";
+  const titleTranslation = useTranslation({ text: title, targetLang: language });
+  const subtitleTranslation = useTranslation({ text: subtitle, targetLang: language });
+  const interpretationTranslation = useTranslation({
+    text: interpretationNote,
+    targetLang: language,
+  });
+  const safeEnglish = (source: string, translated: string, loading: boolean, fallback: string) =>
+    english && (loading || translated === source || shouldHideFrenchSourceInEnglish(translated))
+      ? fallback
+      : translated;
+  const displayedTitle = safeEnglish(title, titleTranslation.translated, titleTranslation.loading, "Relative clinical relevance by age and context");
+  const displayedSubtitle = safeEnglish(subtitle, subtitleTranslation.translated, subtitleTranslation.loading, "Contextual ClinIA synthesis based on recognized guidance.");
+  const displayedInterpretationNote = safeEnglish(
+    interpretationNote,
+    interpretationTranslation.translated,
+    interpretationTranslation.loading,
+    "This visual supports contextual clinical interpretation and does not replace physician judgment."
+  );
   const [highlightedSeries, setHighlightedSeries] = useState<string | null>(null);
 
   const chartData = ageBuckets.map((ageBucket, index) => {
     const row: Record<string, string | number> = { ageBucket };
 
     for (const item of series) {
-      row[item.name] = item.values[index];
+      row[displayChartLabel(item.name, language)] = item.values[index];
     }
 
     return row;
@@ -68,10 +108,10 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
   return (
     <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
       <div className="flex flex-col gap-2 mb-4">
-        <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
-        <p className="text-xs text-gray-600">{subtitle}</p>
+        <h2 className="text-sm font-semibold text-gray-900">{displayedTitle}</h2>
+        <p className="text-xs text-gray-600">{displayedSubtitle}</p>
         <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          {interpretationNote}
+          {displayedInterpretationNote}
         </p>
       </div>
 
@@ -91,15 +131,19 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
             <YAxis
               domain={[1, 5]}
               ticks={[1, 2, 3, 4, 5]}
-              tickFormatter={(value) => levelLabels[value as ClinicalRelevanceLevel]}
+              tickFormatter={(value) =>
+                displayChartLabel(levelLabels[value as ClinicalRelevanceLevel], language)
+              }
               width={148}
               tick={{ fontSize: 11, fill: "#4b5563" }}
               axisLine={{ stroke: "#d1d5db" }}
               tickLine={{ stroke: "#d1d5db" }}
             />
             <Tooltip
-              formatter={(value) => levelLabels[value as ClinicalRelevanceLevel]}
-              labelFormatter={(label) => `Age: ${label}`}
+              formatter={(value) =>
+                displayChartLabel(levelLabels[value as ClinicalRelevanceLevel], language)
+              }
+              labelFormatter={(label) => `${english ? "Age" : "Âge"}: ${label}`}
               contentStyle={{
                 borderRadius: "0.75rem",
                 borderColor: "#d1d5db",
@@ -110,7 +154,7 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
               <Line
                 key={item.name}
                 type="monotone"
-                dataKey={item.name}
+                dataKey={displayChartLabel(item.name, language)}
                 stroke={SERIES_COLORS[index % SERIES_COLORS.length]}
                 strokeWidth={highlightedSeries === item.name ? 4 : 2.5}
                 strokeOpacity={
@@ -149,21 +193,22 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
                 style={{ backgroundColor: SERIES_COLORS[index % SERIES_COLORS.length] }}
                 aria-hidden="true"
               />
-              {item.name}
+              {displayChartLabel(item.name, language)}
             </button>
           );
         })}
       </div>
 
       <p className="mt-3 text-[11px] text-gray-500">
-        Aide visuelle clinique contextuelle. Elle n'indique pas a elle seule une
-        baisse d'efficacite pharmacologique avec l'age. La decision therapeutique
-        finale appartient toujours au medecin.
+        {english
+          ? "Contextual clinical visual aid. It does not by itself indicate reduced pharmacological effectiveness with age. The final treatment decision always belongs to the physician."
+          : "Aide visuelle clinique contextuelle. Elle n'indique pas a elle seule une baisse d'efficacite pharmacologique avec l'age. La decision therapeutique finale appartient toujours au medecin."}
       </p>
 
       <ClinicalReferenceList
-        title="Provenance clinique"
+        title={english ? "Clinical sources" : "Provenance clinique"}
         sources={sources}
+        language={language}
       />
     </section>
   );

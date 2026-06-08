@@ -12,6 +12,24 @@ vi.mock("../../hooks/useTranslation", () => ({
 }));
 
 describe("ClinicalForm", () => {
+    const caseFieldMap: Record<string, string> = {
+        hypertension55: "generalMedicine",
+        gastricCancer59: "oncology",
+        mononucleosis35: "infectiousDiseases",
+        cataract72: "ophthalmology",
+        majorDepression42: "mentalHealth",
+        diabetesType255: "endocrinology",
+    };
+
+    function selectExampleCase(caseId: string) {
+        fireEvent.change(screen.getByLabelText("Champ clinique"), {
+            target: { value: caseFieldMap[caseId] },
+        });
+        fireEvent.change(screen.getByLabelText("Cas exemple"), {
+            target: { value: caseId },
+        });
+    }
+
     beforeEach(() => {
         window.localStorage.clear();
     });
@@ -48,6 +66,8 @@ describe("ClinicalForm", () => {
                 "Le reste du formulaire apparaîtra après la sélection d'un cas exemple."
             )
         ).toBeInTheDocument();
+        expect(screen.getByLabelText("Champ clinique")).toHaveValue("");
+        expect(screen.getByLabelText("Cas exemple")).toBeDisabled();
         expect(screen.queryByLabelText("Pays du patient")).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "Analyser" })).not.toBeInTheDocument();
     });
@@ -75,9 +95,7 @@ describe("ClinicalForm", () => {
             />
         );
 
-        fireEvent.change(screen.getByLabelText("Cas exemple"), {
-            target: { value: "hypertension55" },
-        });
+        selectExampleCase("hypertension55");
 
         expect(screen.getByLabelText("Pays du patient")).toHaveValue("CA");
         expect(
@@ -116,9 +134,7 @@ describe("ClinicalForm", () => {
             />
         );
 
-        fireEvent.change(screen.getByLabelText("Cas exemple"), {
-            target: { value: "hypertension55" },
-        });
+        selectExampleCase("hypertension55");
 
         const input = screen.getByLabelText("Antecedents medicaux");
 
@@ -143,9 +159,7 @@ describe("ClinicalForm", () => {
             />
         );
 
-        fireEvent.change(screen.getByLabelText("Cas exemple"), {
-            target: { value: "gastricCancer59" },
-        });
+        selectExampleCase("gastricCancer59");
 
         expect(screen.getByLabelText("Age du patient")).toHaveValue(59);
         expect(screen.getByLabelText("Sexe")).toHaveValue("female");
@@ -171,9 +185,7 @@ describe("ClinicalForm", () => {
             />
         );
 
-        fireEvent.change(screen.getByLabelText("Cas exemple"), {
-            target: { value: "hypertension55" },
-        });
+        selectExampleCase("hypertension55");
 
         fireEvent.change(screen.getByLabelText("Importer un objet JSON"), {
             target: {
@@ -231,9 +243,7 @@ describe("ClinicalForm", () => {
             />
         );
 
-        fireEvent.change(screen.getByLabelText("Cas exemple"), {
-            target: { value: "hypertension55" },
-        });
+        selectExampleCase("hypertension55");
 
         fireEvent.click(screen.getByLabelText("Mode comparaison visuelle"));
 
@@ -300,9 +310,7 @@ describe("ClinicalForm", () => {
             />
         );
 
-        fireEvent.change(screen.getByLabelText("Cas exemple"), {
-            target: { value: "hypertension55" },
-        });
+        selectExampleCase("hypertension55");
 
         fireEvent.click(screen.getByLabelText("Mode comparaison visuelle"));
         fireEvent.click(screen.getByRole("button", { name: "Charger cas 1" }));
@@ -377,9 +385,7 @@ describe("ClinicalForm", () => {
             />
         );
 
-        fireEvent.change(screen.getByLabelText("Cas exemple"), {
-            target: { value: "diabetesType255" },
-        });
+        selectExampleCase("diabetesType255");
 
         expect(screen.getByLabelText("Age du patient")).toHaveValue(55);
         expect(screen.getByLabelText("Diagnostic / motif clinique principal")).toHaveValue(
@@ -420,9 +426,7 @@ describe("ClinicalForm", () => {
             />
         );
 
-        fireEvent.change(screen.getByLabelText("Cas exemple"), {
-            target: { value: "diabetesType255" },
-        });
+        selectExampleCase("diabetesType255");
 
         fireEvent.click(screen.getByRole("button", { name: "Parametres diabete type 2" }));
 

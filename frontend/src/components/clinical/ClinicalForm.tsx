@@ -122,6 +122,23 @@ const EXAMPLE_CASES: Record<string, ClinicalPayload> = {
     },
 };
 
+type ClinicalField =
+    | "generalMedicine"
+    | "oncology"
+    | "infectiousDiseases"
+    | "ophthalmology"
+    | "mentalHealth"
+    | "endocrinology";
+
+const EXAMPLE_CASE_FIELDS: Record<string, ClinicalField> = {
+    hypertension55: "generalMedicine",
+    gastricCancer59: "oncology",
+    mononucleosis35: "infectiousDiseases",
+    cataract72: "ophthalmology",
+    majorDepression42: "mentalHealth",
+    diabetesType255: "endocrinology",
+};
+
 const COMPARISON_CASE_ONE: ClinicalPayload = {
     age: 58,
     sex: "male",
@@ -498,6 +515,9 @@ export function ClinicalForm({
     const [form, setForm] = useState<ClinicalPayload>(
         initialData ?? loadCachedForm() ?? EMPTY_FORM
     );
+    const [selectedClinicalField, setSelectedClinicalField] = useState<
+        ClinicalField | ""
+    >("");
     const [selectedExampleCase, setSelectedExampleCase] = useState("");
     const [isDiabetesModalOpen, setIsDiabetesModalOpen] = useState(false);
     const [browserCountryCode, setBrowserCountryCode] = useState("");
@@ -592,7 +612,15 @@ export function ClinicalForm({
     function resetPatient() {
         clearCachedForm();
         applyFormData(EMPTY_FORM);
+        setSelectedClinicalField("");
         setSelectedExampleCase("");
+        setIsDiabetesModalOpen(false);
+    }
+
+    function handleClinicalFieldChange(field: ClinicalField | "") {
+        setSelectedClinicalField(field);
+        setSelectedExampleCase("");
+        applyFormData(EMPTY_FORM);
         setIsDiabetesModalOpen(false);
     }
 
@@ -678,9 +706,7 @@ export function ClinicalForm({
     const clinicalParametersTitleLabel = reviewedStrings.clinicalParametersTitle;
     const clinicalParametersHelpLabel = reviewedStrings.clinicalParametersHelp;
     const { translated: incompleteDataLabel } = useTranslation({ text: "Données cliniques incomplètes", targetLang });
-    const { translated: exampleCaseFieldLabel } = useTranslation({ text: "Cas exemple", targetLang });
     const { translated: exampleCaseTooltipLabel } = useTranslation({ text: commentLabels.exampleCaseTooltip, targetLang });
-    const { translated: noExampleCaseLabel } = useTranslation({ text: "Aucun", targetLang });
     const { translated: patient1Label } = useTranslation({ text: "Hypertension", targetLang });
     const { translated: patient2Label } = useTranslation({ text: "Cancer de l'estomac", targetLang });
     const { translated: patient3Label } = useTranslation({ text: "Mononucleose", targetLang });
@@ -942,6 +968,42 @@ export function ClinicalForm({
         comparisonMedicationSitagliptinLabel,
         comparisonMedicationSemaglutideLabel,
     ];
+    const clinicalFieldOptions: Array<{
+        value: ClinicalField;
+        label: string;
+    }> = [
+        {
+            value: "generalMedicine",
+            label: reviewedStrings.clinicalFields.generalMedicine,
+        },
+        { value: "oncology", label: reviewedStrings.clinicalFields.oncology },
+        {
+            value: "infectiousDiseases",
+            label: reviewedStrings.clinicalFields.infectiousDiseases,
+        },
+        {
+            value: "ophthalmology",
+            label: reviewedStrings.clinicalFields.ophthalmology,
+        },
+        {
+            value: "mentalHealth",
+            label: reviewedStrings.clinicalFields.mentalHealth,
+        },
+        {
+            value: "endocrinology",
+            label: reviewedStrings.clinicalFields.endocrinology,
+        },
+    ];
+    const exampleCaseOptions = [
+        { value: "hypertension55", label: patient1Label },
+        { value: "gastricCancer59", label: patient2Label },
+        { value: "mononucleosis35", label: patient3Label },
+        { value: "cataract72", label: patient4Label },
+        { value: "majorDepression42", label: patient5Label },
+        { value: "diabetesType255", label: patient6Label },
+    ].filter(
+        (option) => EXAMPLE_CASE_FIELDS[option.value] === selectedClinicalField
+    );
 
     useEffect(() => {
         const browserCountry = getBrowserCountryCode();
@@ -1086,9 +1148,37 @@ export function ClinicalForm({
 
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div className="w-full md:w-auto flex flex-col gap-3 md:flex-row md:items-end">
-                    <div className="w-full md:w-80 space-y-1">
+                    <div className="grid w-full gap-4 md:grid-cols-2">
+                        <div className="w-full md:w-80 space-y-1">
+                            <label htmlFor="clinical-field" className="text-sm font-medium text-gray-700">
+                                {reviewedStrings.clinicalFieldLabel}
+                            </label>
+                            <p className="text-xs text-gray-500">
+                                {reviewedStrings.clinicalFieldHelp}
+                            </p>
+                            <select
+                                id="clinical-field"
+                                className="input w-full"
+                                value={selectedClinicalField}
+                                onChange={(e) =>
+                                    handleClinicalFieldChange(
+                                        e.target.value as ClinicalField | ""
+                                    )
+                                }
+                            >
+                                <option value="">
+                                    {reviewedStrings.clinicalFieldPlaceholder}
+                                </option>
+                                {clinicalFieldOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="w-full md:w-80 space-y-1">
                         <label htmlFor="clinical-example-case" className="text-sm font-medium text-gray-700">
-                            {exampleCaseFieldLabel}
+                            {reviewedStrings.exampleCaseLabel}
                         </label>
                         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                             {exampleCaseRequiredHintLabel}
@@ -1108,17 +1198,20 @@ export function ClinicalForm({
                                 id="clinical-example-case"
                                 className="input w-full"
                                 value={selectedExampleCase}
+                                disabled={!selectedClinicalField}
                                 onChange={(e) => handleExampleCaseChange(e.target.value)}
                             >
-                                <option value="">{noExampleCaseLabel}</option>
-                                <option value="hypertension55">{patient1Label}</option>
-                                <option value="gastricCancer59">{patient2Label}</option>
-                                <option value="mononucleosis35">{patient3Label}</option>
-                                <option value="cataract72">{patient4Label}</option>
-                                <option value="majorDepression42">{patient5Label}</option>
-                                <option value="diabetesType255">{patient6Label}</option>
+                                <option value="">
+                                    {reviewedStrings.exampleCasePlaceholder}
+                                </option>
+                                {exampleCaseOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
                             </select>
                         </div>
+                    </div>
                     </div>
                     {hasSelectedExampleCase && isType2DiabetesContext() && (
                         <div className="w-full md:w-[30rem] rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 shadow-sm">

@@ -1,6 +1,19 @@
 export type ClinicalFormReviewedStrings = {
   clinicalParametersTitle: string;
   clinicalParametersHelp: string;
+  clinicalFieldLabel: string;
+  clinicalFieldPlaceholder: string;
+  clinicalFieldHelp: string;
+  exampleCaseLabel: string;
+  exampleCasePlaceholder: string;
+  clinicalFields: {
+    generalMedicine: string;
+    oncology: string;
+    infectiousDiseases: string;
+    ophthalmology: string;
+    mentalHealth: string;
+    endocrinology: string;
+  };
   exampleCaseRequiredHint: string;
   exampleCaseSelectionRequired: string;
   agePlaceholder: string;
@@ -17,6 +30,20 @@ const CLINICAL_FORM_STRINGS: Record<string, ClinicalFormReviewedStrings> = {
     clinicalParametersTitle: "Définir les paramètres cliniques de l'analyse",
     clinicalParametersHelp:
       "ClinIA utilise ces paramètres pour préparer une requête clinique minimisée transmise à OpenAI.",
+    clinicalFieldLabel: "Champ clinique",
+    clinicalFieldPlaceholder: "Sélectionner un champ clinique",
+    clinicalFieldHelp:
+      "Choisissez d'abord le domaine clinique afin d'afficher les cas exemples pertinents.",
+    exampleCaseLabel: "Cas exemple",
+    exampleCasePlaceholder: "Sélectionner un cas exemple",
+    clinicalFields: {
+      generalMedicine: "Médecine générale",
+      oncology: "Oncologie",
+      infectiousDiseases: "Infectiologie",
+      ophthalmology: "Ophtalmologie",
+      mentalHealth: "Psychiatrie et santé mentale",
+      endocrinology: "Endocrinologie",
+    },
     exampleCaseRequiredHint:
       "Commencez par choisir un cas exemple pour préremplir rapidement le formulaire, puis ajustez les champs selon votre patient.",
     exampleCaseSelectionRequired:
@@ -33,6 +60,20 @@ const CLINICAL_FORM_STRINGS: Record<string, ClinicalFormReviewedStrings> = {
     clinicalParametersTitle: "Define the clinical parameters for the analysis",
     clinicalParametersHelp:
       "ClinIA uses these parameters to prepare a minimized clinical request sent to OpenAI.",
+    clinicalFieldLabel: "Clinical field",
+    clinicalFieldPlaceholder: "Select a clinical field",
+    clinicalFieldHelp:
+      "First choose the clinical field to display the relevant example cases.",
+    exampleCaseLabel: "Example case",
+    exampleCasePlaceholder: "Select an example case",
+    clinicalFields: {
+      generalMedicine: "General medicine",
+      oncology: "Oncology",
+      infectiousDiseases: "Infectious diseases",
+      ophthalmology: "Ophthalmology",
+      mentalHealth: "Psychiatry and mental health",
+      endocrinology: "Endocrinology",
+    },
     exampleCaseRequiredHint:
       "Start by selecting an example case to quickly prefill the form, then adjust the fields for your patient.",
     exampleCaseSelectionRequired:
@@ -49,6 +90,20 @@ const CLINICAL_FORM_STRINGS: Record<string, ClinicalFormReviewedStrings> = {
     clinicalParametersTitle: "Definir los parámetros clínicos del análisis",
     clinicalParametersHelp:
       "ClinIA utiliza estos parámetros para preparar una solicitud clínica minimizada que se envía a OpenAI.",
+    clinicalFieldLabel: "Campo clínico",
+    clinicalFieldPlaceholder: "Seleccionar un campo clínico",
+    clinicalFieldHelp:
+      "Seleccione primero el campo clínico para mostrar los casos de ejemplo pertinentes.",
+    exampleCaseLabel: "Caso de ejemplo",
+    exampleCasePlaceholder: "Seleccionar un caso de ejemplo",
+    clinicalFields: {
+      generalMedicine: "Medicina general",
+      oncology: "Oncología",
+      infectiousDiseases: "Infectología",
+      ophthalmology: "Oftalmología",
+      mentalHealth: "Psiquiatría y salud mental",
+      endocrinology: "Endocrinología",
+    },
     exampleCaseRequiredHint:
       "Seleccione primero un caso de ejemplo para completar rápidamente el formulario y luego ajuste los campos para su paciente.",
     exampleCaseSelectionRequired:
@@ -65,6 +120,19 @@ const CLINICAL_FORM_STRINGS: Record<string, ClinicalFormReviewedStrings> = {
     clinicalParametersTitle: "解析用の臨床パラメータを設定",
     clinicalParametersHelp:
       "ClinIAはこれらのパラメータを使用して、OpenAIに送信する必要最小限の臨床リクエストを作成します。",
+    clinicalFieldLabel: "診療分野",
+    clinicalFieldPlaceholder: "診療分野を選択",
+    clinicalFieldHelp: "関連する症例例を表示する診療分野を最初に選択してください。",
+    exampleCaseLabel: "症例例",
+    exampleCasePlaceholder: "症例例を選択",
+    clinicalFields: {
+      generalMedicine: "総合診療",
+      oncology: "腫瘍学",
+      infectiousDiseases: "感染症",
+      ophthalmology: "眼科",
+      mentalHealth: "精神科・メンタルヘルス",
+      endocrinology: "内分泌学",
+    },
     exampleCaseRequiredHint:
       "症例例を選択してフォームをすばやく入力し、患者に合わせて各項目を調整してください。",
     exampleCaseSelectionRequired:
@@ -81,6 +149,19 @@ const CLINICAL_FORM_STRINGS: Record<string, ClinicalFormReviewedStrings> = {
     clinicalParametersTitle: "定义分析所需的临床参数",
     clinicalParametersHelp:
       "ClinIA 使用这些参数准备发送给 OpenAI 的最小化临床请求。",
+    clinicalFieldLabel: "临床领域",
+    clinicalFieldPlaceholder: "选择临床领域",
+    clinicalFieldHelp: "请先选择临床领域，以显示相关示例病例。",
+    exampleCaseLabel: "示例病例",
+    exampleCasePlaceholder: "选择示例病例",
+    clinicalFields: {
+      generalMedicine: "全科医学",
+      oncology: "肿瘤学",
+      infectiousDiseases: "传染病学",
+      ophthalmology: "眼科学",
+      mentalHealth: "精神病学与心理健康",
+      endocrinology: "内分泌学",
+    },
     exampleCaseRequiredHint:
       "请先选择一个示例病例以快速预填表单，然后根据患者情况调整各字段。",
     exampleCaseSelectionRequired: "选择示例病例后，将显示表单的其余部分。",
@@ -96,6 +177,19 @@ const CLINICAL_FORM_STRINGS: Record<string, ClinicalFormReviewedStrings> = {
     clinicalParametersTitle: "הגדרת הפרמטרים הקליניים לניתוח",
     clinicalParametersHelp:
       "ClinIA משתמשת בפרמטרים אלה כדי להכין בקשה קלינית מצומצמת הנשלחת ל-OpenAI.",
+    clinicalFieldLabel: "תחום קליני",
+    clinicalFieldPlaceholder: "בחירת תחום קליני",
+    clinicalFieldHelp: "בחרו תחילה תחום קליני כדי להציג מקרי דוגמה מתאימים.",
+    exampleCaseLabel: "מקרה לדוגמה",
+    exampleCasePlaceholder: "בחירת מקרה לדוגמה",
+    clinicalFields: {
+      generalMedicine: "רפואה כללית",
+      oncology: "אונקולוגיה",
+      infectiousDiseases: "מחלות זיהומיות",
+      ophthalmology: "רפואת עיניים",
+      mentalHealth: "פסיכיאטריה ובריאות הנפש",
+      endocrinology: "אנדוקרינולוגיה",
+    },
     exampleCaseRequiredHint:
       "בחרו תחילה מקרה לדוגמה למילוי מהיר של הטופס, ולאחר מכן התאימו את השדות למטופל.",
     exampleCaseSelectionRequired: "שאר הטופס יוצג לאחר בחירת מקרה לדוגמה.",
@@ -111,6 +205,19 @@ const CLINICAL_FORM_STRINGS: Record<string, ClinicalFormReviewedStrings> = {
     clinicalParametersTitle: "분석을 위한 임상 매개변수 정의",
     clinicalParametersHelp:
       "ClinIA는 이 매개변수를 사용하여 OpenAI로 전송할 최소화된 임상 요청을 준비합니다.",
+    clinicalFieldLabel: "임상 분야",
+    clinicalFieldPlaceholder: "임상 분야 선택",
+    clinicalFieldHelp: "관련 예시 사례를 표시할 임상 분야를 먼저 선택하세요.",
+    exampleCaseLabel: "예시 사례",
+    exampleCasePlaceholder: "예시 사례 선택",
+    clinicalFields: {
+      generalMedicine: "일반 의학",
+      oncology: "종양학",
+      infectiousDiseases: "감염학",
+      ophthalmology: "안과학",
+      mentalHealth: "정신의학 및 정신건강",
+      endocrinology: "내분비학",
+    },
     exampleCaseRequiredHint:
       "예시 사례를 선택해 양식을 빠르게 채운 다음 환자에 맞게 각 항목을 조정하세요.",
     exampleCaseSelectionRequired: "예시 사례를 선택하면 나머지 양식이 표시됩니다.",
@@ -126,6 +233,20 @@ const CLINICAL_FORM_STRINGS: Record<string, ClinicalFormReviewedStrings> = {
     clinicalParametersTitle: "Xác định các thông số lâm sàng cho phân tích",
     clinicalParametersHelp:
       "ClinIA sử dụng các thông số này để chuẩn bị yêu cầu lâm sàng tối giản gửi đến OpenAI.",
+    clinicalFieldLabel: "Lĩnh vực lâm sàng",
+    clinicalFieldPlaceholder: "Chọn lĩnh vực lâm sàng",
+    clinicalFieldHelp:
+      "Trước tiên, hãy chọn lĩnh vực lâm sàng để hiển thị các ca mẫu phù hợp.",
+    exampleCaseLabel: "Ca mẫu",
+    exampleCasePlaceholder: "Chọn một ca mẫu",
+    clinicalFields: {
+      generalMedicine: "Y học tổng quát",
+      oncology: "Ung thư học",
+      infectiousDiseases: "Bệnh truyền nhiễm",
+      ophthalmology: "Nhãn khoa",
+      mentalHealth: "Tâm thần học và sức khỏe tâm thần",
+      endocrinology: "Nội tiết học",
+    },
     exampleCaseRequiredHint:
       "Trước tiên, hãy chọn một ca mẫu để điền nhanh biểu mẫu, sau đó điều chỉnh các trường theo bệnh nhân.",
     exampleCaseSelectionRequired:
@@ -142,6 +263,20 @@ const CLINICAL_FORM_STRINGS: Record<string, ClinicalFormReviewedStrings> = {
     clinicalParametersTitle: "Definer kliniske parametere for analysen",
     clinicalParametersHelp:
       "ClinIA bruker disse parameterne til å forberede en minimert klinisk forespørsel som sendes til OpenAI.",
+    clinicalFieldLabel: "Klinisk fagområde",
+    clinicalFieldPlaceholder: "Velg et klinisk fagområde",
+    clinicalFieldHelp:
+      "Velg først fagområdet for å vise relevante eksempeltilfeller.",
+    exampleCaseLabel: "Eksempeltilfelle",
+    exampleCasePlaceholder: "Velg et eksempeltilfelle",
+    clinicalFields: {
+      generalMedicine: "Allmennmedisin",
+      oncology: "Onkologi",
+      infectiousDiseases: "Infeksjonsmedisin",
+      ophthalmology: "Oftalmologi",
+      mentalHealth: "Psykiatri og psykisk helse",
+      endocrinology: "Endokrinologi",
+    },
     exampleCaseRequiredHint:
       "Velg først et eksempeltilfelle for å fylle ut skjemaet raskt, og tilpass deretter feltene til pasienten.",
     exampleCaseSelectionRequired:
