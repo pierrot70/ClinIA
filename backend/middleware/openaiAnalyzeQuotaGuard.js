@@ -1,7 +1,8 @@
+import { RateLimitWindow } from "../models/RateLimitWindow.js";
+
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 5;
-
-const quotaBuckets = new Map();
+const LIMITER_KEY = "openai_analyze";
 
 function isProduction() {
     return process.env.NODE_ENV === "production";
@@ -38,53 +39,73 @@ export function getOpenAIAnalyzeQuotaStatus() {
         enabled: isProduction(),
         state: "open",
         locked: false,
-        activeBuckets: quotaBuckets.size,
+        storage: "mongo",
         maxRequestsPerWindow: MAX_REQUESTS_PER_WINDOW,
         windowMs: WINDOW_MS,
     };
 }
 
-export function openAIAnalyzeQuotaGuard(req, res, next) {
-    if (!isProduction() || !req.auth?.userId) {
-        return next();
-    }
+export function createOpenAIAnalyzeQuotaGuard({
+    RateLimitWindowModel = RateLimitWindow,
+    now = () => Date.now(),
+} = {}) {
+    return async function openAIAnalyzeQuotaGuard(req, res, next) {
+        if (!isProduction() || !req.auth?.userId) {
+            return next();
+        }
 
-    const now = Date.now();
-    const key = getQuotaKey(req);
-    let bucket = quotaBuckets.get(key);
-
-    if (
-        !bucket ||
-        now - bucket.windowStartedAt >= WINDOW_MS
-    ) {
-        bucket = {
-            windowStartedAt: now,
-            requestCount: 0,
-        };
-        quotaBuckets.set(key, bucket);
-    }
-
-    bucket.requestCount += 1;
-
-    if (bucket.requestCount > MAX_REQUESTS_PER_WINDOW) {
-        const retryAfterSeconds = Math.max(
-            1,
-            Math.ceil((bucket.windowStartedAt + WINDOW_MS - now) / 1000)
+        const nowMs = now();
+        const key = getQuotaKey(req);
+        const windowStartedAt = new Date(
+            Math.floor(nowMs / WINDOW_MS) * WINDOW_MS
         );
+        const expiresAt = new Date(windowStartedAt.getTime() + WINDOW_MS * 2);
 
-        console.warn("OPENAI_ANALYZE_RATE_LIMITED", {
-            key,
-            requestCount: bucket.requestCount,
-            windowStartedAt: new Date(bucket.windowStartedAt).toISOString(),
-            path: req.originalUrl || req.url || "/api/ai/analyze",
-        });
+        try {
+            const bucket = await RateLimitWindowModel.findOneAndUpdate(
+                { limiterKey: LIMITER_KEY, actorKey: key, windowStartedAt },
+                {
+                    $setOnInsert: {
+                        limiterKey: LIMITER_KEY,
+                        actorKey: key,
+                        windowStartedAt,
+                        windowMs: WINDOW_MS,
+                        expiresAt,
+                    },
+                    $inc: { requestCount: 1 },
+                },
+                { upsert: true, new: true }
+            );
 
-        return buildRateLimitedResponse(res, retryAfterSeconds);
-    }
+            if (bucket.requestCount <= MAX_REQUESTS_PER_WINDOW) {
+                return next();
+            }
 
-    return next();
+            const retryAfterSeconds = Math.max(
+                1,
+                Math.ceil((windowStartedAt.getTime() + WINDOW_MS - nowMs) / 1000)
+            );
+
+            console.warn("OPENAI_ANALYZE_RATE_LIMITED", {
+                key,
+                requestCount: bucket.requestCount,
+                windowStartedAt: windowStartedAt.toISOString(),
+                path: req.originalUrl || req.url || "/api/ai/analyze",
+            });
+
+            return buildRateLimitedResponse(res, retryAfterSeconds);
+        } catch (err) {
+            console.error("OPENAI_ANALYZE_QUOTA_CHECK_FAILED", err?.message);
+            return res.status(503).json({
+                error: {
+                    code: "OPENAI_ANALYZE_QUOTA_UNAVAILABLE",
+                    message:
+                        "Le controle du quota OpenAI est temporairement indisponible.",
+                    retryable: true,
+                },
+            });
+        }
+    };
 }
 
-export function resetOpenAIAnalyzeQuotaGuardForTests() {
-    quotaBuckets.clear();
-}
+export const openAIAnalyzeQuotaGuard = createOpenAIAnalyzeQuotaGuard();
