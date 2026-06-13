@@ -30,6 +30,7 @@ export function createStartServer(deps) {
     const {
         mongoose,
         initShutdownState,
+        registerGracefulShutdown,
         logger = console,
         port = 4000,
         mongoUri = process.env.MONGO_URI,
@@ -65,11 +66,19 @@ export function createStartServer(deps) {
                     logger.warn("⚠️ initShutdownState failed", err?.message);
                 }
 
-                app.listen(port, () =>
+                const server = app.listen(port, () =>
                     logger.log(
                         `🚀 ClinIA backend ready on http://localhost:${port}`
                     )
                 );
+
+                registerGracefulShutdown?.({
+                    server,
+                    mongoose,
+                    logger,
+                });
+
+                return server;
             })
             .catch((err) => {
                 logger.error("❌ Mongo connection error (FAIL-FAST):", err.message);

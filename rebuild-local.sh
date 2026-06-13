@@ -224,25 +224,25 @@ npm ci --prefer-offline
 
 
 
-
 # Correction automatique des permissions sur dist/ avant suppression (évite les erreurs de permission)
 if [ -d dist ]; then
+  frontend_container="$(
+    docker ps \
+      --filter label=com.docker.compose.project=clinia_local \
+      --filter label=com.docker.compose.service=frontend \
+      --format '{{.Names}}' |
+      head -n 1
+  )"
+
+  if [ -n "$frontend_container" ]; then
+    echo "> Correction des permissions via le conteneur frontend"
+    docker exec -u root "$frontend_container" \
+      chown -R "$(id -u):$(id -g)" /app/dist 2>/dev/null || true
+  fi
+
   echo "> Correction des permissions sur dist/ (chown $USER)"
   chown -R "$USER:$USER" dist 2>/dev/null || true
-  if [ ! -w dist ]; then
-    frontend_container="$(
-      docker ps \
-        --filter label=com.docker.compose.project=clinia_local \
-        --filter label=com.docker.compose.service=frontend \
-        --format '{{.Names}}' |
-        head -n 1
-    )"
-    if [ -n "$frontend_container" ]; then
-      echo "> Correction des permissions via le conteneur frontend"
-      docker exec -u root "$frontend_container" \
-        chown -R "$(id -u):$(id -g)" /app/dist 2>/dev/null || true
-    fi
-  fi
+
   echo "> Suppression du dossier dist/ (clean build)"
   rm -rf dist || {
     echo "❌ Impossible de supprimer dist/ sans interaction. Abandon."

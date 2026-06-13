@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 
 import { createCorsOriginDelegate } from "../security/originProtection.js";
+import { createRequestContextMiddleware, getRequestContext } from "./requestContext.js";
 
 export function createSecurityHeadersMiddleware() {
     return (req, res, next) => {
@@ -23,6 +24,7 @@ export function createSecurityHeadersMiddleware() {
             (typeof forwardedProto === "string" &&
                 forwardedProto.toLowerCase().includes("https"));
 
+        const requestContext = getRequestContext(req);
         console.log("[HTTPS DEBUG]", {
             NODE_ENV: process.env.NODE_ENV,
             isProd,
@@ -33,6 +35,7 @@ export function createSecurityHeadersMiddleware() {
             forwardedProto,
             url: req.url,
             method: req.method,
+            ...requestContext,
         });
 
         if (isProd && !isSecure && !isLocalHostRequest) {
@@ -46,6 +49,7 @@ export function createSecurityHeadersMiddleware() {
                 forwardedProto,
                 url: req.url,
                 method: req.method,
+                ...requestContext,
             });
             return res.status(400).json({
                 error: {
@@ -69,6 +73,7 @@ export function createSecurityHeadersMiddleware() {
 
 export function configureCoreMiddleware(app) {
     app.set("trust proxy", 1);
+    app.use(createRequestContextMiddleware());
     app.use(
         cors({
             origin: createCorsOriginDelegate(),

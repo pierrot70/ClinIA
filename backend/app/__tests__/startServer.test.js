@@ -15,6 +15,9 @@ describe("startServer", () => {
         const listen = vi.fn((port, callback) => callback());
         const app = { listen };
         const warmTranslationMemoryCache = vi.fn().mockResolvedValue(undefined);
+        const registerGracefulShutdown = vi.fn();
+        const server = {};
+        listen.mockReturnValue(server);
 
         const startServer = createStartServer({
             mongoose,
@@ -24,6 +27,7 @@ describe("startServer", () => {
             mongoUri: "mongodb://example/clinia",
             mockAi: "1",
             openaiModel: "gpt-4.1-mini",
+            registerGracefulShutdown,
         });
 
         await startServer({ app, warmTranslationMemoryCache });
@@ -34,6 +38,11 @@ describe("startServer", () => {
         expect(warmTranslationMemoryCache).toHaveBeenCalledTimes(1);
         expect(initShutdownState).toHaveBeenCalledTimes(1);
         expect(listen).toHaveBeenCalledWith(4010, expect.any(Function));
+        expect(registerGracefulShutdown).toHaveBeenCalledWith({
+            server,
+            mongoose,
+            logger,
+        });
         expect(logger.error).not.toHaveBeenCalled();
     });
 

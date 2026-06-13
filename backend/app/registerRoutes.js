@@ -8,6 +8,7 @@ import clinicianCommentsRouter from "../routes/clinicianComments.js";
 import authRouter from "../routes/auth.js";
 import translationRouter from "../routes/translation.js";
 import mocksRouter from "../routes/mocks.js";
+import healthRouter from "../routes/health.js";
 
 import { verifyJWT } from "../middleware/verifyJWT.js";
 import { attachOptionalAuth } from "../middleware/attachOptionalAuth.js";
@@ -23,6 +24,8 @@ export function registerRoutes(app, deps) {
         openAILogsExportMassDownloadDetector,
         aiAnalyzeRouter,
     } = deps;
+
+    app.use("/api/health", healthRouter);
 
     app.use("/api/ai", aiAnalyzeRouter || createAiAnalyzeRouter({}));
 

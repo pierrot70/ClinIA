@@ -49,6 +49,7 @@ import { configureCoreMiddleware } from "./app/configureCoreMiddleware.js";
 import { registerErrorHandlers } from "./app/registerErrorHandlers.js";
 import { registerRoutes } from "./app/registerRoutes.js";
 import { createStartServer } from "./app/startServer.js";
+import { registerGracefulShutdown } from "./app/gracefulShutdown.js";
 import { createAiAnalyzeRouter } from "./routes/aiAnalyze.js";
 import { createRespondWithSecurityIncident } from "./services/aiSecurityResponseService.js";
 import {
@@ -72,18 +73,6 @@ dotenv.config();
 console.log("[BOOT] CLINIA_MOCK_AI (raw env):", process.env.CLINIA_MOCK_AI);
 
 mongoose.set("bufferCommands", false);
-
-/* ------------------------------------------------------------------ */
-/* Process safety (ANTI-CRASH)                                         */
-/* ------------------------------------------------------------------ */
-
-process.on("unhandledRejection", (reason) => {
-    console.error("🔥 UNHANDLED PROMISE REJECTION", reason);
-});
-
-process.on("uncaughtException", (err) => {
-    console.error("🔥 UNCAUGHT EXCEPTION", err);
-});
 
 /* ------------------------------------------------------------------ */
 /* App init                                                           */
@@ -182,6 +171,7 @@ async function warmTranslationMemoryCache() {
 const startServer = createStartServer({
     mongoose,
     initShutdownState,
+    registerGracefulShutdown,
 });
 
 const respondWithSecurityIncident = createRespondWithSecurityIncident({
