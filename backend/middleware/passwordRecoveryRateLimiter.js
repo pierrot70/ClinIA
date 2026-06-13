@@ -1,9 +1,8 @@
+import { RateLimitWindow } from "../models/RateLimitWindow.js";
+
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 5;
 const MAX_VERIFICATIONS_PER_WINDOW = 15;
-
-const requestBuckets = new Map();
-const verificationBuckets = new Map();
 
 function getClientIp(req) {
     const cloudflareIp = req.headers?.["cf-connecting-ip"];
@@ -16,63 +15,85 @@ function getClientIp(req) {
     );
 }
 
-function applyLimit({ req, res, next, buckets, maximum, code, message }) {
-    const now = Date.now();
-    const key = `ip:${getClientIp(req)}`;
-    const bucket = buckets.get(key);
+export function createPasswordRecoveryRateLimiter({
+    limiterKey,
+    maximum,
+    code,
+    message,
+    RateLimitWindowModel = RateLimitWindow,
+    now = () => Date.now(),
+}) {
+    return async function passwordRecoveryRateLimiter(req, res, next) {
+        const nowMs = now();
+        const actorKey = `ip:${getClientIp(req)}`;
+        const windowStartedAt = new Date(
+            Math.floor(nowMs / WINDOW_MS) * WINDOW_MS
+        );
+        const expiresAt = new Date(windowStartedAt.getTime() + WINDOW_MS * 2);
 
-    if (!bucket || now >= bucket.resetAt) {
-        buckets.set(key, {
-            count: 1,
-            resetAt: now + WINDOW_MS,
-        });
-        return next();
-    }
+        try {
+            const bucket = await RateLimitWindowModel.findOneAndUpdate(
+                { limiterKey, actorKey, windowStartedAt },
+                {
+                    $setOnInsert: {
+                        limiterKey,
+                        actorKey,
+                        windowStartedAt,
+                        windowMs: WINDOW_MS,
+                        expiresAt,
+                    },
+                    $inc: { requestCount: 1 },
+                },
+                { upsert: true, new: true }
+            );
 
-    bucket.count += 1;
-    if (bucket.count <= maximum) {
-        return next();
-    }
+            if (bucket.requestCount <= maximum) {
+                return next();
+            }
 
-    const retryAfterSeconds = Math.max(
-        1,
-        Math.ceil((bucket.resetAt - now) / 1000)
-    );
-    res.setHeader("Retry-After", String(retryAfterSeconds));
-    return res.status(429).json({
-        error: {
-            code,
-            message,
-            retryable: true,
-        },
-    });
+            const retryAfterSeconds = Math.max(
+                1,
+                Math.ceil(
+                    (windowStartedAt.getTime() + WINDOW_MS - nowMs) / 1000
+                )
+            );
+            res.setHeader("Retry-After", String(retryAfterSeconds));
+            return res.status(429).json({
+                error: {
+                    code,
+                    message,
+                    retryable: true,
+                },
+            });
+        } catch (err) {
+            console.error("PASSWORD_RECOVERY_RATE_LIMIT_CHECK_FAILED", {
+                limiterKey,
+                message: err?.message,
+            });
+            return res.status(503).json({
+                error: {
+                    code: "PASSWORD_RECOVERY_RATE_LIMIT_UNAVAILABLE",
+                    message:
+                        "Le controle de recuperation du mot de passe est temporairement indisponible.",
+                    retryable: true,
+                },
+            });
+        }
+    };
 }
 
-export function passwordRecoveryRequestRateLimiter(req, res, next) {
-    return applyLimit({
-        req,
-        res,
-        next,
-        buckets: requestBuckets,
+export const passwordRecoveryRequestRateLimiter =
+    createPasswordRecoveryRateLimiter({
+        limiterKey: "password_recovery_request",
         maximum: MAX_REQUESTS_PER_WINDOW,
         code: "PASSWORD_RECOVERY_REQUEST_RATE_LIMITED",
         message: "Trop de demandes. Reessayez dans 15 minutes.",
     });
-}
 
-export function passwordRecoveryVerifyRateLimiter(req, res, next) {
-    return applyLimit({
-        req,
-        res,
-        next,
-        buckets: verificationBuckets,
+export const passwordRecoveryVerifyRateLimiter =
+    createPasswordRecoveryRateLimiter({
+        limiterKey: "password_recovery_verify",
         maximum: MAX_VERIFICATIONS_PER_WINDOW,
         code: "PASSWORD_RECOVERY_VERIFY_RATE_LIMITED",
         message: "Trop de tentatives. Reessayez dans 15 minutes.",
     });
-}
-
-export function resetPasswordRecoveryRateLimitersForTests() {
-    requestBuckets.clear();
-    verificationBuckets.clear();
-}
