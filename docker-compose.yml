@@ -8,13 +8,11 @@ services:
     volumes:
       - mongo_data:/data/db
 
-  backend:
+  backend: &backend
     build:
       context: ./backend
       dockerfile: Dockerfile
     restart: always
-    deploy:
-      replicas: 2
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health/ready').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 10s
@@ -44,6 +42,9 @@ services:
       - "traefik.http.routers.clinia-api-https.service=clinia-api"
     depends_on:
       - mongo
+
+  backend-replica:
+    <<: *backend
 
   frontend:
     build:
