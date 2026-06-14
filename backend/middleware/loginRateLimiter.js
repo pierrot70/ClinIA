@@ -10,6 +10,11 @@ const LOGIN_LIMITER_KEY = "auth_login";
 const REFRESH_LIMITER_KEY = "auth_refresh";
 
 function getClientIp(req) {
+    const cloudflareIp = req.headers["cf-connecting-ip"];
+    if (typeof cloudflareIp === "string" && cloudflareIp.trim()) {
+        return cloudflareIp.trim();
+    }
+
     const forwardedFor = req.headers["x-forwarded-for"];
     if (typeof forwardedFor === "string" && forwardedFor.trim()) {
         return forwardedFor.split(",")[0].trim();

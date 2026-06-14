@@ -128,6 +128,34 @@ describe("loginRateLimiter middleware", () => {
         expect(nextB).toHaveBeenCalledTimes(1);
     });
 
+    it("uses Cloudflare's stable IP across rotating forwarded proxy IPs", async () => {
+        const limiter = createLoginRateLimiter({
+            RateLimitWindowModel: createModel(),
+            now: () => 1_000,
+        });
+        const next = vi.fn();
+        const responses = [];
+
+        for (let i = 0; i < 11; i += 1) {
+            const res = makeRes();
+            responses.push(res);
+            await limiter(
+                {
+                    headers: {
+                        "cf-connecting-ip": "203.0.113.60",
+                        "x-forwarded-for": `172.16.0.${i + 1}`,
+                    },
+                    ip: `10.0.0.${i + 1}`,
+                },
+                res,
+                next
+            );
+        }
+
+        expect(next).toHaveBeenCalledTimes(10);
+        expect(responses[10].status).toHaveBeenCalledWith(429);
+    });
+
     it("fails closed when Mongo cannot verify the login limit", async () => {
         const limiter = createLoginRateLimiter({
             RateLimitWindowModel: {
@@ -247,6 +275,34 @@ describe("refreshRateLimiter middleware", () => {
 
         expect(nextA).toHaveBeenCalledTimes(30);
         expect(nextB).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses Cloudflare's stable IP across rotating forwarded proxy IPs", async () => {
+        const limiter = createRefreshRateLimiter({
+            RateLimitWindowModel: createModel(),
+            now: () => 1_000,
+        });
+        const next = vi.fn();
+        const responses = [];
+
+        for (let i = 0; i < 31; i += 1) {
+            const res = makeRes();
+            responses.push(res);
+            await limiter(
+                {
+                    headers: {
+                        "cf-connecting-ip": "203.0.113.61",
+                        "x-forwarded-for": `172.16.1.${i + 1}`,
+                    },
+                    ip: `10.0.1.${i + 1}`,
+                },
+                res,
+                next
+            );
+        }
+
+        expect(next).toHaveBeenCalledTimes(30);
+        expect(responses[30].status).toHaveBeenCalledWith(429);
     });
 
     it("fails closed when Mongo cannot verify the refresh limit", async () => {
