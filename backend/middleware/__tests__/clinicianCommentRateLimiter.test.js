@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-    clinicianCommentRateLimiter,
-    resetClinicianCommentRateLimiterForTests,
-} from "../clinicianCommentRateLimiter.js";
+import { createClinicianCommentRateLimiter } from "../clinicianCommentRateLimiter.js";
 
 function createRes() {
     return {
@@ -12,15 +9,30 @@ function createRes() {
     };
 }
 
+function createModel() {
+    const counts = new Map();
+
+    return {
+        findOneAndUpdate: vi.fn(async (query) => {
+            const key = `${query.limiterKey}:${query.actorKey}:${query.windowStartedAt.toISOString()}`;
+            const requestCount = (counts.get(key) || 0) + 1;
+            counts.set(key, requestCount);
+            return { requestCount };
+        }),
+    };
+}
+
 describe("clinicianCommentRateLimiter", () => {
     beforeEach(() => {
-        resetClinicianCommentRateLimiterForTests();
         vi.restoreAllMocks();
     });
 
-    it("allows up to 5 comments within 15 minutes", () => {
-        vi.spyOn(Date, "now").mockReturnValue(1_000);
-
+    it("persists comments and blocks the sixth within 15 minutes", async () => {
+        const model = createModel();
+        const limiter = createClinicianCommentRateLimiter({
+            RateLimitWindowModel: model,
+            now: () => 1_000,
+        });
         const req = {
             originalUrl: "/api/clinician-comments",
             ip: "203.0.113.10",
@@ -28,33 +40,13 @@ describe("clinicianCommentRateLimiter", () => {
         const res = createRes();
         const next = vi.fn();
 
-        for (let i = 0; i < 5; i += 1) {
-            clinicianCommentRateLimiter(req, res, next);
+        for (let i = 0; i < 6; i += 1) {
+            await limiter(req, res, next);
         }
 
         expect(next).toHaveBeenCalledTimes(5);
-        expect(res.status).not.toHaveBeenCalled();
-    });
-
-    it("blocks the 6th comment for 15 minutes then unlocks automatically", () => {
-        const nowSpy = vi.spyOn(Date, "now");
-        nowSpy.mockReturnValue(10_000);
-
-        const req = {
-            originalUrl: "/api/clinician-comments",
-            ip: "203.0.113.10",
-        };
-        const res = createRes();
-        const next = vi.fn();
-
-        for (let i = 0; i < 5; i += 1) {
-            clinicianCommentRateLimiter(req, res, next);
-        }
-
-        clinicianCommentRateLimiter(req, res, next);
-
         expect(res.status).toHaveBeenCalledWith(429);
-        expect(res.setHeader).toHaveBeenCalledWith("Retry-After", "900");
+        expect(res.setHeader).toHaveBeenCalledWith("Retry-After", "899");
         expect(res.json).toHaveBeenCalledWith({
             error: {
                 code: "CLINICIAN_COMMENTS_RATE_LIMITED",
@@ -63,57 +55,88 @@ describe("clinicianCommentRateLimiter", () => {
                 retryable: true,
             },
         });
-        expect(next).toHaveBeenCalledTimes(5);
+        expect(model.findOneAndUpdate).toHaveBeenCalledWith(
+            {
+                limiterKey: "clinician_comments",
+                actorKey: "ip:203.0.113.10",
+                windowStartedAt: new Date(0),
+            },
+            {
+                $setOnInsert: {
+                    limiterKey: "clinician_comments",
+                    actorKey: "ip:203.0.113.10",
+                    windowStartedAt: new Date(0),
+                    windowMs: 900_000,
+                    expiresAt: new Date(1_800_000),
+                },
+                $inc: { requestCount: 1 },
+            },
+            { upsert: true, new: true }
+        );
+    });
 
-        const lockedRes = createRes();
-        nowSpy.mockReturnValue(10_000 + 14 * 60 * 1000);
-        clinicianCommentRateLimiter(req, lockedRes, next);
-        expect(lockedRes.status).toHaveBeenCalledWith(429);
+    it("unlocks automatically in the next aligned window", async () => {
+        const model = createModel();
+        let nowMs = 1_000;
+        const limiter = createClinicianCommentRateLimiter({
+            RateLimitWindowModel: model,
+            now: () => nowMs,
+        });
+        const req = { headers: {}, ip: "203.0.113.11" };
+        const next = vi.fn();
 
+        for (let i = 0; i < 6; i += 1) {
+            await limiter(req, createRes(), next);
+        }
+
+        nowMs = 900_001;
         const unlockedRes = createRes();
-        nowSpy.mockReturnValue(10_000 + 15 * 60 * 1000 + 1);
-        clinicianCommentRateLimiter(req, unlockedRes, next);
+        await limiter(req, unlockedRes, next);
+
         expect(unlockedRes.status).not.toHaveBeenCalled();
         expect(next).toHaveBeenCalledTimes(6);
     });
 
-    it("does not block another anonymous IP", () => {
-        vi.spyOn(Date, "now").mockReturnValue(20_000);
-
-        const abusiveReq = {
-            originalUrl: "/api/clinician-comments",
-            ip: "203.0.113.10",
-        };
-        const otherReq = {
-            originalUrl: "/api/clinician-comments",
-            ip: "198.51.100.24",
-        };
+    it("does not block another anonymous IP", async () => {
+        const limiter = createClinicianCommentRateLimiter({
+            RateLimitWindowModel: createModel(),
+            now: () => 20_000,
+        });
         const next = vi.fn();
 
         for (let i = 0; i < 6; i += 1) {
-            clinicianCommentRateLimiter(abusiveReq, createRes(), next);
+            await limiter(
+                { headers: {}, ip: "203.0.113.12" },
+                createRes(),
+                next
+            );
         }
 
         const otherRes = createRes();
-        clinicianCommentRateLimiter(otherReq, otherRes, next);
+        await limiter(
+            { headers: {}, ip: "198.51.100.24" },
+            otherRes,
+            next
+        );
 
         expect(otherRes.status).not.toHaveBeenCalled();
         expect(next).toHaveBeenCalledTimes(6);
     });
 
-    it("uses Cloudflare's stable client IP instead of a rotating proxy IP", () => {
-        vi.spyOn(Date, "now").mockReturnValue(25_000);
-
+    it("uses Cloudflare's stable client IP instead of rotating proxy IPs", async () => {
+        const limiter = createClinicianCommentRateLimiter({
+            RateLimitWindowModel: createModel(),
+            now: () => 25_000,
+        });
         const next = vi.fn();
         const responses = [];
 
         for (let i = 0; i < 6; i += 1) {
             const res = createRes();
             responses.push(res);
-            clinicianCommentRateLimiter(
+            await limiter(
                 {
                     headers: { "cf-connecting-ip": "203.0.113.20" },
-                    originalUrl: "/api/clinician-comments",
                     ip: `172.16.0.${i + 1}`,
                 },
                 res,
@@ -125,29 +148,54 @@ describe("clinicianCommentRateLimiter", () => {
         expect(responses[5].status).toHaveBeenCalledWith(429);
     });
 
-    it("isolates authenticated users even when they share an IP", () => {
-        vi.spyOn(Date, "now").mockReturnValue(30_000);
-
-        const abusiveReq = {
-            auth: { userId: "user-a" },
-            originalUrl: "/api/clinician-comments",
-            ip: "203.0.113.10",
-        };
-        const otherReq = {
-            auth: { userId: "user-b" },
-            originalUrl: "/api/clinician-comments",
-            ip: "203.0.113.10",
-        };
+    it("isolates authenticated users even when they share an IP", async () => {
+        const limiter = createClinicianCommentRateLimiter({
+            RateLimitWindowModel: createModel(),
+            now: () => 30_000,
+        });
         const next = vi.fn();
 
         for (let i = 0; i < 6; i += 1) {
-            clinicianCommentRateLimiter(abusiveReq, createRes(), next);
+            await limiter(
+                { auth: { userId: "user-a" }, ip: "203.0.113.10" },
+                createRes(),
+                next
+            );
         }
 
         const otherRes = createRes();
-        clinicianCommentRateLimiter(otherReq, otherRes, next);
+        await limiter(
+            { auth: { userId: "user-b" }, ip: "203.0.113.10" },
+            otherRes,
+            next
+        );
 
         expect(otherRes.status).not.toHaveBeenCalled();
         expect(next).toHaveBeenCalledTimes(6);
+    });
+
+    it("fails closed when Mongo cannot verify the comment limit", async () => {
+        const limiter = createClinicianCommentRateLimiter({
+            RateLimitWindowModel: {
+                findOneAndUpdate: vi
+                    .fn()
+                    .mockRejectedValue(new Error("mongo unavailable")),
+            },
+        });
+        const res = createRes();
+        const next = vi.fn();
+
+        await limiter({ headers: {}, ip: "203.0.113.30" }, res, next);
+
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(503);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "CLINICIAN_COMMENTS_RATE_LIMIT_UNAVAILABLE",
+                message:
+                    "Le controle des commentaires est temporairement indisponible.",
+                retryable: true,
+            },
+        });
     });
 });

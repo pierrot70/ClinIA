@@ -1,8 +1,8 @@
+import { RateLimitWindow } from "../models/RateLimitWindow.js";
+
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_COMMENTS_PER_WINDOW = 5;
-const MAX_BUCKETS_BEFORE_CLEANUP = 1_000;
-
-const rateLimitBuckets = new Map();
+const LIMITER_KEY = "clinician_comments";
 
 function getRateLimitKey(req) {
     if (req.auth?.userId) {
@@ -20,20 +20,11 @@ function getRateLimitKey(req) {
     return `ip:${clientIp}`;
 }
 
-function cleanupExpiredBuckets(now) {
-    if (rateLimitBuckets.size < MAX_BUCKETS_BEFORE_CLEANUP) {
-        return;
-    }
-
-    for (const [key, bucket] of rateLimitBuckets.entries()) {
-        if (now >= bucket.resetAt) {
-            rateLimitBuckets.delete(key);
-        }
-    }
-}
-
-function buildLimitedResponse(res, resetAt, now) {
-    const retryAfterSeconds = Math.max(1, Math.ceil((resetAt - now) / 1000));
+function buildLimitedResponse(res, windowStartedAt, nowMs) {
+    const retryAfterSeconds = Math.max(
+        1,
+        Math.ceil((windowStartedAt.getTime() + WINDOW_MS - nowMs) / 1000)
+    );
     res.setHeader("Retry-After", String(retryAfterSeconds));
 
     return res.status(429).json({
@@ -46,37 +37,62 @@ function buildLimitedResponse(res, resetAt, now) {
     });
 }
 
-export function clinicianCommentRateLimiter(req, res, next) {
-    const now = Date.now();
-    const key = getRateLimitKey(req);
-    const bucket = rateLimitBuckets.get(key);
+export function createClinicianCommentRateLimiter({
+    RateLimitWindowModel = RateLimitWindow,
+    now = () => Date.now(),
+} = {}) {
+    return async function clinicianCommentRateLimiter(req, res, next) {
+        const nowMs = now();
+        const actorKey = getRateLimitKey(req);
+        const windowStartedAt = new Date(
+            Math.floor(nowMs / WINDOW_MS) * WINDOW_MS
+        );
+        const expiresAt = new Date(windowStartedAt.getTime() + WINDOW_MS * 2);
 
-    cleanupExpiredBuckets(now);
+        try {
+            const bucket = await RateLimitWindowModel.findOneAndUpdate(
+                { limiterKey: LIMITER_KEY, actorKey, windowStartedAt },
+                {
+                    $setOnInsert: {
+                        limiterKey: LIMITER_KEY,
+                        actorKey,
+                        windowStartedAt,
+                        windowMs: WINDOW_MS,
+                        expiresAt,
+                    },
+                    $inc: { requestCount: 1 },
+                },
+                { upsert: true, new: true }
+            );
 
-    if (!bucket || now >= bucket.resetAt) {
-        rateLimitBuckets.set(key, {
-            requestCount: 1,
-            resetAt: now + WINDOW_MS,
-        });
-        return next();
-    }
+            if (bucket.requestCount <= MAX_COMMENTS_PER_WINDOW) {
+                return next();
+            }
 
-    bucket.requestCount += 1;
+            console.warn("CLINICIAN_COMMENTS_RATE_LIMITED", {
+                actorKey,
+                requestCount: bucket.requestCount,
+                windowStartedAt: windowStartedAt.toISOString(),
+                path: req.originalUrl || req.url || "/api/clinician-comments",
+            });
 
-    if (bucket.requestCount > MAX_COMMENTS_PER_WINDOW) {
-        console.warn("🚨 CLINICIAN_COMMENTS_RATE_LIMITED", {
-            key,
-            requestCount: bucket.requestCount,
-            resetAt: new Date(bucket.resetAt).toISOString(),
-            path: req.originalUrl || req.url || "/api/clinician-comments",
-        });
-
-        return buildLimitedResponse(res, bucket.resetAt, now);
-    }
-
-    return next();
+            return buildLimitedResponse(res, windowStartedAt, nowMs);
+        } catch (err) {
+            console.error(
+                "CLINICIAN_COMMENTS_RATE_LIMIT_CHECK_FAILED",
+                err?.message
+            );
+            return res.status(503).json({
+                error: {
+                    code: "CLINICIAN_COMMENTS_RATE_LIMIT_UNAVAILABLE",
+                    message:
+                        "Le controle des commentaires est temporairement indisponible.",
+                    retryable: true,
+                },
+            });
+        }
+    };
 }
 
-export function resetClinicianCommentRateLimiterForTests() {
-    rateLimitBuckets.clear();
-}
+export const clinicianCommentRateLimiter =
+    createClinicianCommentRateLimiter();
