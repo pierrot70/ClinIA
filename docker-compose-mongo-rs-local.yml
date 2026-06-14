@@ -1,0 +1,80 @@
+services:
+  mongo-key-init:
+    image: mongo:7
+    restart: "no"
+    command:
+      - bash
+      - -c
+      - |
+        if [ ! -s /keyfile/mongo-keyfile ]; then
+          openssl rand -base64 756 > /keyfile/mongo-keyfile
+        fi
+        chmod 400 /keyfile/mongo-keyfile
+        chown 999:999 /keyfile/mongo-keyfile
+    volumes:
+      - mongo_keyfile:/keyfile
+
+  mongo-rs-1: &mongo
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      CLINIA_RS_ROOT_USERNAME: "${MONGO_INITDB_ROOT_USERNAME:?Set MONGO_INITDB_ROOT_USERNAME in .env}"
+      CLINIA_RS_ROOT_PASSWORD: "${MONGO_INITDB_ROOT_PASSWORD:?Set MONGO_INITDB_ROOT_PASSWORD in .env}"
+      CLINIA_RS_APP_USERNAME: "${MONGO_APP_USERNAME:?Set MONGO_APP_USERNAME in .env}"
+      CLINIA_RS_APP_PASSWORD: "${MONGO_APP_PASSWORD:?Set MONGO_APP_PASSWORD in .env}"
+    command:
+      - mongod
+      - --replSet
+      - rs0
+      - --bind_ip_all
+      - --keyFile
+      - /keyfile/mongo-keyfile
+    volumes:
+      - mongo_rs_1:/data/db
+      - mongo_keyfile:/keyfile:ro
+    depends_on:
+      mongo-key-init:
+        condition: service_completed_successfully
+
+  mongo-rs-2:
+    <<: *mongo
+    volumes:
+      - mongo_rs_2:/data/db
+      - mongo_keyfile:/keyfile:ro
+
+  mongo-rs-3:
+    <<: *mongo
+    volumes:
+      - mongo_rs_3:/data/db
+      - mongo_keyfile:/keyfile:ro
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile-local
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      MONGO_URI: "${MONGO_RS_URI_DOCKER:?Set MONGO_RS_URI_DOCKER in .env}"
+      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-local-replica-set-test}"
+      OPENAI_MODEL: "gpt-4.1-mini"
+      CLINIA_MOCK_AI: "true"
+      CLINIA_ALLOW_SELF_REGISTRATION: "false"
+      CLINIA_INSTANCE_ID: "mongo-rs-test-backend"
+    ports:
+      - "4002:4000"
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+    depends_on:
+      - mongo-rs-1
+      - mongo-rs-2
+      - mongo-rs-3
+
+volumes:
+  mongo_keyfile:
+  mongo_rs_1:
+  mongo_rs_2:
+  mongo_rs_3:
+  backend_node_modules:

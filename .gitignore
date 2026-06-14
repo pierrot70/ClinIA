@@ -25,4 +25,5 @@ yarn-error.log*
 
 # Ignore local dev artifacts
 *.local
+.local-secrets/
 .env

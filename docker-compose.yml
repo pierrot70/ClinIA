@@ -1,12 +1,61 @@
 services:
+  mongo-key-init:
+    image: mongo:7
+    restart: "no"
+    command:
+      - bash
+      - -c
+      - |
+        if [ ! -s /keyfile/mongo-keyfile ]; then
+          openssl rand -base64 756 > /keyfile/mongo-keyfile
+        fi
+        chmod 400 /keyfile/mongo-keyfile
+        chown 999:999 /keyfile/mongo-keyfile
+    volumes:
+      - mongo_keyfile:/keyfile
+
   mongo:
     image: mongo:7
     restart: always
+    command:
+      - mongod
+      - --replSet
+      - rs0
+      - --bind_ip_all
+      - --keyFile
+      - /keyfile/mongo-keyfile
     environment:
       MONGO_INITDB_ROOT_USERNAME: "${MONGO_INITDB_ROOT_USERNAME}"
       MONGO_INITDB_ROOT_PASSWORD: "${MONGO_INITDB_ROOT_PASSWORD}"
     volumes:
       - mongo_data:/data/db
+      - mongo_keyfile:/keyfile:ro
+    depends_on:
+      mongo-key-init:
+        condition: service_completed_successfully
+
+  mongo-replica-1: &mongo-replica
+    image: mongo:7
+    restart: always
+    command:
+      - mongod
+      - --replSet
+      - rs0
+      - --bind_ip_all
+      - --keyFile
+      - /keyfile/mongo-keyfile
+    volumes:
+      - mongo_replica_1_data:/data/db
+      - mongo_keyfile:/keyfile:ro
+    depends_on:
+      mongo-key-init:
+        condition: service_completed_successfully
+
+  mongo-replica-2:
+    <<: *mongo-replica
+    volumes:
+      - mongo_replica_2_data:/data/db
+      - mongo_keyfile:/keyfile:ro
 
   backend: &backend
     build:
@@ -78,3 +127,6 @@ services:
 
 volumes:
   mongo_data:
+  mongo_keyfile:
+  mongo_replica_1_data:
+  mongo_replica_2_data:
