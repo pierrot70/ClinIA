@@ -25,6 +25,9 @@ MONGO_REPLICA_SET_NAME="${MONGO_REPLICA_SET_NAME:-rs0}"
 MONGO_REPLICA_EXPECTED_MEMBERS="${MONGO_REPLICA_EXPECTED_MEMBERS:-3}"
 MONGO_REPLICA_EXPECTED_SECONDARIES="${MONGO_REPLICA_EXPECTED_SECONDARIES:-2}"
 MONGO_ROOT_USERNAME="${MONGO_ROOT_USERNAME:-root}"
+CHECK_HTTP_READY="${CHECK_HTTP_READY:-false}"
+HTTP_READY_URL="${HTTP_READY_URL:-https://clinique-ai.ca/api/health/ready}"
+HTTP_READY_TIMEOUT_SECONDS="${HTTP_READY_TIMEOUT_SECONDS:-10}"
 
 emit() {
   local status="$1"
@@ -184,6 +187,43 @@ mongo_container_for_replica_check() {
     '
 }
 
+check_http_ready() {
+  local response
+  local http_code
+  local body
+
+  if ! command -v curl >/dev/null 2>&1; then
+    emit "CRITICAL" "http_ready url=$HTTP_READY_URL message=\"curl command not found\""
+    return
+  fi
+
+  if ! response="$(
+    curl -sS \
+      --max-time "$HTTP_READY_TIMEOUT_SECONDS" \
+      -w '\n%{http_code}' \
+      "$HTTP_READY_URL" 2>/dev/null
+  )"; then
+    emit "CRITICAL" "http_ready url=$HTTP_READY_URL message=\"request failed\""
+    return
+  fi
+
+  http_code="$(printf '%s\n' "$response" | tail -n1)"
+  body="$(printf '%s\n' "$response" | sed '$d')"
+
+  if [[ "$http_code" != "200" ]]; then
+    emit "CRITICAL" "http_ready url=$HTTP_READY_URL http_code=$http_code message=\"unexpected HTTP status\""
+    return
+  fi
+
+  if [[ "$body" != *'"status":"ok"'* || "$body" != *'"mongo":"connected"'* ]]; then
+    emit "CRITICAL" "http_ready url=$HTTP_READY_URL http_code=$http_code message=\"unexpected response body\""
+    return
+  fi
+
+  emit "OK" "http_ready url=$HTTP_READY_URL http_code=$http_code"
+}
+
+
 check_mongo_replica_set() {
   local container
   local mongo_root_password
@@ -280,6 +320,10 @@ fi
 
 if [[ "$CHECK_MONGO_REPLICA" == "true" ]]; then
   check_mongo_replica_set
+fi
+
+if [[ "$CHECK_HTTP_READY" == "true" ]]; then
+  check_http_ready
 fi
 
 if ((CRITICAL_COUNT > 0)); then
