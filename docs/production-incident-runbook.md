@@ -41,6 +41,46 @@ curl -I --resolve clinique-ai.ca:443:146.190.189.77 \
 
 Expected result: `HTTP/2 200` and `content-type: text/html`.
 
+## Production health-check script
+
+Use the repository health-check script for a complete production baseline after
+a deployment, during an incident, or after changing infrastructure settings.
+
+On `clinia-coolify`:
+
+```bash
+cd /tmp
+
+curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/production-health-check.sh \
+  -o production-health-check.sh
+
+chmod +x production-health-check.sh
+
+CHECK_CONTAINERS=true \
+CHECK_MONGO_REPLICA=true \
+CHECK_HTTP_READY=true \
+MONGO_REPLICA_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- \
+./production-health-check.sh
+
+echo "exit=$?"
+```
+
+Expected healthy result:
+
+- Disk: `OK`
+- Memory: `OK`
+- Frontend container: `OK`
+- Backend containers: `OK`
+- Mongo containers: `OK`
+- Mongo replica set: `OK mongo_replica_set set=rs0 members=3 primary=1 secondaries=2 healthy=3`
+- Public HTTP readiness: `OK http_ready url=https://clinique-ai.ca/api/health/ready http_code=200`
+
+Exit codes:
+
+- `0`: OK
+- `1`: WARN, investigate soon
+- `2`: CRITICAL, investigate immediately
+
 ## Droplet checks
 
 Run these on `clinia-coolify`:
