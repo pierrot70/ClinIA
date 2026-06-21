@@ -9,6 +9,7 @@ import authRouter from "../routes/auth.js";
 import translationRouter from "../routes/translation.js";
 import mocksRouter from "../routes/mocks.js";
 import healthRouter from "../routes/health.js";
+import dbStatusRouter from "../routes/dbStatus.js";
 
 import { verifyJWT } from "../middleware/verifyJWT.js";
 import { attachOptionalAuth } from "../middleware/attachOptionalAuth.js";
@@ -86,6 +87,13 @@ export function registerRoutes(app, deps) {
         openAILogsExportMassDownloadDetector,
         loi25DataLeakGuard,
         openaiLogsRouter
+    );
+    app.use(
+        "/api/db-status",
+        verifyJWT,
+        requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+        loi25DataLeakGuard,
+        dbStatusRouter
     );
     app.use(
         "/api/clinician-comments",

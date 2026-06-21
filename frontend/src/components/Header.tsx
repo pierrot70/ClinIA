@@ -1717,6 +1717,20 @@ const Header: React.FC = () => {
                         </Link>
                     )}
 
+                    {showAdminHeaderNav && (
+                        <Link
+                            to="/admin/db-status"
+                            className={
+                                "hover:text-blue-600 transition-colors " +
+                                (location.pathname === "/admin/db-status"
+                                    ? "text-blue-600 font-medium"
+                                    : "text-gray-600")
+                            }
+                        >
+                            <HeaderLabel text="Etat BD" />
+                        </Link>
+                    )}
+
                     {showAdminHeaderNav && showSuperAdminHeaderNav && (
                         <Link
                             to="/admin/users/manage"
@@ -1856,6 +1870,10 @@ const Header: React.FC = () => {
 
                             {showAdminHeaderNav && (
                                 <Link to="/admin/openai-logs" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.openaiAudits} /></Link>
+                            )}
+
+                            {showAdminHeaderNav && (
+                                <Link to="/admin/db-status" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text="Etat BD" /></Link>
                             )}
 
                             {showAdminHeaderNav && showSuperAdminHeaderNav && (

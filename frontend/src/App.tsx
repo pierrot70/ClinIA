@@ -26,6 +26,7 @@ import { AppointmentsListPage } from "./pages/AppointmentsList";
 import { PatientsPage } from "./pages/PatientsPage";
 import { PatientAuditLogsPage } from "./pages/PatientAuditLogsPage";
 import { OpenAILogsPage } from "./pages/OpenAILogsPage";
+import { DbStatusPage } from "./pages/DbStatusPage";
 import { CliniquesPage } from "./pages/CliniquesPage";
 import { SpecialistsPage } from "./pages/SpecialistsPage";
 import { ClinicianCommentsPage } from "./pages/ClinicianCommentsPage";
@@ -367,6 +368,14 @@ const App: React.FC = () => {
                         element={
                             <ProtectedRoute allowedRoles={[...ADMIN_ROLES]}>
                                 <OpenAILogsPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/admin/db-status"
+                        element={
+                            <ProtectedRoute allowedRoles={[...ADMIN_ROLES]}>
+                                <DbStatusPage />
                             </ProtectedRoute>
                         }
                     />
