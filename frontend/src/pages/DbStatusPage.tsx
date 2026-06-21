@@ -408,23 +408,30 @@ export function DbStatusPage() {
                                         <StatusPill ok={!backup.sha256Error && backup.sha256FilePresent} label={getChecksumLabel(backup)} />
                                     </td>
                                     <td className="px-4 py-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => void handleToggleBackupProtection(backup)}
-                                            disabled={protectingFileName === backup.fileName}
-                                            className={
-                                                "inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium ring-1 disabled:cursor-not-allowed disabled:opacity-60 " +
-                                                (backup.protected
-                                                    ? "bg-amber-50 text-amber-800 ring-amber-200 hover:bg-amber-100"
-                                                    : "bg-slate-50 text-slate-700 ring-slate-200 hover:bg-slate-100")
-                                            }
-                                        >
-                                            {protectingFileName === backup.fileName
-                                                ? backupLabels.protecting
-                                                : backup.protected
-                                                    ? backupLabels.unprotectAction
-                                                    : getProtectionLabel(backup)}
-                                        </button>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {backup.protected && (
+                                                <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 ring-1 ring-amber-200">
+                                                    {backupLabels.protected}
+                                                </span>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => void handleToggleBackupProtection(backup)}
+                                                disabled={protectingFileName === backup.fileName}
+                                                className={
+                                                    "inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium ring-1 disabled:cursor-not-allowed disabled:opacity-60 " +
+                                                    (backup.protected
+                                                        ? "bg-white text-amber-800 ring-amber-200 hover:bg-amber-50"
+                                                        : "bg-slate-50 text-slate-700 ring-slate-200 hover:bg-slate-100")
+                                                }
+                                            >
+                                                {protectingFileName === backup.fileName
+                                                    ? backupLabels.protecting
+                                                    : backup.protected
+                                                        ? backupLabels.unprotectAction
+                                                        : getProtectionLabel(backup)}
+                                            </button>
+                                        </div>
                                     </td>
                                     <td className="whitespace-nowrap px-4 py-3 text-gray-700">{formatTimestamp(backup.createdAt)}</td>
                                 </tr>

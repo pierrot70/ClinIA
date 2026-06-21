@@ -114,7 +114,7 @@ export const UI_LABELS_FR = {
             unavailableShort: "N/D",
             protected: "Conserve",
             protectAction: "Conserver",
-            unprotectAction: "Retirer",
+            unprotectAction: "Retirer protection",
             protecting: "Mise a jour...",
             shaPresent: "Present",
             shaVerified: "Verifie",
