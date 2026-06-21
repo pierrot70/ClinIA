@@ -362,6 +362,9 @@ sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scrip
 sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/scheduled-mongo-backup.sh \
   -o /opt/clinia/scripts/scheduled-mongo-backup.sh
 
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/restore-mongo-production.sh \
+  -o /opt/clinia/scripts/restore-mongo-production.sh
+
 sudo chmod 700 /var/backups/clinia/mongo
 sudo chmod 755 /opt/clinia/scripts/*.sh
 ```
@@ -434,6 +437,70 @@ sudo tail -n 80 "$(sudo ls -t /var/log/clinia/mongo-backup-*.log | head -n1)"
 Escalate if the latest log is missing `INFO backup_verification=ok`, if the
 latest archive is older than 24 hours, or if `/var/backups/clinia/mongo` is close
 to full.
+
+## Catastrophic Mongo production restore
+
+Use this only when production must be restored from the latest local backup.
+The script stops the running backend containers, selects the newest
+`clinia-prod-*.archive.gz`, verifies `sha256` and `gzip`, restores the `clinia`
+database on the current Mongo primary, waits until two secondaries are
+`SECONDARY` with `health: 1`, restarts the backends, checks
+`/api/health/ready`, and then checks `/api/db-status` if a bearer token is
+provided.
+
+Do not restore each Mongo member manually. Restore only to the primary and let
+the replica set replicate the restored data.
+
+Install or refresh the restore script:
+
+```bash
+sudo mkdir -p /opt/clinia/scripts
+
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/restore-mongo-production.sh \
+  -o /opt/clinia/scripts/restore-mongo-production.sh
+
+sudo chmod 755 /opt/clinia/scripts/restore-mongo-production.sh
+```
+
+Run the restore:
+
+```bash
+sudo CONFIRM_RESTORE_PRODUCTION=RESTORE_LATEST_CLINIA_BACKUP \
+  BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo \
+  BACKUP_LABEL=clinia-prod \
+  MONGO_DATABASE=clinia \
+  MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- \
+  MONGO_REPLICA_1_PREFIX=mongo-replica-1- \
+  MONGO_REPLICA_2_PREFIX=mongo-replica-2- \
+  BACKEND_PREFIX=backend- \
+  BACKEND_REPLICA_PREFIX=backend-replica- \
+  /opt/clinia/scripts/restore-mongo-production.sh
+```
+
+Expected success signals:
+
+- `INFO selected_archive=...`
+- `INFO backend_stop containers=...`
+- `INFO primary=...`
+- `INFO replica_set=healthy`
+- `INFO backend_start containers=...`
+- `INFO http_ready=ok url=https://clinique-ai.ca/api/health/ready`
+- `INFO restore_complete archive=... database=clinia`
+
+If the restore fails after the backend containers were stopped, do not restart
+the backends until the Mongo error is understood. Keeping the API down is safer
+than reopening writes against a partially restored database.
+
+If you have a current admin bearer token, add:
+
+```bash
+DB_STATUS_BEARER_TOKEN=<admin-access-token>
+```
+
+Without `DB_STATUS_BEARER_TOKEN`, the script prints
+`db_status=manual_check_required`. In that case, open `/admin/db-status` in the
+UI after the restore and confirm Mongo, collections, replica set, and backups
+look healthy.
 
 ## Load Balancer checks
 
