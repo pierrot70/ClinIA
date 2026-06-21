@@ -12,6 +12,18 @@ export type DbStatusCollection = {
     error: string | null;
 };
 
+export type DbStatusReplicaMember = {
+    name: string;
+    role: "primary" | "secondary" | "arbiter" | "unknown";
+    state: string;
+    onlineStatus: "online" | "down" | "unknown";
+    syncStatus: "synced" | "syncing" | "unsynced" | "unknown";
+    health: number | null;
+    lagSeconds: number | null;
+    error: string | null;
+    source: string;
+};
+
 export type DbStatusPayload = {
     checkedAt: string;
     responseTimeMs: number;
@@ -34,6 +46,7 @@ export type DbStatusPayload = {
         secondary: boolean | null;
         primary: string | null;
         hosts: string[];
+        members: DbStatusReplicaMember[];
         error: string | null;
     };
     database: null | {

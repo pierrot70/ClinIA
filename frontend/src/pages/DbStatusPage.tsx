@@ -89,6 +89,62 @@ function MetricCard({
     );
 }
 
+function memberToneClass(status: "online" | "down" | "unknown" | "synced" | "syncing" | "unsynced" | "not-applicable") {
+    if (status === "online" || status === "synced") {
+        return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
+    }
+
+    if (status === "not-applicable") {
+        return "bg-slate-50 text-slate-700 ring-1 ring-slate-200";
+    }
+
+    if (status === "syncing" || status === "unknown") {
+        return "bg-amber-50 text-amber-700 ring-1 ring-amber-200";
+    }
+
+    return "bg-red-50 text-red-700 ring-1 ring-red-200";
+}
+
+function isStandaloneMember(member: DbStatusPayload["replicaSet"]["members"][number]) {
+    return member.state.toLowerCase() === "standalone";
+}
+
+function ReplicaMemberCard({ member }: { member: DbStatusPayload["replicaSet"]["members"][number] }) {
+    const standalone = isStandaloneMember(member);
+    const roleLabel = standalone ? "standalone" : member.role;
+    const onlineLabel = standalone ? "online" : member.onlineStatus;
+    const syncLabel = standalone ? "sync n/a" : member.syncStatus;
+    const syncTone = standalone ? "not-applicable" : member.syncStatus;
+
+    return (
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-gray-950">{member.name}</div>
+                    <div className="mt-1 text-xs uppercase text-gray-500">{roleLabel}</div>
+                </div>
+                <span className={"inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-medium " + memberToneClass(standalone ? "online" : member.onlineStatus)}>
+                    {onlineLabel}
+                </span>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+                <span className={"inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium " + memberToneClass(syncTone)}>
+                    {syncLabel}
+                </span>
+                <span className="inline-flex items-center rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
+                    {member.state}
+                </span>
+                {member.lagSeconds != null && (
+                    <span className="inline-flex items-center rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
+                        lag {member.lagSeconds}s
+                    </span>
+                )}
+            </div>
+            {member.error && <div className="mt-3 text-xs text-red-700">{member.error}</div>}
+        </div>
+    );
+}
+
 function getOverallStatus(data: DbStatusPayload | null) {
     if (!data) {
         return { ok: false, label: "Aucune donnee" };
@@ -142,6 +198,12 @@ export function DbStatusPage() {
     const overall = useMemo(() => getOverallStatus(data), [data]);
     const database = data?.database?.status === "ok" ? data.database : null;
     const collectionErrors = data?.collections.filter((collection) => collection.status !== "ok") || [];
+    const replicaMembers = data?.replicaSet.members || [];
+    const standaloneMode = replicaMembers.length === 1 && isStandaloneMember(replicaMembers[0]);
+    const syncedMembers = replicaMembers.filter((member) => member.syncStatus === "synced").length;
+    const replicaSummary = standaloneMode
+        ? "Mode standalone local"
+        : `${syncedMembers} / ${replicaMembers.length} membre(s) synchronise(s)`;
 
     return (
         <section className="mx-auto max-w-6xl px-4 py-8">
@@ -193,7 +255,7 @@ export function DbStatusPage() {
                     icon={<Server className="h-5 w-5" />}
                     label="Replica set"
                     value={data?.replicaSet.available ? data.replicaSet.setName || "Detecte" : "Non detecte"}
-                    detail={data?.replicaSet.available ? `${data.replicaSet.hosts.length} membre(s), primaire: ${data.replicaSet.primary || "inconnu"}` : data?.replicaSet.error || undefined}
+                    detail={data?.replicaSet.available ? `${replicaMembers.length || data.replicaSet.hosts.length} membre(s), primaire: ${data.replicaSet.primary || "inconnu"}` : data?.replicaSet.error || undefined}
                 />
                 <MetricCard
                     icon={<Clock className="h-5 w-5" />}
@@ -209,6 +271,24 @@ export function DbStatusPage() {
                 <MetricCard icon={<HardDrive className="h-5 w-5" />} label="Index" value={formatBytes(database?.indexSizeBytes)} detail={`${formatNumber(database?.indexes)} index`} />
                 <MetricCard icon={<Activity className="h-5 w-5" />} label="Temps backend" value={data ? `${data.responseTimeMs} ms` : "-"} detail={collectionErrors.length > 0 ? `${collectionErrors.length} collection(s) en erreur` : "Collections lisibles"} />
             </div>
+
+            {replicaMembers.length > 0 && (
+                <div className="mt-6">
+                    <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <h2 className="text-base font-semibold text-gray-950">Membres Mongo</h2>
+                            <p className="text-sm text-gray-500">
+                                {replicaSummary}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-3">
+                        {replicaMembers.map((member) => (
+                            <ReplicaMemberCard key={member.name} member={member} />
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
                 <div className="border-b border-gray-200 px-4 py-3">

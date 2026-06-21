@@ -12,13 +12,26 @@ function createConnectedConnection() {
         databaseName: "clinia",
         admin: () => ({
             ping: async () => ({ ok: 1 }),
-            command: async () => ({
-                setName: "rs0",
-                isWritablePrimary: true,
-                secondary: false,
-                primary: "mongo:27017",
-                hosts: ["mongo:27017", "mongo-replica-1:27017", "mongo-replica-2:27017"],
-            }),
+            command: async (command) => {
+                if (command.replSetGetStatus) {
+                    return {
+                        set: "rs0",
+                        members: [
+                            { name: "mongo:27017", stateStr: "PRIMARY", health: 1, optimeDate: new Date("2026-01-01T00:00:05Z") },
+                            { name: "mongo-replica-1:27017", stateStr: "SECONDARY", health: 1, optimeDate: new Date("2026-01-01T00:00:05Z") },
+                            { name: "mongo-replica-2:27017", stateStr: "SECONDARY", health: 1, optimeDate: new Date("2026-01-01T00:00:04Z") },
+                        ],
+                    };
+                }
+
+                return {
+                    setName: "rs0",
+                    isWritablePrimary: true,
+                    secondary: false,
+                    primary: "mongo:27017",
+                    hosts: ["mongo:27017", "mongo-replica-1:27017", "mongo-replica-2:27017"],
+                };
+            },
         }),
         stats: async () => ({
             collections: 2,
@@ -68,6 +81,11 @@ describe("dbStatus service", () => {
             isWritablePrimary: true,
             primary: "mongo:27017",
         });
+        expect(status.replicaSet.members).toEqual([
+            expect.objectContaining({ name: "mongo:27017", role: "primary", onlineStatus: "online", syncStatus: "synced" }),
+            expect.objectContaining({ name: "mongo-replica-1:27017", role: "secondary", onlineStatus: "online", syncStatus: "synced" }),
+            expect.objectContaining({ name: "mongo-replica-2:27017", role: "secondary", onlineStatus: "online", syncStatus: "synced", lagSeconds: 1 }),
+        ]);
         expect(status.database).toMatchObject({
             status: "ok",
             collections: 2,
@@ -92,6 +110,7 @@ describe("dbStatus service", () => {
         expect(status.connection.status).toBe("disconnected");
         expect(status.ping.ok).toBe(false);
         expect(status.replicaSet.available).toBe(false);
+        expect(status.replicaSet.members).toEqual([]);
         expect(status.database).toBeNull();
         expect(status.collections).toEqual([]);
     });
