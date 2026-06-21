@@ -134,10 +134,21 @@ describe("dbStatus service", () => {
         const archivePath = path.join(backupDirectory, archiveName);
         const archiveContent = "fake gzip bytes for metadata test";
         const sha256 = createHash("sha256").update(archiveContent).digest("hex");
+        const manifest = {
+            databaseName: "clinia",
+            generatedAt: "2026-06-21T12:00:01.000Z",
+            collectionCount: 2,
+            documentCount: 12,
+            collections: [
+                { name: "appointments", documentCount: 8 },
+                { name: "patients", documentCount: 4 },
+            ],
+        };
 
         try {
             await writeFile(archivePath, archiveContent);
             await writeFile(`${archivePath}.sha256`, `${sha256}  ${archiveName}\n`);
+            await writeFile(`${archivePath}.manifest.json`, JSON.stringify(manifest));
 
             const snapshots = await readBackupSnapshots({
                 backupDirectory,
@@ -158,9 +169,46 @@ describe("dbStatus service", () => {
                         sha256FilePresent: true,
                         sha256Verified: null,
                         sha256Error: null,
+                        manifest: expect.objectContaining({
+                            available: true,
+                            databaseName: "clinia",
+                            collectionCount: 2,
+                            documentCount: 12,
+                        }),
                     }),
                 ],
             });
+        } finally {
+            await rm(backupDirectory, { recursive: true, force: true });
+        }
+    });
+
+    it("keeps older backups visible when the manifest is missing", async () => {
+        const backupDirectory = await mkdtemp(path.join(os.tmpdir(), "clinia-backups-"));
+        const archiveName = "clinia-prod-20260621-130000.archive.gz";
+        const archivePath = path.join(backupDirectory, archiveName);
+        const archiveContent = "older backup without manifest";
+        const sha256 = createHash("sha256").update(archiveContent).digest("hex");
+
+        try {
+            await writeFile(archivePath, archiveContent);
+            await writeFile(`${archivePath}.sha256`, `${sha256}  ${archiveName}\n`);
+
+            const snapshots = await readBackupSnapshots({
+                backupDirectory,
+                retentionDays: 7,
+            });
+
+            expect(snapshots.backups[0]).toMatchObject({
+                fileName: archiveName,
+                manifest: {
+                    available: false,
+                    collectionCount: null,
+                    documentCount: null,
+                    error: "manifest_missing",
+                },
+            });
+            expect(snapshots.latestStatus).toBe("ok");
         } finally {
             await rm(backupDirectory, { recursive: true, force: true });
         }

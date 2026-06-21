@@ -86,6 +86,7 @@ archive_name="${BACKUP_LABEL}-${timestamp}.archive.gz"
 container_archive_path="/tmp/${archive_name}"
 host_archive_path="${BACKUP_OUTPUT_DIR%/}/${archive_name}"
 host_sha_path="${host_archive_path}.sha256"
+host_manifest_path="${host_archive_path}.manifest.json"
 
 db_arg="$(archive_db_argument)"
 
@@ -100,6 +101,29 @@ if [[ -n "$MONGO_URI" ]]; then
     -e MONGO_DATABASE="$MONGO_DATABASE" \
     "$container" \
     sh -lc 'db_arg=""; if [ -n "$MONGO_DATABASE" ]; then db_arg="--db=$MONGO_DATABASE"; fi; mongodump --uri="$MONGO_URI" $db_arg --archive="$CONTAINER_ARCHIVE_PATH" --gzip'
+
+  if [[ -n "$MONGO_DATABASE" ]]; then
+    docker exec \
+      -e MONGO_URI="$MONGO_URI" \
+      -e MONGO_DATABASE="$MONGO_DATABASE" \
+      "$container" \
+      sh -lc 'mongosh "$MONGO_URI" --quiet --eval "
+        const databaseName = process.env.MONGO_DATABASE;
+        const target = db.getSiblingDB(databaseName);
+        const collections = target.getCollectionNames().sort();
+        const collectionStats = collections.map((name) => ({
+          name,
+          documentCount: target.getCollection(name).countDocuments()
+        }));
+        print(JSON.stringify({
+          databaseName,
+          generatedAt: new Date().toISOString(),
+          collectionCount: collectionStats.length,
+          documentCount: collectionStats.reduce((sum, entry) => sum + entry.documentCount, 0),
+          collections: collectionStats
+        }));
+      "' > "$host_manifest_path"
+  fi
 else
   if [[ -z "$MONGO_ROOT_PASSWORD" ]]; then
     MONGO_ROOT_PASSWORD="$(load_root_password_from_container "$container")"
@@ -118,6 +142,31 @@ else
     -e MONGO_DATABASE="$MONGO_DATABASE" \
     "$container" \
     sh -lc 'db_arg=""; if [ -n "$MONGO_DATABASE" ]; then db_arg="--db=$MONGO_DATABASE"; fi; mongodump --username="$MONGO_ROOT_USERNAME" --password="$MONGO_ROOT_PASSWORD" --authenticationDatabase "$MONGO_AUTH_DB" $db_arg --archive="$CONTAINER_ARCHIVE_PATH" --gzip'
+
+  if [[ -n "$MONGO_DATABASE" ]]; then
+    docker exec \
+      -e MONGO_ROOT_USERNAME="$MONGO_ROOT_USERNAME" \
+      -e MONGO_ROOT_PASSWORD="$MONGO_ROOT_PASSWORD" \
+      -e MONGO_AUTH_DB="$MONGO_AUTH_DB" \
+      -e MONGO_DATABASE="$MONGO_DATABASE" \
+      "$container" \
+      sh -lc 'mongosh --quiet --username="$MONGO_ROOT_USERNAME" --password="$MONGO_ROOT_PASSWORD" --authenticationDatabase "$MONGO_AUTH_DB" --eval "
+        const databaseName = process.env.MONGO_DATABASE;
+        const target = db.getSiblingDB(databaseName);
+        const collections = target.getCollectionNames().sort();
+        const collectionStats = collections.map((name) => ({
+          name,
+          documentCount: target.getCollection(name).countDocuments()
+        }));
+        print(JSON.stringify({
+          databaseName,
+          generatedAt: new Date().toISOString(),
+          collectionCount: collectionStats.length,
+          documentCount: collectionStats.reduce((sum, entry) => sum + entry.documentCount, 0),
+          collections: collectionStats
+        }));
+      "' > "$host_manifest_path"
+  fi
 fi
 
 docker cp "$container:$container_archive_path" "$host_archive_path"
@@ -127,6 +176,10 @@ chmod 600 "$host_archive_path"
 sha256sum "$host_archive_path" > "$host_sha_path"
 chmod 600 "$host_sha_path"
 
+if [[ -f "$host_manifest_path" ]]; then
+  chmod 600 "$host_manifest_path"
+fi
+
 gzip -t "$host_archive_path"
 
 size_bytes="$(stat -c '%s' "$host_archive_path")"
@@ -134,6 +187,9 @@ permissions="$(stat -c '%a' "$host_archive_path")"
 
 info "archive=$host_archive_path"
 info "sha256_file=$host_sha_path"
+if [[ -f "$host_manifest_path" ]]; then
+  info "manifest_file=$host_manifest_path"
+fi
 info "size_bytes=$size_bytes permissions=$permissions"
 info 'gzip=ok'
 info 'backup=ok'

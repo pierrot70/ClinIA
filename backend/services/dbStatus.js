@@ -47,11 +47,39 @@ async function readSha256File(filePath) {
     return content.trim().split(/\s+/)[0] || null;
 }
 
+async function readBackupManifest(filePath) {
+    try {
+        const content = await readFile(filePath, "utf8");
+        const manifest = JSON.parse(content);
+
+        return {
+            available: true,
+            databaseName: typeof manifest.databaseName === "string" ? manifest.databaseName : null,
+            generatedAt: typeof manifest.generatedAt === "string" ? manifest.generatedAt : null,
+            collectionCount: Number.isFinite(Number(manifest.collectionCount)) ? Number(manifest.collectionCount) : null,
+            documentCount: Number.isFinite(Number(manifest.documentCount)) ? Number(manifest.documentCount) : null,
+        };
+    } catch (err) {
+        return {
+            available: false,
+            databaseName: null,
+            generatedAt: null,
+            collectionCount: null,
+            documentCount: null,
+            error: err?.code === "ENOENT"
+                ? "manifest_missing"
+                : err?.message || "manifest_unavailable",
+        };
+    }
+}
+
 async function buildBackupEntry({ backupDirectory, fileName, nowMs }) {
     const archivePath = path.join(backupDirectory, fileName);
     const sha256Path = `${archivePath}.sha256`;
+    const manifestPath = `${archivePath}.manifest.json`;
     const archiveStats = await stat(archivePath);
     const verifyChecksums = process.env.MONGO_BACKUP_VERIFY_CHECKSUMS === "true";
+    const manifest = await readBackupManifest(manifestPath);
     let sha256FilePresent = false;
     let sha256Verified = null;
     let sha256Error = null;
@@ -80,6 +108,7 @@ async function buildBackupEntry({ backupDirectory, fileName, nowMs }) {
         sha256FilePresent,
         sha256Verified,
         sha256Error,
+        manifest,
     };
 }
 
@@ -112,6 +141,14 @@ export async function readBackupSnapshots({
                 sha256FilePresent: false,
                 sha256Verified: null,
                 sha256Error: err?.message || "backup_metadata_unavailable",
+                manifest: {
+                    available: false,
+                    databaseName: null,
+                    generatedAt: null,
+                    collectionCount: null,
+                    documentCount: null,
+                    error: "backup_metadata_unavailable",
+                },
             })))
         );
 

@@ -90,6 +90,8 @@ export const UI_LABELS_FR = {
             title: "Backups Mongo",
             description:
                 "Archives locales visibles par le backend. Le contenu des backups n'est jamais affiche.",
+            sizeNote:
+                "La taille gzip peut varier legerement sans suppression de donnees. Verifiez surtout le checksum, les collections et les documents.",
             unavailable: "Backups indisponibles",
             latestOk: "Dernier backup OK",
             latestWarning: "Backup a verifier",
@@ -101,9 +103,12 @@ export const UI_LABELS_FR = {
             file: "Fichier",
             age: "Age",
             size: "Taille",
+            collections: "Collections",
+            documents: "Documents",
             checksum: "Checksum",
             createdAt: "Date archive",
             empty: "Aucun backup local a afficher.",
+            unavailableShort: "N/D",
             shaPresent: "Present",
             shaVerified: "Verifie",
             shaError: "Erreur",

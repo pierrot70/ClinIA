@@ -354,12 +354,17 @@ export function DbStatusPage() {
                         {data.backups.error}
                     </div>
                 )}
+                <div className="border-b border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                    {backupLabels.sizeNote}
+                </div>
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
                         <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                             <tr>
                                 <th className="px-4 py-3">{backupLabels.file}</th>
                                 <th className="px-4 py-3 text-right">{backupLabels.size}</th>
+                                <th className="px-4 py-3 text-right">{backupLabels.collections}</th>
+                                <th className="px-4 py-3 text-right">{backupLabels.documents}</th>
                                 <th className="px-4 py-3 text-right">{backupLabels.age}</th>
                                 <th className="px-4 py-3">{backupLabels.checksum}</th>
                                 <th className="px-4 py-3">{backupLabels.createdAt}</th>
@@ -370,6 +375,12 @@ export function DbStatusPage() {
                                 <tr key={backup.fileName}>
                                     <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900">{backup.fileName}</td>
                                     <td className="px-4 py-3 text-right text-gray-700">{formatBytes(backup.sizeBytes)}</td>
+                                    <td className="px-4 py-3 text-right text-gray-700">
+                                        {backup.manifest.available ? formatNumber(backup.manifest.collectionCount) : backupLabels.unavailableShort}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-gray-700">
+                                        {backup.manifest.available ? formatNumber(backup.manifest.documentCount) : backupLabels.unavailableShort}
+                                    </td>
                                     <td className="px-4 py-3 text-right text-gray-700">{formatAgeHours(backup.ageHours)}</td>
                                     <td className="px-4 py-3">
                                         <StatusPill ok={!backup.sha256Error && backup.sha256FilePresent} label={getChecksumLabel(backup)} />
@@ -379,7 +390,7 @@ export function DbStatusPage() {
                             ))}
                             {!loading && !data?.backups.backups.length && (
                                 <tr>
-                                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                                         {backupLabels.empty}
                                     </td>
                                 </tr>

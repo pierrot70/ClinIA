@@ -55,7 +55,7 @@ cleanup_old_backups() {
 
   find "$BACKUP_OUTPUT_DIR" \
     -type f \
-    \( -name "${BACKUP_LABEL}-*.archive.gz" -o -name "${BACKUP_LABEL}-*.archive.gz.sha256" \) \
+    \( -name "${BACKUP_LABEL}-*.archive.gz" -o -name "${BACKUP_LABEL}-*.archive.gz.sha256" -o -name "${BACKUP_LABEL}-*.archive.gz.manifest.json" \) \
     -mtime +"$BACKUP_RETENTION_DAYS" \
     -print \
     -delete

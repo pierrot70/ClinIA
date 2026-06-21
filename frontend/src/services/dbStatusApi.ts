@@ -21,6 +21,14 @@ export type DbStatusBackup = {
     sha256FilePresent: boolean;
     sha256Verified: boolean | null;
     sha256Error: string | null;
+    manifest: {
+        available: boolean;
+        databaseName: string | null;
+        generatedAt: string | null;
+        collectionCount: number | null;
+        documentCount: number | null;
+        error?: string | null;
+    };
 };
 
 export type DbStatusReplicaMember = {

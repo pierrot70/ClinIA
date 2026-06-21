@@ -386,6 +386,7 @@ Expected result:
 - `INFO backup=ok`
 - `INFO backup_verification=ok`
 - `INFO backup_completed archive=...`
+- A matching `.manifest.json` with collection and document counts
 - A dated log under `/var/log/clinia`
 
 Schedule the daily backup:
@@ -421,6 +422,9 @@ Dashboard visibility:
 
 - The database dashboard reads only backup metadata: filename, size, age, and
   checksum-file status.
+- New backups also include a `.manifest.json` with collection and document
+  counts. Older backups without a manifest remain valid, but the dashboard shows
+  their counts as unavailable.
 - The backup directory must be mounted read-only in the backend containers:
   `/var/backups/clinia/mongo:/var/backups/clinia/mongo:ro`.
 - Set `MONGO_BACKUP_DIR=/var/backups/clinia/mongo` and
