@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, rm, writeFile } from "fs/promises";
+import { mkdtemp, rm, stat, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 import { createHash } from "crypto";
 
-import { getDbStatus, readBackupSnapshots } from "../dbStatus.js";
+import { getDbStatus, readBackupSnapshots, setBackupProtection } from "../dbStatus.js";
 
 function createConnectedConnection() {
     const collections = [
@@ -169,6 +169,7 @@ describe("dbStatus service", () => {
                         sha256FilePresent: true,
                         sha256Verified: null,
                         sha256Error: null,
+                        protected: false,
                         manifest: expect.objectContaining({
                             available: true,
                             databaseName: "clinia",
@@ -211,6 +212,61 @@ describe("dbStatus service", () => {
             expect(snapshots.latestStatus).toBe("ok");
         } finally {
             await rm(backupDirectory, { recursive: true, force: true });
+        }
+    });
+
+    it("marks a backup as protected and keeps protected backups beyond the recent display limit", async () => {
+        const backupDirectory = await mkdtemp(path.join(os.tmpdir(), "clinia-backups-"));
+        const keepDirectory = await mkdtemp(path.join(os.tmpdir(), "clinia-backups-keep-"));
+        const protectedArchiveName = "clinia-prod-20260621-010000.archive.gz";
+
+        try {
+            for (let index = 1; index <= 10; index += 1) {
+                const hour = String(index).padStart(2, "0");
+                const archiveName = `clinia-prod-20260621-${hour}0000.archive.gz`;
+                const archivePath = path.join(backupDirectory, archiveName);
+                const archiveContent = `backup-${index}`;
+                const sha256 = createHash("sha256").update(archiveContent).digest("hex");
+
+                await writeFile(archivePath, archiveContent);
+                await writeFile(`${archivePath}.sha256`, `${sha256}  ${archiveName}\n`);
+            }
+
+            const protection = await setBackupProtection({
+                fileName: protectedArchiveName,
+                protectedValue: true,
+                backupDirectory,
+                keepDirectory,
+            });
+
+            await expect(stat(path.join(keepDirectory, `${protectedArchiveName}.keep`))).resolves.toBeTruthy();
+            expect(protection).toMatchObject({
+                fileName: protectedArchiveName,
+                protected: true,
+            });
+
+            const snapshots = await readBackupSnapshots({
+                backupDirectory,
+                keepDirectory,
+                retentionDays: 7,
+                maxBackups: 8,
+            });
+
+            expect(snapshots.maxBackups).toBe(8);
+            expect(snapshots.backups).toHaveLength(9);
+            expect(snapshots.backups[0].fileName).toBe("clinia-prod-20260621-100000.archive.gz");
+            expect(snapshots.backups).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        fileName: protectedArchiveName,
+                        protected: true,
+                        protectedAt: expect.any(String),
+                    }),
+                ])
+            );
+        } finally {
+            await rm(backupDirectory, { recursive: true, force: true });
+            await rm(keepDirectory, { recursive: true, force: true });
         }
     });
 });

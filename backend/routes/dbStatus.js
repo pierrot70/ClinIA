@@ -1,5 +1,5 @@
 import express from "express";
-import { getDbStatus } from "../services/dbStatus.js";
+import { getDbStatus, setBackupProtection } from "../services/dbStatus.js";
 
 const router = express.Router();
 
@@ -22,6 +22,48 @@ router.get("/", async (_req, res) => {
                 code: "DB_STATUS_FAILED",
                 message: "Impossible de recuperer l'etat des bases de donnees.",
                 retryable: true,
+            },
+        });
+    }
+});
+
+router.post("/backups/:fileName/protection", async (req, res) => {
+    try {
+        const data = await setBackupProtection({
+            fileName: req.params.fileName,
+            protectedValue: true,
+        });
+
+        return res.status(200).json({ data });
+    } catch (err) {
+        console.error("❌ DB backup protection error:", err);
+
+        return res.status(400).json({
+            error: {
+                code: "BACKUP_PROTECTION_FAILED",
+                message: "Impossible de conserver ce backup.",
+                retryable: false,
+            },
+        });
+    }
+});
+
+router.delete("/backups/:fileName/protection", async (req, res) => {
+    try {
+        const data = await setBackupProtection({
+            fileName: req.params.fileName,
+            protectedValue: false,
+        });
+
+        return res.status(200).json({ data });
+    } catch (err) {
+        console.error("❌ DB backup protection removal error:", err);
+
+        return res.status(400).json({
+            error: {
+                code: "BACKUP_PROTECTION_REMOVAL_FAILED",
+                message: "Impossible de retirer la conservation de ce backup.",
+                retryable: false,
             },
         });
     }

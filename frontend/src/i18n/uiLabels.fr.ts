@@ -92,6 +92,8 @@ export const UI_LABELS_FR = {
                 "Archives locales visibles par le backend. Le contenu des backups n'est jamais affiche.",
             sizeNote:
                 "La taille gzip peut varier legerement sans suppression de donnees. Verifiez surtout le checksum, les collections et les documents.",
+            keepNote:
+                "Les backups conserves manuellement restent visibles et ne sont pas supprimes par la retention cron.",
             unavailable: "Backups indisponibles",
             latestOk: "Dernier backup OK",
             latestWarning: "Backup a verifier",
@@ -106,9 +108,14 @@ export const UI_LABELS_FR = {
             collections: "Collections",
             documents: "Documents",
             checksum: "Checksum",
+            protection: "Protection",
             createdAt: "Date archive",
             empty: "Aucun backup local a afficher.",
             unavailableShort: "N/D",
+            protected: "Conserve",
+            protectAction: "Conserver",
+            unprotectAction: "Retirer",
+            protecting: "Mise a jour...",
             shaPresent: "Present",
             shaVerified: "Verifie",
             shaError: "Erreur",

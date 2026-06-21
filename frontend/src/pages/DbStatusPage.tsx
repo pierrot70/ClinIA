@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, Archive, Clock, Database, HardDrive, RefreshCw, Server } from "lucide-react";
-import { fetchDbStatus, type DbStatusPayload } from "../services/dbStatusApi";
+import { fetchDbStatus, updateBackupProtection, type DbStatusPayload } from "../services/dbStatusApi";
 import type { ApiError } from "../types/api";
 import { labels } from "../i18n/uiLabels";
 
@@ -202,10 +202,17 @@ function getChecksumLabel(backup: DbStatusPayload["backups"]["backups"][number])
     return backup.sha256FilePresent ? backupLabels.shaPresent : backupLabels.shaError;
 }
 
+function getProtectionLabel(backup: DbStatusPayload["backups"]["backups"][number]) {
+    return backup.protected
+        ? labels.dbStatus.backups.protected
+        : labels.dbStatus.backups.protectAction;
+}
+
 export function DbStatusPage() {
     const [data, setData] = useState<DbStatusPayload | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
     const [loading, setLoading] = useState(true);
+    const [protectingFileName, setProtectingFileName] = useState<string | null>(null);
     const [lastRefreshStartedAt, setLastRefreshStartedAt] = useState<Date | null>(null);
 
     const loadStatus = useCallback(async (showLoading = false) => {
@@ -226,6 +233,19 @@ export function DbStatusPage() {
 
         setLoading(false);
     }, []);
+
+    const handleToggleBackupProtection = useCallback(async (backup: DbStatusPayload["backups"]["backups"][number]) => {
+        setProtectingFileName(backup.fileName);
+        const response = await updateBackupProtection(backup.fileName, !backup.protected);
+
+        if ("error" in response) {
+            setError(response.error);
+        } else {
+            await loadStatus(false);
+        }
+
+        setProtectingFileName(null);
+    }, [loadStatus]);
 
     useEffect(() => {
         void loadStatus(true);
@@ -355,7 +375,8 @@ export function DbStatusPage() {
                     </div>
                 )}
                 <div className="border-b border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-                    {backupLabels.sizeNote}
+                    <p>{backupLabels.sizeNote}</p>
+                    <p className="mt-1">{backupLabels.keepNote}</p>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -367,6 +388,7 @@ export function DbStatusPage() {
                                 <th className="px-4 py-3 text-right">{backupLabels.documents}</th>
                                 <th className="px-4 py-3 text-right">{backupLabels.age}</th>
                                 <th className="px-4 py-3">{backupLabels.checksum}</th>
+                                <th className="px-4 py-3">{backupLabels.protection}</th>
                                 <th className="px-4 py-3">{backupLabels.createdAt}</th>
                             </tr>
                         </thead>
@@ -385,12 +407,31 @@ export function DbStatusPage() {
                                     <td className="px-4 py-3">
                                         <StatusPill ok={!backup.sha256Error && backup.sha256FilePresent} label={getChecksumLabel(backup)} />
                                     </td>
+                                    <td className="px-4 py-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => void handleToggleBackupProtection(backup)}
+                                            disabled={protectingFileName === backup.fileName}
+                                            className={
+                                                "inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium ring-1 disabled:cursor-not-allowed disabled:opacity-60 " +
+                                                (backup.protected
+                                                    ? "bg-amber-50 text-amber-800 ring-amber-200 hover:bg-amber-100"
+                                                    : "bg-slate-50 text-slate-700 ring-slate-200 hover:bg-slate-100")
+                                            }
+                                        >
+                                            {protectingFileName === backup.fileName
+                                                ? backupLabels.protecting
+                                                : backup.protected
+                                                    ? backupLabels.unprotectAction
+                                                    : getProtectionLabel(backup)}
+                                        </button>
+                                    </td>
                                     <td className="whitespace-nowrap px-4 py-3 text-gray-700">{formatTimestamp(backup.createdAt)}</td>
                                 </tr>
                             ))}
                             {!loading && !data?.backups.backups.length && (
                                 <tr>
-                                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                                    <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                                         {backupLabels.empty}
                                     </td>
                                 </tr>

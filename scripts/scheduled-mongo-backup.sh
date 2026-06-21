@@ -5,6 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 BACKUP_OUTPUT_DIR="${BACKUP_OUTPUT_DIR:-/var/backups/clinia/mongo}"
+BACKUP_KEEP_DIR="${BACKUP_KEEP_DIR:-/var/backups/clinia/mongo-keep}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 BACKUP_LOG_DIR="${BACKUP_LOG_DIR:-/var/log/clinia}"
 BACKUP_LABEL="${BACKUP_LABEL:-clinia-prod}"
@@ -53,12 +54,26 @@ cleanup_old_backups() {
     return
   fi
 
-  find "$BACKUP_OUTPUT_DIR" \
+  mkdir -p "$BACKUP_KEEP_DIR"
+
+  while IFS= read -r archive_path; do
+    archive_name="$(basename "$archive_path")"
+
+    if [[ -f "${BACKUP_KEEP_DIR%/}/${archive_name}.keep" ]]; then
+      info "retention=kept archive=$archive_path marker=${BACKUP_KEEP_DIR%/}/${archive_name}.keep"
+      continue
+    fi
+
+    rm -f \
+      "$archive_path" \
+      "${archive_path}.sha256" \
+      "${archive_path}.manifest.json"
+    info "retention=deleted archive=$archive_path"
+  done < <(find "$BACKUP_OUTPUT_DIR" \
     -type f \
-    \( -name "${BACKUP_LABEL}-*.archive.gz" -o -name "${BACKUP_LABEL}-*.archive.gz.sha256" -o -name "${BACKUP_LABEL}-*.archive.gz.manifest.json" \) \
+    -name "${BACKUP_LABEL}-*.archive.gz" \
     -mtime +"$BACKUP_RETENTION_DAYS" \
-    -print \
-    -delete
+    -print)
 
   find "$BACKUP_LOG_DIR" \
     -type f \
@@ -71,8 +86,9 @@ cleanup_old_backups() {
 require_command find
 require_command mkdir
 
-mkdir -p "$BACKUP_OUTPUT_DIR" "$BACKUP_LOG_DIR"
+mkdir -p "$BACKUP_OUTPUT_DIR" "$BACKUP_KEEP_DIR" "$BACKUP_LOG_DIR"
 chmod 700 "$BACKUP_OUTPUT_DIR"
+chmod 700 "$BACKUP_KEEP_DIR"
 
 timestamp="$(date -u +%Y%m%d-%H%M%S)"
 log_path="${BACKUP_LOG_DIR%/}/mongo-backup-${timestamp}.log"

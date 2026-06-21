@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { createHash } from "crypto";
-import { readdir, readFile, stat } from "fs/promises";
+import { mkdir, readdir, readFile, stat, unlink, writeFile } from "fs/promises";
 import path from "path";
 
 const READY_STATE_LABELS = {
@@ -21,6 +21,26 @@ function safeNumber(value) {
 function parsePositiveInt(value, fallback) {
     const parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getBackupKeepDirectory(backupDirectory) {
+    return process.env.MONGO_BACKUP_KEEP_DIR || (
+        backupDirectory === "/var/backups/clinia/mongo"
+            ? "/var/backups/clinia/mongo-keep"
+            : path.join(backupDirectory, ".keep")
+    );
+}
+
+function validateBackupFileName(fileName) {
+    if (
+        typeof fileName !== "string" ||
+        path.basename(fileName) !== fileName ||
+        !/^clinia-prod-\d{8}-\d{6}\.archive\.gz$/.test(fileName)
+    ) {
+        throw new Error("Invalid backup filename.");
+    }
+
+    return fileName;
 }
 
 function parseBackupTimestamp(fileName) {
@@ -73,13 +93,32 @@ async function readBackupManifest(filePath) {
     }
 }
 
-async function buildBackupEntry({ backupDirectory, fileName, nowMs }) {
+async function readKeepMarker(keepDirectory, fileName) {
+    try {
+        const content = await readFile(path.join(keepDirectory, `${fileName}.keep`), "utf8");
+        const marker = JSON.parse(content);
+
+        return {
+            protected: true,
+            protectedAt: typeof marker.protectedAt === "string" ? marker.protectedAt : null,
+        };
+    } catch (err) {
+        return {
+            protected: false,
+            protectedAt: null,
+            error: err?.code === "ENOENT" ? null : err?.message || "keep_marker_unavailable",
+        };
+    }
+}
+
+async function buildBackupEntry({ backupDirectory, keepDirectory, fileName, nowMs }) {
     const archivePath = path.join(backupDirectory, fileName);
     const sha256Path = `${archivePath}.sha256`;
     const manifestPath = `${archivePath}.manifest.json`;
     const archiveStats = await stat(archivePath);
     const verifyChecksums = process.env.MONGO_BACKUP_VERIFY_CHECKSUMS === "true";
     const manifest = await readBackupManifest(manifestPath);
+    const keep = await readKeepMarker(keepDirectory, fileName);
     let sha256FilePresent = false;
     let sha256Verified = null;
     let sha256Error = null;
@@ -109,27 +148,31 @@ async function buildBackupEntry({ backupDirectory, fileName, nowMs }) {
         sha256Verified,
         sha256Error,
         manifest,
+        protected: keep.protected,
+        protectedAt: keep.protectedAt,
+        keepError: keep.error || null,
     };
 }
 
 export async function readBackupSnapshots({
     backupDirectory = process.env.MONGO_BACKUP_DIR || "/var/backups/clinia/mongo",
+    keepDirectory = getBackupKeepDirectory(backupDirectory),
     retentionDays = parsePositiveInt(process.env.MONGO_BACKUP_RETENTION_DAYS || "7", 7),
-    maxBackups = 20,
+    maxBackups = 8,
 } = {}) {
     const nowMs = Date.now();
 
     try {
         const entries = await readdir(backupDirectory);
-        const backupFileNames = entries
+        const allBackupFileNames = entries
             .filter((entry) => entry.endsWith(".archive.gz"))
             .sort()
-            .reverse()
-            .slice(0, maxBackups);
+            .reverse();
 
-        const backups = await Promise.all(
-            backupFileNames.map((fileName) => buildBackupEntry({
+        const allBackups = await Promise.all(
+            allBackupFileNames.map((fileName) => buildBackupEntry({
                 backupDirectory,
+                keepDirectory,
                 fileName,
                 nowMs,
             }).catch((err) => ({
@@ -149,8 +192,12 @@ export async function readBackupSnapshots({
                     documentCount: null,
                     error: "backup_metadata_unavailable",
                 },
+                protected: false,
+                protectedAt: null,
+                keepError: null,
             })))
         );
+        const backups = allBackups.filter((backup, index) => index < maxBackups || backup.protected);
 
         const latest = backups[0] || null;
         const latestAgeHours = latest?.ageHours ?? null;
@@ -158,7 +205,9 @@ export async function readBackupSnapshots({
         return {
             available: true,
             directory: backupDirectory,
+            keepDirectory,
             retentionDays,
+            maxBackups,
             expectedFrequencyHours: 24,
             checksumMode: process.env.MONGO_BACKUP_VERIFY_CHECKSUMS === "true"
                 ? "verified"
@@ -176,7 +225,9 @@ export async function readBackupSnapshots({
         return {
             available: false,
             directory: backupDirectory,
+            keepDirectory,
             retentionDays,
+            maxBackups,
             expectedFrequencyHours: 24,
             checksumMode: process.env.MONGO_BACKUP_VERIFY_CHECKSUMS === "true"
                 ? "verified"
@@ -189,6 +240,38 @@ export async function readBackupSnapshots({
                 : err?.message || "Backup metadata unavailable.",
         };
     }
+}
+
+export async function setBackupProtection({
+    fileName,
+    protectedValue,
+    backupDirectory = process.env.MONGO_BACKUP_DIR || "/var/backups/clinia/mongo",
+    keepDirectory = getBackupKeepDirectory(backupDirectory),
+} = {}) {
+    const safeFileName = validateBackupFileName(fileName);
+    const archivePath = path.join(backupDirectory, safeFileName);
+    const markerPath = path.join(keepDirectory, `${safeFileName}.keep`);
+
+    await stat(archivePath);
+    await mkdir(keepDirectory, { recursive: true });
+
+    if (protectedValue) {
+        const payload = {
+            fileName: safeFileName,
+            protectedAt: new Date().toISOString(),
+            reason: "manual_dashboard_keep",
+        };
+        await writeFile(markerPath, `${JSON.stringify(payload, null, 2)}\n`, { mode: 0o600 });
+        return { fileName: safeFileName, protected: true, protectedAt: payload.protectedAt };
+    }
+
+    await unlink(markerPath).catch((err) => {
+        if (err?.code !== "ENOENT") {
+            throw err;
+        }
+    });
+
+    return { fileName: safeFileName, protected: false, protectedAt: null };
 }
 
 function memberRoleFromState(stateStr, serverType) {

@@ -21,6 +21,9 @@ export type DbStatusBackup = {
     sha256FilePresent: boolean;
     sha256Verified: boolean | null;
     sha256Error: string | null;
+    protected: boolean;
+    protectedAt: string | null;
+    keepError: string | null;
     manifest: {
         available: boolean;
         databaseName: string | null;
@@ -82,7 +85,9 @@ export type DbStatusPayload = {
     backups: {
         available: boolean;
         directory: string;
+        keepDirectory: string;
         retentionDays: number;
+        maxBackups: number;
         expectedFrequencyHours: number;
         checksumMode: "recorded" | "verified";
         latestAgeHours: number | null;
@@ -125,6 +130,39 @@ export async function fetchDbStatus(): Promise<ApiResponse<DbStatusPayload>> {
             error: {
                 code: "INTERNAL_ERROR",
                 message: "Erreur reseau lors du chargement de l'etat des bases de donnees.",
+                retryable: true,
+            },
+        };
+    }
+}
+
+export async function updateBackupProtection(fileName: string, protect: boolean): Promise<ApiResponse<{ fileName: string; protected: boolean; protectedAt: string | null }>> {
+    try {
+        const response = await authFetch(
+            `/api/db-status/backups/${encodeURIComponent(fileName)}/protection`,
+            { method: protect ? "POST" : "DELETE" }
+        );
+
+        if (!response.ok) {
+            return { error: await toApiError(response) };
+        }
+
+        return (await response.json()) as ApiResponse<{ fileName: string; protected: boolean; protectedAt: string | null }>;
+    } catch (err) {
+        if (err instanceof SessionExpiredError) {
+            return {
+                error: {
+                    code: "INTERNAL_ERROR",
+                    message: "Session expiree.",
+                    retryable: false,
+                },
+            };
+        }
+
+        return {
+            error: {
+                code: "INTERNAL_ERROR",
+                message: "Erreur reseau lors de la mise a jour de la conservation du backup.",
                 retryable: true,
             },
         };

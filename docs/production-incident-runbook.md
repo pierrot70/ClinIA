@@ -351,7 +351,7 @@ Current local retention target: `7` days.
 Install the wrapper on `clinia-coolify`:
 
 ```bash
-sudo mkdir -p /opt/clinia/scripts /var/backups/clinia/mongo /var/log/clinia
+sudo mkdir -p /opt/clinia/scripts /var/backups/clinia/mongo /var/backups/clinia/mongo-keep /var/log/clinia
 
 sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/backup-mongo.sh \
   -o /opt/clinia/scripts/backup-mongo.sh
@@ -366,6 +366,7 @@ sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scrip
   -o /opt/clinia/scripts/restore-mongo-production.sh
 
 sudo chmod 700 /var/backups/clinia/mongo
+sudo chmod 700 /var/backups/clinia/mongo-keep
 sudo chmod 755 /opt/clinia/scripts/*.sh
 ```
 
@@ -373,6 +374,7 @@ Run a manual scheduled-backup test:
 
 ```bash
 sudo BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo \
+  BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep \
   BACKUP_RETENTION_DAYS=7 \
   BACKUP_LOG_DIR=/var/log/clinia \
   MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- \
@@ -396,7 +398,7 @@ sudo tee /etc/cron.d/clinia-mongo-backup >/dev/null <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-15 5 * * * root BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_RETENTION_DAYS=7 BACKUP_LOG_DIR=/var/log/clinia MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- MONGO_DATABASE=clinia BACKUP_LABEL=clinia-prod /opt/clinia/scripts/scheduled-mongo-backup.sh
+15 5 * * * root BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep BACKUP_RETENTION_DAYS=7 BACKUP_LOG_DIR=/var/log/clinia MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- MONGO_DATABASE=clinia BACKUP_LABEL=clinia-prod /opt/clinia/scripts/scheduled-mongo-backup.sh
 EOF
 ```
 
@@ -409,7 +411,7 @@ sudo tee /etc/cron.d/clinia-mongo-backup >/dev/null <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-15 5 * * * root BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_RETENTION_DAYS=7 BACKUP_LOG_DIR=/var/log/clinia ALERT_WEBHOOK_URL=https://example.invalid/clinia-backup-alerts MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- MONGO_DATABASE=clinia BACKUP_LABEL=clinia-prod /opt/clinia/scripts/scheduled-mongo-backup.sh
+15 5 * * * root BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep BACKUP_RETENTION_DAYS=7 BACKUP_LOG_DIR=/var/log/clinia ALERT_WEBHOOK_URL=https://example.invalid/clinia-backup-alerts MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- MONGO_DATABASE=clinia BACKUP_LABEL=clinia-prod /opt/clinia/scripts/scheduled-mongo-backup.sh
 EOF
 ```
 
@@ -425,9 +427,17 @@ Dashboard visibility:
 - New backups also include a `.manifest.json` with collection and document
   counts. Older backups without a manifest remain valid, but the dashboard shows
   their counts as unavailable.
+- The dashboard shows the 8 most recent backups plus any manually conserved
+  backups.
+- Manually conserved backups create a `.keep` marker under
+  `/var/backups/clinia/mongo-keep`; the cron retention job never deletes an
+  archive that has this marker.
 - The backup directory must be mounted read-only in the backend containers:
   `/var/backups/clinia/mongo:/var/backups/clinia/mongo:ro`.
+- The keep-marker directory must be mounted read-write in the backend containers:
+  `/var/backups/clinia/mongo-keep:/var/backups/clinia/mongo-keep:rw`.
 - Set `MONGO_BACKUP_DIR=/var/backups/clinia/mongo` and
+  `MONGO_BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep` and
   `MONGO_BACKUP_RETENTION_DAYS=7` for the backend.
 - Do not mount the backup directory in the frontend container.
 
