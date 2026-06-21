@@ -338,6 +338,92 @@ docker exec \
 docker exec "$MONGO_CONTAINER" rm -f /tmp/clinia-restore-test.archive.gz
 ```
 
+## Automated Mongo backups
+
+Use the scheduled backup wrapper for the minimum viable production baseline:
+daily backup, automatic `sha256` and `gzip` verification, local retention, and
+optional webhook alerting on failure. This still keeps the archive on the
+droplet; the next hardening step is copying verified archives to external object
+storage such as DigitalOcean Spaces or S3.
+
+Install the wrapper on `clinia-coolify`:
+
+```bash
+sudo mkdir -p /opt/clinia/scripts /var/backups/clinia/mongo /var/log/clinia
+
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/backup-mongo.sh \
+  -o /opt/clinia/scripts/backup-mongo.sh
+
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/verify-mongo-backup.sh \
+  -o /opt/clinia/scripts/verify-mongo-backup.sh
+
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/scheduled-mongo-backup.sh \
+  -o /opt/clinia/scripts/scheduled-mongo-backup.sh
+
+sudo chmod 700 /var/backups/clinia/mongo
+sudo chmod 755 /opt/clinia/scripts/*.sh
+```
+
+Run a manual scheduled-backup test:
+
+```bash
+sudo BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo \
+  BACKUP_RETENTION_DAYS=14 \
+  BACKUP_LOG_DIR=/var/log/clinia \
+  MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- \
+  MONGO_DATABASE=clinia \
+  BACKUP_LABEL=clinia-prod \
+  /opt/clinia/scripts/scheduled-mongo-backup.sh
+```
+
+Expected result:
+
+- `INFO backup=ok`
+- `INFO backup_verification=ok`
+- `INFO backup_completed archive=...`
+- A dated log under `/var/log/clinia`
+
+Schedule the daily backup:
+
+```bash
+sudo tee /etc/cron.d/clinia-mongo-backup >/dev/null <<'EOF'
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+15 5 * * * root BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_RETENTION_DAYS=14 BACKUP_LOG_DIR=/var/log/clinia MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- MONGO_DATABASE=clinia BACKUP_LABEL=clinia-prod /opt/clinia/scripts/scheduled-mongo-backup.sh
+EOF
+```
+
+Use `BACKUP_RETENTION_DAYS=7` if disk pressure is a concern; prefer `14` days
+when storage allows it.
+
+Optional alerting:
+
+```bash
+sudo tee /etc/cron.d/clinia-mongo-backup >/dev/null <<'EOF'
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+15 5 * * * root BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_RETENTION_DAYS=14 BACKUP_LOG_DIR=/var/log/clinia ALERT_WEBHOOK_URL=https://example.invalid/clinia-backup-alerts MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- MONGO_DATABASE=clinia BACKUP_LABEL=clinia-prod /opt/clinia/scripts/scheduled-mongo-backup.sh
+EOF
+```
+
+Replace the example webhook URL before enabling alerting. Do not put patient
+data in alert payloads; the wrapper sends only service status and log location.
+Set `ALERT_ON_SUCCESS=true` only if the receiving system needs positive backup
+heartbeats.
+
+Daily verification:
+
+```bash
+sudo ls -lt /var/backups/clinia/mongo/clinia-prod-*.archive.gz | head
+sudo tail -n 80 "$(sudo ls -t /var/log/clinia/mongo-backup-*.log | head -n1)"
+```
+
+Escalate if the latest log is missing `INFO backup_verification=ok`, if the
+latest archive is older than 24 hours, or if `/var/backups/clinia/mongo` is close
+to full.
+
 ## Load Balancer checks
 
 In DigitalOcean:
