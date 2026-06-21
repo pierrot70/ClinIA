@@ -215,6 +215,22 @@ MONGO_PASSWORD="$(
   tail -n1
 )"
 
+docker exec \
+  -e MONGO_PASSWORD="$MONGO_PASSWORD" \
+  "$MONGO_CONTAINER" \
+  sh -c 'mongosh --quiet \
+    --username root \
+    --password="$MONGO_PASSWORD" \
+    --authenticationDatabase admin \
+    --eval "
+      const hello = db.hello();
+      printjson({
+        isWritablePrimary: hello.isWritablePrimary,
+        primary: hello.primary
+      });
+      if (!hello.isWritablePrimary) quit(2);
+    "'
+
 docker cp "$BACKUP_ARCHIVE" "$MONGO_CONTAINER:/tmp/clinia-restore-test.archive.gz"
 
 docker exec \
@@ -268,6 +284,44 @@ Expected result:
 - Counts match for each collection.
 - If production writes occurred during the backup window, repeat the drill during
   a quiet period before treating count drift as a restore failure.
+
+Record a minimal drill evidence file without patient data:
+
+```bash
+DRILL_EVIDENCE="/tmp/clinia-mongo-backups/restore-drill-$(date -u +%Y%m%d-%H%M%S).txt"
+
+{
+  date -u
+  printf 'archive=%s\n' "$BACKUP_ARCHIVE"
+  sha256sum "$BACKUP_ARCHIVE"
+  docker exec \
+    -e MONGO_PASSWORD="$MONGO_PASSWORD" \
+    "$MONGO_CONTAINER" \
+    sh -c 'mongosh --quiet \
+      --username root \
+      --password="$MONGO_PASSWORD" \
+      --authenticationDatabase admin \
+      --eval "
+        const restored = db.getSiblingDB(\"clinia_restore_test\");
+        const collections = restored.getCollectionNames().sort();
+        printjson({
+          database: \"clinia_restore_test\",
+          collectionCount: collections.length,
+          collections
+        });
+      "'
+} > "$DRILL_EVIDENCE"
+
+chmod 600 "$DRILL_EVIDENCE"
+ls -lh "$DRILL_EVIDENCE"
+```
+
+Failure criteria:
+
+- Checksum or gzip verification fails.
+- `mongorestore` fails or targets any database other than `clinia_restore_test`.
+- A production collection is missing from `clinia_restore_test`.
+- Counts differ when the drill ran during a quiet period.
 
 Optional cleanup after validation:
 
