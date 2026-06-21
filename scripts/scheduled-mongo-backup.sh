@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 BACKUP_OUTPUT_DIR="${BACKUP_OUTPUT_DIR:-/var/backups/clinia/mongo}"
-BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-14}"
+BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 BACKUP_LOG_DIR="${BACKUP_LOG_DIR:-/var/log/clinia}"
 BACKUP_LABEL="${BACKUP_LABEL:-clinia-prod}"
 MONGO_DATABASE="${MONGO_DATABASE:-clinia}"

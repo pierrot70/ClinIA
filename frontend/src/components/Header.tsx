@@ -1727,7 +1727,7 @@ const Header: React.FC = () => {
                                     : "text-gray-600")
                             }
                         >
-                            <HeaderLabel text="Etat BD" />
+                            <HeaderLabel text={headerLabels.nav.dbStatus} />
                         </Link>
                     )}
 
@@ -1873,7 +1873,7 @@ const Header: React.FC = () => {
                             )}
 
                             {showAdminHeaderNav && (
-                                <Link to="/admin/db-status" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text="Etat BD" /></Link>
+                                <Link to="/admin/db-status" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.dbStatus} /></Link>
                             )}
 
                             {showAdminHeaderNav && showSuperAdminHeaderNav && (

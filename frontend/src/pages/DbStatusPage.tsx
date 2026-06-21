@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, Clock, Database, HardDrive, RefreshCw, Server } from "lucide-react";
+import { Activity, Archive, Clock, Database, HardDrive, RefreshCw, Server } from "lucide-react";
 import { fetchDbStatus, type DbStatusPayload } from "../services/dbStatusApi";
 import type { ApiError } from "../types/api";
+import { labels } from "../i18n/uiLabels";
 
 const REFRESH_INTERVAL_MS = 5_000;
 
@@ -41,6 +42,14 @@ function formatTimestamp(value?: string | null) {
     }
 
     return date.toLocaleString("fr-CA");
+}
+
+function formatAgeHours(value?: number | null) {
+    if (value == null || !Number.isFinite(value)) {
+        return "-";
+    }
+
+    return `${value.toLocaleString("fr-CA")} ${labels.dbStatus.backups.hoursSuffix}`;
 }
 
 function StatusPill({ ok, label }: { ok: boolean; label: string }) {
@@ -161,6 +170,38 @@ function getOverallStatus(data: DbStatusPayload | null) {
     return { ok: true, label: "BD operationnelle" };
 }
 
+function getBackupStatusLabel(status?: DbStatusPayload["backups"]["latestStatus"]) {
+    const backupLabels = labels.dbStatus.backups;
+
+    if (status === "ok") {
+        return backupLabels.latestOk;
+    }
+
+    if (status === "warning") {
+        return backupLabels.latestWarning;
+    }
+
+    if (status === "missing") {
+        return backupLabels.latestMissing;
+    }
+
+    return backupLabels.unavailable;
+}
+
+function getChecksumLabel(backup: DbStatusPayload["backups"]["backups"][number]) {
+    const backupLabels = labels.dbStatus.backups;
+
+    if (backup.sha256Error) {
+        return backupLabels.shaError;
+    }
+
+    if (backup.sha256Verified === true) {
+        return backupLabels.shaVerified;
+    }
+
+    return backup.sha256FilePresent ? backupLabels.shaPresent : backupLabels.shaError;
+}
+
 export function DbStatusPage() {
     const [data, setData] = useState<DbStatusPayload | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
@@ -199,6 +240,8 @@ export function DbStatusPage() {
     const database = data?.database?.status === "ok" ? data.database : null;
     const collectionErrors = data?.collections.filter((collection) => collection.status !== "ok") || [];
     const replicaMembers = data?.replicaSet.members || [];
+    const backupLabels = labels.dbStatus.backups;
+    const backupStatusOk = data?.backups.latestStatus === "ok";
     const standaloneMode = replicaMembers.length === 1 && isStandaloneMember(replicaMembers[0]);
     const syncedMembers = replicaMembers.filter((member) => member.syncStatus === "synced").length;
     const replicaSummary = standaloneMode
@@ -270,6 +313,80 @@ export function DbStatusPage() {
                 <MetricCard icon={<HardDrive className="h-5 w-5" />} label="Stockage" value={formatBytes(database?.storageSizeBytes)} detail={`${formatNumber(database?.collections)} collection(s)`} />
                 <MetricCard icon={<HardDrive className="h-5 w-5" />} label="Index" value={formatBytes(database?.indexSizeBytes)} detail={`${formatNumber(database?.indexes)} index`} />
                 <MetricCard icon={<Activity className="h-5 w-5" />} label="Temps backend" value={data ? `${data.responseTimeMs} ms` : "-"} detail={collectionErrors.length > 0 ? `${collectionErrors.length} collection(s) en erreur` : "Collections lisibles"} />
+            </div>
+
+            <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div className="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <Archive className="h-5 w-5 text-slate-600" />
+                            <h2 className="text-base font-semibold text-gray-950">{backupLabels.title}</h2>
+                        </div>
+                        <p className="mt-1 text-sm text-gray-500">{backupLabels.description}</p>
+                    </div>
+                    <StatusPill
+                        ok={backupStatusOk}
+                        label={getBackupStatusLabel(data?.backups.latestStatus)}
+                    />
+                </div>
+                <div className="grid gap-3 border-b border-gray-100 px-4 py-3 text-sm text-gray-600 md:grid-cols-4">
+                    <div>
+                        <span className="font-medium text-gray-900">{backupLabels.directory}: </span>
+                        <span className="break-all">{data?.backups.directory || "-"}</span>
+                    </div>
+                    <div>
+                        <span className="font-medium text-gray-900">{backupLabels.retention}: </span>
+                        {data?.backups.retentionDays ?? "-"} {backupLabels.daysSuffix}
+                    </div>
+                    <div>
+                        <span className="font-medium text-gray-900">{backupLabels.age}: </span>
+                        {formatAgeHours(data?.backups.latestAgeHours)}
+                    </div>
+                    <div>
+                        <span className="font-medium text-gray-900">{backupLabels.checksum}: </span>
+                        {data?.backups.checksumMode === "verified"
+                            ? backupLabels.checksumModeVerified
+                            : backupLabels.checksumModeRecorded}
+                    </div>
+                </div>
+                {data?.backups.error && (
+                    <div className="border-b border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        {data.backups.error}
+                    </div>
+                )}
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                            <tr>
+                                <th className="px-4 py-3">{backupLabels.file}</th>
+                                <th className="px-4 py-3 text-right">{backupLabels.size}</th>
+                                <th className="px-4 py-3 text-right">{backupLabels.age}</th>
+                                <th className="px-4 py-3">{backupLabels.checksum}</th>
+                                <th className="px-4 py-3">{backupLabels.createdAt}</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                            {(data?.backups.backups || []).map((backup) => (
+                                <tr key={backup.fileName}>
+                                    <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900">{backup.fileName}</td>
+                                    <td className="px-4 py-3 text-right text-gray-700">{formatBytes(backup.sizeBytes)}</td>
+                                    <td className="px-4 py-3 text-right text-gray-700">{formatAgeHours(backup.ageHours)}</td>
+                                    <td className="px-4 py-3">
+                                        <StatusPill ok={!backup.sha256Error && backup.sha256FilePresent} label={getChecksumLabel(backup)} />
+                                    </td>
+                                    <td className="whitespace-nowrap px-4 py-3 text-gray-700">{formatTimestamp(backup.createdAt)}</td>
+                                </tr>
+                            ))}
+                            {!loading && !data?.backups.backups.length && (
+                                <tr>
+                                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                                        {backupLabels.empty}
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {replicaMembers.length > 0 && (

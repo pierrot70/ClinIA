@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, rm, writeFile } from "fs/promises";
+import os from "os";
+import path from "path";
+import { createHash } from "crypto";
 
-import { getDbStatus } from "../dbStatus.js";
+import { getDbStatus, readBackupSnapshots } from "../dbStatus.js";
 
 function createConnectedConnection() {
     const collections = [
@@ -95,6 +99,11 @@ describe("dbStatus service", () => {
             expect.objectContaining({ name: "diagnosisresults", status: "ok", documentCount: 10 }),
             expect.objectContaining({ name: "patients", status: "ok", documentCount: 2 }),
         ]);
+        expect(status.backups).toMatchObject({
+            directory: expect.any(String),
+            retentionDays: expect.any(Number),
+            backups: expect.any(Array),
+        });
     });
 
     it("returns an unavailable snapshot when Mongo is disconnected", async () => {
@@ -113,5 +122,47 @@ describe("dbStatus service", () => {
         expect(status.replicaSet.members).toEqual([]);
         expect(status.database).toBeNull();
         expect(status.collections).toEqual([]);
+        expect(status.backups).toMatchObject({
+            directory: expect.any(String),
+            backups: expect.any(Array),
+        });
+    });
+
+    it("lists backup archive metadata without exposing backup contents", async () => {
+        const backupDirectory = await mkdtemp(path.join(os.tmpdir(), "clinia-backups-"));
+        const archiveName = "clinia-prod-20260621-120000.archive.gz";
+        const archivePath = path.join(backupDirectory, archiveName);
+        const archiveContent = "fake gzip bytes for metadata test";
+        const sha256 = createHash("sha256").update(archiveContent).digest("hex");
+
+        try {
+            await writeFile(archivePath, archiveContent);
+            await writeFile(`${archivePath}.sha256`, `${sha256}  ${archiveName}\n`);
+
+            const snapshots = await readBackupSnapshots({
+                backupDirectory,
+                retentionDays: 7,
+            });
+
+            expect(snapshots).toMatchObject({
+                available: true,
+                directory: backupDirectory,
+                retentionDays: 7,
+                latestStatus: "ok",
+                checksumMode: "recorded",
+                backups: [
+                    expect.objectContaining({
+                        fileName: archiveName,
+                        sizeBytes: archiveContent.length,
+                        createdAt: "2026-06-21T12:00:00.000Z",
+                        sha256FilePresent: true,
+                        sha256Verified: null,
+                        sha256Error: null,
+                    }),
+                ],
+            });
+        } finally {
+            await rm(backupDirectory, { recursive: true, force: true });
+        }
     });
 });

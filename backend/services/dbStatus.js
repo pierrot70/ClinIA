@@ -1,4 +1,7 @@
 import mongoose from "mongoose";
+import { createHash } from "crypto";
+import { readdir, readFile, stat } from "fs/promises";
+import path from "path";
 
 const READY_STATE_LABELS = {
     0: "disconnected",
@@ -13,6 +16,142 @@ function getReadyStateLabel(readyState) {
 
 function safeNumber(value) {
     return Number.isFinite(Number(value)) ? Number(value) : 0;
+}
+
+function parsePositiveInt(value, fallback) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseBackupTimestamp(fileName) {
+    const match = fileName.match(/-(\d{8})-(\d{6})\.archive\.gz$/);
+
+    if (!match) {
+        return null;
+    }
+
+    const [, datePart, timePart] = match;
+    const iso = `${datePart.slice(0, 4)}-${datePart.slice(4, 6)}-${datePart.slice(6, 8)}T${timePart.slice(0, 2)}:${timePart.slice(2, 4)}:${timePart.slice(4, 6)}Z`;
+    const parsed = new Date(iso);
+
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+async function calculateSha256(filePath) {
+    const content = await readFile(filePath);
+    return createHash("sha256").update(content).digest("hex");
+}
+
+async function readSha256File(filePath) {
+    const content = await readFile(filePath, "utf8");
+    return content.trim().split(/\s+/)[0] || null;
+}
+
+async function buildBackupEntry({ backupDirectory, fileName, nowMs }) {
+    const archivePath = path.join(backupDirectory, fileName);
+    const sha256Path = `${archivePath}.sha256`;
+    const archiveStats = await stat(archivePath);
+    const verifyChecksums = process.env.MONGO_BACKUP_VERIFY_CHECKSUMS === "true";
+    let sha256FilePresent = false;
+    let sha256Verified = null;
+    let sha256Error = null;
+
+    try {
+        const expectedSha256 = await readSha256File(sha256Path);
+        sha256FilePresent = Boolean(expectedSha256);
+
+        if (expectedSha256 && verifyChecksums) {
+            const actualSha256 = await calculateSha256(archivePath);
+            sha256Verified = actualSha256 === expectedSha256;
+            sha256Error = sha256Verified ? null : "sha256_mismatch";
+        }
+    } catch (err) {
+        sha256Error = err?.code === "ENOENT"
+            ? "sha256_file_missing"
+            : err?.message || "sha256_unavailable";
+    }
+
+    return {
+        fileName,
+        sizeBytes: safeNumber(archiveStats.size),
+        createdAt: parseBackupTimestamp(fileName) || archiveStats.mtime.toISOString(),
+        modifiedAt: archiveStats.mtime.toISOString(),
+        ageHours: Math.max(0, Math.round(((nowMs - archiveStats.mtime.getTime()) / 3_600_000) * 10) / 10),
+        sha256FilePresent,
+        sha256Verified,
+        sha256Error,
+    };
+}
+
+export async function readBackupSnapshots({
+    backupDirectory = process.env.MONGO_BACKUP_DIR || "/var/backups/clinia/mongo",
+    retentionDays = parsePositiveInt(process.env.MONGO_BACKUP_RETENTION_DAYS || "7", 7),
+    maxBackups = 20,
+} = {}) {
+    const nowMs = Date.now();
+
+    try {
+        const entries = await readdir(backupDirectory);
+        const backupFileNames = entries
+            .filter((entry) => entry.endsWith(".archive.gz"))
+            .sort()
+            .reverse()
+            .slice(0, maxBackups);
+
+        const backups = await Promise.all(
+            backupFileNames.map((fileName) => buildBackupEntry({
+                backupDirectory,
+                fileName,
+                nowMs,
+            }).catch((err) => ({
+                fileName,
+                sizeBytes: null,
+                createdAt: null,
+                modifiedAt: null,
+                ageHours: null,
+                sha256FilePresent: false,
+                sha256Verified: null,
+                sha256Error: err?.message || "backup_metadata_unavailable",
+            })))
+        );
+
+        const latest = backups[0] || null;
+        const latestAgeHours = latest?.ageHours ?? null;
+
+        return {
+            available: true,
+            directory: backupDirectory,
+            retentionDays,
+            expectedFrequencyHours: 24,
+            checksumMode: process.env.MONGO_BACKUP_VERIFY_CHECKSUMS === "true"
+                ? "verified"
+                : "recorded",
+            latestAgeHours,
+            latestStatus: latest
+                ? latest.sha256Error || latest.sha256Verified === false
+                    ? "warning"
+                    : "ok"
+                : "missing",
+            backups,
+            error: null,
+        };
+    } catch (err) {
+        return {
+            available: false,
+            directory: backupDirectory,
+            retentionDays,
+            expectedFrequencyHours: 24,
+            checksumMode: process.env.MONGO_BACKUP_VERIFY_CHECKSUMS === "true"
+                ? "verified"
+                : "recorded",
+            latestAgeHours: null,
+            latestStatus: "unavailable",
+            backups: [],
+            error: err?.code === "ENOENT"
+                ? "Backup directory is not mounted or does not exist."
+                : err?.message || "Backup metadata unavailable.",
+        };
+    }
 }
 
 function memberRoleFromState(stateStr, serverType) {
@@ -143,7 +282,7 @@ function mergeReplicaMembers({ helloHosts, statusMembers, topologyMembers }) {
     });
 }
 
-function buildUnavailablePayload({ connection, checkedAt, startedAt }) {
+function buildUnavailablePayload({ connection, checkedAt, startedAt, backups }) {
     const readyState = connection?.readyState ?? 0;
 
     return {
@@ -172,6 +311,7 @@ function buildUnavailablePayload({ connection, checkedAt, startedAt }) {
         },
         database: null,
         collections: [],
+        backups,
     };
 }
 
@@ -259,9 +399,15 @@ export async function getDbStatus({ connection = mongoose.connection } = {}) {
     const startedAt = Date.now();
     const checkedAt = new Date(startedAt).toISOString();
     const readyState = connection?.readyState ?? 0;
+    const backupsPromise = readBackupSnapshots();
 
     if (readyState !== 1 || !connection?.db) {
-        return buildUnavailablePayload({ connection, checkedAt, startedAt });
+        return buildUnavailablePayload({
+            connection,
+            checkedAt,
+            startedAt,
+            backups: await backupsPromise,
+        });
     }
 
     const db = connection.db;
@@ -276,10 +422,11 @@ export async function getDbStatus({ connection = mongoose.connection } = {}) {
         pingError = err?.message || "Mongo ping failed.";
     }
 
-    const [dbStats, replicaSet, collections] = await Promise.all([
+    const [dbStats, replicaSet, collections, backups] = await Promise.all([
         db.stats().catch((err) => ({ error: err?.message || "Database stats unavailable." })),
         readReplicaSetSnapshot(db, connection),
         readCollectionSnapshots(db).catch(() => []),
+        backupsPromise,
     ]);
 
     return {
@@ -310,5 +457,6 @@ export async function getDbStatus({ connection = mongoose.connection } = {}) {
                 indexSizeBytes: safeNumber(dbStats.indexSize),
             },
         collections,
+        backups,
     };
 }

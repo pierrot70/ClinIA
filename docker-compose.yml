@@ -75,6 +75,10 @@ services:
       OPENAI_API_KEY: "${OPENAI_API_KEY}"
       OPENAI_MODEL: gpt-4.1-mini
       CLINIA_MOCK_AI: "false"
+      MONGO_BACKUP_DIR: /var/backups/clinia/mongo
+      MONGO_BACKUP_RETENTION_DAYS: "7"
+    volumes:
+      - /var/backups/clinia/mongo:/var/backups/clinia/mongo:ro
     expose:
       - "4000"
     labels:

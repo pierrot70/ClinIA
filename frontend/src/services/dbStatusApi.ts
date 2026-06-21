@@ -12,6 +12,17 @@ export type DbStatusCollection = {
     error: string | null;
 };
 
+export type DbStatusBackup = {
+    fileName: string;
+    sizeBytes: number | null;
+    createdAt: string | null;
+    modifiedAt: string | null;
+    ageHours: number | null;
+    sha256FilePresent: boolean;
+    sha256Verified: boolean | null;
+    sha256Error: string | null;
+};
+
 export type DbStatusReplicaMember = {
     name: string;
     role: "primary" | "secondary" | "arbiter" | "unknown";
@@ -60,6 +71,17 @@ export type DbStatusPayload = {
         error?: string;
     };
     collections: DbStatusCollection[];
+    backups: {
+        available: boolean;
+        directory: string;
+        retentionDays: number;
+        expectedFrequencyHours: number;
+        checksumMode: "recorded" | "verified";
+        latestAgeHours: number | null;
+        latestStatus: "ok" | "warning" | "missing" | "unavailable";
+        backups: DbStatusBackup[];
+        error: string | null;
+    };
 };
 
 async function toApiError(response: Response): Promise<ApiError> {

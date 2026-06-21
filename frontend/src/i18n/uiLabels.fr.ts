@@ -85,6 +85,32 @@ export const UI_LABELS_FR = {
                 "Maintenance en cours. L'application est temporairement arrêtée pour les usagers non SUPERADMIN.",
         },
     },
+    dbStatus: {
+        backups: {
+            title: "Backups Mongo",
+            description:
+                "Archives locales visibles par le backend. Le contenu des backups n'est jamais affiche.",
+            unavailable: "Backups indisponibles",
+            latestOk: "Dernier backup OK",
+            latestWarning: "Backup a verifier",
+            latestMissing: "Aucun backup",
+            directory: "Dossier",
+            retention: "Retention",
+            checksumModeRecorded: "Checksum enregistre",
+            checksumModeVerified: "Checksum verifie",
+            file: "Fichier",
+            age: "Age",
+            size: "Taille",
+            checksum: "Checksum",
+            createdAt: "Date archive",
+            empty: "Aucun backup local a afficher.",
+            shaPresent: "Present",
+            shaVerified: "Verifie",
+            shaError: "Erreur",
+            hoursSuffix: "h",
+            daysSuffix: "jours",
+        },
+    },
     // Header.tsx - navigation globale, menus et modales d'administration.
     header: {
         brand: {
@@ -128,6 +154,7 @@ export const UI_LABELS_FR = {
             mockStudio: "Mock Studio",
             patientAudits: "Audits patient",
             openaiAudits: "Audits OpenAI",
+            dbStatus: "Etat BD",
             users: "Utilisateurs",
             logout: "Déconnexion",
         },
