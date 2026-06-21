@@ -27,3 +27,6 @@ yarn-error.log*
 *.local
 .local-secrets/
 .env
+
+# Ignore local backup archives
+backups/
