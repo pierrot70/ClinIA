@@ -3,7 +3,10 @@
 set -euo pipefail
 
 BACKUP_OUTPUT_DIR="${BACKUP_OUTPUT_DIR:-/var/backups/clinia/mongo}"
+BACKUP_KEEP_DIR="${BACKUP_KEEP_DIR:-/var/backups/clinia/mongo-keep}"
 BACKUP_LABEL="${BACKUP_LABEL:-clinia-prod}"
+RESTORE_ARCHIVE="${RESTORE_ARCHIVE:-}"
+RESTORE_SELECTION="${RESTORE_SELECTION:-latest}"
 MONGO_DATABASE="${MONGO_DATABASE:-clinia}"
 MONGO_CONTAINER_PREFIX="${MONGO_CONTAINER_PREFIX:-mongo-gko400wwcs44csw8000o0sss-}"
 MONGO_REPLICA_1_PREFIX="${MONGO_REPLICA_1_PREFIX:-mongo-replica-1-}"
@@ -32,14 +35,65 @@ require_command() {
   command -v "$1" >/dev/null 2>&1 || fail "command_not_found command=$1"
 }
 
-latest_backup_archive() {
+backup_archive_query() {
+  local sort_order="$1"
+
   find "$BACKUP_OUTPUT_DIR" \
     -maxdepth 1 \
     -type f \
     -name "${BACKUP_LABEL}-*.archive.gz" \
     -printf '%T@ %p\n' |
-    sort -nr |
+    sort "$sort_order"
+}
+
+latest_backup_archive() {
+  backup_archive_query "-nr" |
     awk 'NR == 1 { $1=""; sub(/^ /, ""); print }'
+}
+
+oldest_backup_archive() {
+  backup_archive_query "-n" |
+    awk 'NR == 1 { $1=""; sub(/^ /, ""); print }'
+}
+
+protected_backup_archive() {
+  local sort_order="$1"
+  local line archive_path archive_name
+
+  while IFS= read -r line; do
+    archive_path="${line#* }"
+    archive_name="$(basename "$archive_path")"
+
+    if [[ -f "${BACKUP_KEEP_DIR%/}/${archive_name}.keep" ]]; then
+      printf '%s\n' "$archive_path"
+      return
+    fi
+  done < <(backup_archive_query "$sort_order")
+}
+
+selected_backup_archive() {
+  if [[ -n "$RESTORE_ARCHIVE" ]]; then
+    printf '%s\n' "$RESTORE_ARCHIVE"
+    return
+  fi
+
+  case "$RESTORE_SELECTION" in
+    latest)
+      latest_backup_archive
+      ;;
+    oldest)
+      oldest_backup_archive
+      ;;
+    protected | protected-newest)
+      protected_backup_archive "-nr"
+      ;;
+    protected-oldest)
+      protected_backup_archive "-n"
+      ;;
+    *)
+      fail "invalid_restore_selection value=$RESTORE_SELECTION expected=latest,oldest,protected-newest,protected-oldest"
+      ;;
+  esac
 }
 
 running_backend_containers() {
@@ -88,7 +142,7 @@ find_primary_container() {
   return 1
 }
 
-verify_latest_archive() {
+verify_selected_archive() {
   local archive="$1"
 
   [[ -f "$archive" ]] || fail "archive_not_found path=$archive"
@@ -232,6 +286,7 @@ check_db_status() {
 }
 
 require_command awk
+require_command basename
 require_command curl
 require_command docker
 require_command find
@@ -240,16 +295,26 @@ require_command grep
 require_command sha256sum
 require_command sort
 
-[[ "$CONFIRM_RESTORE_PRODUCTION" == "RESTORE_LATEST_CLINIA_BACKUP" ]] ||
-  fail 'missing_confirmation set CONFIRM_RESTORE_PRODUCTION=RESTORE_LATEST_CLINIA_BACKUP'
+if [[ -n "$RESTORE_ARCHIVE" || "$RESTORE_SELECTION" != "latest" ]]; then
+  [[ "$CONFIRM_RESTORE_PRODUCTION" == "RESTORE_SELECTED_CLINIA_BACKUP" ]] ||
+    fail 'missing_confirmation set CONFIRM_RESTORE_PRODUCTION=RESTORE_SELECTED_CLINIA_BACKUP'
+else
+  [[ "$CONFIRM_RESTORE_PRODUCTION" == "RESTORE_LATEST_CLINIA_BACKUP" ]] ||
+    fail 'missing_confirmation set CONFIRM_RESTORE_PRODUCTION=RESTORE_LATEST_CLINIA_BACKUP'
+fi
 
 mapfile -t STOPPED_BACKENDS < <(true)
-archive="$(latest_backup_archive)"
+archive="$(selected_backup_archive)"
 
-[[ -n "$archive" ]] || fail "latest_backup_not_found dir=$BACKUP_OUTPUT_DIR label=$BACKUP_LABEL"
+[[ -n "$archive" ]] || fail "backup_not_found dir=$BACKUP_OUTPUT_DIR label=$BACKUP_LABEL selection=$RESTORE_SELECTION"
 
 info "selected_archive=$archive"
-verify_latest_archive "$archive"
+if [[ -n "$RESTORE_ARCHIVE" ]]; then
+  info 'restore_selection=explicit'
+else
+  info "restore_selection=$RESTORE_SELECTION"
+fi
+verify_selected_archive "$archive"
 
 mapfile -t MONGO_CONTAINERS < <(mongo_containers)
 [[ "${#MONGO_CONTAINERS[@]}" -gt 0 ]] || fail 'mongo_containers_not_found'

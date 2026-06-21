@@ -454,8 +454,8 @@ to full.
 
 ## Catastrophic Mongo production restore
 
-Use this only when production must be restored from the latest local backup.
-The script stops the running backend containers, selects the newest
+Use this only when production must be restored from a local backup. The script
+stops the running backend containers, selects the requested
 `clinia-prod-*.archive.gz`, verifies `sha256` and `gzip`, restores the `clinia`
 database on the current Mongo primary, waits until two secondaries are
 `SECONDARY` with `health: 1`, restarts the backends, checks
@@ -476,11 +476,63 @@ sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scrip
 sudo chmod 755 /opt/clinia/scripts/restore-mongo-production.sh
 ```
 
-Run the restore:
+Restore the latest backup:
 
 ```bash
 sudo CONFIRM_RESTORE_PRODUCTION=RESTORE_LATEST_CLINIA_BACKUP \
   BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo \
+  BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep \
+  BACKUP_LABEL=clinia-prod \
+  MONGO_DATABASE=clinia \
+  MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- \
+  MONGO_REPLICA_1_PREFIX=mongo-replica-1- \
+  MONGO_REPLICA_2_PREFIX=mongo-replica-2- \
+  BACKEND_PREFIX=backend- \
+  BACKEND_REPLICA_PREFIX=backend-replica- \
+  /opt/clinia/scripts/restore-mongo-production.sh
+```
+
+Restore the oldest local backup:
+
+```bash
+sudo CONFIRM_RESTORE_PRODUCTION=RESTORE_SELECTED_CLINIA_BACKUP \
+  RESTORE_SELECTION=oldest \
+  BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo \
+  BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep \
+  BACKUP_LABEL=clinia-prod \
+  MONGO_DATABASE=clinia \
+  MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- \
+  MONGO_REPLICA_1_PREFIX=mongo-replica-1- \
+  MONGO_REPLICA_2_PREFIX=mongo-replica-2- \
+  BACKEND_PREFIX=backend- \
+  BACKEND_REPLICA_PREFIX=backend-replica- \
+  /opt/clinia/scripts/restore-mongo-production.sh
+```
+
+Restore the newest manually conserved backup:
+
+```bash
+sudo CONFIRM_RESTORE_PRODUCTION=RESTORE_SELECTED_CLINIA_BACKUP \
+  RESTORE_SELECTION=protected-newest \
+  BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo \
+  BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep \
+  BACKUP_LABEL=clinia-prod \
+  MONGO_DATABASE=clinia \
+  MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- \
+  MONGO_REPLICA_1_PREFIX=mongo-replica-1- \
+  MONGO_REPLICA_2_PREFIX=mongo-replica-2- \
+  BACKEND_PREFIX=backend- \
+  BACKEND_REPLICA_PREFIX=backend-replica- \
+  /opt/clinia/scripts/restore-mongo-production.sh
+```
+
+Restore a specific backup selected from the dashboard:
+
+```bash
+sudo CONFIRM_RESTORE_PRODUCTION=RESTORE_SELECTED_CLINIA_BACKUP \
+  RESTORE_ARCHIVE=/var/backups/clinia/mongo/clinia-prod-YYYYMMDD-HHMMSS.archive.gz \
+  BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo \
+  BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep \
   BACKUP_LABEL=clinia-prod \
   MONGO_DATABASE=clinia \
   MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- \
@@ -494,6 +546,7 @@ sudo CONFIRM_RESTORE_PRODUCTION=RESTORE_LATEST_CLINIA_BACKUP \
 Expected success signals:
 
 - `INFO selected_archive=...`
+- `INFO restore_selection=...`
 - `INFO backend_stop containers=...`
 - `INFO primary=...`
 - `INFO replica_set=healthy`
