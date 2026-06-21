@@ -154,6 +154,136 @@ ACTIVE_MONGO="$(docker ps --format '{{.Names}}' |
 
 Then run the same `rs.status()` command against `$ACTIVE_MONGO`.
 
+## Mongo backup and restore drill
+
+Run this drill from `clinia-coolify` before risky infrastructure work and at
+least once after changing Mongo credentials or replica set topology. The restore
+target must stay isolated in `clinia_restore_test`; never restore a drill over
+the production `clinia` database.
+
+Create a fresh backup:
+
+```bash
+cd /tmp
+
+curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/backup-mongo.sh \
+  -o backup-mongo.sh
+
+chmod +x backup-mongo.sh
+
+BACKUP_OUTPUT_DIR=/tmp/clinia-mongo-backups \
+MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- \
+MONGO_DATABASE=clinia \
+BACKUP_LABEL=clinia-prod \
+./backup-mongo.sh
+```
+
+Expected result:
+
+- `INFO backup=ok`
+- A `clinia-prod-*.archive.gz` file under `/tmp/clinia-mongo-backups`
+- A matching `.sha256` file
+- Archive permissions are `600`
+
+Verify the backup before any restore test:
+
+```bash
+BACKUP_ARCHIVE="$(ls -t /tmp/clinia-mongo-backups/clinia-prod-*.archive.gz | head -n1)"
+
+sha256sum -c "${BACKUP_ARCHIVE}.sha256"
+gzip -t "$BACKUP_ARCHIVE"
+ls -lh "$BACKUP_ARCHIVE" "${BACKUP_ARCHIVE}.sha256"
+```
+
+Expected result:
+
+- `sha256sum` returns `OK`
+- `gzip -t` exits with code `0`
+- The archive size is non-zero
+
+Restore the archive into the isolated drill database:
+
+```bash
+MONGO_CONTAINER="$(docker ps --format '{{.Names}}' |
+  grep '^mongo-gko400wwcs44csw8000o0sss-' |
+  head -n1)"
+
+MONGO_PASSWORD="$(
+  docker inspect "$MONGO_CONTAINER" \
+    --format '{{range .Config.Env}}{{println .}}{{end}}' |
+  sed -n 's/^MONGO_INITDB_ROOT_PASSWORD=//p' |
+  tail -n1
+)"
+
+docker cp "$BACKUP_ARCHIVE" "$MONGO_CONTAINER:/tmp/clinia-restore-test.archive.gz"
+
+docker exec \
+  -e MONGO_PASSWORD="$MONGO_PASSWORD" \
+  "$MONGO_CONTAINER" \
+  sh -c 'mongorestore \
+    --username root \
+    --password="$MONGO_PASSWORD" \
+    --authenticationDatabase admin \
+    --archive=/tmp/clinia-restore-test.archive.gz \
+    --gzip \
+    --drop \
+    --nsFrom="clinia.*" \
+    --nsTo="clinia_restore_test.*"'
+```
+
+Validate the restored collections:
+
+```bash
+docker exec \
+  -e MONGO_PASSWORD="$MONGO_PASSWORD" \
+  "$MONGO_CONTAINER" \
+  sh -c 'mongosh --quiet \
+    --username root \
+    --password="$MONGO_PASSWORD" \
+    --authenticationDatabase admin \
+    --eval "
+      const source = db.getSiblingDB(\"clinia\");
+      const restored = db.getSiblingDB(\"clinia_restore_test\");
+      const sourceCollections = source.getCollectionNames().sort();
+      const restoredCollections = restored.getCollectionNames().sort();
+      printjson({ sourceCollections, restoredCollections });
+      const counts = sourceCollections.map((name) => ({
+        collection: name,
+        source: source.getCollection(name).countDocuments(),
+        restored: restored.getCollection(name).countDocuments()
+      }));
+      printjson(counts);
+      const missing = sourceCollections.filter((name) => !restoredCollections.includes(name));
+      const mismatched = counts.filter((entry) => entry.source !== entry.restored);
+      if (missing.length || mismatched.length) {
+        printjson({ missing, mismatched });
+        quit(2);
+      }
+    "'
+```
+
+Expected result:
+
+- `sourceCollections` and `restoredCollections` contain the same collection names.
+- Counts match for each collection.
+- If production writes occurred during the backup window, repeat the drill during
+  a quiet period before treating count drift as a restore failure.
+
+Optional cleanup after validation:
+
+```bash
+docker exec \
+  -e MONGO_PASSWORD="$MONGO_PASSWORD" \
+  "$MONGO_CONTAINER" \
+  sh -c 'mongosh --quiet \
+    --username root \
+    --password="$MONGO_PASSWORD" \
+    --authenticationDatabase admin \
+    --eval "db.getSiblingDB(\"clinia_restore_test\").dropDatabase()"'
+
+docker exec "$MONGO_CONTAINER" rm -f /tmp/clinia-restore-test.archive.gz
+```
+
 ## Load Balancer checks
 
 In DigitalOcean:
