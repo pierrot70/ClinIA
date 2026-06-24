@@ -54,7 +54,10 @@ sudo mkdir -p /opt/clinia/scripts /var/log/clinia
 sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/production-health-check.sh \
   -o /opt/clinia/scripts/production-health-check.sh
 
-sudo chmod 755 /opt/clinia/scripts/production-health-check.sh
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/run-production-failover-drill.sh \
+  -o /opt/clinia/scripts/run-production-failover-drill.sh
+
+sudo chmod 755 /opt/clinia/scripts/production-health-check.sh /opt/clinia/scripts/run-production-failover-drill.sh
 ```
 
 Run a full manual check:
@@ -132,6 +135,44 @@ HTTP_READY_URL=https://clinique-ai.ca/api/health/ready-does-not-exist \
 
 Expected result: exit code `2` and one Slack `[failed]` alert for
 `clinia-production-health`.
+
+## Production failover drill script
+
+Use this script only during a planned maintenance window. It runs the controlled
+failover drills end to end:
+
+- stop the primary backend and confirm the replica backend serves traffic;
+- stop `mongo-replica-1` and confirm the app still serves traffic;
+- stop the current Mongo primary and confirm a secondary is elected;
+- restart every stopped container;
+- verify the final normal state: `1 PRIMARY`, `2 SECONDARY`, `health: 1` for
+  all Mongo members, low replica lag, and `/api/health/ready` OK.
+
+Install or refresh the script:
+
+```bash
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/run-production-failover-drill.sh \
+  -o /opt/clinia/scripts/run-production-failover-drill.sh
+
+sudo chmod 755 /opt/clinia/scripts/run-production-failover-drill.sh
+```
+
+Run the drill:
+
+```bash
+sudo CONFIRM_PRODUCTION_FAILOVER_DRILL=RUN_CLINIA_FAILOVER_DRILL \
+  /opt/clinia/scripts/run-production-failover-drill.sh
+```
+
+Expected final result:
+
+```text
+INFO production_failover_drill=passed verdict="DRILL PASSED: all tested services returned to normal"
+```
+
+If it fails, the script attempts to restart any container it stopped and prints
+`DRILL FAILED`. Run the production health-check script immediately after any
+failed drill.
 
 ## Droplet checks
 
