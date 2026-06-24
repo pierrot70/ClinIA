@@ -49,20 +49,36 @@ a deployment, during an incident, or after changing infrastructure settings.
 On `clinia-coolify`:
 
 ```bash
-cd /tmp
+sudo mkdir -p /opt/clinia/scripts /var/log/clinia
 
-curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/production-health-check.sh \
-  -o production-health-check.sh
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/production-health-check.sh \
+  -o /opt/clinia/scripts/production-health-check.sh
 
-chmod +x production-health-check.sh
+sudo chmod 755 /opt/clinia/scripts/production-health-check.sh
+```
 
+Run a full manual check:
+
+```bash
+sudo bash -c '
+set -a
+if [ -f /root/clinia-backup-alert.env ]; then . /root/clinia-backup-alert.env; fi
+if [ -f /root/clinia-backup-s3.env ]; then . /root/clinia-backup-s3.env; fi
+set +a
+
+ALERT_ON_SUCCESS=false \
 CHECK_CONTAINERS=true \
 CHECK_MONGO_REPLICA=true \
 CHECK_HTTP_READY=true \
+CHECK_LOCAL_BACKUP=true \
+CHECK_S3_BACKUP=true \
+BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo \
+BACKUP_LABEL=clinia-prod \
 MONGO_REPLICA_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- \
-./production-health-check.sh
+/opt/clinia/scripts/production-health-check.sh
 
 echo "exit=$?"
+'
 ```
 
 Expected healthy result:
@@ -74,12 +90,48 @@ Expected healthy result:
 - Mongo containers: `OK`
 - Mongo replica set: `OK mongo_replica_set set=rs0 members=3 primary=1 secondaries=2 healthy=3`
 - Public HTTP readiness: `OK http_ready url=https://clinique-ai.ca/api/health/ready http_code=200`
+- Local backup: `OK backup_local archive=... age_hours=...`
+- S3 backup: `OK backup_s3 archive=... age_hours=...`
 
 Exit codes:
 
 - `0`: OK
 - `1`: WARN, investigate soon
 - `2`: CRITICAL, investigate immediately
+
+Schedule the global production health monitor every 15 minutes:
+
+```bash
+sudo tee /etc/cron.d/clinia-production-health >/dev/null <<'EOF'
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+*/15 * * * * root set -a; if [ -f /root/clinia-backup-alert.env ]; then . /root/clinia-backup-alert.env; fi; if [ -f /root/clinia-backup-s3.env ]; then . /root/clinia-backup-s3.env; fi; set +a; ALERT_ON_SUCCESS=false CHECK_CONTAINERS=true CHECK_MONGO_REPLICA=true CHECK_HTTP_READY=true CHECK_LOCAL_BACKUP=true CHECK_S3_BACKUP=true BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_LABEL=clinia-prod MONGO_REPLICA_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- /opt/clinia/scripts/production-health-check.sh >>/var/log/clinia/production-health-check.log 2>&1
+EOF
+```
+
+The monitor sends Slack alerts through `/root/clinia-backup-alert.env` when a
+check returns `WARN` or `CRITICAL`. Keep `ALERT_ON_SUCCESS=false` for this cron
+to avoid noisy heartbeat alerts every 15 minutes.
+
+Test the Slack failure path without breaking production:
+
+```bash
+sudo bash -c '
+set -a
+. /root/clinia-backup-alert.env
+set +a
+
+CHECK_CONTAINERS=false \
+CHECK_MONGO_REPLICA=false \
+CHECK_HTTP_READY=true \
+HTTP_READY_URL=https://clinique-ai.ca/api/health/ready-does-not-exist \
+/opt/clinia/scripts/production-health-check.sh
+'
+```
+
+Expected result: exit code `2` and one Slack `[failed]` alert for
+`clinia-production-health`.
 
 ## Droplet checks
 
