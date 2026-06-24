@@ -489,7 +489,13 @@ Install the AWS CLI if needed:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y awscli
+sudo apt-get install -y unzip
+
+cd /tmp
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip -q -o awscliv2.zip
+sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update
+aws --version
 ```
 
 Configure S3 or DigitalOcean Spaces:

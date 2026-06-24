@@ -119,7 +119,7 @@ install_aws_cli_hint() {
     return
   fi
 
-  fail 'aws_cli_missing install="sudo apt-get update && sudo apt-get install -y awscli"'
+  fail 'aws_cli_missing install="sudo apt-get update && sudo apt-get install -y unzip && cd /tmp && curl https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip && unzip -q -o awscliv2.zip && sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update"'
 }
 
 write_s3_env_file() {
