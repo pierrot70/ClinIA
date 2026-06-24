@@ -365,6 +365,9 @@ sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scrip
 sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/restore-mongo-production.sh \
   -o /opt/clinia/scripts/restore-mongo-production.sh
 
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/fetch-mongo-backup-from-s3.sh \
+  -o /opt/clinia/scripts/fetch-mongo-backup-from-s3.sh
+
 sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/configure-mongo-backup-slack-alert.sh \
   -o /opt/clinia/scripts/configure-mongo-backup-slack-alert.sh
 
@@ -531,6 +534,42 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 15 5 * * * root set -a; . /root/clinia-backup-alert.env; . /root/clinia-backup-s3.env; set +a; BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep BACKUP_RETENTION_DAYS=7 BACKUP_LOG_DIR=/var/log/clinia MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- MONGO_DATABASE=clinia BACKUP_LABEL=clinia-prod /opt/clinia/scripts/scheduled-mongo-backup.sh
 EOF
+```
+
+Fetch a backup back from S3 without restoring production:
+
+```bash
+sudo bash -c '
+set -a
+. /root/clinia-backup-s3.env
+set +a
+
+BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo \
+BACKUP_LABEL=clinia-prod \
+/opt/clinia/scripts/fetch-mongo-backup-from-s3.sh
+'
+```
+
+Expected result:
+
+- the latest `clinia-prod-*.archive.gz` is downloaded locally;
+- its `.sha256` and `.manifest.json` are downloaded when present;
+- `sha256sum -c` and `gzip -t` pass;
+- the helper prints the exact `restore-mongo-production.sh` command to run.
+
+Fetch a specific S3 archive:
+
+```bash
+sudo bash -c '
+set -a
+. /root/clinia-backup-s3.env
+set +a
+
+S3_RESTORE_ARCHIVE=clinia-prod-YYYYMMDD-HHMMSS.archive.gz \
+BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo \
+BACKUP_LABEL=clinia-prod \
+/opt/clinia/scripts/fetch-mongo-backup-from-s3.sh
+'
 ```
 
 Dashboard visibility:
