@@ -368,6 +368,9 @@ sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scrip
 sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/configure-mongo-backup-slack-alert.sh \
   -o /opt/clinia/scripts/configure-mongo-backup-slack-alert.sh
 
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/configure-mongo-backup-s3.sh \
+  -o /opt/clinia/scripts/configure-mongo-backup-s3.sh
+
 sudo chmod 700 /var/backups/clinia/mongo
 sudo chmod 700 /var/backups/clinia/mongo-keep
 sudo chmod 755 /opt/clinia/scripts/*.sh
@@ -471,6 +474,56 @@ Expected result: the command exits non-zero, prints
 `ERROR scheduled_backup_failed log=...`, and the receiving webhook gets a
 `status=failed` alert. Then rerun the normal manual scheduled-backup test with
 the real Mongo prefix to confirm backups still succeed.
+
+External S3 storage:
+
+Use S3-compatible object storage after Slack alerting is working. The scheduled
+wrapper uploads only after the local archive passes `sha256` and `gzip`
+verification. It uploads:
+
+- `clinia-prod-*.archive.gz`
+- `clinia-prod-*.archive.gz.sha256`
+- `clinia-prod-*.archive.gz.manifest.json` when present
+
+Install the AWS CLI if needed:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y awscli
+```
+
+Configure S3 or DigitalOcean Spaces:
+
+```bash
+sudo /opt/clinia/scripts/configure-mongo-backup-s3.sh
+```
+
+When prompted:
+
+- `S3 destination`: use a dedicated prefix, for example
+  `s3://clinia-backups/mongo/prod`.
+- `S3 endpoint URL`: leave blank for AWS S3. For DigitalOcean Spaces, use the
+  region endpoint, for example `https://nyc3.digitaloceanspaces.com`.
+- `S3 region`: use the AWS region or the Spaces region, for example
+  `ca-central-1` or `nyc3`.
+- Paste the access key id and secret access key. Do not paste them in Slack or
+  commit them.
+
+The helper writes `/root/clinia-backup-s3.env` with mode `600`, uploads a small
+test file, and rewrites the daily cron so it sources both Slack and S3 env files.
+If S3 upload fails during the daily backup, the whole backup job fails and Slack
+receives the failure alert.
+
+Manual cron equivalent with Slack and S3:
+
+```bash
+sudo tee /etc/cron.d/clinia-mongo-backup >/dev/null <<'EOF'
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+15 5 * * * root set -a; . /root/clinia-backup-alert.env; . /root/clinia-backup-s3.env; set +a; BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep BACKUP_RETENTION_DAYS=7 BACKUP_LOG_DIR=/var/log/clinia MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- MONGO_DATABASE=clinia BACKUP_LABEL=clinia-prod /opt/clinia/scripts/scheduled-mongo-backup.sh
+EOF
+```
 
 Dashboard visibility:
 

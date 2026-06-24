@@ -14,6 +14,7 @@ MONGO_DATABASE="${MONGO_DATABASE:-clinia}"
 MONGO_CONTAINER_PREFIX="${MONGO_CONTAINER_PREFIX:-mongo-gko400wwcs44csw8000o0sss-}"
 CRON_FILE="${CRON_FILE:-/etc/cron.d/clinia-mongo-backup}"
 ALERT_ENV_FILE="${ALERT_ENV_FILE:-/root/clinia-backup-alert.env}"
+S3_ENV_FILE="${S3_ENV_FILE:-/root/clinia-backup-s3.env}"
 ALERT_TEST_DIR="${ALERT_TEST_DIR:-/tmp/clinia-alert-test}"
 CRON_SCHEDULE="${CRON_SCHEDULE:-15 5 * * *}"
 
@@ -147,6 +148,7 @@ confirm_slack_received() {
 
 write_cron_file() {
   local alert_env_file_q
+  local s3_env_file_q
   local backup_output_dir_q
   local backup_keep_dir_q
   local backup_log_dir_q
@@ -157,6 +159,7 @@ write_cron_file() {
   local scheduled_script_q
 
   alert_env_file_q="$(shell_quote "$ALERT_ENV_FILE")"
+  s3_env_file_q="$(shell_quote "$S3_ENV_FILE")"
   backup_output_dir_q="$(shell_quote "$BACKUP_OUTPUT_DIR")"
   backup_keep_dir_q="$(shell_quote "$BACKUP_KEEP_DIR")"
   backup_log_dir_q="$(shell_quote "$BACKUP_LOG_DIR")"
@@ -170,7 +173,7 @@ write_cron_file() {
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-${CRON_SCHEDULE} root set -a; . ${alert_env_file_q}; set +a; BACKUP_OUTPUT_DIR=${backup_output_dir_q} BACKUP_KEEP_DIR=${backup_keep_dir_q} BACKUP_RETENTION_DAYS=${backup_retention_days_q} BACKUP_LOG_DIR=${backup_log_dir_q} MONGO_CONTAINER_PREFIX=${mongo_container_prefix_q} MONGO_DATABASE=${mongo_database_q} BACKUP_LABEL=${backup_label_q} ${scheduled_script_q}
+${CRON_SCHEDULE} root set -a; . ${alert_env_file_q}; if [ -f ${s3_env_file_q} ]; then . ${s3_env_file_q}; fi; set +a; BACKUP_OUTPUT_DIR=${backup_output_dir_q} BACKUP_KEEP_DIR=${backup_keep_dir_q} BACKUP_RETENTION_DAYS=${backup_retention_days_q} BACKUP_LOG_DIR=${backup_log_dir_q} MONGO_CONTAINER_PREFIX=${mongo_container_prefix_q} MONGO_DATABASE=${mongo_database_q} BACKUP_LABEL=${backup_label_q} ${scheduled_script_q}
 EOF
 
   chmod 644 "$CRON_FILE"

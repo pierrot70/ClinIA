@@ -18,6 +18,11 @@ ALERT_WEBHOOK_HEADER="${ALERT_WEBHOOK_HEADER:-}"
 ALERT_TIMEOUT_SECONDS="${ALERT_TIMEOUT_SECONDS:-10}"
 ALERT_SERVICE_NAME="${ALERT_SERVICE_NAME:-clinia-mongo-backup}"
 ALERT_ON_SUCCESS="${ALERT_ON_SUCCESS:-false}"
+S3_BACKUP_URI="${S3_BACKUP_URI:-}"
+S3_ENDPOINT_URL="${S3_ENDPOINT_URL:-}"
+S3_STORAGE_CLASS="${S3_STORAGE_CLASS:-}"
+S3_SSE="${S3_SSE:-}"
+S3_ONLY_SHOW_ERRORS="${S3_ONLY_SHOW_ERRORS:-true}"
 
 fail() {
   printf 'ERROR %s\n' "$1" >&2
@@ -164,6 +169,66 @@ cleanup_old_backups() {
     -delete
 }
 
+build_aws_args() {
+  if [[ -n "$S3_ENDPOINT_URL" ]]; then
+    printf '%s\n' --endpoint-url "$S3_ENDPOINT_URL"
+  fi
+}
+
+upload_s3_file() {
+  local source_path="$1"
+  local destination_uri="$2"
+  local aws_args
+  local cp_args
+
+  if [[ ! -f "$source_path" ]]; then
+    info "s3_upload=skipped missing_file=$source_path"
+    return
+  fi
+
+  mapfile -t aws_args < <(build_aws_args)
+
+  cp_args=(s3 cp "$source_path" "$destination_uri")
+
+  if [[ "$S3_ONLY_SHOW_ERRORS" == "true" ]]; then
+    cp_args+=(--only-show-errors)
+  fi
+
+  if [[ -n "$S3_STORAGE_CLASS" ]]; then
+    cp_args+=(--storage-class "$S3_STORAGE_CLASS")
+  fi
+
+  if [[ -n "$S3_SSE" ]]; then
+    cp_args+=(--sse "$S3_SSE")
+  fi
+
+  aws "${aws_args[@]}" "${cp_args[@]}"
+  aws "${aws_args[@]}" s3 ls "$destination_uri" >/dev/null
+  info "s3_uploaded source=$source_path destination=$destination_uri"
+}
+
+upload_backup_to_s3() {
+  local backup_archive="$1"
+  local destination_prefix
+  local archive_name
+
+  if [[ -z "$S3_BACKUP_URI" ]]; then
+    info 's3_upload=disabled'
+    return
+  fi
+
+  require_command aws
+
+  destination_prefix="${S3_BACKUP_URI%/}"
+  archive_name="$(basename "$backup_archive")"
+
+  upload_s3_file "$backup_archive" "${destination_prefix}/${archive_name}"
+  upload_s3_file "${backup_archive}.sha256" "${destination_prefix}/${archive_name}.sha256"
+  upload_s3_file "${backup_archive}.manifest.json" "${destination_prefix}/${archive_name}.manifest.json"
+
+  info "s3_upload=ok archive=$backup_archive destination=${destination_prefix}/${archive_name}"
+}
+
 require_command find
 require_command mkdir
 
@@ -208,6 +273,7 @@ run_scheduled_backup() {
   fi
 
   "$SCRIPT_DIR/verify-mongo-backup.sh" "$backup_archive" || return "$?"
+  upload_backup_to_s3 "$backup_archive" || return "$?"
   cleanup_old_backups || return "$?"
 
   info "backup_completed archive=$backup_archive log=$log_path"
