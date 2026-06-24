@@ -91,6 +91,7 @@ write_alert_env_file() {
     printf 'ALERT_WEBHOOK_URL=%s\n' "$(shell_quote "$webhook_url")"
     printf 'ALERT_WEBHOOK_FORMAT=slack\n'
     printf 'ALERT_TIMEOUT_SECONDS=10\n'
+    printf 'ALERT_ON_SUCCESS=true\n'
   } >"$tmp_file"
 
   install -m 600 "$tmp_file" "$ALERT_ENV_FILE"

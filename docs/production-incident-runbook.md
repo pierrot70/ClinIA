@@ -427,7 +427,10 @@ sudo /opt/clinia/scripts/configure-mongo-backup-slack-alert.sh
 When prompted, paste either the full Slack webhook URL or only the secret suffix
 in the form `/TON/URL/SLACK`. The helper writes
 `/root/clinia-backup-alert.env` with mode `600` and configures cron to source
-that file, so the real Slack URL is not stored in this repository.
+that file, so the real Slack URL is not stored in this repository. It sets
+`ALERT_ON_SUCCESS=true`, so Slack receives one notification for every scheduled
+backup: `ok` when the backup and upload complete, or `failed` when any step
+fails.
 
 Manual equivalent:
 
@@ -450,9 +453,8 @@ needs auth, add `ALERT_WEBHOOK_BEARER_TOKEN=...` or
 `ALERT_WEBHOOK_HEADER='X-Clinia-Backup-Token: ...'`.
 
 Alert payloads must never include patient data. The wrapper sends only:
-`service`, `status`, `message`, `host`, `timestamp`, and `logPath`. By default,
-alerts are sent only when the scheduled backup fails. Set `ALERT_ON_SUCCESS=true`
-only if the receiving system needs positive backup heartbeats.
+`service`, `status`, `message`, `host`, `timestamp`, and `logPath`. For Slack,
+the helper enables positive backup heartbeats with `ALERT_ON_SUCCESS=true`.
 
 Test the failure alert without touching Mongo by pointing the cron command at a
 missing Mongo prefix:
