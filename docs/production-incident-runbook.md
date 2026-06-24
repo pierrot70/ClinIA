@@ -411,14 +411,40 @@ sudo tee /etc/cron.d/clinia-mongo-backup >/dev/null <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-15 5 * * * root BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep BACKUP_RETENTION_DAYS=7 BACKUP_LOG_DIR=/var/log/clinia ALERT_WEBHOOK_URL=https://example.invalid/clinia-backup-alerts MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- MONGO_DATABASE=clinia BACKUP_LABEL=clinia-prod /opt/clinia/scripts/scheduled-mongo-backup.sh
+15 5 * * * root BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep BACKUP_RETENTION_DAYS=7 BACKUP_LOG_DIR=/var/log/clinia ALERT_WEBHOOK_URL=https://example.invalid/clinia-backup-alerts ALERT_WEBHOOK_BEARER_TOKEN=replace-me MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- MONGO_DATABASE=clinia BACKUP_LABEL=clinia-prod /opt/clinia/scripts/scheduled-mongo-backup.sh
 EOF
 ```
 
-Replace the example webhook URL before enabling alerting. Do not put patient
-data in alert payloads; the wrapper sends only service status and log location.
-Set `ALERT_ON_SUCCESS=true` only if the receiving system needs positive backup
-heartbeats.
+Replace the example webhook URL and token before enabling alerting. If the
+receiver needs a custom header instead of bearer auth, use
+`ALERT_WEBHOOK_HEADER='X-Clinia-Backup-Token: replace-me'` and omit
+`ALERT_WEBHOOK_BEARER_TOKEN`.
+
+Alert payloads must never include patient data. The wrapper sends only:
+`service`, `status`, `message`, `host`, `timestamp`, and `logPath`. By default,
+alerts are sent only when the scheduled backup fails. Set `ALERT_ON_SUCCESS=true`
+only if the receiving system needs positive backup heartbeats.
+
+Test the failure alert without touching Mongo by pointing the cron command at a
+missing Mongo prefix:
+
+```bash
+sudo BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo \
+  BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep \
+  BACKUP_RETENTION_DAYS=7 \
+  BACKUP_LOG_DIR=/var/log/clinia \
+  ALERT_WEBHOOK_URL=https://example.invalid/clinia-backup-alerts \
+  ALERT_WEBHOOK_BEARER_TOKEN=replace-me \
+  MONGO_CONTAINER_PREFIX=missing-mongo-prefix- \
+  MONGO_DATABASE=clinia \
+  BACKUP_LABEL=clinia-prod \
+  /opt/clinia/scripts/scheduled-mongo-backup.sh
+```
+
+Expected result: the command exits non-zero, prints
+`ERROR scheduled_backup_failed log=...`, and the receiving webhook gets a
+`status=failed` alert. Then rerun the normal manual scheduled-backup test with
+the real Mongo prefix to confirm backups still succeed.
 
 Dashboard visibility:
 
