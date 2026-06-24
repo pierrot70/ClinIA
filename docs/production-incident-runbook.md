@@ -136,6 +136,34 @@ HTTP_READY_URL=https://clinique-ai.ca/api/health/ready-does-not-exist \
 Expected result: exit code `2` and one Slack `[failed]` alert for
 `clinia-production-health`.
 
+## Operations signal grid
+
+Use this grid when Slack, the dashboard, or a manual check reports a production
+signal.
+
+| Signal | Meaning | First action |
+| --- | --- | --- |
+| Slack `[ok] clinia-production-health` | Hourly heartbeat passed. App, Mongo, backups, S3, disk, and memory are within thresholds. | No action. |
+| Slack `[failed] clinia-production-health` | At least one health monitor check is critical. | Open `/var/log/clinia/production-health-check.log`, run the full manual health check, then follow the failed line below. |
+| `CRITICAL http_ready` | Public API readiness failed. | Test Cloudflare bypass with `curl --resolve`; inspect backend containers and logs. |
+| `CRITICAL mongo_replica_set` | Mongo topology is not normal. | Run replica set checks; confirm `1 PRIMARY`, `2 SECONDARY`, `health: 1`, and low lag. |
+| `CRITICAL backup_local` | Latest local backup is missing, too old, or missing `.sha256`. | Run the scheduled backup manually and inspect `/var/log/clinia/mongo-backup-*.log`. |
+| `CRITICAL backup_s3` | Latest S3 backup is missing, too old, or missing `.sha256`. | Source `/root/clinia-backup-s3.env`, list S3, then rerun a manual backup. |
+| Slack `[failed] clinia-mongo-backup` | The scheduled backup job failed. | Inspect the log path shown in Slack, then rerun the scheduled backup manually. |
+| Slack `[ok] clinia-mongo-backup` | Backup, verification, retention, and S3 upload completed. | No action unless the dashboard or S3 listing disagrees. |
+| Dashboard backup age over 24 h | Backups may not be running. | Check cron, latest backup log, and Slack backup alerts. |
+| Dashboard checksum missing/error | A backup artifact is incomplete or corrupted. | Do not restore that archive; use another verified backup and rerun backup. |
+| `DRILL FAILED` | Controlled failover did not return to normal automatically. | Run the full health check, inspect stopped containers, and do not continue drills until normal. |
+
+Normal temporary signals:
+
+- During failover drills, a stopped Mongo member can briefly show
+  `(not reachable/healthy)` and `health: 0`.
+- During container restart, a short `502` or `MongoNetworkError` can be normal
+  if the final health check returns OK.
+- A drill is successful only when the final state returns to normal, not merely
+  when the application keeps responding during the outage.
+
 ## Production failover drill script
 
 Use this script only during a planned maintenance window. It runs the controlled
@@ -170,9 +198,111 @@ Expected final result:
 INFO production_failover_drill=passed verdict="DRILL PASSED: all tested services returned to normal"
 ```
 
+Validated production evidence:
+
+- Backend failover: stopping `backend-*` left `backend-replica-*` serving
+  `/api/health/ready` successfully.
+- Mongo secondary failure: stopping `mongo-replica-1` left the API healthy while
+  the replica set reported that member as not reachable, then returned it to
+  `SECONDARY` with `health: 1`.
+- Mongo primary failover: stopping the current primary caused a secondary to be
+  elected `PRIMARY`; `/api/health/ready` stayed OK; after restart the set
+  returned to `1 PRIMARY`, `2 SECONDARY`, `health: 1`.
+- Final automated drill verdict observed:
+  `DRILL PASSED: all tested services returned to normal`.
+
+Expected temporary signals during the drill:
+
+- `MongoNetworkError: connect ECONNREFUSED 127.0.0.1:27017` while a Mongo
+  container is starting.
+- `stateStr: '(not reachable/healthy)'` and `health: 0` for the intentionally
+  stopped Mongo member.
+- A short period where the former primary returns as `SECONDARY` or where
+  another member remains `PRIMARY`. This is acceptable if the final state is
+  normal.
+
+Final normal Mongo criteria:
+
+```text
+ok: 1
+primaryCount: 1
+secondaryCount: 2
+unhealthyCount: 0
+lagSeconds: 0-10
+```
+
+Also confirm `/api/health/ready` returns `status: ok` and
+`dependencies.mongo: connected`.
+
 If it fails, the script attempts to restart any container it stopped and prints
 `DRILL FAILED`. Run the production health-check script immediately after any
 failed drill.
+
+Recommended drill cadence:
+
+- Run the full production failover drill quarterly, and after any infrastructure
+  change touching Coolify routing, backend scaling, Mongo topology, or Mongo
+  credentials.
+- Run the S3 fetch plus restore drill quarterly.
+- Keep the daily backup plus hourly Slack heartbeat running continuously.
+- Record each drill date, operator, final verdict, selected backup archive when
+  applicable, and any unexpected temporary signal.
+
+## Evidence log template
+
+Use this template after each production incident, restore drill, failover drill,
+or monitoring change. Store the note in the operational incident tracker or in a
+dated internal evidence file; do not paste secrets.
+
+```text
+Date/time UTC:
+Operator:
+Scenario:
+Scope:
+
+Commands/scripts run:
+- <command or script>
+
+Expected result:
+- <expected signal>
+
+Actual result:
+- <observed signal>
+
+Evidence:
+- Health endpoint:
+- Mongo final state:
+- Backup archive:
+- S3 object:
+- Slack alert:
+- Relevant log path:
+
+Outcome:
+- PASS / FAIL
+
+Follow-up:
+- <owner and next action>
+```
+
+Minimum evidence for a successful failover drill:
+
+- `production_failover_drill=passed`
+- `/api/health/ready` returned OK after the drill
+- Mongo final state:
+  `primaryCount: 1`, `secondaryCount: 2`, `unhealthyCount: 0`,
+  `lagSeconds <= 10`
+- Any temporary `502`, `MongoNetworkError`, or `not reachable/healthy` signal
+  resolved before the final verdict
+
+Minimum evidence for a successful restore drill:
+
+- selected backup archive name
+- source: local or S3
+- `sha256sum -c`: OK
+- `gzip -t`: OK
+- `mongorestore`: `0 document(s) failed`
+- final Mongo state normal
+- `/api/health/ready`: OK
 
 ## Droplet checks
 
