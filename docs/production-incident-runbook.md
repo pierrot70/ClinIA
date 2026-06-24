@@ -365,6 +365,9 @@ sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scrip
 sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/restore-mongo-production.sh \
   -o /opt/clinia/scripts/restore-mongo-production.sh
 
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/configure-mongo-backup-slack-alert.sh \
+  -o /opt/clinia/scripts/configure-mongo-backup-slack-alert.sh
+
 sudo chmod 700 /var/backups/clinia/mongo
 sudo chmod 700 /var/backups/clinia/mongo-keep
 sudo chmod 755 /opt/clinia/scripts/*.sh
@@ -410,12 +413,27 @@ Slack Incoming Webhooks work well for the first alerting channel. In Slack,
 create or open a ClinIA operations app, enable Incoming Webhooks, add a webhook
 to the target channel, and keep the generated URL secret.
 
+Use the helper script to store the Slack URL in a root-only env file, run a
+failure-alert test, and reinstall the real daily cron only after confirming that
+Slack received the test notification:
+
+```bash
+sudo /opt/clinia/scripts/configure-mongo-backup-slack-alert.sh
+```
+
+When prompted, paste either the full Slack webhook URL or only the secret suffix
+in the form `/TON/URL/SLACK`. The helper writes
+`/root/clinia-backup-alert.env` with mode `600` and configures cron to source
+that file, so the real Slack URL is not stored in this repository.
+
+Manual equivalent:
+
 ```bash
 sudo tee /etc/cron.d/clinia-mongo-backup >/dev/null <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-15 5 * * * root BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep BACKUP_RETENTION_DAYS=7 BACKUP_LOG_DIR=/var/log/clinia ALERT_WEBHOOK_URL=https://hooks.slack.com/services/REPLACE/REPLACE/REPLACE ALERT_WEBHOOK_FORMAT=slack MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- MONGO_DATABASE=clinia BACKUP_LABEL=clinia-prod /opt/clinia/scripts/scheduled-mongo-backup.sh
+15 5 * * * root set -a; . /root/clinia-backup-alert.env; set +a; BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep BACKUP_RETENTION_DAYS=7 BACKUP_LOG_DIR=/var/log/clinia MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- MONGO_DATABASE=clinia BACKUP_LABEL=clinia-prod /opt/clinia/scripts/scheduled-mongo-backup.sh
 EOF
 ```
 
