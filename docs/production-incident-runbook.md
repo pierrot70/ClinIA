@@ -406,19 +406,27 @@ Increase `BACKUP_RETENTION_DAYS` only after confirming disk capacity.
 
 Optional alerting:
 
+Slack Incoming Webhooks work well for the first alerting channel. In Slack,
+create or open a ClinIA operations app, enable Incoming Webhooks, add a webhook
+to the target channel, and keep the generated URL secret.
+
 ```bash
 sudo tee /etc/cron.d/clinia-mongo-backup >/dev/null <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-15 5 * * * root BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep BACKUP_RETENTION_DAYS=7 BACKUP_LOG_DIR=/var/log/clinia ALERT_WEBHOOK_URL=https://example.invalid/clinia-backup-alerts ALERT_WEBHOOK_BEARER_TOKEN=replace-me MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- MONGO_DATABASE=clinia BACKUP_LABEL=clinia-prod /opt/clinia/scripts/scheduled-mongo-backup.sh
+15 5 * * * root BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep BACKUP_RETENTION_DAYS=7 BACKUP_LOG_DIR=/var/log/clinia ALERT_WEBHOOK_URL=https://hooks.slack.com/services/REPLACE/REPLACE/REPLACE ALERT_WEBHOOK_FORMAT=slack MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- MONGO_DATABASE=clinia BACKUP_LABEL=clinia-prod /opt/clinia/scripts/scheduled-mongo-backup.sh
 EOF
 ```
 
-Replace the example webhook URL and token before enabling alerting. If the
-receiver needs a custom header instead of bearer auth, use
-`ALERT_WEBHOOK_HEADER='X-Clinia-Backup-Token: replace-me'` and omit
-`ALERT_WEBHOOK_BEARER_TOKEN`.
+Replace the example Slack URL before enabling alerting. Do not commit the real
+webhook URL; Slack treats it as a secret and may revoke leaked URLs. The wrapper
+also auto-detects `hooks.slack.com` and `hooks.slack-gov.com`, but
+`ALERT_WEBHOOK_FORMAT=slack` keeps the cron intent explicit.
+
+For a non-Slack receiver, set `ALERT_WEBHOOK_FORMAT=generic`. If the receiver
+needs auth, add `ALERT_WEBHOOK_BEARER_TOKEN=...` or
+`ALERT_WEBHOOK_HEADER='X-Clinia-Backup-Token: ...'`.
 
 Alert payloads must never include patient data. The wrapper sends only:
 `service`, `status`, `message`, `host`, `timestamp`, and `logPath`. By default,
@@ -433,8 +441,8 @@ sudo BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo \
   BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep \
   BACKUP_RETENTION_DAYS=7 \
   BACKUP_LOG_DIR=/var/log/clinia \
-  ALERT_WEBHOOK_URL=https://example.invalid/clinia-backup-alerts \
-  ALERT_WEBHOOK_BEARER_TOKEN=replace-me \
+  ALERT_WEBHOOK_URL=https://hooks.slack.com/services/REPLACE/REPLACE/REPLACE \
+  ALERT_WEBHOOK_FORMAT=slack \
   MONGO_CONTAINER_PREFIX=missing-mongo-prefix- \
   MONGO_DATABASE=clinia \
   BACKUP_LABEL=clinia-prod \

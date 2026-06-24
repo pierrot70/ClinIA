@@ -12,6 +12,7 @@ BACKUP_LABEL="${BACKUP_LABEL:-clinia-prod}"
 MONGO_DATABASE="${MONGO_DATABASE:-clinia}"
 MONGO_CONTAINER_PREFIX="${MONGO_CONTAINER_PREFIX:-mongo-gko400wwcs44csw8000o0sss-}"
 ALERT_WEBHOOK_URL="${ALERT_WEBHOOK_URL:-}"
+ALERT_WEBHOOK_FORMAT="${ALERT_WEBHOOK_FORMAT:-auto}"
 ALERT_WEBHOOK_BEARER_TOKEN="${ALERT_WEBHOOK_BEARER_TOKEN:-}"
 ALERT_WEBHOOK_HEADER="${ALERT_WEBHOOK_HEADER:-}"
 ALERT_TIMEOUT_SECONDS="${ALERT_TIMEOUT_SECONDS:-10}"
@@ -45,11 +46,52 @@ json_escape() {
   printf '%s' "$value"
 }
 
+resolve_alert_format() {
+  if [[ "$ALERT_WEBHOOK_FORMAT" != "auto" ]]; then
+    printf '%s' "$ALERT_WEBHOOK_FORMAT"
+    return
+  fi
+
+  case "$ALERT_WEBHOOK_URL" in
+    https://hooks.slack.com/*|https://hooks.slack-gov.com/*)
+      printf 'slack'
+      ;;
+    *)
+      printf 'generic'
+      ;;
+  esac
+}
+
+build_alert_payload() {
+  local status="$1"
+  local message="$2"
+  local hostname_value="$3"
+  local timestamp_value="$4"
+  local format="$5"
+  local text
+
+  if [[ "$format" == "slack" ]]; then
+    text="$(printf '[%s] %s: %s\nHost: %s\nLog: %s\nTimestamp: %s' \
+      "$status" "$ALERT_SERVICE_NAME" "$message" "$hostname_value" "${log_path:-}" "$timestamp_value")"
+    printf '{"text":"%s"}' "$(json_escape "$text")"
+    return
+  fi
+
+  printf '{"service":"%s","status":"%s","message":"%s","host":"%s","timestamp":"%s","logPath":"%s"}' \
+    "$(json_escape "$ALERT_SERVICE_NAME")" \
+    "$(json_escape "$status")" \
+    "$(json_escape "$message")" \
+    "$(json_escape "$hostname_value")" \
+    "$(json_escape "$timestamp_value")" \
+    "$(json_escape "${log_path:-}")"
+}
+
 send_alert() {
   local status="$1"
   local message="$2"
   local hostname_value
   local timestamp_value
+  local alert_format
   local payload
   local curl_args
 
@@ -64,13 +106,8 @@ send_alert() {
 
   hostname_value="$(hostname 2>/dev/null || printf 'unknown')"
   timestamp_value="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  payload="$(printf '{"service":"%s","status":"%s","message":"%s","host":"%s","timestamp":"%s","logPath":"%s"}' \
-    "$(json_escape "$ALERT_SERVICE_NAME")" \
-    "$(json_escape "$status")" \
-    "$(json_escape "$message")" \
-    "$(json_escape "$hostname_value")" \
-    "$(json_escape "$timestamp_value")" \
-    "$(json_escape "${log_path:-}")")"
+  alert_format="$(resolve_alert_format)"
+  payload="$(build_alert_payload "$status" "$message" "$hostname_value" "$timestamp_value" "$alert_format")"
 
   curl_args=(
     -fsS
