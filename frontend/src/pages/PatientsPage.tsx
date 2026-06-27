@@ -13,6 +13,7 @@ import {
 } from "../services/patientsApi";
 import type { ApiError } from "../types/api";
 import { useDebounce } from "../hooks/useDebounce";
+import { SaveFeedback } from "../components/system/SaveFeedback";
 
 function usePatientsPageLabels(targetLang: string) {
     const source = labels.patientsPage;
@@ -40,8 +41,17 @@ function usePatientsPageLabels(targetLang: string) {
     const { translated: longitudePlaceholder } = useTranslation({ text: source.form.longitudePlaceholder, ...options });
     const { translated: smsEnabled } = useTranslation({ text: source.form.smsEnabled, ...options });
     const { translated: save } = useTranslation({ text: source.form.save, ...options });
+    const { translated: saving } = useTranslation({ text: source.form.saving, ...options });
     const { translated: create } = useTranslation({ text: source.form.create, ...options });
+    const { translated: creating } = useTranslation({ text: source.form.creating, ...options });
     const { translated: cancel } = useTranslation({ text: source.form.cancel, ...options });
+    const { translated: statusCreating } = useTranslation({ text: source.status.creating, ...options });
+    const { translated: statusUpdating } = useTranslation({ text: source.status.updating, ...options });
+    const { translated: statusDeleting } = useTranslation({ text: source.status.deleting, ...options });
+    const { translated: statusCreated } = useTranslation({ text: source.status.created, ...options });
+    const { translated: statusUpdated } = useTranslation({ text: source.status.updated, ...options });
+    const { translated: statusDeleted } = useTranslation({ text: source.status.deleted, ...options });
+    const { translated: statusFailed } = useTranslation({ text: source.status.failed, ...options });
     const { translated: searchTitle } = useTranslation({ text: source.search.title, ...options });
     const { translated: filterLastNamePlaceholder } = useTranslation({ text: source.search.lastNamePlaceholder, ...options });
     const { translated: filterFirstNamePlaceholder } = useTranslation({ text: source.search.firstNamePlaceholder, ...options });
@@ -87,8 +97,17 @@ function usePatientsPageLabels(targetLang: string) {
         longitudePlaceholder,
         smsEnabled,
         save,
+        saving,
         create,
+        creating,
         cancel,
+        statusCreating,
+        statusUpdating,
+        statusDeleting,
+        statusCreated,
+        statusUpdated,
+        statusDeleted,
+        statusFailed,
         searchTitle,
         filterLastNamePlaceholder,
         filterFirstNamePlaceholder,
@@ -171,6 +190,11 @@ export function PatientsPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const [busyIds, setBusyIds] = useState<Record<string, boolean>>({});
+    const [formSaving, setFormSaving] = useState(false);
+    const [saveFeedback, setSaveFeedback] = useState<{
+        type: "info" | "success" | "error";
+        message: string;
+    } | null>(null);
 
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
@@ -443,16 +467,31 @@ export function PatientsPage() {
     }
 
     async function handleSubmit() {
+        if (formSaving) {
+            return;
+        }
+
         if (!form.nom.trim() || !form.prenom.trim()) {
             setError({
                 code: "INVALID_INPUT",
                 message: ui.requiredName,
                 retryable: false,
             });
+            setSaveFeedback({
+                type: "error",
+                message: ui.requiredName,
+            });
             return;
         }
 
         setError(null);
+        setSaveFeedback({
+            type: "info",
+            message: editingId ? ui.statusUpdating : ui.statusCreating,
+        });
+        setFormSaving(true);
+
+        let savedMessage = editingId ? ui.statusUpdated : ui.statusCreated;
 
         if (editingId) {
             let payload: PatientPayload;
@@ -467,11 +506,24 @@ export function PatientsPage() {
                             : ui.invalidCoordinates,
                     retryable: false,
                 });
+                setSaveFeedback({
+                    type: "error",
+                    message:
+                        err instanceof Error
+                            ? err.message
+                            : ui.invalidCoordinates,
+                });
+                setFormSaving(false);
                 return;
             }
             const response = await updatePatient(editingId, payload);
             if ("error" in response) {
                 setError(response.error);
+                setSaveFeedback({
+                    type: "error",
+                    message: response.error.message || ui.statusFailed,
+                });
+                setFormSaving(false);
                 return;
             }
         } else {
@@ -487,17 +539,35 @@ export function PatientsPage() {
                             : ui.invalidCoordinates,
                     retryable: false,
                 });
+                setSaveFeedback({
+                    type: "error",
+                    message:
+                        err instanceof Error
+                            ? err.message
+                            : ui.invalidCoordinates,
+                });
+                setFormSaving(false);
                 return;
             }
             const response = await createPatient(payload);
             if ("error" in response) {
                 setError(response.error);
+                setSaveFeedback({
+                    type: "error",
+                    message: response.error.message || ui.statusFailed,
+                });
+                setFormSaving(false);
                 return;
             }
         }
 
         resetForm();
         await loadPatients();
+        setSaveFeedback({
+            type: "success",
+            message: savedMessage,
+        });
+        setFormSaving(false);
     }
 
     async function handleEdit(patient: Patient) {
@@ -524,16 +594,28 @@ export function PatientsPage() {
 
         setBusyIds((p) => ({ ...p, [id]: true }));
         setError(null);
+        setSaveFeedback({
+            type: "info",
+            message: ui.statusDeleting,
+        });
 
         const response = await deletePatient(id);
         if ("error" in response) {
             setError(response.error);
+            setSaveFeedback({
+                type: "error",
+                message: response.error.message || ui.statusFailed,
+            });
             setBusyIds((p) => ({ ...p, [id]: false }));
             return;
         }
 
         setBusyIds((p) => ({ ...p, [id]: false }));
         await loadPatients();
+        setSaveFeedback({
+            type: "success",
+            message: ui.statusDeleted,
+        });
     }
 
     function toggleSort(
@@ -600,6 +682,13 @@ export function PatientsPage() {
                 <div className="text-sm text-red-600">
                     {visibleErrorMessage}
                 </div>
+            )}
+
+            {saveFeedback && (
+                <SaveFeedback
+                    type={saveFeedback.type}
+                    message={saveFeedback.message}
+                />
             )}
 
             {viewMode === "create" && (
@@ -720,13 +809,21 @@ export function PatientsPage() {
                     <div className="flex gap-2">
                         <button
                             onClick={handleSubmit}
-                            className="px-4 py-2 bg-primary text-white rounded"
+                            disabled={formSaving}
+                            className="px-4 py-2 bg-primary text-white rounded disabled:opacity-50"
                         >
-                            {editingId ? ui.save : ui.create}
+                            {formSaving
+                                ? editingId
+                                    ? ui.saving
+                                    : ui.creating
+                                : editingId
+                                    ? ui.save
+                                    : ui.create}
                         </button>
                         {editingId && (
                             <button
                                 onClick={resetForm}
+                                disabled={formSaving}
                                 className="px-4 py-2 border rounded"
                             >
                                 {ui.cancel}

@@ -108,6 +108,86 @@ describe("patients routes audit", () => {
         expect(res.status).toHaveBeenCalledWith(201);
     });
 
+    it("returns a telephone-specific conflict message on patient creation", async () => {
+        const handler = getRouteHandler("post", "/");
+        const dto = {
+            nom: "Doe",
+            prenom: "Jane",
+            telephone: "5145550101",
+        };
+
+        toCreatePatientDTO.mockReturnValue(dto);
+        createPatient.mockRejectedValue({
+            code: 11000,
+            keyPattern: { telephone: 1 },
+        });
+
+        const req = {
+            body: dto,
+            headers: {},
+            auth: {
+                userId: "user-1",
+                username: "doctor.one",
+                role: "MEDECIN",
+            },
+            ip: "10.0.0.10",
+            originalUrl: "/api/patients",
+        };
+        const res = makeRes();
+
+        await handler(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "PATIENT_CONFLICT",
+                message: "Ce numéro de téléphone existe déjà.",
+                retryable: false,
+            },
+        });
+        expect(recordPatientAuditEvent).not.toHaveBeenCalled();
+    });
+
+    it("returns a RAMQ-specific conflict message on patient update", async () => {
+        const handler = getRouteHandler("patch", "/:id");
+        const dto = {
+            num_assurance_maladie: "RAMQ1234567890",
+        };
+
+        toUpdatePatientDTO.mockReturnValue(dto);
+        updatePatient.mockRejectedValue({
+            code: 11000,
+            keyValue: { num_assurance_maladie: "RAMQ1234567890" },
+        });
+
+        const req = {
+            body: dto,
+            params: { id: "patient-2" },
+            headers: {},
+            auth: {
+                userId: "user-2",
+                username: "doctor.one",
+                role: "MEDECIN",
+            },
+            ip: "10.0.0.10",
+            originalUrl: "/api/patients/patient-2",
+        };
+        const res = makeRes();
+
+        await handler(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "PATIENT_CONFLICT",
+                message:
+                    "Ce numéro d'assurance maladie existe déjà.",
+                retryable: false,
+            },
+        });
+        expect(recordPatientAuditEvent).not.toHaveBeenCalled();
+    });
+
     it("records changed fields on patient update", async () => {
         const handler = getRouteHandler("patch", "/:id");
         const dto = {

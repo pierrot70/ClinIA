@@ -68,6 +68,34 @@ function buildPatientAuditContext(dto) {
     };
 }
 
+function buildPatientConflictMessage(err) {
+    const conflictFields = [
+        ...Object.keys(err?.keyPattern ?? {}),
+        ...Object.keys(err?.keyValue ?? {}),
+    ];
+    const uniqueFields = new Set(conflictFields);
+
+    if (uniqueFields.has("telephone")) {
+        return "Ce numéro de téléphone existe déjà.";
+    }
+
+    if (uniqueFields.has("num_assurance_maladie")) {
+        return "Ce numéro d'assurance maladie existe déjà.";
+    }
+
+    return "Un patient existe déjà avec une valeur unique identique.";
+}
+
+function sendPatientConflict(res, err) {
+    return res.status(409).json({
+        error: {
+            code: "PATIENT_CONFLICT",
+            message: buildPatientConflictMessage(err),
+            retryable: false,
+        },
+    });
+}
+
 /* ------------------------------------------------------------------ */
 /* POST /api/patients                                                  */
 /* ------------------------------------------------------------------ */
@@ -114,14 +142,7 @@ router.post("/", async (req, res) => {
         }
 
         if (err.code === 11000) {
-            return res.status(409).json({
-                error: {
-                    code: "PATIENT_CONFLICT",
-                    message:
-                        "Ce numéro d'assurance maladie existe déjà.",
-                    retryable: false,
-                },
-            });
+            return sendPatientConflict(res, err);
         }
 
         console.error("❌ Patient create error:", err);
@@ -412,14 +433,7 @@ router.patch("/:id", async (req, res) => {
         }
 
         if (err.code === 11000) {
-            return res.status(409).json({
-                error: {
-                    code: "PATIENT_CONFLICT",
-                    message:
-                        "Ce numéro d'assurance maladie existe déjà.",
-                    retryable: false,
-                },
-            });
+            return sendPatientConflict(res, err);
         }
 
         console.error("❌ Patient update error:", err);

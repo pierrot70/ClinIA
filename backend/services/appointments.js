@@ -4,6 +4,7 @@ import { Patient } from "../models/Patient.js";
 import mongoose from "mongoose";
 import { isValidRamq } from "../utils/validators.js";
 import { buildOwnerScope } from "../auth/resourceAccess.js";
+import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 
 /* ------------------------------------------------------------------ */
 /* Service Appointment                                                 */
@@ -115,11 +116,13 @@ export async function createAppointment(dto, authUser) {
 
     /* ---------------- Persistance ---------------- */
 
-    return Appointment.create({
+    const appointment = new Appointment({
         ...dto,
         patientInsuranceNumber: patient.num_assurance_maladie,
         ownerUserId: patient.ownerUserId || authUser.userId,
     });
+
+    return appointment.save(CLINICAL_WRITE_CONCERN);
 }
 
 /* ------------------------------------------------------------------ */
@@ -199,7 +202,7 @@ export async function cancelAppointment(id, authUser) {
     }
 
     appointment.status = "cancelled";
-    await appointment.save();
+    await appointment.save(CLINICAL_WRITE_CONCERN);
 
     return appointment;
 }
@@ -258,7 +261,7 @@ export async function updateAppointmentStatus(id, newStatus, authUser) {
     }
 
     appointment.status = newStatus;
-    await appointment.save();
+    await appointment.save(CLINICAL_WRITE_CONCERN);
 
     return appointment;
 }
@@ -340,7 +343,7 @@ export async function updateAppointmentSchedule(id, { date, time }, authUser) {
 
     appointment.date = date;
     appointment.time = time;
-    await appointment.save();
+    await appointment.save(CLINICAL_WRITE_CONCERN);
 
     return appointment;
 }

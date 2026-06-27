@@ -645,6 +645,7 @@ export const UI_LABELS_FR = {
             loading: "Création...",
             submit: "Créer le rendez-vous",
             success: "Rendez-vous créé avec succès.",
+            failure: "Le rendez-vous n'a pas été sauvegardé.",
         },
     },
     // PatientsPage.tsx - page /patients, création et recherche de patients.
@@ -678,8 +679,20 @@ export const UI_LABELS_FR = {
             longitudePlaceholder: "Longitude (optionnel)",
             smsEnabled: "SMS activé",
             save: "Enregistrer",
+            saving: "Enregistrement...",
             create: "Créer",
+            creating: "Création...",
             cancel: "Annuler",
+        },
+        status: {
+            creating: "Sauvegarde du patient en cours...",
+            updating: "Sauvegarde des modifications en cours...",
+            deleting: "Suppression du patient en cours...",
+            created: "Patient sauvegardé avec succès.",
+            updated: "Modifications du patient sauvegardées avec succès.",
+            deleted: "Patient supprimé avec succès.",
+            failed:
+                "La sauvegarde n'a pas pu être confirmée. Vérifiez la connexion et réessayez.",
         },
         search: {
             title: "Recherche",

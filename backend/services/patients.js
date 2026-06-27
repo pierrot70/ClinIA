@@ -3,6 +3,10 @@ import { Patient } from "../models/Patient.js";
 import { PatientAuditLog } from "../models/PatientAuditLog.js";
 import { geocodeFreeAddress } from "../utils/geocode.js";
 import { buildOwnerScope } from "../auth/resourceAccess.js";
+import {
+    CLINICAL_QUERY_WRITE_OPTIONS,
+    CLINICAL_WRITE_CONCERN,
+} from "../db/clinicalWriteConcern.js";
 
 /* ------------------------------------------------------------------ */
 /* Service Patient                                                     */
@@ -78,10 +82,12 @@ export async function createPatient(dto, authUser) {
         }
     }
 
-    return Patient.create({
+    const patient = new Patient({
         ...dto,
         ownerUserId: authUser.userId,
     });
+
+    return patient.save(CLINICAL_WRITE_CONCERN);
 }
 
 export async function listPatients(filters = {}, opts = {}, authUser) {
@@ -425,7 +431,11 @@ export async function updatePatient(id, updates, authUser) {
     const patient = await Patient.findOneAndUpdate(
         { _id: id, ...ownerScope },
         { $set: updates },
-        { new: true, runValidators: true }
+        {
+            new: true,
+            runValidators: true,
+            ...CLINICAL_QUERY_WRITE_OPTIONS,
+        }
     );
 
     if (!patient) {
@@ -446,10 +456,13 @@ export async function deletePatient(id, authUser) {
         };
     }
 
-    const deleted = await Patient.findOneAndDelete({
-        _id: id,
-        ...buildOwnerScope(authUser),
-    });
+    const deleted = await Patient.findOneAndDelete(
+        {
+            _id: id,
+            ...buildOwnerScope(authUser),
+        },
+        CLINICAL_QUERY_WRITE_OPTIONS
+    );
 
     if (!deleted) {
         throw {

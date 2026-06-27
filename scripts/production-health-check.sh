@@ -43,7 +43,12 @@ ALERT_WEBHOOK_BEARER_TOKEN="${ALERT_WEBHOOK_BEARER_TOKEN:-}"
 ALERT_WEBHOOK_HEADER="${ALERT_WEBHOOK_HEADER:-}"
 ALERT_TIMEOUT_SECONDS="${ALERT_TIMEOUT_SECONDS:-10}"
 ALERT_SERVICE_NAME="${ALERT_SERVICE_NAME:-clinia-production-health}"
+ALERT_ORIGIN="${ALERT_ORIGIN:-PROD}"
 ALERT_ON_SUCCESS="${ALERT_ON_SUCCESS:-false}"
+MONGO_DEGRADED_WEBHOOK_URL="${MONGO_DEGRADED_WEBHOOK_URL:-}"
+MONGO_INCIDENT_WEBHOOK_URL="${MONGO_INCIDENT_WEBHOOK_URL:-}"
+MONGO_REPLICA_ALERT_LEVEL=""
+MONGO_REPLICA_ALERT_MESSAGE=""
 
 emit() {
   local status="$1"
@@ -98,14 +103,15 @@ build_alert_payload() {
   details_text="$(printf '%s\n' "${EMITTED_LINES[@]}")"
 
   if [[ "$format" == "slack" ]]; then
-    text="$(printf '[%s] %s: %s\nHost: %s\nTimestamp: %s\n\n%s' \
-      "$status" "$ALERT_SERVICE_NAME" "$message" "$hostname_value" "$timestamp_value" "$details_text")"
+    text="$(printf '[%s][%s] %s: %s\nHost: %s\nTimestamp: %s\n\n%s' \
+      "$status" "$ALERT_ORIGIN" "$ALERT_SERVICE_NAME" "$message" "$hostname_value" "$timestamp_value" "$details_text")"
     printf '{"text":"%s"}' "$(json_escape "$text")"
     return
   fi
 
-  printf '{"service":"%s","status":"%s","message":"%s","host":"%s","timestamp":"%s","details":"%s"}' \
+  printf '{"service":"%s","origin":"%s","status":"%s","message":"%s","host":"%s","timestamp":"%s","details":"%s"}' \
     "$(json_escape "$ALERT_SERVICE_NAME")" \
+    "$(json_escape "$ALERT_ORIGIN")" \
     "$(json_escape "$status")" \
     "$(json_escape "$message")" \
     "$(json_escape "$hostname_value")" \
@@ -113,16 +119,18 @@ build_alert_payload() {
     "$(json_escape "$details_text")"
 }
 
-send_alert() {
-  local status="$1"
-  local message="$2"
+send_alert_to_url() {
+  local webhook_url="$1"
+  local status="$2"
+  local message="$3"
   local hostname_value
   local timestamp_value
   local alert_format
   local payload
   local curl_args
+  local previous_alert_webhook_url="$ALERT_WEBHOOK_URL"
 
-  if [[ -z "$ALERT_WEBHOOK_URL" ]]; then
+  if [[ -z "$webhook_url" ]]; then
     return
   fi
 
@@ -133,7 +141,9 @@ send_alert() {
 
   hostname_value="$(hostname 2>/dev/null || printf 'unknown')"
   timestamp_value="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  ALERT_WEBHOOK_URL="$webhook_url"
   alert_format="$(resolve_alert_format)"
+  ALERT_WEBHOOK_URL="$previous_alert_webhook_url"
   payload="$(build_alert_payload "$status" "$message" "$hostname_value" "$timestamp_value" "$alert_format")"
 
   curl_args=(
@@ -151,9 +161,24 @@ send_alert() {
     curl_args+=(-H "$ALERT_WEBHOOK_HEADER")
   fi
 
-  if ! curl "${curl_args[@]}" --data "$payload" "$ALERT_WEBHOOK_URL" >/dev/null; then
-    printf 'WARN alert_failed status=%s webhook=%s\n' "$status" "$ALERT_WEBHOOK_URL" >&2
+  if ! curl "${curl_args[@]}" --data "$payload" "$webhook_url" >/dev/null; then
+    printf 'WARN alert_failed status=%s webhook=%s\n' "$status" "$webhook_url" >&2
   fi
+}
+
+send_alert() {
+  local status="$1"
+  local message="$2"
+
+  send_alert_to_url "$ALERT_WEBHOOK_URL" "$status" "$message"
+}
+
+mark_mongo_replica_alert() {
+  local level="$1"
+  local message="$2"
+
+  MONGO_REPLICA_ALERT_LEVEL="$level"
+  MONGO_REPLICA_ALERT_MESSAGE="$message"
 }
 
 check_disk() {
@@ -350,11 +375,13 @@ check_mongo_replica_set() {
   local set_name
 
   if ! command -v docker >/dev/null 2>&1; then
+    mark_mongo_replica_alert "incident" "Mongo replica set incident: origin=$ALERT_ORIGIN docker command not found"
     emit "CRITICAL" "mongo_replica_set message=\"docker command not found\""
     return
   fi
 
   if ! container="$(mongo_container_for_replica_check)"; then
+    mark_mongo_replica_alert "incident" "Mongo replica set incident: origin=$ALERT_ORIGIN container not found prefix=$MONGO_REPLICA_CONTAINER_PREFIX"
     emit "CRITICAL" "mongo_replica_set prefix=$MONGO_REPLICA_CONTAINER_PREFIX message=\"mongo container not found\""
     return
   fi
@@ -371,6 +398,16 @@ check_mongo_replica_set() {
   fi
 
   if [[ -z "$mongo_root_password" ]]; then
+    mongo_root_password="$(
+      docker inspect "$container" \
+        --format '{{range .Config.Env}}{{println .}}{{end}}' |
+      sed -n 's/^CLINIA_RS_ROOT_PASSWORD=//p' |
+      tail -n1
+    )"
+  fi
+
+  if [[ -z "$mongo_root_password" ]]; then
+    mark_mongo_replica_alert "incident" "Mongo replica set incident: origin=$ALERT_ORIGIN missing Mongo root password"
     emit "CRITICAL" "mongo_replica_set container=$container message=\"missing Mongo root password\""
     return
   fi
@@ -392,6 +429,7 @@ check_mongo_replica_set() {
           print([status.set, status.members.length, primaryCount, secondaryCount, healthyCount].join(" "));
         '"'"''
   )"; then
+    mark_mongo_replica_alert "incident" "Mongo replica set incident: origin=$ALERT_ORIGIN rs.status failed"
     emit "CRITICAL" "mongo_replica_set container=$container message=\"rs.status failed\""
     return
   fi
@@ -399,26 +437,43 @@ check_mongo_replica_set() {
   read -r set_name total_count primary_count secondary_count healthy_count <<<"$result"
 
   if [[ "$set_name" != "$MONGO_REPLICA_SET_NAME" ]]; then
+    mark_mongo_replica_alert "incident" "Mongo replica set incident: origin=$ALERT_ORIGIN unexpected replica set name=$set_name"
     emit "CRITICAL" "mongo_replica_set set=$set_name expected_set=$MONGO_REPLICA_SET_NAME message=\"unexpected replica set name\""
     return
   fi
 
   if (( total_count < MONGO_REPLICA_EXPECTED_MEMBERS )); then
+    mark_mongo_replica_alert "incident" "Mongo replica set incident: origin=$ALERT_ORIGIN members=$total_count/$MONGO_REPLICA_EXPECTED_MEMBERS"
     emit "CRITICAL" "mongo_replica_set set=$set_name members=$total_count expected_members=$MONGO_REPLICA_EXPECTED_MEMBERS message=\"missing replica set members\""
     return
   fi
 
   if (( primary_count != 1 )); then
-    emit "CRITICAL" "mongo_replica_set set=$set_name primary=$primary_count message=\"expected exactly one healthy primary\""
+    mark_mongo_replica_alert "incident" "Mongo replica set incident: origin=$ALERT_ORIGIN healthy=$healthy_count/$MONGO_REPLICA_EXPECTED_MEMBERS primary=$primary_count secondaries=$secondary_count"
+    emit "CRITICAL" "mongo_replica_set set=$set_name primary=$primary_count healthy=$healthy_count expected_healthy=$MONGO_REPLICA_EXPECTED_MEMBERS message=\"expected exactly one healthy primary\""
+    return
+  fi
+
+  if (( healthy_count <= 1 )); then
+    mark_mongo_replica_alert "incident" "Mongo replica set incident: origin=$ALERT_ORIGIN healthy=$healthy_count/$MONGO_REPLICA_EXPECTED_MEMBERS primary=$primary_count secondaries=$secondary_count"
+    emit "CRITICAL" "mongo_replica_set set=$set_name healthy=$healthy_count expected_healthy=$MONGO_REPLICA_EXPECTED_MEMBERS primary=$primary_count secondaries=$secondary_count message=\"replica set majority unavailable\""
+    return
+  fi
+
+  if (( healthy_count == 2 )); then
+    mark_mongo_replica_alert "degraded" "Mongo replica set degraded: origin=$ALERT_ORIGIN healthy=$healthy_count/$MONGO_REPLICA_EXPECTED_MEMBERS primary=$primary_count secondaries=$secondary_count"
+    emit "WARN" "mongo_replica_set set=$set_name members=$total_count primary=$primary_count secondaries=$secondary_count healthy=$healthy_count expected_healthy=$MONGO_REPLICA_EXPECTED_MEMBERS message=\"replica set degraded but majority available\""
     return
   fi
 
   if (( secondary_count < MONGO_REPLICA_EXPECTED_SECONDARIES )); then
+    mark_mongo_replica_alert "incident" "Mongo replica set incident: origin=$ALERT_ORIGIN healthy=$healthy_count/$MONGO_REPLICA_EXPECTED_MEMBERS primary=$primary_count secondaries=$secondary_count"
     emit "CRITICAL" "mongo_replica_set set=$set_name secondaries=$secondary_count expected_secondaries=$MONGO_REPLICA_EXPECTED_SECONDARIES message=\"not enough healthy secondaries\""
     return
   fi
 
   if (( healthy_count < MONGO_REPLICA_EXPECTED_MEMBERS )); then
+    mark_mongo_replica_alert "incident" "Mongo replica set incident: origin=$ALERT_ORIGIN healthy=$healthy_count/$MONGO_REPLICA_EXPECTED_MEMBERS primary=$primary_count secondaries=$secondary_count"
     emit "CRITICAL" "mongo_replica_set set=$set_name healthy=$healthy_count expected_healthy=$MONGO_REPLICA_EXPECTED_MEMBERS message=\"not all members healthy\""
     return
   fi
@@ -573,6 +628,12 @@ fi
 
 if [[ "$CHECK_S3_BACKUP" == "true" ]]; then
   check_s3_backup
+fi
+
+if [[ "$MONGO_REPLICA_ALERT_LEVEL" == "degraded" ]]; then
+  send_alert_to_url "$MONGO_DEGRADED_WEBHOOK_URL" "warning" "$MONGO_REPLICA_ALERT_MESSAGE"
+elif [[ "$MONGO_REPLICA_ALERT_LEVEL" == "incident" ]]; then
+  send_alert_to_url "$MONGO_INCIDENT_WEBHOOK_URL" "failed" "$MONGO_REPLICA_ALERT_MESSAGE"
 fi
 
 if ((CRITICAL_COUNT > 0)); then

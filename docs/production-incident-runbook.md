@@ -117,6 +117,111 @@ The monitor sends Slack alerts through `/root/clinia-backup-alert.env` when a
 check returns `WARN` or `CRITICAL`. Keep `ALERT_ON_SUCCESS=false` for this cron
 to avoid noisy heartbeat alerts every 15 minutes.
 
+Mongo replica alert routing:
+
+Use dedicated Slack Incoming Webhooks for Mongo topology alerts:
+
+- `MONGO_DEGRADED_WEBHOOK_URL`: send to `#mongo-degraded` when Mongo has `2/3`
+  healthy members. Majority writes should still work, but redundancy is reduced.
+- `MONGO_INCIDENT_WEBHOOK_URL`: send to `#mongo-incident` when Mongo has `1/3`
+  healthy members or no healthy primary. Majority writes should not be trusted.
+- `ALERT_ORIGIN`: set to `DEV` for local drills and `PROD` for Coolify. Slack
+  messages include this origin, for example `[warning][DEV]` or
+  `[failed][PROD]`.
+
+Store real webhook URLs only in root-owned env files, never in git. For
+production, put them in a root-only file such as
+`/root/clinia-mongo-alerts.env`:
+
+```bash
+sudo tee /root/clinia-mongo-alerts.env >/dev/null <<'EOF'
+ALERT_ORIGIN=PROD
+ALERT_WEBHOOK_FORMAT=slack
+MONGO_DEGRADED_WEBHOOK_URL=https://hooks.slack.com/services/REPLACE/REPLACE/REPLACE
+MONGO_INCIDENT_WEBHOOK_URL=https://hooks.slack.com/services/REPLACE/REPLACE/REPLACE
+EOF
+sudo chmod 600 /root/clinia-mongo-alerts.env
+```
+
+Then source that file from the health cron before running the script:
+
+```bash
+*/15 * * * * root set -a; if [ -f /root/clinia-backup-alert.env ]; then . /root/clinia-backup-alert.env; fi; if [ -f /root/clinia-backup-s3.env ]; then . /root/clinia-backup-s3.env; fi; if [ -f /root/clinia-mongo-alerts.env ]; then . /root/clinia-mongo-alerts.env; fi; set +a; ALERT_ON_SUCCESS=false CHECK_CONTAINERS=true CHECK_MONGO_REPLICA=true CHECK_HTTP_READY=true CHECK_LOCAL_BACKUP=true CHECK_S3_BACKUP=true BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_LABEL=clinia-prod MONGO_REPLICA_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- /opt/clinia/scripts/production-health-check.sh >>/var/log/clinia/production-health-check.log 2>&1
+```
+
+For local drills, export the same variables with `ALERT_ORIGIN=DEV` in the local
+terminal. Do not paste Slack webhook URLs in chat or commit them.
+
+### Mongo degraded/incident alert drills
+
+Purpose: prove that Mongo topology degradation is routed to the right Slack
+channel with the right origin marker.
+
+Local drill, already validated in the local replica set stack:
+
+```bash
+ALERT_ORIGIN=DEV \
+MONGO_DEGRADED_WEBHOOK_URL="$MONGO_DEGRADED_WEBHOOK_URL" \
+MONGO_INCIDENT_WEBHOOK_URL="$MONGO_INCIDENT_WEBHOOK_URL" \
+./scripts/run-local-mongo-alert-drill.sh
+```
+
+Expected local result:
+
+```text
+INFO LOCAL_MONGO_ALERT_DRILL_PASSED origin=DEV
+```
+
+Expected local Slack messages:
+
+- `#mongo-degraded`: one `[warning][DEV]` message when Mongo is `2/3`.
+- `#mongo-incident`: one `[failed][DEV]` message when Mongo is `1/3`.
+
+Production drill: run only during a planned maintenance window. This drill
+intentionally stops both Mongo secondaries for a short period. At `2/3`, Mongo
+still has a majority and should remain writable. At `1/3`, Mongo should lose
+majority and writes should not be trusted until the members return.
+
+Install or refresh the scripts on `clinia-coolify`:
+
+```bash
+sudo mkdir -p /opt/clinia/scripts
+
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/production-health-check.sh \
+  -o /opt/clinia/scripts/production-health-check.sh
+
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/run-production-mongo-alert-drill.sh \
+  -o /opt/clinia/scripts/run-production-mongo-alert-drill.sh
+
+sudo chmod 755 /opt/clinia/scripts/production-health-check.sh \
+  /opt/clinia/scripts/run-production-mongo-alert-drill.sh
+```
+
+Run the production alert drill:
+
+```bash
+sudo CONFIRM_PRODUCTION_MONGO_ALERT_DRILL=RUN_CLINIA_MONGO_ALERT_DRILL \
+  ALERT_ORIGIN=PROD \
+  /opt/clinia/scripts/run-production-mongo-alert-drill.sh
+```
+
+Expected production result:
+
+```text
+INFO PRODUCTION_MONGO_ALERT_DRILL_PASSED origin=PROD
+```
+
+Expected production Slack messages:
+
+- `#mongo-degraded`: one `[warning][PROD]` message for `2/3`.
+- `#mongo-incident`: one `[failed][PROD]` message for `1/3` or no healthy
+  primary.
+
+Final success requires the script to restart the stopped secondaries and verify
+Mongo is back to `1 PRIMARY`, `2 SECONDARY`, `healthy=3`. If the script fails,
+it attempts cleanup automatically; immediately run the full production health
+check and inspect `/var/log/clinia/production-health-check.log`.
+
 Test the Slack failure path without breaking production:
 
 ```bash

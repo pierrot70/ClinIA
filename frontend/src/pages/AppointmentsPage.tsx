@@ -20,6 +20,7 @@ import {
     type Specialist,
 } from "../services/specialistsApi";
 import type { ApiError } from "../types/api";
+import { SaveFeedback } from "../components/system/SaveFeedback";
 
 function useAppointmentsPageLabels(targetLang: string) {
     const source = labels.appointmentsPage;
@@ -51,6 +52,7 @@ function useAppointmentsPageLabels(targetLang: string) {
     const { translated: createLoading } = useTranslation({ text: source.action.loading, ...options });
     const { translated: createSubmit } = useTranslation({ text: source.action.submit, ...options });
     const { translated: createSuccess } = useTranslation({ text: source.action.success, ...options });
+    const { translated: createFailure } = useTranslation({ text: source.action.failure, ...options });
 
     return {
         title,
@@ -79,6 +81,7 @@ function useAppointmentsPageLabels(targetLang: string) {
         createLoading,
         createSubmit,
         createSuccess,
+        createFailure,
     };
 }
 
@@ -743,15 +746,17 @@ export function AppointmentsPage() {
                 </button>
 
                 {apiError && (
-                    <div className="text-sm text-red-600">
-                        {apiError.message}
-                    </div>
+                    <SaveFeedback
+                        type="error"
+                        message={apiError.message || ui.createFailure}
+                    />
                 )}
 
                 {success && (
-                    <div className="text-sm text-green-600">
-                        {ui.createSuccess}
-                    </div>
+                    <SaveFeedback
+                        type="success"
+                        message={ui.createSuccess}
+                    />
                 )}
             </div>
         </div>
