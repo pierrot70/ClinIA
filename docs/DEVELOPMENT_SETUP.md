@@ -159,6 +159,101 @@ Verification API:
 curl -i http://localhost:4000/api/auth/app-status
 ```
 
+## Staging local avec Mongo replica set
+
+Le mode `STAGING` sert a reproduire localement une topologie plus proche de
+Coolify/production, sans frais cloud et sans toucher aux donnees production.
+
+Il lance:
+
+- `mongo-rs-1`, `mongo-rs-2`, `mongo-rs-3` dans le replica set `rs0`;
+- un backend principal sur `http://localhost:4002`;
+- un backend replica sur `http://localhost:4003`;
+- la base locale `clinia` dans le stack Docker `clinia_mongo_rs`.
+
+Demarrer ou reconstruire le staging local:
+
+```bash
+./rebuild-local.sh STAGING
+```
+
+Resultat attendu:
+
+```text
+Staging ready
+Backend primary : http://localhost:4002
+Backend replica : http://localhost:4003
+```
+
+Le script verifie aussi que Mongo termine avec:
+
+```text
+mongo-rs-1: PRIMARY, health: 1
+mongo-rs-2: SECONDARY, health: 1
+mongo-rs-3: SECONDARY, health: 1
+```
+
+Pour inspecter le stack:
+
+```bash
+docker compose -p clinia_mongo_rs -f docker-compose-mongo-rs-local.yml ps
+```
+
+### Drill CRUD patients
+
+Le drill patient valide le cycle complet `create`, `read`, `update`, `delete`
+sur l'API staging. Il cree un patient marque par `created_by_reference`, le
+supprime, puis verifie qu'aucun patient zombie ne reste.
+
+Sortie concise:
+
+```bash
+VERBOSE=0 ./scripts/run-staging-patient-write-drill.sh
+```
+
+Resultat attendu:
+
+```text
+Testing patients collection
+Mongo replica set before drill: 3/3 healthy, primary=1, secondaries=2
+Patient documents before drill: 4
+ - creating patient OK
+ - reading patient OK
+ - updating patient OK
+ - deleting patient OK
+Patient documents after drill: 4
+Mongo replica set after drill: 3/3 healthy, primary=1, secondaries=2
+```
+
+Le nombre de documents avant/apres doit rester identique. Si une etape echoue,
+le script affiche `FAILED` et tente quand meme le cleanup par marqueur.
+
+### Drill resilience patients
+
+Le drill resilience automatise les scenarios Mongo les plus utiles pour la
+collection `patients`:
+
+- CRUD en etat normal `3/3`;
+- arret d'un secondary et CRUD en `2/3`;
+- redemarrage du secondary et retour `3/3`;
+- arret du primary, election d'un nouveau primary, puis CRUD en `2/3`;
+- redemarrage de l'ancien primary et retour final `3/3`.
+
+Commande:
+
+```bash
+./scripts/run-staging-patient-resilience-drill.sh
+```
+
+Resultat attendu a la fin:
+
+```text
+INFO STAGING_PATIENT_RESILIENCE_DRILL_PASSED
+```
+
+Ce drill doit toujours laisser la collection `patients` avec le meme nombre de
+documents qu'au depart de chaque sous-test.
+
 ## Acces depuis iPhone avec Tailscale
 
 1. Installer Tailscale sur Windows et iPhone.
@@ -430,9 +525,12 @@ docker ps
 - `RUNNING.md`
 - `.env.example`
 - `docker-compose-local.yml`
+- `docker-compose-mongo-rs-local.yml`
 - `docker-compose.yml`
 - `dev.sh`
 - `rebuild-local.sh`
+- `scripts/run-staging-patient-write-drill.sh`
+- `scripts/run-staging-patient-resilience-drill.sh`
 - `.githooks/pre-push`
 - `docs/mongo-credential-rotation.md`
 - `backend/package.json`

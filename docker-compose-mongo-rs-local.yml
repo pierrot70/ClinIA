@@ -48,11 +48,17 @@ services:
       - mongo_rs_3:/data/db
       - mongo_keyfile:/keyfile:ro
 
-  backend:
+  backend: &backend
     build:
       context: ./backend
       dockerfile: Dockerfile-local
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health/ready').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
     environment:
       NODE_ENV: development
       MONGO_URI: "${MONGO_RS_URI_DOCKER:?Set MONGO_RS_URI_DOCKER in .env}"
@@ -71,6 +77,20 @@ services:
       - mongo-rs-1
       - mongo-rs-2
       - mongo-rs-3
+
+  backend-replica:
+    <<: *backend
+    environment:
+      NODE_ENV: development
+      MONGO_URI: "${MONGO_RS_URI_DOCKER:?Set MONGO_RS_URI_DOCKER in .env}"
+      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-local-replica-set-test}"
+      OPENAI_MODEL: "gpt-4.1-mini"
+      CLINIA_MOCK_AI: "true"
+      CLINIA_ALLOW_SELF_REGISTRATION: "false"
+      CLINIA_INSTANCE_ID: "mongo-rs-test-backend-replica"
+    ports:
+      - "4003:4000"
 
 volumes:
   mongo_keyfile:

@@ -7,6 +7,104 @@ headline() {
   echo "=================================================="
 }
 
+EARLY_MODE="${MODE:-${1:-}}"
+
+if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
+  set -euo pipefail
+
+  ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  STAGING_COMPOSE_FILE="${STAGING_COMPOSE_FILE:-$ROOT_DIR/docker-compose-mongo-rs-local.yml}"
+  STAGING_PROJECT_NAME="${STAGING_PROJECT_NAME:-clinia_mongo_rs}"
+  WIPE_VOLUMES="${WIPE_VOLUMES:-0}"
+  NO_CACHE="${NO_CACHE:-0}"
+  PULL="${PULL:-0}"
+
+  sdc() {
+    docker compose -p "$STAGING_PROJECT_NAME" -f "$STAGING_COMPOSE_FILE" "$@"
+  }
+
+  wait_for_staging_url() {
+    local label="$1"
+    local url="$2"
+    local attempt
+
+    for attempt in {1..30}; do
+      if curl -fsS --max-time 5 "$url" >/dev/null 2>&1; then
+        echo "OK $label url=$url attempt=$attempt"
+        return
+      fi
+      sleep 2
+    done
+
+    echo "ERREUR $label url=$url"
+    exit 1
+  }
+
+  headline "ClinIA local staging rebuild"
+
+  command -v docker >/dev/null 2>&1 || {
+    echo "ERREUR docker introuvable"
+    exit 1
+  }
+  command -v curl >/dev/null 2>&1 || {
+    echo "ERREUR curl introuvable"
+    exit 1
+  }
+
+  echo "Compose file : $STAGING_COMPOSE_FILE"
+  echo "Project name : $STAGING_PROJECT_NAME"
+  echo "Mode         : ${EARLY_MODE^^}"
+  echo "Options:"
+  echo "  WIPE_VOLUMES=$WIPE_VOLUMES"
+  echo "  NO_CACHE=$NO_CACHE"
+  echo "  PULL=$PULL"
+
+  headline "Validating staging compose"
+  sdc config --quiet
+
+  headline "Stopping staging containers"
+  if [[ "$WIPE_VOLUMES" == "1" ]]; then
+    sdc down -v --remove-orphans
+  else
+    sdc down --remove-orphans
+  fi
+
+  headline "Building staging backend images"
+  BUILD_ARGS=()
+  [[ "$NO_CACHE" == "1" ]] && BUILD_ARGS+=(--no-cache)
+  [[ "$PULL" == "1" ]] && BUILD_ARGS+=(--pull)
+  sdc build "${BUILD_ARGS[@]}" backend backend-replica
+
+  headline "Starting Mongo replica set"
+  sdc up -d mongo-rs-1 mongo-rs-2 mongo-rs-3
+
+  headline "Initializing Mongo replica set"
+  COMPOSE_PROJECT="$STAGING_PROJECT_NAME" "$ROOT_DIR/scripts/init-mongo-rs-local.sh"
+
+  headline "Starting staging backends"
+  sdc up -d backend backend-replica
+
+  headline "Container status"
+  sdc ps
+
+  headline "Staging sanity checks"
+  wait_for_staging_url "backend" "http://localhost:4002/api/health/ready"
+  wait_for_staging_url "backend-replica" "http://localhost:4003/api/health/ready"
+
+  sdc exec -T mongo-rs-1 sh -c 'mongosh --quiet \
+    --username "$CLINIA_RS_ROOT_USERNAME" \
+    --password="$CLINIA_RS_ROOT_PASSWORD" \
+    --authenticationDatabase admin \
+    --eval "rs.status().members.map(({name,stateStr,health}) => ({name,stateStr,health}))"'
+
+  headline "Staging ready"
+  echo "Backend primary : http://localhost:4002"
+  echo "Backend replica : http://localhost:4003"
+  echo "Mongo RS stack  : docker compose -p \"$STAGING_PROJECT_NAME\" -f \"$STAGING_COMPOSE_FILE\" ps"
+  echo "Alert drill     : ALERT_ORIGIN=DEV ./scripts/run-local-mongo-alert-drill.sh"
+  exit 0
+fi
+
 TEST_SUMMARY_FRONTEND_TOTAL=0
 TEST_SUMMARY_FRONTEND_FAILED=0
 TEST_SUMMARY_FRONTEND_FAILED_NAMES=""
