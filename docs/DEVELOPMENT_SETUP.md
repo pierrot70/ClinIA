@@ -265,7 +265,13 @@ qui supportent leur travail clinique:
 - `diagnosisresults`: creation, lecture, modification, suppression d'un
   resultat d'analyse clinique sauvegarde;
 - `cliniciancomments`: creation, lecture, reponse admin, consultation des
-  reponses, suppression de cleanup.
+  reponses, suppression de cleanup;
+- `specialists`: creation, lecture, modification, suppression d'un specialiste;
+- `cliniques`: creation, lecture, modification, suppression d'une clinique.
+
+Le drill `patientauditlogs` valide la conformite des journaux d'audit patient:
+les actions `PATIENT_CREATE`, `PATIENT_UPDATE` et `PATIENT_DELETE` doivent etre
+presentes, sans exposer les valeurs patient sensibles exactes.
 
 Commandes CRUD simples:
 
@@ -274,6 +280,9 @@ VERBOSE=0 ./scripts/run-staging-patient-write-drill.sh
 VERBOSE=0 ./scripts/run-staging-appointment-write-drill.sh
 VERBOSE=0 ./scripts/run-staging-diagnosis-result-write-drill.sh
 VERBOSE=0 ./scripts/run-staging-clinician-comment-write-drill.sh
+VERBOSE=0 ./scripts/run-staging-specialist-write-drill.sh
+VERBOSE=0 ./scripts/run-staging-clinique-write-drill.sh
+VERBOSE=0 ./scripts/run-staging-patient-audit-log-compliance-drill.sh
 ```
 
 Commandes resilience:
@@ -283,6 +292,8 @@ Commandes resilience:
 ./scripts/run-staging-appointment-resilience-drill.sh
 ./scripts/run-staging-diagnosis-result-resilience-drill.sh
 ./scripts/run-staging-clinician-comment-resilience-drill.sh
+./scripts/run-staging-specialist-resilience-drill.sh
+./scripts/run-staging-clinique-resilience-drill.sh
 ```
 
 Chaque drill resilience execute le meme parcours:
@@ -300,6 +311,9 @@ INFO STAGING_PATIENT_RESILIENCE_DRILL_PASSED
 INFO STAGING_APPOINTMENT_RESILIENCE_DRILL_PASSED
 INFO STAGING_DIAGNOSIS_RESULT_RESILIENCE_DRILL_PASSED
 INFO STAGING_CLINICIAN_COMMENT_RESILIENCE_DRILL_PASSED
+INFO STAGING_SPECIALIST_RESILIENCE_DRILL_PASSED
+INFO STAGING_CLINIQUE_RESILIENCE_DRILL_PASSED
+INFO STAGING_PATIENT_AUDIT_LOG_COMPLIANCE_DRILL_PASSED
 ```
 
 Chaque drill doit afficher le meme nombre de documents avant et apres son
@@ -318,6 +332,14 @@ Notes importantes:
   publique normale pour cette collection.
 - Le drill `cliniciancomments` nettoie aussi la fenetre de rate limit locale du
   commentaire pour permettre les tests repetes dans le stack STAGING.
+- `specialists` et `cliniques` passent par les API protegees
+  `ADMIN`/`SUPERADMIN`.
+- `cliniques` fournit `lat` et `long` explicitement pour eviter tout geocodage
+  externe pendant le drill.
+- `patientauditlogs` cree, modifie et supprime un patient de test, verifie les
+  trois actions attendues, confirme l'absence des valeurs exactes RAMQ,
+  telephone, courriel, prenom et nom dans les logs, puis nettoie les logs de
+  drill par `patientId`.
 
 ## Acces depuis iPhone avec Tailscale
 
@@ -602,6 +624,11 @@ docker ps
 - `scripts/run-staging-diagnosis-result-resilience-drill.sh`
 - `scripts/run-staging-clinician-comment-write-drill.sh`
 - `scripts/run-staging-clinician-comment-resilience-drill.sh`
+- `scripts/run-staging-specialist-write-drill.sh`
+- `scripts/run-staging-specialist-resilience-drill.sh`
+- `scripts/run-staging-clinique-write-drill.sh`
+- `scripts/run-staging-clinique-resilience-drill.sh`
+- `scripts/run-staging-patient-audit-log-compliance-drill.sh`
 - `.githooks/pre-push`
 - `docs/mongo-credential-rotation.md`
 - `backend/package.json`

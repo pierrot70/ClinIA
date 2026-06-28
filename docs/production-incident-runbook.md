@@ -350,7 +350,10 @@ Recommended drill cadence:
   credentials.
 - Run the local STAGING collection resilience drills before promoting risky
   persistence changes that touch `patients`, `appointments`,
-  `diagnosisresults`, or `cliniciancomments`.
+  `diagnosisresults`, `cliniciancomments`, `specialists`, or `cliniques`.
+- Run the local STAGING `patientauditlogs` compliance drill before promoting
+  risky changes that touch patient audit logging, patient mutation routes, or
+  Loi 25/PIPEDA evidence.
 - Run the S3 fetch plus restore drill quarterly.
 - Keep the daily backup plus hourly Slack heartbeat running continuously.
 - Record each drill date, operator, final verdict, selected backup archive when
