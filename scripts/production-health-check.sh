@@ -163,7 +163,7 @@ send_alert_to_url() {
   fi
 
   if ! curl "${curl_args[@]}" --data "$payload" "$webhook_url" >/dev/null; then
-    printf 'WARN alert_failed status=%s webhook=%s\n' "$status" "$webhook_url" >&2
+    printf 'WARN alert_failed status=%s webhook_configured=true\n' "$status" >&2
   fi
 }
 
