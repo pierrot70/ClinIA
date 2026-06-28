@@ -348,10 +348,17 @@ Recommended drill cadence:
 - Run the full production failover drill quarterly, and after any infrastructure
   change touching Coolify routing, backend scaling, Mongo topology, or Mongo
   credentials.
+- Run the local STAGING collection resilience drills before promoting risky
+  persistence changes that touch `patients`, `appointments`,
+  `diagnosisresults`, or `cliniciancomments`.
 - Run the S3 fetch plus restore drill quarterly.
 - Keep the daily backup plus hourly Slack heartbeat running continuously.
 - Record each drill date, operator, final verdict, selected backup archive when
   applicable, and any unexpected temporary signal.
+
+Local STAGING collection drills are documented in
+`docs/DEVELOPMENT_SETUP.md`. They intentionally run against the local
+`clinia_mongo_rs` replica set, not against production.
 
 ## Evidence log template
 

@@ -254,6 +254,71 @@ INFO STAGING_PATIENT_RESILIENCE_DRILL_PASSED
 Ce drill doit toujours laisser la collection `patients` avec le meme nombre de
 documents qu'au depart de chaque sous-test.
 
+### Drills STAGING des collections medecin-critiques
+
+Ces drills valident les collections que les medecins utilisent directement ou
+qui supportent leur travail clinique:
+
+- `patients`: creation, lecture, modification, suppression d'un patient;
+- `appointments`: creation, lecture, modification d'horaire, annulation d'un
+  rendez-vous;
+- `diagnosisresults`: creation, lecture, modification, suppression d'un
+  resultat d'analyse clinique sauvegarde;
+- `cliniciancomments`: creation, lecture, reponse admin, consultation des
+  reponses, suppression de cleanup.
+
+Commandes CRUD simples:
+
+```bash
+VERBOSE=0 ./scripts/run-staging-patient-write-drill.sh
+VERBOSE=0 ./scripts/run-staging-appointment-write-drill.sh
+VERBOSE=0 ./scripts/run-staging-diagnosis-result-write-drill.sh
+VERBOSE=0 ./scripts/run-staging-clinician-comment-write-drill.sh
+```
+
+Commandes resilience:
+
+```bash
+./scripts/run-staging-patient-resilience-drill.sh
+./scripts/run-staging-appointment-resilience-drill.sh
+./scripts/run-staging-diagnosis-result-resilience-drill.sh
+./scripts/run-staging-clinician-comment-resilience-drill.sh
+```
+
+Chaque drill resilience execute le meme parcours:
+
+- CRUD en etat normal `3/3`;
+- arret d'un secondary et CRUD en `2/3`;
+- redemarrage du secondary et retour `3/3`;
+- arret du primary, election d'un nouveau primary, puis CRUD en `2/3`;
+- redemarrage de l'ancien primary et retour final `3/3`.
+
+Resultats finaux attendus:
+
+```text
+INFO STAGING_PATIENT_RESILIENCE_DRILL_PASSED
+INFO STAGING_APPOINTMENT_RESILIENCE_DRILL_PASSED
+INFO STAGING_DIAGNOSIS_RESULT_RESILIENCE_DRILL_PASSED
+INFO STAGING_CLINICIAN_COMMENT_RESILIENCE_DRILL_PASSED
+```
+
+Chaque drill doit afficher le meme nombre de documents avant et apres son
+execution. Les donnees temporaires sont marquees avec un prefixe
+`clinia-staging-...-drill-` et nettoyees a la fin. Si une etape affiche
+`FAILED`, ne pas continuer avec les drills suivants avant d'avoir restaure Mongo
+en `3/3 healthy`.
+
+Notes importantes:
+
+- `diagnosisresults` est teste localement par ecriture Mongo directe pour eviter
+  tout appel IA/cloud pendant un drill.
+- `cliniciancomments` passe par l'API pour valider creation, lecture, reponse et
+  lookup public des reponses. Le cleanup final supprime directement le
+  commentaire de test en Mongo parce que l'API ne fournit pas de suppression
+  publique normale pour cette collection.
+- Le drill `cliniciancomments` nettoie aussi la fenetre de rate limit locale du
+  commentaire pour permettre les tests repetes dans le stack STAGING.
+
 ## Acces depuis iPhone avec Tailscale
 
 1. Installer Tailscale sur Windows et iPhone.
@@ -531,6 +596,12 @@ docker ps
 - `rebuild-local.sh`
 - `scripts/run-staging-patient-write-drill.sh`
 - `scripts/run-staging-patient-resilience-drill.sh`
+- `scripts/run-staging-appointment-write-drill.sh`
+- `scripts/run-staging-appointment-resilience-drill.sh`
+- `scripts/run-staging-diagnosis-result-write-drill.sh`
+- `scripts/run-staging-diagnosis-result-resilience-drill.sh`
+- `scripts/run-staging-clinician-comment-write-drill.sh`
+- `scripts/run-staging-clinician-comment-resilience-drill.sh`
 - `.githooks/pre-push`
 - `docs/mongo-credential-rotation.md`
 - `backend/package.json`
