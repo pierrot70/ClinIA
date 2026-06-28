@@ -67,6 +67,7 @@ services:
       OPENAI_MODEL: "gpt-4.1-mini"
       CLINIA_MOCK_AI: "true"
       CLINIA_ALLOW_SELF_REGISTRATION: "false"
+      CLINIA_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"
       CLINIA_INSTANCE_ID: "mongo-rs-test-backend"
     ports:
       - "4002:4000"
@@ -88,6 +89,7 @@ services:
       OPENAI_MODEL: "gpt-4.1-mini"
       CLINIA_MOCK_AI: "true"
       CLINIA_ALLOW_SELF_REGISTRATION: "false"
+      CLINIA_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"
       CLINIA_INSTANCE_ID: "mongo-rs-test-backend-replica"
     ports:
       - "4003:4000"

@@ -6,7 +6,13 @@ import { createHash } from "crypto";
 
 import { getDbStatus, readBackupSnapshots, setBackupProtection } from "../dbStatus.js";
 
-function createConnectedConnection() {
+function createConnectedConnection({
+    members = [
+        { name: "mongo:27017", stateStr: "PRIMARY", health: 1, optimeDate: new Date("2026-01-01T00:00:05Z") },
+        { name: "mongo-replica-1:27017", stateStr: "SECONDARY", health: 1, optimeDate: new Date("2026-01-01T00:00:05Z"), syncSourceHost: "mongo:27017" },
+        { name: "mongo-replica-2:27017", stateStr: "SECONDARY", health: 1, optimeDate: new Date("2026-01-01T00:00:04Z"), syncSourceHost: "mongo-replica-1:27017" },
+    ],
+} = {}) {
     const collections = [
         { name: "patients" },
         { name: "diagnosisresults" },
@@ -20,11 +26,7 @@ function createConnectedConnection() {
                 if (command.replSetGetStatus) {
                     return {
                         set: "rs0",
-                        members: [
-                            { name: "mongo:27017", stateStr: "PRIMARY", health: 1, optimeDate: new Date("2026-01-01T00:00:05Z") },
-                            { name: "mongo-replica-1:27017", stateStr: "SECONDARY", health: 1, optimeDate: new Date("2026-01-01T00:00:05Z") },
-                            { name: "mongo-replica-2:27017", stateStr: "SECONDARY", health: 1, optimeDate: new Date("2026-01-01T00:00:04Z") },
-                        ],
+                        members,
                     };
                 }
 
@@ -81,14 +83,25 @@ describe("dbStatus service", () => {
         expect(status.ping.ok).toBe(true);
         expect(status.replicaSet).toMatchObject({
             available: true,
+            summary: {
+                status: "OK",
+                memberCount: 3,
+                healthyCount: 3,
+                primaryCount: 1,
+                secondaryCount: 2,
+                majorityCount: 2,
+                majorityAvailable: true,
+                maxLagSeconds: 1,
+                laggingThresholdSeconds: 10,
+            },
             setName: "rs0",
             isWritablePrimary: true,
             primary: "mongo:27017",
         });
         expect(status.replicaSet.members).toEqual([
             expect.objectContaining({ name: "mongo:27017", role: "primary", onlineStatus: "online", syncStatus: "synced" }),
-            expect.objectContaining({ name: "mongo-replica-1:27017", role: "secondary", onlineStatus: "online", syncStatus: "synced" }),
-            expect.objectContaining({ name: "mongo-replica-2:27017", role: "secondary", onlineStatus: "online", syncStatus: "synced", lagSeconds: 1 }),
+            expect.objectContaining({ name: "mongo-replica-1:27017", role: "secondary", onlineStatus: "online", syncStatus: "synced", optimeDate: "2026-01-01T00:00:05.000Z", syncSourceHost: "mongo:27017" }),
+            expect.objectContaining({ name: "mongo-replica-2:27017", role: "secondary", onlineStatus: "online", syncStatus: "synced", lagSeconds: 1, optimeDate: "2026-01-01T00:00:04.000Z", syncSourceHost: "mongo-replica-1:27017" }),
         ]);
         expect(status.database).toMatchObject({
             status: "ok",
@@ -119,12 +132,88 @@ describe("dbStatus service", () => {
         expect(status.connection.status).toBe("disconnected");
         expect(status.ping.ok).toBe(false);
         expect(status.replicaSet.available).toBe(false);
+        expect(status.replicaSet.summary).toMatchObject({
+            status: "UNKNOWN",
+            majorityAvailable: false,
+            maxLagSeconds: null,
+        });
         expect(status.replicaSet.members).toEqual([]);
         expect(status.database).toBeNull();
         expect(status.collections).toEqual([]);
         expect(status.backups).toMatchObject({
             directory: expect.any(String),
             backups: expect.any(Array),
+        });
+    });
+
+    it("marks the replica set as lagging when a secondary falls behind", async () => {
+        const status = await getDbStatus({
+            connection: createConnectedConnection({
+                members: [
+                    { name: "mongo:27017", stateStr: "PRIMARY", health: 1, optimeDate: new Date("2026-01-01T00:00:30Z") },
+                    { name: "mongo-replica-1:27017", stateStr: "SECONDARY", health: 1, optimeDate: new Date("2026-01-01T00:00:05Z") },
+                    { name: "mongo-replica-2:27017", stateStr: "SECONDARY", health: 1, optimeDate: new Date("2026-01-01T00:00:29Z") },
+                ],
+            }),
+        });
+
+        expect(status.replicaSet.summary).toMatchObject({
+            status: "LAGGING",
+            healthyCount: 3,
+            primaryCount: 1,
+            secondaryCount: 2,
+            majorityAvailable: true,
+            maxLagSeconds: 25,
+        });
+    });
+
+    it("marks the replica set as degraded when majority is available but a member is down", async () => {
+        const status = await getDbStatus({
+            connection: createConnectedConnection({
+                members: [
+                    { name: "mongo:27017", stateStr: "PRIMARY", health: 1, optimeDate: new Date("2026-01-01T00:00:05Z") },
+                    { name: "mongo-replica-1:27017", stateStr: "SECONDARY", health: 1, optimeDate: new Date("2026-01-01T00:00:05Z") },
+                    { name: "mongo-replica-2:27017", stateStr: "(not reachable/healthy)", health: 0, optimeDate: new Date("1970-01-01T00:00:00Z"), lastHeartbeatMessage: "Connection refused" },
+                ],
+            }),
+        });
+
+        expect(status.replicaSet.summary).toMatchObject({
+            status: "DEGRADED",
+            memberCount: 3,
+            healthyCount: 2,
+            primaryCount: 1,
+            secondaryCount: 1,
+            majorityCount: 2,
+            majorityAvailable: true,
+        });
+        expect(status.replicaSet.members[2]).toMatchObject({
+            onlineStatus: "down",
+            lagSeconds: null,
+            optimeDate: null,
+            lastHeartbeatMessage: "Connection refused",
+        });
+    });
+
+    it("marks the replica set as an incident when majority is not available", async () => {
+        const status = await getDbStatus({
+            connection: createConnectedConnection({
+                members: [
+                    { name: "mongo:27017", stateStr: "PRIMARY", health: 1, optimeDate: new Date("2026-01-01T00:00:05Z") },
+                    { name: "mongo-replica-1:27017", stateStr: "(not reachable/healthy)", health: 0, optimeDate: new Date("2026-01-01T00:00:04Z") },
+                    { name: "mongo-replica-2:27017", stateStr: "(not reachable/healthy)", health: 0, optimeDate: new Date("2026-01-01T00:00:04Z") },
+                ],
+            }),
+        });
+
+        expect(status.replicaSet.summary).toMatchObject({
+            status: "INCIDENT",
+            memberCount: 3,
+            healthyCount: 1,
+            primaryCount: 1,
+            secondaryCount: 0,
+            majorityCount: 2,
+            majorityAvailable: false,
         });
     });
 

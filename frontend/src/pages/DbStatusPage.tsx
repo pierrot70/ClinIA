@@ -67,6 +67,27 @@ function StatusPill({ ok, label }: { ok: boolean; label: string }) {
     );
 }
 
+function TonePill({
+    tone,
+    label,
+}: {
+    tone: "emerald" | "amber" | "red" | "slate";
+    label: string;
+}) {
+    const toneClass = {
+        emerald: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+        amber: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
+        red: "bg-red-50 text-red-700 ring-1 ring-red-200",
+        slate: "bg-slate-50 text-slate-700 ring-1 ring-slate-200",
+    }[tone];
+
+    return (
+        <span className={"inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium " + toneClass}>
+            {label}
+        </span>
+    );
+}
+
 function MetricCard({
     icon,
     label,
@@ -119,6 +140,7 @@ function isStandaloneMember(member: DbStatusPayload["replicaSet"]["members"][num
 }
 
 function ReplicaMemberCard({ member }: { member: DbStatusPayload["replicaSet"]["members"][number] }) {
+    const replicaLabels = labels.dbStatus.replica;
     const standalone = isStandaloneMember(member);
     const roleLabel = standalone ? "standalone" : member.role;
     const onlineLabel = standalone ? "online" : member.onlineStatus;
@@ -145,13 +167,54 @@ function ReplicaMemberCard({ member }: { member: DbStatusPayload["replicaSet"]["
                 </span>
                 {member.lagSeconds != null && (
                     <span className="inline-flex items-center rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
-                        lag {member.lagSeconds}s
+                        lag {member.lagSeconds}{replicaLabels.secondsSuffix}
                     </span>
+                )}
+            </div>
+            <div className="mt-4 space-y-1 text-xs text-gray-500">
+                {member.syncSourceHost && (
+                    <div>
+                        <span className="font-medium text-gray-700">{replicaLabels.syncSource}: </span>
+                        <span>{member.syncSourceHost}</span>
+                    </div>
+                )}
+                {member.optimeDate && (
+                    <div>
+                        <span className="font-medium text-gray-700">{replicaLabels.optime}: </span>
+                        <span>{formatTimestamp(member.optimeDate)}</span>
+                    </div>
+                )}
+                {member.lastHeartbeatMessage && (
+                    <div>
+                        <span className="font-medium text-gray-700">{replicaLabels.heartbeat}: </span>
+                        <span>{member.lastHeartbeatMessage}</span>
+                    </div>
                 )}
             </div>
             {member.error && <div className="mt-3 text-xs text-red-700">{member.error}</div>}
         </div>
     );
+}
+
+function getReplicaTone(status?: DbStatusPayload["replicaSet"]["summary"]["status"]) {
+    if (status === "OK") {
+        return "emerald" as const;
+    }
+
+    if (status === "DEGRADED" || status === "LAGGING") {
+        return "amber" as const;
+    }
+
+    if (status === "INCIDENT") {
+        return "red" as const;
+    }
+
+    return "slate" as const;
+}
+
+function getReplicaStatusLabel(status?: DbStatusPayload["replicaSet"]["summary"]["status"]) {
+    const replicaLabels = labels.dbStatus.replica;
+    return status ? replicaLabels.statuses[status] : replicaLabels.statuses.UNKNOWN;
 }
 
 function getOverallStatus(data: DbStatusPayload | null) {
@@ -261,6 +324,7 @@ export function DbStatusPage() {
     const collectionErrors = data?.collections.filter((collection) => collection.status !== "ok") || [];
     const replicaMembers = data?.replicaSet.members || [];
     const backupLabels = labels.dbStatus.backups;
+    const replicaLabels = labels.dbStatus.replica;
     const backupStatusOk = data?.backups.latestStatus === "ok";
     const standaloneMode = replicaMembers.length === 1 && isStandaloneMember(replicaMembers[0]);
     const syncedMembers = replicaMembers.filter((member) => member.syncStatus === "synced").length;
@@ -275,7 +339,10 @@ export function DbStatusPage() {
                     <div className="mb-2 flex items-center gap-2">
                         <StatusPill ok={overall.ok} label={overall.label} />
                         {data?.replicaSet.available && (
-                            <StatusPill ok={true} label={`Replica set ${data.replicaSet.setName || "detecte"}`} />
+                            <TonePill
+                                tone={getReplicaTone(data.replicaSet.summary.status)}
+                                label={`${replicaLabels.setName} ${getReplicaStatusLabel(data.replicaSet.summary.status)}`}
+                            />
                         )}
                     </div>
                     <h1 className="text-2xl font-semibold text-gray-950">Etat des bases de donnees</h1>
@@ -316,9 +383,11 @@ export function DbStatusPage() {
                 />
                 <MetricCard
                     icon={<Server className="h-5 w-5" />}
-                    label="Replica set"
-                    value={data?.replicaSet.available ? data.replicaSet.setName || "Detecte" : "Non detecte"}
-                    detail={data?.replicaSet.available ? `${replicaMembers.length || data.replicaSet.hosts.length} membre(s), primaire: ${data.replicaSet.primary || "inconnu"}` : data?.replicaSet.error || undefined}
+                    label={replicaLabels.setName}
+                    value={data?.replicaSet.available ? getReplicaStatusLabel(data.replicaSet.summary.status) : replicaLabels.notDetected}
+                    detail={data?.replicaSet.available
+                        ? `${data.replicaSet.setName || replicaLabels.detected}, ${replicaLabels.primary}: ${data.replicaSet.primary || replicaLabels.unknownPrimary}`
+                        : data?.replicaSet.error || undefined}
                 />
                 <MetricCard
                     icon={<Clock className="h-5 w-5" />}
@@ -334,6 +403,62 @@ export function DbStatusPage() {
                 <MetricCard icon={<HardDrive className="h-5 w-5" />} label="Index" value={formatBytes(database?.indexSizeBytes)} detail={`${formatNumber(database?.indexes)} index`} />
                 <MetricCard icon={<Activity className="h-5 w-5" />} label="Temps backend" value={data ? `${data.responseTimeMs} ms` : "-"} detail={collectionErrors.length > 0 ? `${collectionErrors.length} collection(s) en erreur` : "Collections lisibles"} />
             </div>
+
+            {data?.replicaSet.available && (
+                <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                    <div className="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <Server className="h-5 w-5 text-slate-600" />
+                                <h2 className="text-base font-semibold text-gray-950">{replicaLabels.title}</h2>
+                            </div>
+                            <p className="mt-1 text-sm text-gray-500">{replicaLabels.subtitle}</p>
+                        </div>
+                        <TonePill
+                            tone={getReplicaTone(data.replicaSet.summary.status)}
+                            label={getReplicaStatusLabel(data.replicaSet.summary.status)}
+                        />
+                    </div>
+                    <div className="grid gap-3 px-4 py-4 text-sm md:grid-cols-5">
+                        <div>
+                            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{replicaLabels.health}</div>
+                            <div className="mt-1 font-semibold text-gray-950">
+                                {data.replicaSet.summary.healthyCount} / {data.replicaSet.summary.memberCount}
+                            </div>
+                        </div>
+                        <div>
+                            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{replicaLabels.majority}</div>
+                            <div className="mt-1 font-semibold text-gray-950">
+                                {data.replicaSet.summary.majorityAvailable
+                                    ? replicaLabels.majorityAvailable
+                                    : replicaLabels.majorityUnavailable}
+                            </div>
+                        </div>
+                        <div>
+                            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{replicaLabels.primary}</div>
+                            <div className="mt-1 font-semibold text-gray-950">{data.replicaSet.summary.primaryCount}</div>
+                        </div>
+                        <div>
+                            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{replicaLabels.secondaries}</div>
+                            <div className="mt-1 font-semibold text-gray-950">{data.replicaSet.summary.secondaryCount}</div>
+                        </div>
+                        <div>
+                            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{replicaLabels.maxLag}</div>
+                            <div className="mt-1 font-semibold text-gray-950">
+                                {data.replicaSet.summary.maxLagSeconds == null
+                                    ? replicaLabels.noLag
+                                    : `${data.replicaSet.summary.maxLagSeconds}${replicaLabels.secondsSuffix}`}
+                                <span className="ml-1 text-xs font-normal text-gray-500">
+                                    / {data.replicaSet.summary.laggingThresholdSeconds}{replicaLabels.secondsSuffix}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="border-t border-gray-100 px-4 py-3 text-sm text-gray-600">
+                        {data.replicaSet.summary.message}
+                    </div>
+                </div>
+            )}
 
             <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
                 <div className="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">

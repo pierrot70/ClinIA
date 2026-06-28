@@ -42,6 +42,9 @@ export type DbStatusReplicaMember = {
     syncStatus: "synced" | "syncing" | "unsynced" | "unknown";
     health: number | null;
     lagSeconds: number | null;
+    optimeDate: string | null;
+    syncSourceHost: string | null;
+    lastHeartbeatMessage: string | null;
     error: string | null;
     source: string;
 };
@@ -63,6 +66,18 @@ export type DbStatusPayload = {
     };
     replicaSet: {
         available: boolean;
+        summary: {
+            status: "OK" | "DEGRADED" | "INCIDENT" | "LAGGING" | "UNKNOWN";
+            message: string;
+            memberCount: number;
+            healthyCount: number;
+            primaryCount: number;
+            secondaryCount: number;
+            majorityCount: number | null;
+            majorityAvailable: boolean;
+            maxLagSeconds: number | null;
+            laggingThresholdSeconds: number;
+        };
         setName: string | null;
         isWritablePrimary: boolean | null;
         secondary: boolean | null;

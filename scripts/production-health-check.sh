@@ -25,6 +25,7 @@ MONGO_REPLICA_CONTAINER_EXCLUDE_PREFIX="${MONGO_REPLICA_CONTAINER_EXCLUDE_PREFIX
 MONGO_REPLICA_SET_NAME="${MONGO_REPLICA_SET_NAME:-rs0}"
 MONGO_REPLICA_EXPECTED_MEMBERS="${MONGO_REPLICA_EXPECTED_MEMBERS:-3}"
 MONGO_REPLICA_EXPECTED_SECONDARIES="${MONGO_REPLICA_EXPECTED_SECONDARIES:-2}"
+MONGO_REPLICA_LAG_WARN_SECONDS="${MONGO_REPLICA_LAG_WARN_SECONDS:-10}"
 MONGO_ROOT_USERNAME="${MONGO_ROOT_USERNAME:-root}"
 CHECK_HTTP_READY="${CHECK_HTTP_READY:-false}"
 HTTP_READY_URL="${HTTP_READY_URL:-https://clinique-ai.ca/api/health/ready}"
@@ -373,6 +374,7 @@ check_mongo_replica_set() {
   local healthy_count
   local total_count
   local set_name
+  local max_lag_seconds
 
   if ! command -v docker >/dev/null 2>&1; then
     mark_mongo_replica_alert "incident" "Mongo replica set incident: origin=$ALERT_ORIGIN docker command not found"
@@ -426,7 +428,23 @@ check_mongo_replica_set() {
           const primaryCount = status.members.filter(m => m.stateStr === "PRIMARY" && m.health === 1).length;
           const secondaryCount = status.members.filter(m => m.stateStr === "SECONDARY" && m.health === 1).length;
           const healthyCount = status.members.filter(m => m.health === 1).length;
-          print([status.set, status.members.length, primaryCount, secondaryCount, healthyCount].join(" "));
+          const primary = status.members.find(m => m.stateStr === "PRIMARY" && m.health === 1);
+          let maxLagSeconds = 0;
+          if (primary && primary.optimeDate) {
+            const primaryOptimeMs = new Date(primary.optimeDate).getTime();
+            for (const member of status.members) {
+              if (
+                member.health === 1 &&
+                ["PRIMARY", "SECONDARY"].includes(member.stateStr) &&
+                member.optimeDate
+              ) {
+                const memberOptimeMs = new Date(member.optimeDate).getTime();
+                const lagSeconds = Math.max(0, Math.round((primaryOptimeMs - memberOptimeMs) / 1000));
+                maxLagSeconds = Math.max(maxLagSeconds, lagSeconds);
+              }
+            }
+          }
+          print([status.set, status.members.length, primaryCount, secondaryCount, healthyCount, maxLagSeconds].join(" "));
         '"'"''
   )"; then
     mark_mongo_replica_alert "incident" "Mongo replica set incident: origin=$ALERT_ORIGIN rs.status failed"
@@ -434,7 +452,8 @@ check_mongo_replica_set() {
     return
   fi
 
-  read -r set_name total_count primary_count secondary_count healthy_count <<<"$result"
+  read -r set_name total_count primary_count secondary_count healthy_count max_lag_seconds <<<"$result"
+  max_lag_seconds="${max_lag_seconds:-0}"
 
   if [[ "$set_name" != "$MONGO_REPLICA_SET_NAME" ]]; then
     mark_mongo_replica_alert "incident" "Mongo replica set incident: origin=$ALERT_ORIGIN unexpected replica set name=$set_name"
@@ -461,8 +480,8 @@ check_mongo_replica_set() {
   fi
 
   if (( healthy_count == 2 )); then
-    mark_mongo_replica_alert "degraded" "Mongo replica set degraded: origin=$ALERT_ORIGIN healthy=$healthy_count/$MONGO_REPLICA_EXPECTED_MEMBERS primary=$primary_count secondaries=$secondary_count"
-    emit "WARN" "mongo_replica_set set=$set_name members=$total_count primary=$primary_count secondaries=$secondary_count healthy=$healthy_count expected_healthy=$MONGO_REPLICA_EXPECTED_MEMBERS message=\"replica set degraded but majority available\""
+    mark_mongo_replica_alert "degraded" "Mongo replica set degraded: origin=$ALERT_ORIGIN healthy=$healthy_count/$MONGO_REPLICA_EXPECTED_MEMBERS primary=$primary_count secondaries=$secondary_count lag_seconds=$max_lag_seconds"
+    emit "WARN" "mongo_replica_set set=$set_name members=$total_count primary=$primary_count secondaries=$secondary_count healthy=$healthy_count expected_healthy=$MONGO_REPLICA_EXPECTED_MEMBERS lag_seconds=$max_lag_seconds message=\"replica set degraded but majority available\""
     return
   fi
 
@@ -478,7 +497,13 @@ check_mongo_replica_set() {
     return
   fi
 
-  emit "OK" "mongo_replica_set set=$set_name members=$total_count primary=$primary_count secondaries=$secondary_count healthy=$healthy_count"
+  if (( max_lag_seconds > MONGO_REPLICA_LAG_WARN_SECONDS )); then
+    mark_mongo_replica_alert "degraded" "Mongo replica set lagging: origin=$ALERT_ORIGIN lag_seconds=$max_lag_seconds threshold_seconds=$MONGO_REPLICA_LAG_WARN_SECONDS healthy=$healthy_count/$MONGO_REPLICA_EXPECTED_MEMBERS primary=$primary_count secondaries=$secondary_count"
+    emit "WARN" "mongo_replica_set set=$set_name members=$total_count primary=$primary_count secondaries=$secondary_count healthy=$healthy_count lag_seconds=$max_lag_seconds threshold_seconds=$MONGO_REPLICA_LAG_WARN_SECONDS message=\"replica set lag above threshold\""
+    return
+  fi
+
+  emit "OK" "mongo_replica_set set=$set_name members=$total_count primary=$primary_count secondaries=$secondary_count healthy=$healthy_count lag_seconds=$max_lag_seconds threshold_seconds=$MONGO_REPLICA_LAG_WARN_SECONDS"
 }
 
 check_local_backup() {
@@ -631,9 +656,17 @@ if [[ "$CHECK_S3_BACKUP" == "true" ]]; then
 fi
 
 if [[ "$MONGO_REPLICA_ALERT_LEVEL" == "degraded" ]]; then
-  send_alert_to_url "$MONGO_DEGRADED_WEBHOOK_URL" "warning" "$MONGO_REPLICA_ALERT_MESSAGE"
+  if [[ -z "$MONGO_DEGRADED_WEBHOOK_URL" ]]; then
+    printf 'WARN mongo_replica_alert_skipped level=degraded reason=missing_MONGO_DEGRADED_WEBHOOK_URL\n' >&2
+  else
+    send_alert_to_url "$MONGO_DEGRADED_WEBHOOK_URL" "warning" "$MONGO_REPLICA_ALERT_MESSAGE"
+  fi
 elif [[ "$MONGO_REPLICA_ALERT_LEVEL" == "incident" ]]; then
-  send_alert_to_url "$MONGO_INCIDENT_WEBHOOK_URL" "failed" "$MONGO_REPLICA_ALERT_MESSAGE"
+  if [[ -z "$MONGO_INCIDENT_WEBHOOK_URL" ]]; then
+    printf 'WARN mongo_replica_alert_skipped level=incident reason=missing_MONGO_INCIDENT_WEBHOOK_URL\n' >&2
+  else
+    send_alert_to_url "$MONGO_INCIDENT_WEBHOOK_URL" "failed" "$MONGO_REPLICA_ALERT_MESSAGE"
+  fi
 fi
 
 if ((CRITICAL_COUNT > 0)); then

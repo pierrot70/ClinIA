@@ -18,6 +18,10 @@ function safeNumber(value) {
     return Number.isFinite(Number(value)) ? Number(value) : 0;
 }
 
+function nullableNumber(value) {
+    return Number.isFinite(Number(value)) ? Number(value) : null;
+}
+
 function parsePositiveInt(value, fallback) {
     const parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -327,7 +331,18 @@ function memberSyncStatus({ stateStr, serverType, onlineStatus }) {
     return "unknown";
 }
 
-function normalizeReplicaMember({ name, stateStr = null, health = null, serverType = null, error = null, lagSeconds = null, source = "unknown" }) {
+function normalizeReplicaMember({
+    name,
+    stateStr = null,
+    health = null,
+    serverType = null,
+    error = null,
+    lagSeconds = null,
+    optimeDate = null,
+    syncSourceHost = null,
+    lastHeartbeatMessage = null,
+    source = "unknown",
+}) {
     const onlineStatus = memberOnlineStatus({ health, stateStr, serverType, error });
 
     return {
@@ -338,6 +353,9 @@ function normalizeReplicaMember({ name, stateStr = null, health = null, serverTy
         syncStatus: memberSyncStatus({ stateStr, serverType, onlineStatus }),
         health: health == null ? null : safeNumber(health),
         lagSeconds,
+        optimeDate,
+        syncSourceHost,
+        lastHeartbeatMessage,
         error,
         source,
     };
@@ -364,8 +382,12 @@ function readStatusMembers(status) {
     return Array.isArray(status?.members)
         ? status.members.map((member) => {
             let lagSeconds = null;
+            const isHealthyReplicatingMember = (
+                member.health === 1 &&
+                ["PRIMARY", "SECONDARY"].includes(member.stateStr)
+            );
 
-            if (primaryOptimeDate && member.optimeDate) {
+            if (isHealthyReplicatingMember && primaryOptimeDate && member.optimeDate) {
                 lagSeconds = Math.max(0, Math.round((new Date(primaryOptimeDate).getTime() - new Date(member.optimeDate).getTime()) / 1000));
             }
 
@@ -375,10 +397,102 @@ function readStatusMembers(status) {
                 health: member.health,
                 error: member.healthMessage || null,
                 lagSeconds,
+                optimeDate: isHealthyReplicatingMember && member.optimeDate
+                    ? new Date(member.optimeDate).toISOString()
+                    : null,
+                syncSourceHost: member.syncSourceHost || null,
+                lastHeartbeatMessage: member.lastHeartbeatMessage || null,
                 source: "replicaStatus",
             });
         })
         : [];
+}
+
+function buildReplicaSetSummary({ available, members, thresholdSeconds }) {
+    if (!available) {
+        return {
+            status: "UNKNOWN",
+            message: "Replica set metadata unavailable.",
+            memberCount: 0,
+            healthyCount: 0,
+            primaryCount: 0,
+            secondaryCount: 0,
+            majorityCount: null,
+            majorityAvailable: false,
+            maxLagSeconds: null,
+            laggingThresholdSeconds: thresholdSeconds,
+        };
+    }
+
+    const memberCount = members.length;
+    const majorityCount = Math.floor(memberCount / 2) + 1;
+    const onlineMembers = members.filter((member) => member.onlineStatus === "online");
+    const healthyCount = onlineMembers.length;
+    const primaryCount = onlineMembers.filter((member) => member.role === "primary").length;
+    const secondaryCount = onlineMembers.filter((member) => member.role === "secondary").length;
+    const maxLagSeconds = members.reduce((max, member) => {
+        const lag = nullableNumber(member.lagSeconds);
+        return lag == null ? max : Math.max(max ?? 0, lag);
+    }, null);
+    const majorityAvailable = healthyCount >= majorityCount && primaryCount === 1;
+
+    if (primaryCount !== 1 || !majorityAvailable) {
+        return {
+            status: "INCIDENT",
+            message: "Mongo does not have one healthy primary with majority available.",
+            memberCount,
+            healthyCount,
+            primaryCount,
+            secondaryCount,
+            majorityCount,
+            majorityAvailable,
+            maxLagSeconds,
+            laggingThresholdSeconds: thresholdSeconds,
+        };
+    }
+
+    if (maxLagSeconds != null && maxLagSeconds > thresholdSeconds) {
+        return {
+            status: "LAGGING",
+            message: `Mongo replica lag is above ${thresholdSeconds} seconds.`,
+            memberCount,
+            healthyCount,
+            primaryCount,
+            secondaryCount,
+            majorityCount,
+            majorityAvailable,
+            maxLagSeconds,
+            laggingThresholdSeconds: thresholdSeconds,
+        };
+    }
+
+    if (healthyCount < memberCount) {
+        return {
+            status: "DEGRADED",
+            message: "Mongo majority is available, but at least one member is unhealthy.",
+            memberCount,
+            healthyCount,
+            primaryCount,
+            secondaryCount,
+            majorityCount,
+            majorityAvailable,
+            maxLagSeconds,
+            laggingThresholdSeconds: thresholdSeconds,
+        };
+    }
+
+    return {
+        status: "OK",
+        message: "Mongo replica set is healthy.",
+        memberCount,
+        healthyCount,
+        primaryCount,
+        secondaryCount,
+        majorityCount,
+        majorityAvailable,
+        maxLagSeconds,
+        laggingThresholdSeconds: thresholdSeconds,
+    };
 }
 
 function mergeReplicaMembers({ helloHosts, statusMembers, topologyMembers }) {
@@ -421,6 +535,11 @@ function buildUnavailablePayload({ connection, checkedAt, startedAt, backups }) 
         },
         replicaSet: {
             available: false,
+            summary: buildReplicaSetSummary({
+                available: false,
+                members: [],
+                thresholdSeconds: parsePositiveInt(process.env.MONGO_REPLICA_LAG_WARN_SECONDS || "10", 10),
+            }),
             setName: null,
             isWritablePrimary: null,
             secondary: null,
@@ -436,6 +555,11 @@ function buildUnavailablePayload({ connection, checkedAt, startedAt, backups }) 
 }
 
 async function readReplicaSetSnapshot(db, connection) {
+    const laggingThresholdSeconds = parsePositiveInt(
+        process.env.MONGO_REPLICA_LAG_WARN_SECONDS || "10",
+        10
+    );
+
     try {
         const hello = await db.admin().command({ hello: 1 });
         const status = await db.admin().command({ replSetGetStatus: 1 }).catch(() => null);
@@ -453,6 +577,11 @@ async function readReplicaSetSnapshot(db, connection) {
 
         return {
             available: Boolean(hello.setName || helloHosts.length || members.length),
+            summary: buildReplicaSetSummary({
+                available: Boolean(hello.setName || helloHosts.length || members.length),
+                members,
+                thresholdSeconds: laggingThresholdSeconds,
+            }),
             setName: hello.setName || status?.set || null,
             isWritablePrimary: hello.isWritablePrimary === true,
             secondary: hello.secondary === true,
@@ -464,6 +593,11 @@ async function readReplicaSetSnapshot(db, connection) {
     } catch (err) {
         return {
             available: false,
+            summary: buildReplicaSetSummary({
+                available: false,
+                members: [],
+                thresholdSeconds: laggingThresholdSeconds,
+            }),
             setName: null,
             isWritablePrimary: null,
             secondary: null,

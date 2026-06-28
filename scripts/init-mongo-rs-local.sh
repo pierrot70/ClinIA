@@ -84,14 +84,19 @@ dc exec -T mongo-rs-1 sh -c 'mongosh --quiet \
   --authenticationDatabase admin \
   --eval '"'"'
     const appDb = db.getSiblingDB("clinia");
+    const appUserRoles = [
+      { role: "readWrite", db: "clinia" },
+      { role: "clusterMonitor", db: "admin" }
+    ];
     if (!appDb.getUser(process.env.CLINIA_RS_APP_USERNAME)) {
       appDb.createUser({
         user: process.env.CLINIA_RS_APP_USERNAME,
         pwd: process.env.CLINIA_RS_APP_PASSWORD,
-        roles: [{ role: "readWrite", db: "clinia" }]
+        roles: appUserRoles
       });
       print("Application user created");
     } else {
+      appDb.updateUser(process.env.CLINIA_RS_APP_USERNAME, { roles: appUserRoles });
       print("Application user already exists");
     }
   '"'"
