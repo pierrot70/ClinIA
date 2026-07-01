@@ -1,10 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, Archive, Clock, Database, HardDrive, RefreshCw, Server } from "lucide-react";
 import { fetchDbStatus, updateBackupProtection, type DbStatusPayload } from "../services/dbStatusApi";
 import type { ApiError } from "../types/api";
 import { labels } from "../i18n/uiLabels";
 
 const REFRESH_INTERVAL_MS = 5_000;
+const MAX_REPLICA_READINGS = 8;
+
+type ReplicaReading = {
+    id: string;
+    checkedAt: string;
+    status: DbStatusPayload["replicaSet"]["summary"]["status"];
+    healthyCount: number;
+    memberCount: number;
+    primaryCount: number;
+    secondaryCount: number;
+    majorityAvailable: boolean;
+    maxLagSeconds: number | null;
+    laggingThresholdSeconds: number;
+};
 
 function formatBytes(value?: number | null) {
     if (value == null || !Number.isFinite(value)) {
@@ -265,6 +279,35 @@ function getChecksumLabel(backup: DbStatusPayload["backups"]["backups"][number])
     return backup.sha256FilePresent ? backupLabels.shaPresent : backupLabels.shaError;
 }
 
+function toReplicaReading(payload: DbStatusPayload): ReplicaReading | null {
+    if (!payload.replicaSet.available) {
+        return null;
+    }
+
+    const { summary } = payload.replicaSet;
+
+    return {
+        id: [
+            summary.status,
+            summary.healthyCount,
+            summary.memberCount,
+            summary.primaryCount,
+            summary.secondaryCount,
+            summary.majorityAvailable ? "majority" : "no-majority",
+            summary.status === "LAGGING" ? "lagging" : "lag-ok",
+        ].join(":"),
+        checkedAt: payload.checkedAt,
+        status: summary.status,
+        healthyCount: summary.healthyCount,
+        memberCount: summary.memberCount,
+        primaryCount: summary.primaryCount,
+        secondaryCount: summary.secondaryCount,
+        majorityAvailable: summary.majorityAvailable,
+        maxLagSeconds: summary.maxLagSeconds,
+        laggingThresholdSeconds: summary.laggingThresholdSeconds,
+    };
+}
+
 function getProtectionLabel(backup: DbStatusPayload["backups"]["backups"][number]) {
     return backup.protected
         ? labels.dbStatus.backups.protected
@@ -275,26 +318,70 @@ export function DbStatusPage() {
     const [data, setData] = useState<DbStatusPayload | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [protectingFileName, setProtectingFileName] = useState<string | null>(null);
     const [lastRefreshStartedAt, setLastRefreshStartedAt] = useState<Date | null>(null);
+    const [replicaReadings, setReplicaReadings] = useState<ReplicaReading[]>([]);
+    const refreshInFlightRef = useRef(false);
+    const clearedReplicaReadingIdRef = useRef<string | null>(null);
+    const consecutiveLagReadingsRef = useRef(0);
 
     const loadStatus = useCallback(async (showLoading = false) => {
+        if (refreshInFlightRef.current) {
+            return;
+        }
+
+        refreshInFlightRef.current = true;
+        setRefreshing(true);
         if (showLoading) {
             setLoading(true);
         }
 
-        setLastRefreshStartedAt(new Date());
-        const response = await fetchDbStatus();
+        try {
+            setLastRefreshStartedAt(new Date());
+            const response = await fetchDbStatus();
 
-        if ("error" in response) {
-            setError(response.error);
-            setData(null);
-        } else {
-            setError(null);
-            setData(response.data);
+            if ("error" in response) {
+                setError(response.error);
+                setData(null);
+            } else {
+                setError(null);
+                setData(response.data);
+                const reading = toReplicaReading(response.data);
+
+                if (reading) {
+                    if (reading.status === "LAGGING") {
+                        consecutiveLagReadingsRef.current += 1;
+                    } else {
+                        consecutiveLagReadingsRef.current = 0;
+                    }
+
+                    setReplicaReadings((currentReadings) => {
+                        if (reading.status === "LAGGING" && consecutiveLagReadingsRef.current < 2) {
+                            return currentReadings;
+                        }
+
+                        if (currentReadings.length === 0 && clearedReplicaReadingIdRef.current === reading.id) {
+                            return currentReadings;
+                        }
+
+                        if (clearedReplicaReadingIdRef.current && clearedReplicaReadingIdRef.current !== reading.id) {
+                            clearedReplicaReadingIdRef.current = null;
+                        }
+
+                        if (currentReadings[0]?.id === reading.id) {
+                            return currentReadings;
+                        }
+
+                        return [reading, ...currentReadings].slice(0, MAX_REPLICA_READINGS);
+                    });
+                }
+            }
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+            refreshInFlightRef.current = false;
         }
-
-        setLoading(false);
     }, []);
 
     const handleToggleBackupProtection = useCallback(async (backup: DbStatusPayload["backups"]["backups"][number]) => {
@@ -347,7 +434,7 @@ export function DbStatusPage() {
                     </div>
                     <h1 className="text-2xl font-semibold text-gray-950">Etat des bases de donnees</h1>
                     <p className="mt-2 max-w-3xl text-sm text-gray-600">
-                        Vue admin rafraichie toutes les 5 secondes pour surveiller Mongo, le replica set et les collections applicatives.
+                        {labels.dbStatus.replica.autoRefreshDescription}
                     </p>
                 </div>
 
@@ -357,8 +444,8 @@ export function DbStatusPage() {
                     className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
                     disabled={loading}
                 >
-                    <RefreshCw className={"h-4 w-4 " + (loading ? "animate-spin" : "")} />
-                    Rafraichir
+                    <RefreshCw className={"h-4 w-4 " + (refreshing ? "animate-spin" : "")} />
+                    {labels.dbStatus.replica.refreshAction}
                 </button>
             </div>
 
@@ -391,9 +478,11 @@ export function DbStatusPage() {
                 />
                 <MetricCard
                     icon={<Clock className="h-5 w-5" />}
-                    label="Derniere lecture"
+                    label={replicaLabels.lastReading}
                     value={data ? formatTimestamp(data.checkedAt) : "-"}
-                    detail={lastRefreshStartedAt ? `Demande lancee: ${lastRefreshStartedAt.toLocaleTimeString("fr-CA")}` : undefined}
+                    detail={lastRefreshStartedAt
+                        ? `${refreshing ? replicaLabels.refreshing : replicaLabels.lastRequest}: ${lastRefreshStartedAt.toLocaleTimeString("fr-CA")}`
+                        : undefined}
                 />
             </div>
 
@@ -456,6 +545,63 @@ export function DbStatusPage() {
                     </div>
                     <div className="border-t border-gray-100 px-4 py-3 text-sm text-gray-600">
                         {data.replicaSet.summary.message}
+                    </div>
+                    <div className="border-t border-gray-100 bg-slate-50 px-4 py-3">
+                        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="text-sm font-semibold text-gray-950">{replicaLabels.lastReadings}</div>
+                            <div className="flex flex-wrap items-center gap-3">
+                                <div className="text-xs text-gray-500">
+                                    {replicaLabels.refreshEvery} {REFRESH_INTERVAL_MS / 1000}{replicaLabels.secondsSuffix}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        clearedReplicaReadingIdRef.current = data ? toReplicaReading(data)?.id ?? null : null;
+                                        setReplicaReadings([]);
+                                    }}
+                                    className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                                >
+                                    {replicaLabels.clearTransitions}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                            {replicaReadings.map((reading, index) => (
+                                <div
+                                    key={reading.id}
+                                    className="min-w-[13rem] rounded-md border border-gray-200 bg-white p-3 text-xs shadow-sm"
+                                >
+                                    <div className="mb-2 flex items-center justify-between gap-2">
+                                        <TonePill
+                                            tone={getReplicaTone(reading.status)}
+                                            label={getReplicaStatusLabel(reading.status)}
+                                        />
+                                        {index === 0 && (
+                                            <span className="text-[11px] font-medium uppercase text-gray-400">
+                                                {replicaLabels.current}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="font-medium text-gray-950">{formatTimestamp(reading.checkedAt)}</div>
+                                    <div className="mt-2 grid grid-cols-2 gap-2 text-gray-600">
+                                        <span>{replicaLabels.health}: {reading.healthyCount}/{reading.memberCount}</span>
+                                        <span>{replicaLabels.primary}: {reading.primaryCount}</span>
+                                        <span>{replicaLabels.secondaries}: {reading.secondaryCount}</span>
+                                        <span>
+                                            {replicaLabels.maxLag}: {reading.maxLagSeconds ?? replicaLabels.noLag}{reading.maxLagSeconds == null ? "" : replicaLabels.secondsSuffix}
+                                        </span>
+                                    </div>
+                                    <div className="mt-2 text-gray-500">
+                                        {replicaLabels.majority}: {reading.majorityAvailable
+                                            ? replicaLabels.majorityAvailable
+                                            : replicaLabels.majorityUnavailable}
+                                    </div>
+                                </div>
+                            ))}
+                            {replicaReadings.length === 0 && (
+                                <div className="text-sm text-gray-500">{replicaLabels.noReadings}</div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

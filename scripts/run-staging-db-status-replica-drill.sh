@@ -18,6 +18,7 @@ BASELINE_ATTEMPTS="${BASELINE_ATTEMPTS:-12}"
 BASELINE_WAIT_SECONDS="${BASELINE_WAIT_SECONDS:-5}"
 DEGRADED_ATTEMPTS="${DEGRADED_ATTEMPTS:-12}"
 DEGRADED_WAIT_SECONDS="${DEGRADED_WAIT_SECONDS:-5}"
+UI_CONFIRM="${UI_CONFIRM:-auto}"
 
 TOKEN=""
 STOPPED_SERVICE=""
@@ -39,6 +40,47 @@ fail() {
   exit 1
 }
 
+should_prompt_ui() {
+  case "${UI_CONFIRM,,}" in
+    1|true|yes|y|oui|o)
+      return 0
+      ;;
+    0|false|no|n|non)
+      return 1
+      ;;
+    auto)
+      [[ -t 0 ]]
+      return
+      ;;
+    *)
+      fail "invalid_ui_confirm value=$UI_CONFIRM expected=auto|1|0"
+      ;;
+  esac
+}
+
+confirm_ui_observation() {
+  local stage="$1"
+  local expected="$2"
+  local answer
+
+  should_prompt_ui || return 0
+
+  printf '\nUI check - %s\n' "$stage"
+  printf '%s\n' "$expected"
+  printf 'Est-ce que tu vois ca dans Status BD? [oui/non] '
+
+  read -r answer
+
+  case "${answer,,}" in
+    oui|o|yes|y)
+      printf 'OK observation_ui=%s\n' "$stage"
+      ;;
+    *)
+      fail "ui_observation_not_confirmed stage=$stage"
+      ;;
+  esac
+}
+
 require_command() {
   command -v "$1" >/dev/null 2>&1 || fail "command_not_found command=$1"
 }
@@ -56,13 +98,37 @@ mongo_exec_service() {
   return 1
 }
 
+service_container_id() {
+  local service="$1"
+
+  dc ps -a -q "$service" | head -n1
+}
+
+docker_start_service_container() {
+  local service="$1"
+  local container_id
+
+  container_id="$(service_container_id "$service")"
+  [[ -n "$container_id" ]] || fail "container_not_found service=$service"
+
+  docker start "$container_id" >/dev/null
+}
+
+start_all_mongo_members() {
+  local service
+
+  for service in mongo-rs-1 mongo-rs-2 mongo-rs-3; do
+    docker_start_service_container "$service" || true
+  done
+}
+
 restore_stopped_service() {
   if [[ -z "$STOPPED_SERVICE" ]]; then
     return
   fi
 
   info "restore_service=$STOPPED_SERVICE"
-  dc start "$STOPPED_SERVICE" >/dev/null || true
+  docker_start_service_container "$STOPPED_SERVICE" || true
 }
 
 trap restore_stopped_service EXIT
@@ -270,11 +336,17 @@ require_command grep
 
 printf '\nTesting Mongo replica status API\n'
 
+start_all_mongo_members
+sleep "$WAIT_SECONDS"
+
 wait_for_backend
 ensure_staging_user
 login
 
 wait_for_ok "Baseline" "$BASELINE_ATTEMPTS" "$BASELINE_WAIT_SECONDS" "baseline_did_not_return_to_ok"
+confirm_ui_observation \
+  "etat initial" \
+  "Clique d'abord sur Effacer transitions. Tu devrais ensuite voir: Resume replica = OK, Sante 3/3, Primary 1, Secondaries 2, Majorite disponible. Dans Dernieres transitions replica, tu devrais voir: Aucune transition replica a afficher."
 
 secondary="$(choose_secondary_service)"
 [[ -n "$secondary" ]] || fail "secondary_not_found"
@@ -285,12 +357,18 @@ STOPPED_SERVICE="$secondary"
 sleep "$WAIT_SECONDS"
 
 wait_for_status "DEGRADED" "After secondary stop" "$DEGRADED_ATTEMPTS" "$DEGRADED_WAIT_SECONDS" "degraded_status_not_detected"
+confirm_ui_observation \
+  "secondaire arrete" \
+  "Tu devrais voir: Resume replica = Degrade, Sante 2/3, Primary 1, Secondaries 1, Majorite disponible. Dans Dernieres transitions replica, une nouvelle carte Degrade devrait etre ajoutee."
 
 printf 'Restarting secondary: %s\n' "$secondary"
-dc start "$secondary" >/dev/null 2>&1
+docker_start_service_container "$secondary"
 STOPPED_SERVICE=""
 sleep "$WAIT_SECONDS"
 
 wait_for_ok_after_restore
+confirm_ui_observation \
+  "secondaire restaure" \
+  "Tu devrais voir: Resume replica = OK, Sante 3/3, Primary 1, Secondaries 2. Dans Dernieres transitions replica, tu devrais voir le passage Degrade puis le retour OK. Une carte Lag devrait seulement apparaitre si le lag persiste sur plusieurs lectures."
 
 printf 'Replica status API drill PASSED\n'

@@ -89,6 +89,17 @@ export const UI_LABELS_FR = {
         replica: {
             title: "Resume replica",
             subtitle: "Etat actuel du replica set Mongo et retard de synchronisation.",
+            autoRefreshDescription:
+                "Vue admin rafraichie toutes les 5 secondes pour surveiller Mongo, le replica set et les transitions en cours.",
+            refreshAction: "Rafraichir",
+            refreshing: "Lecture en cours",
+            lastRequest: "Derniere demande",
+            lastReading: "Derniere lecture",
+            lastReadings: "Dernieres transitions replica",
+            clearTransitions: "Effacer transitions",
+            refreshEvery: "Rafraichissement toutes les",
+            current: "Actuel",
+            noReadings: "Aucune transition replica a afficher.",
             status: "Statut",
             health: "Sante",
             majority: "Majorite",
