@@ -15,6 +15,10 @@ import {
     toUpdatePatientDTO,
 } from "../dto/patient.dto.js";
 import { recordPatientAuditEvent } from "../audit/patientAudit.js";
+import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
+import { getRequestContext } from "../app/requestContext.js";
+import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
+import { getReplicaSetStatus } from "../services/dbStatus.js";
 
 const router = express.Router();
 
@@ -30,21 +34,72 @@ function getRequestIp(req) {
 
 async function recordPatientMutationAudit(req, {
     action,
+    operation,
     patientId,
     changedFields = [],
     context = null,
 }) {
-    await recordPatientAuditEvent({
+    const requestContext = getRequestContext(req);
+    const ip = getRequestIp(req);
+    const requestPath = req.originalUrl || req.path || null;
+
+    const patientAuditLog = await recordPatientAuditEvent({
         action,
         outcome: "SUCCESS",
         actorUserId: req.auth?.userId ?? null,
         actorUsername: req.auth?.username ?? null,
         actorRole: req.auth?.role ?? null,
-        ip: getRequestIp(req),
+        ip,
         patientId,
         changedFields,
-        requestPath: req.originalUrl || req.path || null,
+        requestPath,
         context,
+    });
+
+    const replicaSet = await getReplicaSetStatus();
+
+    await recordWriteOperationAuditEvent({
+        collectionName: "patientauditlogs",
+        operation: "CREATE",
+        outcome: "SUCCESS",
+        actorUserId: req.auth?.userId ?? null,
+        actorUsername: req.auth?.username ?? null,
+        actorRole: req.auth?.role ?? null,
+        ip,
+        requestId: requestContext.requestId,
+        instanceId: requestContext.instanceId,
+        resourceId: patientAuditLog?._id ? String(patientAuditLog._id) : null,
+        changedFields: [
+            "action",
+            "outcome",
+            "actorUserId",
+            "actorUsernameMasked",
+            "actorRole",
+            "patientId",
+            "changedFields",
+            "requestPath",
+            "context",
+        ],
+        requestPath,
+        writeConcern: CLINICAL_WRITE_CONCERN,
+        replicaSet,
+    });
+
+    await recordWriteOperationAuditEvent({
+        collectionName: "patients",
+        operation,
+        outcome: "SUCCESS",
+        actorUserId: req.auth?.userId ?? null,
+        actorUsername: req.auth?.username ?? null,
+        actorRole: req.auth?.role ?? null,
+        ip,
+        requestId: requestContext.requestId,
+        instanceId: requestContext.instanceId,
+        resourceId: patientId ? String(patientId) : null,
+        changedFields,
+        requestPath,
+        writeConcern: CLINICAL_WRITE_CONCERN,
+        replicaSet,
     });
 }
 
@@ -119,6 +174,7 @@ router.post("/", async (req, res) => {
 
         await recordPatientMutationAudit(req, {
             action: "PATIENT_CREATE",
+            operation: "CREATE",
             patientId: patient?._id ?? null,
             changedFields: Object.keys(dto),
         });
@@ -396,6 +452,7 @@ router.patch("/:id", async (req, res) => {
 
         await recordPatientMutationAudit(req, {
             action: "PATIENT_UPDATE",
+            operation: "UPDATE",
             patientId: patient?._id ?? req.params.id,
             changedFields: Object.keys(dto),
             context: buildPatientAuditContext(dto),
@@ -462,6 +519,7 @@ router.delete(
 
             await recordPatientMutationAudit(req, {
                 action: "PATIENT_DELETE",
+                operation: "DELETE",
                 patientId: deleted?._id ?? req.params.id,
                 changedFields: [],
             });

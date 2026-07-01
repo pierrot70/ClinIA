@@ -7,6 +7,7 @@ export async function buildMockAnalyzeResponse({
     getMockForDiagnosis,
     normalizeClinicalAnalysis,
     persistOrReuseDiagnosis,
+    writeAudit,
 }) {
     const mock = getMockForDiagnosis(diagnosisSeed || diagnosis);
     const analysis = normalizeClinicalAnalysis(mock, {
@@ -20,6 +21,7 @@ export async function buildMockAnalyzeResponse({
         output: analysis,
         mode: "mock",
         model: "mock",
+        writeAudit,
     });
 
     if (!persist.ok) {
@@ -72,6 +74,7 @@ export async function buildPersistedRealAnalyzeResponse({
     reqAuth,
     neutralizationMeta,
     persistOrReuseDiagnosis,
+    writeAudit,
     logger = console,
 }) {
     const persist = await persistOrReuseDiagnosis({
@@ -89,6 +92,7 @@ export async function buildPersistedRealAnalyzeResponse({
                   role: reqAuth?.role ?? null,
               }
             : undefined,
+        writeAudit,
     });
 
     logger.log("AI_RESPONSE From OpenAI", {

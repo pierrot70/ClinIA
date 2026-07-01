@@ -10,8 +10,47 @@ import {
     toCreateSpecialistDTO,
     toUpdateSpecialistDTO,
 } from "../dto/specialist.dto.js";
+import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
+import { getRequestContext } from "../app/requestContext.js";
+import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
+import { getReplicaSetStatus } from "../services/dbStatus.js";
 
 const router = express.Router();
+
+function getRequestIp(req) {
+    const forwardedFor = req.headers?.["x-forwarded-for"];
+
+    if (typeof forwardedFor === "string" && forwardedFor.trim()) {
+        return forwardedFor.split(",")[0].trim();
+    }
+
+    return req.ip || null;
+}
+
+async function recordSpecialistWriteAudit(req, {
+    operation,
+    specialistId,
+    changedFields = [],
+}) {
+    const requestContext = getRequestContext(req);
+
+    await recordWriteOperationAuditEvent({
+        collectionName: "specialists",
+        operation,
+        outcome: "SUCCESS",
+        actorUserId: req.auth?.userId ?? null,
+        actorUsername: req.auth?.username ?? null,
+        actorRole: req.auth?.role ?? null,
+        ip: getRequestIp(req),
+        requestId: requestContext.requestId,
+        instanceId: requestContext.instanceId,
+        resourceId: specialistId ? String(specialistId) : null,
+        changedFields,
+        requestPath: req.originalUrl || req.path || null,
+        writeConcern: CLINICAL_WRITE_CONCERN,
+        replicaSet: await getReplicaSetStatus(),
+    });
+}
 
 /* ------------------------------------------------------------------ */
 /* POST /api/specialists                                               */
@@ -33,6 +72,11 @@ router.post("/", async (req, res) => {
 
     try {
         const specialist = await createSpecialist(dto);
+        await recordSpecialistWriteAudit(req, {
+            operation: "CREATE",
+            specialistId: specialist._id,
+            changedFields: Object.keys(dto),
+        });
 
         return res.status(201).json({
             data: specialist,
@@ -195,6 +239,11 @@ router.patch("/:id", async (req, res) => {
 
     try {
         const specialist = await updateSpecialist(req.params.id, dto);
+        await recordSpecialistWriteAudit(req, {
+            operation: "UPDATE",
+            specialistId: specialist._id,
+            changedFields: Object.keys(dto),
+        });
 
         return res.status(200).json({
             data: specialist,
@@ -258,6 +307,10 @@ router.patch("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
     try {
         const deleted = await deleteSpecialist(req.params.id);
+        await recordSpecialistWriteAudit(req, {
+            operation: "DELETE",
+            specialistId: deleted._id,
+        });
 
         return res.status(200).json({
             data: deleted,

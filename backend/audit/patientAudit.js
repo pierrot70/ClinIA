@@ -87,7 +87,7 @@ export async function recordPatientAuditEvent({
     context = null,
 }) {
     try {
-        await PatientAuditLog.create({
+        return await PatientAuditLog.create({
             action,
             outcome,
             actorUserId,
@@ -103,5 +103,6 @@ export async function recordPatientAuditEvent({
     } catch (err) {
         // Never block patient flows due to audit persistence issues.
         console.warn("⚠️ Patient audit write failed", err?.message);
+        return null;
     }
 }

@@ -10,8 +10,47 @@ import {
     toCreateCliniqueDTO,
     toUpdateCliniqueDTO,
 } from "../dto/clinique.dto.js";
+import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
+import { getRequestContext } from "../app/requestContext.js";
+import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
+import { getReplicaSetStatus } from "../services/dbStatus.js";
 
 const router = express.Router();
+
+function getRequestIp(req) {
+    const forwardedFor = req.headers?.["x-forwarded-for"];
+
+    if (typeof forwardedFor === "string" && forwardedFor.trim()) {
+        return forwardedFor.split(",")[0].trim();
+    }
+
+    return req.ip || null;
+}
+
+async function recordCliniqueWriteAudit(req, {
+    operation,
+    cliniqueId,
+    changedFields = [],
+}) {
+    const requestContext = getRequestContext(req);
+
+    await recordWriteOperationAuditEvent({
+        collectionName: "cliniques",
+        operation,
+        outcome: "SUCCESS",
+        actorUserId: req.auth?.userId ?? null,
+        actorUsername: req.auth?.username ?? null,
+        actorRole: req.auth?.role ?? null,
+        ip: getRequestIp(req),
+        requestId: requestContext.requestId,
+        instanceId: requestContext.instanceId,
+        resourceId: cliniqueId ? String(cliniqueId) : null,
+        changedFields,
+        requestPath: req.originalUrl || req.path || null,
+        writeConcern: CLINICAL_WRITE_CONCERN,
+        replicaSet: await getReplicaSetStatus(),
+    });
+}
 
 /* ------------------------------------------------------------------ */
 /* POST /api/cliniques                                                 */
@@ -33,6 +72,11 @@ router.post("/", async (req, res) => {
 
     try {
         const clinique = await createClinique(dto);
+        await recordCliniqueWriteAudit(req, {
+            operation: "CREATE",
+            cliniqueId: clinique._id,
+            changedFields: Object.keys(dto),
+        });
 
         return res.status(201).json({
             data: clinique,
@@ -180,6 +224,11 @@ router.patch("/:id", async (req, res) => {
 
     try {
         const clinique = await updateClinique(req.params.id, dto);
+        await recordCliniqueWriteAudit(req, {
+            operation: "UPDATE",
+            cliniqueId: clinique._id,
+            changedFields: Object.keys(dto),
+        });
 
         return res.status(200).json({
             data: clinique,
@@ -231,7 +280,11 @@ router.patch("/:id", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
     try {
-        await deleteClinique(req.params.id);
+        const deleted = await deleteClinique(req.params.id);
+        await recordCliniqueWriteAudit(req, {
+            operation: "DELETE",
+            cliniqueId: deleted._id,
+        });
 
         return res.status(200).json({
             data: null,

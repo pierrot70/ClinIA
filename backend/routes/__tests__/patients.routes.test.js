@@ -24,6 +24,14 @@ const { recordPatientAuditEvent } = vi.hoisted(() => ({
     recordPatientAuditEvent: vi.fn(),
 }));
 
+const { recordWriteOperationAuditEvent } = vi.hoisted(() => ({
+    recordWriteOperationAuditEvent: vi.fn(),
+}));
+
+const { getReplicaSetStatus } = vi.hoisted(() => ({
+    getReplicaSetStatus: vi.fn(),
+}));
+
 vi.mock("../../services/patients.js", () => ({
     createPatient,
     listPatients: vi.fn(),
@@ -40,6 +48,14 @@ vi.mock("../../dto/patient.dto.js", () => ({
 
 vi.mock("../../audit/patientAudit.js", () => ({
     recordPatientAuditEvent,
+}));
+
+vi.mock("../../audit/writeOperationAudit.js", () => ({
+    recordWriteOperationAuditEvent,
+}));
+
+vi.mock("../../services/dbStatus.js", () => ({
+    getReplicaSetStatus,
 }));
 
 import router from "../patients.js";
@@ -68,6 +84,18 @@ function getRouteHandler(method, path) {
 describe("patients routes audit", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        getReplicaSetStatus.mockResolvedValue({
+            summary: {
+                status: "OK",
+                memberCount: 3,
+                healthyCount: 3,
+                primaryCount: 1,
+                secondaryCount: 2,
+                majorityAvailable: true,
+                maxLagSeconds: 0,
+                laggingThresholdSeconds: 10,
+            },
+        });
     });
 
     it("records audit data on patient creation", async () => {
@@ -88,6 +116,10 @@ describe("patients routes audit", () => {
             },
             ip: "10.0.0.10",
             originalUrl: "/api/patients",
+            requestContext: {
+                requestId: "request-create",
+                instanceId: "instance-a",
+            },
         };
         const res = makeRes();
 
@@ -104,6 +136,37 @@ describe("patients routes audit", () => {
             changedFields: ["nom", "prenom"],
             requestPath: "/api/patients",
             context: null,
+        });
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith({
+            collectionName: "patients",
+            operation: "CREATE",
+            outcome: "SUCCESS",
+            actorUserId: "user-1",
+            actorUsername: "admin.user",
+            actorRole: "ADMIN",
+            ip: "10.0.0.10",
+            requestId: "request-create",
+            instanceId: "instance-a",
+            resourceId: "patient-1",
+            changedFields: ["nom", "prenom"],
+            requestPath: "/api/patients",
+            writeConcern: {
+                w: "majority",
+                j: true,
+                wtimeout: 5000,
+            },
+            replicaSet: {
+                summary: {
+                    status: "OK",
+                    memberCount: 3,
+                    healthyCount: 3,
+                    primaryCount: 1,
+                    secondaryCount: 2,
+                    majorityAvailable: true,
+                    maxLagSeconds: 0,
+                    laggingThresholdSeconds: 10,
+                },
+            },
         });
         expect(res.status).toHaveBeenCalledWith(201);
     });
@@ -146,6 +209,7 @@ describe("patients routes audit", () => {
             },
         });
         expect(recordPatientAuditEvent).not.toHaveBeenCalled();
+        expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
     });
 
     it("returns a RAMQ-specific conflict message on patient update", async () => {
@@ -186,6 +250,7 @@ describe("patients routes audit", () => {
             },
         });
         expect(recordPatientAuditEvent).not.toHaveBeenCalled();
+        expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
     });
 
     it("records changed fields on patient update", async () => {
@@ -216,6 +281,10 @@ describe("patients routes audit", () => {
             },
             ip: "10.0.0.10",
             originalUrl: "/api/patients/patient-2",
+            requestContext: {
+                requestId: "request-update",
+                instanceId: "instance-b",
+            },
         };
         const res = makeRes();
 
@@ -243,6 +312,41 @@ describe("patients routes audit", () => {
                 },
             },
         });
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith({
+            collectionName: "patients",
+            operation: "UPDATE",
+            outcome: "SUCCESS",
+            actorUserId: "user-2",
+            actorUsername: "doctor.one",
+            actorRole: "MEDECIN",
+            ip: "203.0.113.9",
+            requestId: "request-update",
+            instanceId: "instance-b",
+            resourceId: "patient-2",
+            changedFields: [
+                "nom",
+                "prenom",
+                "secure_request_profile",
+            ],
+            requestPath: "/api/patients/patient-2",
+            writeConcern: {
+                w: "majority",
+                j: true,
+                wtimeout: 5000,
+            },
+            replicaSet: {
+                summary: {
+                    status: "OK",
+                    memberCount: 3,
+                    healthyCount: 3,
+                    primaryCount: 1,
+                    secondaryCount: 2,
+                    majorityAvailable: true,
+                    maxLagSeconds: 0,
+                    laggingThresholdSeconds: 10,
+                },
+            },
+        });
         expect(res.status).toHaveBeenCalledWith(200);
     });
 
@@ -261,6 +365,10 @@ describe("patients routes audit", () => {
             },
             ip: "127.0.0.1",
             originalUrl: "/api/patients/patient-3",
+            requestContext: {
+                requestId: "request-delete",
+                instanceId: "instance-c",
+            },
         };
         const res = makeRes();
 
@@ -277,6 +385,37 @@ describe("patients routes audit", () => {
             changedFields: [],
             requestPath: "/api/patients/patient-3",
             context: null,
+        });
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith({
+            collectionName: "patients",
+            operation: "DELETE",
+            outcome: "SUCCESS",
+            actorUserId: "user-3",
+            actorUsername: "super.admin",
+            actorRole: "SUPERADMIN",
+            ip: "127.0.0.1",
+            requestId: "request-delete",
+            instanceId: "instance-c",
+            resourceId: "patient-3",
+            changedFields: [],
+            requestPath: "/api/patients/patient-3",
+            writeConcern: {
+                w: "majority",
+                j: true,
+                wtimeout: 5000,
+            },
+            replicaSet: {
+                summary: {
+                    status: "OK",
+                    memberCount: 3,
+                    healthyCount: 3,
+                    primaryCount: 1,
+                    secondaryCount: 2,
+                    majorityAvailable: true,
+                    maxLagSeconds: 0,
+                    laggingThresholdSeconds: 10,
+                },
+            },
         });
         expect(res.status).toHaveBeenCalledWith(200);
     });

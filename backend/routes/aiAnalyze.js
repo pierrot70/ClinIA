@@ -15,6 +15,7 @@ import {
 } from "../services/aiAnalyzeResponseService.js";
 import { resolveAnalyzeExecutionMode } from "../services/aiAnalyzeAccessService.js";
 import { requireRole } from "../middleware/requireRole.js";
+import { getRequestContext } from "../app/requestContext.js";
 
 export function createAiAnalyzeRouter(deps) {
     const {
@@ -136,6 +137,16 @@ export function createAiAnalyzeRouter(deps) {
                     symptoms,
                 }) || diagnosisSeed || "To be determined by ClinIA";
                 const patient = safeBody;
+                const requestContext = getRequestContext(req);
+                const writeAudit = {
+                    actorUserId: req.auth?.userId ?? null,
+                    actorUsername: req.auth?.username ?? null,
+                    actorRole: req.auth?.role ?? null,
+                    ip: getRequestIp(req),
+                    requestId: requestContext.requestId,
+                    instanceId: requestContext.instanceId,
+                    requestPath: req.originalUrl || req.path || null,
+                };
                 let cloudSafePatient = buildCloudSafePatientPayload(patient);
                 let neutralizationMeta = null;
                 const fingerprint = makeFingerprint({
@@ -245,7 +256,8 @@ export function createAiAnalyzeRouter(deps) {
                     if (cacheNeedsUpgrade) {
                         upgradePersistedDiagnosisOutput(
                             fingerprint,
-                            normalizedCachedOutput
+                            normalizedCachedOutput,
+                            { writeAudit }
                         );
                     }
 
@@ -284,6 +296,7 @@ export function createAiAnalyzeRouter(deps) {
                         getMockForDiagnosis,
                         normalizeClinicalAnalysis,
                         persistOrReuseDiagnosis,
+                        writeAudit,
                     });
 
                     if (!mockResult.ok) {
@@ -345,6 +358,7 @@ export function createAiAnalyzeRouter(deps) {
                     reqAuth: req.auth,
                     neutralizationMeta,
                     persistOrReuseDiagnosis,
+                    writeAudit,
                 });
 
                 if (!finalResult.ok) {

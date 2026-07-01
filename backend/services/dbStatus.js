@@ -451,10 +451,10 @@ function buildReplicaSetSummary({ available, members, thresholdSeconds }) {
         };
     }
 
-    if (maxLagSeconds != null && maxLagSeconds > thresholdSeconds) {
+    if (healthyCount < memberCount) {
         return {
-            status: "LAGGING",
-            message: `Mongo replica lag is above ${thresholdSeconds} seconds.`,
+            status: "DEGRADED",
+            message: "Mongo majority is available, but at least one member is unhealthy.",
             memberCount,
             healthyCount,
             primaryCount,
@@ -466,10 +466,10 @@ function buildReplicaSetSummary({ available, members, thresholdSeconds }) {
         };
     }
 
-    if (healthyCount < memberCount) {
+    if (maxLagSeconds != null && maxLagSeconds > thresholdSeconds) {
         return {
-            status: "DEGRADED",
-            message: "Mongo majority is available, but at least one member is unhealthy.",
+            status: "LAGGING",
+            message: `Mongo replica lag is above ${thresholdSeconds} seconds.`,
             memberCount,
             healthyCount,
             primaryCount,
@@ -609,6 +609,33 @@ async function readReplicaSetSnapshot(db, connection) {
     }
 }
 
+export async function getReplicaSetStatus({ connection = mongoose.connection } = {}) {
+    const readyState = connection?.readyState ?? 0;
+
+    if (readyState !== 1 || !connection?.db) {
+        return {
+            available: false,
+            summary: buildReplicaSetSummary({
+                available: false,
+                members: [],
+                thresholdSeconds: parsePositiveInt(
+                    process.env.MONGO_REPLICA_LAG_WARN_SECONDS || "10",
+                    10
+                ),
+            }),
+            setName: null,
+            isWritablePrimary: null,
+            secondary: null,
+            primary: null,
+            hosts: [],
+            members: [],
+            error: "Mongo connection is not ready.",
+        };
+    }
+
+    return readReplicaSetSnapshot(connection.db, connection);
+}
+
 async function readCollectionSnapshots(db) {
     const collections = await db.listCollections({}, { nameOnly: true }).toArray();
 
@@ -678,7 +705,7 @@ export async function getDbStatus({ connection = mongoose.connection } = {}) {
 
     const [dbStats, replicaSet, collections, backups] = await Promise.all([
         db.stats().catch((err) => ({ error: err?.message || "Database stats unavailable." })),
-        readReplicaSetSnapshot(db, connection),
+        getReplicaSetStatus({ connection }),
         readCollectionSnapshots(db).catch(() => []),
         backupsPromise,
     ]);

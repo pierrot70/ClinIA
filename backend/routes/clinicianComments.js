@@ -12,8 +12,49 @@ import { requireRole } from "../middleware/requireRole.js";
 import { AUTH_ROLES } from "../auth/constants.js";
 import { clinicianCommentRateLimiter } from "../middleware/clinicianCommentRateLimiter.js";
 import { clinicianReplyLookupRateLimiter } from "../middleware/clinicianReplyLookupRateLimiter.js";
+import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
+import { getRequestContext } from "../app/requestContext.js";
+import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
+import { getReplicaSetStatus } from "../services/dbStatus.js";
 
 const router = express.Router();
+
+function getRequestIp(req) {
+    const forwardedFor = req.headers?.["x-forwarded-for"];
+
+    if (typeof forwardedFor === "string" && forwardedFor.trim()) {
+        return forwardedFor.split(",")[0].trim();
+    }
+
+    return req.ip || null;
+}
+
+async function recordClinicianCommentWriteAudit(req, {
+    operation,
+    commentId,
+    actorUsername = null,
+    actorRole = null,
+    changedFields = [],
+}) {
+    const requestContext = getRequestContext(req);
+
+    await recordWriteOperationAuditEvent({
+        collectionName: "cliniciancomments",
+        operation,
+        outcome: "SUCCESS",
+        actorUserId: req.auth?.userId ?? null,
+        actorUsername: req.auth?.username ?? actorUsername,
+        actorRole: req.auth?.role ?? actorRole,
+        ip: getRequestIp(req),
+        requestId: requestContext.requestId,
+        instanceId: requestContext.instanceId,
+        resourceId: commentId ? String(commentId) : null,
+        changedFields,
+        requestPath: req.originalUrl || req.path || null,
+        writeConcern: CLINICAL_WRITE_CONCERN,
+        replicaSet: await getReplicaSetStatus(),
+    });
+}
 
 router.get(
     "/inbox",
@@ -216,6 +257,18 @@ router.post("/", clinicianCommentRateLimiter, async (req, res) => {
             trackingCode: req.body?.trackingCode,
             category: req.body?.category,
         });
+        await recordClinicianCommentWriteAudit(req, {
+            operation: "CREATE",
+            commentId: data.id,
+            actorUsername: data.actorUsername,
+            actorRole: data.actorRole,
+            changedFields: [
+                "actorUsername",
+                "category",
+                "comment",
+                "trackingCodeHash",
+            ],
+        });
 
         return res.status(201).json({
             data,
@@ -266,6 +319,11 @@ router.post(
                 authUser: req.auth,
                 commentId: req.params.id,
                 message: req.body?.message,
+            });
+            await recordClinicianCommentWriteAudit(req, {
+                operation: "REPLY",
+                commentId: data.id,
+                changedFields: ["replies"],
             });
 
             return res.status(200).json({

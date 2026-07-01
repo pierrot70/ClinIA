@@ -11,8 +11,47 @@ import {
 import { toCreateAppointmentDTO } from "../dto/appointment.dto.js";
 import mongoose from "mongoose";
 import { isValidRamq } from "../utils/validators.js";
+import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
+import { getRequestContext } from "../app/requestContext.js";
+import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
+import { getReplicaSetStatus } from "../services/dbStatus.js";
 
 const router = express.Router();
+
+function getRequestIp(req) {
+    const forwardedFor = req.headers?.["x-forwarded-for"];
+
+    if (typeof forwardedFor === "string" && forwardedFor.trim()) {
+        return forwardedFor.split(",")[0].trim();
+    }
+
+    return req.ip || null;
+}
+
+async function recordAppointmentWriteAudit(req, {
+    operation,
+    appointmentId,
+    changedFields = [],
+}) {
+    const requestContext = getRequestContext(req);
+
+    await recordWriteOperationAuditEvent({
+        collectionName: "appointments",
+        operation,
+        outcome: "SUCCESS",
+        actorUserId: req.auth?.userId ?? null,
+        actorUsername: req.auth?.username ?? null,
+        actorRole: req.auth?.role ?? null,
+        ip: getRequestIp(req),
+        requestId: requestContext.requestId,
+        instanceId: requestContext.instanceId,
+        resourceId: appointmentId ? String(appointmentId) : null,
+        changedFields,
+        requestPath: req.originalUrl || req.path || null,
+        writeConcern: CLINICAL_WRITE_CONCERN,
+        replicaSet: await getReplicaSetStatus(),
+    });
+}
 
 /* ------------------------------------------------------------------ */
 /* GET /api/appointments/slots                                         */
@@ -74,6 +113,11 @@ router.post("/", async (req, res) => {
 
     try {
         const appointment = await createAppointment(dto, req.auth);
+        await recordAppointmentWriteAudit(req, {
+            operation: "CREATE",
+            appointmentId: appointment._id,
+            changedFields: Object.keys(dto),
+        });
 
         return res.status(201).json({
             data: appointment,
@@ -264,6 +308,11 @@ router.get("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
     try {
         const appointment = await cancelAppointment(req.params.id, req.auth);
+        await recordAppointmentWriteAudit(req, {
+            operation: "DELETE",
+            appointmentId: appointment._id,
+            changedFields: ["status"],
+        });
 
         return res.status(200).json({
             data: appointment,
@@ -329,6 +378,11 @@ router.patch("/:id/status", async (req, res) => {
     try {
         const appointment =
             await updateAppointmentStatus(req.params.id, status, req.auth);
+        await recordAppointmentWriteAudit(req, {
+            operation: "UPDATE",
+            appointmentId: appointment._id,
+            changedFields: ["status"],
+        });
 
         return res.status(200).json({
             data: appointment,
@@ -403,6 +457,11 @@ router.patch("/:id/schedule", async (req, res) => {
             { date, time },
             req.auth
         );
+        await recordAppointmentWriteAudit(req, {
+            operation: "UPDATE",
+            appointmentId: appointment._id,
+            changedFields: ["date", "time"],
+        });
 
         return res.status(200).json({
             data: appointment,

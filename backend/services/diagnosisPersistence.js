@@ -1,22 +1,59 @@
 import { DiagnosisResult } from "../models/DiagnosisResult.js";
 import { CLINICAL_QUERY_WRITE_OPTIONS, CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
+import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
+import { getReplicaSetStatus } from "./dbStatus.js";
+
+async function recordDiagnosisWriteAudit({
+    operation,
+    doc,
+    writeAudit,
+    changedFields,
+}) {
+    if (!writeAudit || !doc?._id) {
+        return;
+    }
+
+    await recordWriteOperationAuditEvent({
+        collectionName: "diagnosisresults",
+        operation,
+        outcome: "SUCCESS",
+        actorUserId: writeAudit.actorUserId ?? null,
+        actorUsername: writeAudit.actorUsername ?? null,
+        actorRole: writeAudit.actorRole ?? null,
+        ip: writeAudit.ip ?? null,
+        requestId: writeAudit.requestId ?? null,
+        instanceId: writeAudit.instanceId ?? null,
+        resourceId: String(doc._id),
+        changedFields,
+        requestPath: writeAudit.requestPath ?? null,
+        writeConcern: CLINICAL_WRITE_CONCERN,
+        replicaSet: await getReplicaSetStatus(),
+    });
+}
 
 export async function persistOrReuseDiagnosis(payload, deps = {}) {
     const {
         isPlaceholderClinicalAnalysis = () => false,
         logger = console,
     } = deps;
+    const { writeAudit, ...diagnosisPayload } = payload;
 
     try {
         const [created] = await DiagnosisResult.create(
-            [payload],
+            [diagnosisPayload],
             CLINICAL_QUERY_WRITE_OPTIONS
         );
+        await recordDiagnosisWriteAudit({
+            operation: "CREATE",
+            doc: created,
+            writeAudit,
+            changedFields: ["fingerprint", "input", "output", "mode", "model"],
+        });
         return { ok: true, doc: created };
     } catch (err) {
         if (err.code === 11000) {
             const existing = await DiagnosisResult.findOne({
-                fingerprint: payload.fingerprint,
+                fingerprint: diagnosisPayload.fingerprint,
             });
 
             if (existing) {
@@ -24,19 +61,19 @@ export async function persistOrReuseDiagnosis(payload, deps = {}) {
                     existing.mode === "real" &&
                     isPlaceholderClinicalAnalysis(existing.output);
                 const incomingIsMeaningfulReal =
-                    payload.mode === "real" &&
-                    !isPlaceholderClinicalAnalysis(payload.output);
+                    diagnosisPayload.mode === "real" &&
+                    !isPlaceholderClinicalAnalysis(diagnosisPayload.output);
                 const shouldReplaceExistingReal =
-                    payload.mode === "real" &&
+                    diagnosisPayload.mode === "real" &&
                     existing.mode === "real" &&
-                    payload.replaceExisting === true;
+                    diagnosisPayload.replaceExisting === true;
 
                 if (
-                    (payload.mode === "real" && existing.mode === "mock") ||
+                    (diagnosisPayload.mode === "real" && existing.mode === "mock") ||
                     (existingIsPlaceholderReal && incomingIsMeaningfulReal) ||
                     shouldReplaceExistingReal
                 ) {
-                    if (payload.archiveExistingAsDeleted === true) {
+                    if (diagnosisPayload.archiveExistingAsDeleted === true) {
                         existing.history = Array.isArray(existing.history)
                             ? existing.history
                             : [];
@@ -44,9 +81,9 @@ export async function persistOrReuseDiagnosis(payload, deps = {}) {
                             status: "DELETE",
                             archivedAt: new Date(),
                             archivedBy: {
-                                userId: payload.archivedBy?.userId ?? null,
-                                username: payload.archivedBy?.username ?? null,
-                                role: payload.archivedBy?.role ?? null,
+                                userId: diagnosisPayload.archivedBy?.userId ?? null,
+                                username: diagnosisPayload.archivedBy?.username ?? null,
+                                role: diagnosisPayload.archivedBy?.role ?? null,
                             },
                             input: existing.input,
                             output: existing.output,
@@ -55,11 +92,23 @@ export async function persistOrReuseDiagnosis(payload, deps = {}) {
                         });
                     }
 
-                    existing.input = payload.input;
-                    existing.output = payload.output;
-                    existing.mode = payload.mode;
-                    existing.model = payload.model;
+                    existing.input = diagnosisPayload.input;
+                    existing.output = diagnosisPayload.output;
+                    existing.mode = diagnosisPayload.mode;
+                    existing.model = diagnosisPayload.model;
                     await existing.save(CLINICAL_WRITE_CONCERN);
+                    await recordDiagnosisWriteAudit({
+                        operation: "UPDATE",
+                        doc: existing,
+                        writeAudit,
+                        changedFields: [
+                            "input",
+                            "output",
+                            "mode",
+                            "model",
+                            ...(diagnosisPayload.archiveExistingAsDeleted === true ? ["history"] : []),
+                        ],
+                    });
                     return { ok: true, doc: existing.toObject() };
                 }
 
@@ -96,14 +145,23 @@ export async function upgradePersistedDiagnosisOutput(
     normalizedOutput,
     deps = {}
 ) {
-    const { logger = console } = deps;
+    const { logger = console, writeAudit = null } = deps;
 
     try {
-        await DiagnosisResult.updateOne(
+        const result = await DiagnosisResult.updateOne(
             { fingerprint },
             { $set: { output: normalizedOutput } },
             CLINICAL_QUERY_WRITE_OPTIONS
         );
+        if (result.modifiedCount > 0 && writeAudit) {
+            const updated = await DiagnosisResult.findOne({ fingerprint }).lean();
+            await recordDiagnosisWriteAudit({
+                operation: "UPDATE",
+                doc: updated,
+                writeAudit,
+                changedFields: ["output"],
+            });
+        }
         return true;
     } catch (err) {
         logger.warn("⚠️ AI cache upgrade failed", err?.message);
