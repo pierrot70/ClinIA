@@ -5,6 +5,7 @@ import {
 } from "../utils/clinicianCommentPrivacy.js";
 import mongoose from "mongoose";
 import crypto from "crypto";
+import { CLINICAL_QUERY_WRITE_OPTIONS, CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 
 const DEFAULT_PAGE_LIMIT = 20;
 const MAX_PAGE_LIMIT = 100;
@@ -268,7 +269,7 @@ export async function createClinicianComment({
     validateTrackingCode(resolvedTrackingCode);
     const trackingCodeHash = hashTrackingCode(resolvedTrackingCode);
 
-    const created = await ClinicianComment.create({
+    const created = await new ClinicianComment({
         actorUserId: authUser?.userId || null,
         actorUsername: resolvedUsername,
         actorRole: authUser?.role || "ANONYMOUS",
@@ -277,7 +278,7 @@ export async function createClinicianComment({
         comment: obfuscated.sanitized,
         redactionCount: obfuscated.redactionCount,
         redactionTypes: obfuscated.redactionTypes,
-    });
+    }).save(CLINICAL_WRITE_CONCERN);
 
     return {
         ...normalizeComment(created.toObject()),
@@ -456,11 +457,15 @@ export async function acknowledgeClinicianCommentsInbox({ authUser }) {
         );
     }
 
-    await mongoose.model("AdminUser").findByIdAndUpdate(authUser.userId, {
-        $set: {
-            clinicianCommentsInboxSeenAt: new Date(),
+    await mongoose.model("AdminUser").findByIdAndUpdate(
+        authUser.userId,
+        {
+            $set: {
+                clinicianCommentsInboxSeenAt: new Date(),
+            },
         },
-    });
+        CLINICAL_QUERY_WRITE_OPTIONS
+    );
 
     return { success: true };
 }
@@ -518,7 +523,11 @@ export async function replyToClinicianComment({
                 },
             },
         },
-        { new: true, lean: true }
+        {
+            new: true,
+            lean: true,
+            ...CLINICAL_QUERY_WRITE_OPTIONS,
+        }
     );
 
     if (!updated) {

@@ -1,4 +1,5 @@
 import { DiagnosisResult } from "../models/DiagnosisResult.js";
+import { CLINICAL_QUERY_WRITE_OPTIONS, CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 
 export async function persistOrReuseDiagnosis(payload, deps = {}) {
     const {
@@ -7,7 +8,10 @@ export async function persistOrReuseDiagnosis(payload, deps = {}) {
     } = deps;
 
     try {
-        const created = await DiagnosisResult.create(payload);
+        const [created] = await DiagnosisResult.create(
+            [payload],
+            CLINICAL_QUERY_WRITE_OPTIONS
+        );
         return { ok: true, doc: created };
     } catch (err) {
         if (err.code === 11000) {
@@ -55,7 +59,7 @@ export async function persistOrReuseDiagnosis(payload, deps = {}) {
                     existing.output = payload.output;
                     existing.mode = payload.mode;
                     existing.model = payload.model;
-                    await existing.save();
+                    await existing.save(CLINICAL_WRITE_CONCERN);
                     return { ok: true, doc: existing.toObject() };
                 }
 
@@ -97,7 +101,8 @@ export async function upgradePersistedDiagnosisOutput(
     try {
         await DiagnosisResult.updateOne(
             { fingerprint },
-            { $set: { output: normalizedOutput } }
+            { $set: { output: normalizedOutput } },
+            CLINICAL_QUERY_WRITE_OPTIONS
         );
         return true;
     } catch (err) {

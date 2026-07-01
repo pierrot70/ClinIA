@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { Clinique } from "../models/Clinique.js";
 import { geocodeAddress } from "../utils/geocode.js";
+import { CLINICAL_QUERY_WRITE_OPTIONS, CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 
 /* ------------------------------------------------------------------ */
 /* Clinique Service                                                   */
@@ -41,7 +42,8 @@ export async function createClinique(dto) {
     const payload = { ...dto };
     await maybePopulateCoordinates(payload, payload);
 
-    return Clinique.create(payload);
+    const clinique = new Clinique(payload);
+    return clinique.save(CLINICAL_WRITE_CONCERN);
 }
 
 export async function listCliniques(filters = {}, opts = {}) {
@@ -146,7 +148,11 @@ export async function updateClinique(id, updates) {
     const clinique = await Clinique.findByIdAndUpdate(
         id,
         { $set: hydratedUpdates },
-        { new: true, runValidators: true }
+        {
+            new: true,
+            runValidators: true,
+            ...CLINICAL_QUERY_WRITE_OPTIONS,
+        }
     );
 
     if (!clinique) {
@@ -167,7 +173,10 @@ export async function deleteClinique(id) {
         };
     }
 
-    const deleted = await Clinique.findByIdAndDelete(id);
+    const deleted = await Clinique.findByIdAndDelete(
+        id,
+        CLINICAL_QUERY_WRITE_OPTIONS
+    );
 
     if (!deleted) {
         throw {

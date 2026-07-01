@@ -65,7 +65,11 @@ describe("diagnosisPersistence", () => {
             diagnosis: { suspected: "Updated diagnosis" },
         });
         expect(existing.model).toBe("new-model");
-        expect(save).toHaveBeenCalledTimes(1);
+        expect(save).toHaveBeenCalledWith({
+            w: "majority",
+            j: true,
+            wtimeout: 5000,
+        });
         expect(result).toEqual({
             ok: true,
             doc: {
@@ -156,7 +160,11 @@ describe("diagnosisPersistence", () => {
             mode: "real",
             model: "old-model",
         });
-        expect(save).toHaveBeenCalledTimes(1);
+        expect(save).toHaveBeenCalledWith({
+            w: "majority",
+            j: true,
+            wtimeout: 5000,
+        });
         expect(result.ok).toBe(true);
     });
 
@@ -174,6 +182,13 @@ describe("diagnosisPersistence", () => {
                     output: {
                         diagnosis: { suspected: "Updated diagnosis" },
                     },
+                },
+            },
+            {
+                writeConcern: {
+                    w: "majority",
+                    j: true,
+                    wtimeout: 5000,
                 },
             }
         );

@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { Specialist } from "../models/Specialist.js";
+import { CLINICAL_QUERY_WRITE_OPTIONS, CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 
 /* ------------------------------------------------------------------ */
 /* Specialist Service                                                  */
@@ -97,7 +98,8 @@ export async function createSpecialist(dto) {
 
     validateDisponibilites(dto.disponibilites);
 
-    return Specialist.create(dto);
+    const specialist = new Specialist(dto);
+    return specialist.save(CLINICAL_WRITE_CONCERN);
 }
 
 export async function listSpecialists(filters = {}, opts = {}) {
@@ -202,7 +204,11 @@ export async function updateSpecialist(id, updates) {
     const specialist = await Specialist.findByIdAndUpdate(
         id,
         { $set: updates },
-        { new: true, runValidators: true }
+        {
+            new: true,
+            runValidators: true,
+            ...CLINICAL_QUERY_WRITE_OPTIONS,
+        }
     );
 
     if (!specialist) {
@@ -223,7 +229,10 @@ export async function deleteSpecialist(id) {
         };
     }
 
-    const deleted = await Specialist.findByIdAndDelete(id);
+    const deleted = await Specialist.findByIdAndDelete(
+        id,
+        CLINICAL_QUERY_WRITE_OPTIONS
+    );
 
     if (!deleted) {
         throw {
