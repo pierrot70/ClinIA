@@ -19,6 +19,11 @@ type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 const SESSION_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 const SESSION_WARNING_MS = 60 * 1000;
 const SESSION_SERVER_TOUCH_MS = 60 * 1000;
+const DB_STATUS_DIAGNOSTIC_PATH = "/admin/db-status";
+
+function isDbStatusDiagnosticPath() {
+    return window.location.pathname === DB_STATUS_DIAGNOSTIC_PATH;
+}
 
 interface AuthContextValue {
     status: AuthStatus;
@@ -79,6 +84,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             forceServerTouch ||
             now - lastServerTouchAtRef.current >= SESSION_SERVER_TOUCH_MS
         ) {
+            if (isDbStatusDiagnosticPath()) {
+                return;
+            }
+
             lastServerTouchAtRef.current = now;
             void syncSession();
         }

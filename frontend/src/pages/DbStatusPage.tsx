@@ -18,6 +18,11 @@ type ReplicaReading = {
     majorityAvailable: boolean;
     maxLagSeconds: number | null;
     laggingThresholdSeconds: number;
+    primaryName: string | null;
+    isWritablePrimary: boolean | null;
+    drillMarker: string | null;
+    drillCycle: number | null;
+    drillTotalCycles: number | null;
 };
 
 function formatBytes(value?: number | null) {
@@ -231,6 +236,72 @@ function getReplicaStatusLabel(status?: DbStatusPayload["replicaSet"]["summary"]
     return status ? replicaLabels.statuses[status] : replicaLabels.statuses.UNKNOWN;
 }
 
+function getWriteSafetyDrillTone(status?: string | null) {
+    if (status === "success") {
+        return "emerald" as const;
+    }
+
+    if (status === "failure") {
+        return "red" as const;
+    }
+
+    if (status === "running") {
+        return "amber" as const;
+    }
+
+    return "slate" as const;
+}
+
+function getWriteSafetyDrillLabel(status?: string | null) {
+    if (status === "success") {
+        return "Success";
+    }
+
+    if (status === "failure") {
+        return "Echec";
+    }
+
+    if (status === "running") {
+        return "En cours";
+    }
+
+    return "Inactif";
+}
+
+function formatReplicaHealth({
+    healthyCount,
+    memberCount,
+    status,
+}: {
+    healthyCount: number;
+    memberCount: number;
+    status?: DbStatusPayload["replicaSet"]["summary"]["status"];
+}) {
+    const value = `${healthyCount} / ${memberCount}`;
+
+    if (status === "INCIDENT" && healthyCount === 0 && memberCount > 0) {
+        return `${value} ${labels.dbStatus.replica.confirmed}`;
+    }
+
+    return value;
+}
+
+function formatWritablePrimary(value?: boolean | null, majorityAvailable?: boolean) {
+    if (majorityAvailable === false) {
+        return labels.dbStatus.replica.no;
+    }
+
+    if (value === true) {
+        return labels.dbStatus.replica.yes;
+    }
+
+    if (value === false) {
+        return labels.dbStatus.replica.no;
+    }
+
+    return labels.dbStatus.replica.noLag;
+}
+
 function getOverallStatus(data: DbStatusPayload | null) {
     if (!data) {
         return { ok: false, label: "Aucune donnee" };
@@ -280,7 +351,7 @@ function getChecksumLabel(backup: DbStatusPayload["backups"]["backups"][number])
 }
 
 function toReplicaReading(payload: DbStatusPayload): ReplicaReading | null {
-    if (!payload.replicaSet.available) {
+    if (!payload.replicaSet?.summary) {
         return null;
     }
 
@@ -295,6 +366,9 @@ function toReplicaReading(payload: DbStatusPayload): ReplicaReading | null {
             summary.secondaryCount,
             summary.majorityAvailable ? "majority" : "no-majority",
             summary.status === "LAGGING" ? "lagging" : "lag-ok",
+            payload.writeSafetyDrill?.marker || "no-drill",
+            payload.writeSafetyDrill?.currentCycle ?? "no-cycle",
+            payload.writeSafetyDrill?.phase || "no-phase",
         ].join(":"),
         checkedAt: payload.checkedAt,
         status: summary.status,
@@ -305,6 +379,11 @@ function toReplicaReading(payload: DbStatusPayload): ReplicaReading | null {
         majorityAvailable: summary.majorityAvailable,
         maxLagSeconds: summary.maxLagSeconds,
         laggingThresholdSeconds: summary.laggingThresholdSeconds,
+        primaryName: payload.replicaSet.primary,
+        isWritablePrimary: payload.replicaSet.isWritablePrimary,
+        drillMarker: payload.writeSafetyDrill?.marker || null,
+        drillCycle: payload.writeSafetyDrill?.currentCycle ?? null,
+        drillTotalCycles: payload.writeSafetyDrill?.totalCycles ?? null,
     };
 }
 
@@ -322,9 +401,12 @@ export function DbStatusPage() {
     const [protectingFileName, setProtectingFileName] = useState<string | null>(null);
     const [lastRefreshStartedAt, setLastRefreshStartedAt] = useState<Date | null>(null);
     const [replicaReadings, setReplicaReadings] = useState<ReplicaReading[]>([]);
+    const [lastKnownPrimary, setLastKnownPrimary] = useState<string | null>(null);
     const refreshInFlightRef = useRef(false);
     const clearedReplicaReadingIdRef = useRef<string | null>(null);
     const consecutiveLagReadingsRef = useRef(0);
+    const activeDrillMarkerRef = useRef<string | null>(null);
+    const activeDrillCycleRef = useRef<number | null>(null);
 
     const loadStatus = useCallback(async (showLoading = false) => {
         if (refreshInFlightRef.current) {
@@ -343,13 +425,23 @@ export function DbStatusPage() {
 
             if ("error" in response) {
                 setError(response.error);
-                setData(null);
             } else {
                 setError(null);
                 setData(response.data);
-                const reading = toReplicaReading(response.data);
+                const rawReading = toReplicaReading(response.data);
+                const reading = rawReading && !rawReading.drillMarker && activeDrillMarkerRef.current
+                    ? {
+                        ...rawReading,
+                        drillMarker: activeDrillMarkerRef.current,
+                        drillCycle: activeDrillCycleRef.current,
+                    }
+                    : rawReading;
 
                 if (reading) {
+                    if (reading.primaryName) {
+                        setLastKnownPrimary(reading.primaryName);
+                    }
+
                     if (reading.status === "LAGGING") {
                         consecutiveLagReadingsRef.current += 1;
                     } else {
@@ -357,23 +449,47 @@ export function DbStatusPage() {
                     }
 
                     setReplicaReadings((currentReadings) => {
-                        if (reading.status === "LAGGING" && consecutiveLagReadingsRef.current < 2) {
-                            return currentReadings;
+                        let nextReadings = currentReadings;
+
+                        if (reading.drillMarker && activeDrillMarkerRef.current !== reading.drillMarker) {
+                            activeDrillMarkerRef.current = reading.drillMarker;
+                            activeDrillCycleRef.current = reading.drillCycle;
+                            clearedReplicaReadingIdRef.current = null;
+                            nextReadings = [];
                         }
 
-                        if (currentReadings.length === 0 && clearedReplicaReadingIdRef.current === reading.id) {
-                            return currentReadings;
+                        if (
+                            reading.drillMarker &&
+                            reading.drillCycle != null &&
+                            activeDrillCycleRef.current !== reading.drillCycle
+                        ) {
+                            activeDrillCycleRef.current = reading.drillCycle;
+                            clearedReplicaReadingIdRef.current = null;
+                            nextReadings = [];
+                        }
+
+                        if (reading.status === "DEGRADED" && nextReadings[0]?.status !== "DEGRADED") {
+                            clearedReplicaReadingIdRef.current = null;
+                            nextReadings = [];
+                        }
+
+                        if (reading.status === "LAGGING" && consecutiveLagReadingsRef.current < 2) {
+                            return nextReadings;
+                        }
+
+                        if (nextReadings.length === 0 && clearedReplicaReadingIdRef.current === reading.id) {
+                            return nextReadings;
                         }
 
                         if (clearedReplicaReadingIdRef.current && clearedReplicaReadingIdRef.current !== reading.id) {
                             clearedReplicaReadingIdRef.current = null;
                         }
 
-                        if (currentReadings[0]?.id === reading.id) {
-                            return currentReadings;
+                        if (nextReadings[0]?.id === reading.id) {
+                            return nextReadings;
                         }
 
-                        return [reading, ...currentReadings].slice(0, MAX_REPLICA_READINGS);
+                        return [reading, ...nextReadings].slice(0, MAX_REPLICA_READINGS);
                     });
                 }
             }
@@ -413,6 +529,16 @@ export function DbStatusPage() {
     const backupLabels = labels.dbStatus.backups;
     const replicaLabels = labels.dbStatus.replica;
     const backupStatusOk = data?.backups.latestStatus === "ok";
+    const replicaSet = data?.replicaSet || null;
+    const hasReplicaSummary = Boolean(replicaSet?.summary);
+    const displayedLastKnownPrimary = replicaSet?.primary || lastKnownPrimary;
+    const writeSafetyDrill = data?.writeSafetyDrill || null;
+    const displayedReplicaReadings = writeSafetyDrill?.marker && writeSafetyDrill.currentCycle != null
+        ? replicaReadings.filter((reading) =>
+            reading.drillMarker === writeSafetyDrill.marker &&
+            reading.drillCycle === writeSafetyDrill.currentCycle
+        )
+        : replicaReadings;
     const standaloneMode = replicaMembers.length === 1 && isStandaloneMember(replicaMembers[0]);
     const syncedMembers = replicaMembers.filter((member) => member.syncStatus === "synced").length;
     const replicaSummary = standaloneMode
@@ -425,10 +551,10 @@ export function DbStatusPage() {
                 <div>
                     <div className="mb-2 flex items-center gap-2">
                         <StatusPill ok={overall.ok} label={overall.label} />
-                        {data?.replicaSet.available && (
+                        {hasReplicaSummary && replicaSet && (
                             <TonePill
-                                tone={getReplicaTone(data.replicaSet.summary.status)}
-                                label={`${replicaLabels.setName} ${getReplicaStatusLabel(data.replicaSet.summary.status)}`}
+                                tone={getReplicaTone(replicaSet.summary.status)}
+                                label={`${replicaLabels.setName} ${getReplicaStatusLabel(replicaSet.summary.status)}`}
                             />
                         )}
                     </div>
@@ -471,10 +597,10 @@ export function DbStatusPage() {
                 <MetricCard
                     icon={<Server className="h-5 w-5" />}
                     label={replicaLabels.setName}
-                    value={data?.replicaSet.available ? getReplicaStatusLabel(data.replicaSet.summary.status) : replicaLabels.notDetected}
-                    detail={data?.replicaSet.available
-                        ? `${data.replicaSet.setName || replicaLabels.detected}, ${replicaLabels.primary}: ${data.replicaSet.primary || replicaLabels.unknownPrimary}`
-                        : data?.replicaSet.error || undefined}
+                    value={replicaSet?.summary ? getReplicaStatusLabel(replicaSet.summary.status) : replicaLabels.notDetected}
+                    detail={replicaSet?.available
+                        ? `${replicaSet.setName || replicaLabels.detected}, ${replicaLabels.lastKnownPrimary}: ${replicaSet.primary || displayedLastKnownPrimary || replicaLabels.unknownPrimary}`
+                        : replicaSet?.error || replicaSet?.summary?.message || undefined}
                 />
                 <MetricCard
                     icon={<Clock className="h-5 w-5" />}
@@ -493,7 +619,7 @@ export function DbStatusPage() {
                 <MetricCard icon={<Activity className="h-5 w-5" />} label="Temps backend" value={data ? `${data.responseTimeMs} ms` : "-"} detail={collectionErrors.length > 0 ? `${collectionErrors.length} collection(s) en erreur` : "Collections lisibles"} />
             </div>
 
-            {data?.replicaSet.available && (
+            {replicaSet?.summary && (
                 <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
                     <div className="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
@@ -504,47 +630,60 @@ export function DbStatusPage() {
                             <p className="mt-1 text-sm text-gray-500">{replicaLabels.subtitle}</p>
                         </div>
                         <TonePill
-                            tone={getReplicaTone(data.replicaSet.summary.status)}
-                            label={getReplicaStatusLabel(data.replicaSet.summary.status)}
+                            tone={getReplicaTone(replicaSet.summary.status)}
+                            label={getReplicaStatusLabel(replicaSet.summary.status)}
                         />
                     </div>
-                    <div className="grid gap-3 px-4 py-4 text-sm md:grid-cols-5">
+                    <div className="grid gap-3 px-4 py-4 text-sm md:grid-cols-6">
                         <div>
                             <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{replicaLabels.health}</div>
                             <div className="mt-1 font-semibold text-gray-950">
-                                {data.replicaSet.summary.healthyCount} / {data.replicaSet.summary.memberCount}
+                                {formatReplicaHealth({
+                                    healthyCount: replicaSet.summary.healthyCount,
+                                    memberCount: replicaSet.summary.memberCount,
+                                    status: replicaSet.summary.status,
+                                })}
                             </div>
                         </div>
                         <div>
                             <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{replicaLabels.majority}</div>
                             <div className="mt-1 font-semibold text-gray-950">
-                                {data.replicaSet.summary.majorityAvailable
+                                {replicaSet.summary.majorityAvailable
                                     ? replicaLabels.majorityAvailable
                                     : replicaLabels.majorityUnavailable}
                             </div>
                         </div>
                         <div>
                             <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{replicaLabels.primary}</div>
-                            <div className="mt-1 font-semibold text-gray-950">{data.replicaSet.summary.primaryCount}</div>
+                            <div className="mt-1 font-semibold text-gray-950">{replicaSet.summary.primaryCount}</div>
+                        </div>
+                        <div>
+                            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{replicaLabels.writablePrimary}</div>
+                            <div className="mt-1 font-semibold text-gray-950">
+                                {formatWritablePrimary(replicaSet.isWritablePrimary, replicaSet.summary.majorityAvailable)}
+                            </div>
                         </div>
                         <div>
                             <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{replicaLabels.secondaries}</div>
-                            <div className="mt-1 font-semibold text-gray-950">{data.replicaSet.summary.secondaryCount}</div>
+                            <div className="mt-1 font-semibold text-gray-950">{replicaSet.summary.secondaryCount}</div>
                         </div>
                         <div>
                             <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{replicaLabels.maxLag}</div>
                             <div className="mt-1 font-semibold text-gray-950">
-                                {data.replicaSet.summary.maxLagSeconds == null
+                                {replicaSet.summary.maxLagSeconds == null
                                     ? replicaLabels.noLag
-                                    : `${data.replicaSet.summary.maxLagSeconds}${replicaLabels.secondsSuffix}`}
+                                    : `${replicaSet.summary.maxLagSeconds}${replicaLabels.secondsSuffix}`}
                                 <span className="ml-1 text-xs font-normal text-gray-500">
-                                    / {data.replicaSet.summary.laggingThresholdSeconds}{replicaLabels.secondsSuffix}
+                                    / {replicaSet.summary.laggingThresholdSeconds}{replicaLabels.secondsSuffix}
                                 </span>
                             </div>
                         </div>
                     </div>
                     <div className="border-t border-gray-100 px-4 py-3 text-sm text-gray-600">
-                        {data.replicaSet.summary.message}
+                        <div>{replicaSet.summary.message}</div>
+                        <div className="mt-1 text-xs text-gray-500">
+                            {replicaLabels.lastKnownPrimary}: {displayedLastKnownPrimary || replicaLabels.unknownPrimary}
+                        </div>
                     </div>
                     <div className="border-t border-gray-100 bg-slate-50 px-4 py-3">
                         <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -566,7 +705,7 @@ export function DbStatusPage() {
                             </div>
                         </div>
                         <div className="flex gap-2 overflow-x-auto pb-1">
-                            {replicaReadings.map((reading, index) => (
+                            {displayedReplicaReadings.map((reading, index) => (
                                 <div
                                     key={reading.id}
                                     className="min-w-[13rem] rounded-md border border-gray-200 bg-white p-3 text-xs shadow-sm"
@@ -583,9 +722,23 @@ export function DbStatusPage() {
                                         )}
                                     </div>
                                     <div className="font-medium text-gray-950">{formatTimestamp(reading.checkedAt)}</div>
+                                    {reading.drillCycle != null && reading.drillTotalCycles != null && (
+                                        <div className="mt-1 text-xs font-semibold text-gray-700">
+                                            {replicaLabels.writeSafetyDrillCycle}: {reading.drillCycle} / {reading.drillTotalCycles}
+                                        </div>
+                                    )}
                                     <div className="mt-2 grid grid-cols-2 gap-2 text-gray-600">
-                                        <span>{replicaLabels.health}: {reading.healthyCount}/{reading.memberCount}</span>
+                                        <span>
+                                            {replicaLabels.health}: {formatReplicaHealth({
+                                                healthyCount: reading.healthyCount,
+                                                memberCount: reading.memberCount,
+                                                status: reading.status,
+                                            })}
+                                        </span>
                                         <span>{replicaLabels.primary}: {reading.primaryCount}</span>
+                                        <span>
+                                            {replicaLabels.writablePrimary}: {formatWritablePrimary(reading.isWritablePrimary, reading.majorityAvailable)}
+                                        </span>
                                         <span>{replicaLabels.secondaries}: {reading.secondaryCount}</span>
                                         <span>
                                             {replicaLabels.maxLag}: {reading.maxLagSeconds ?? replicaLabels.noLag}{reading.maxLagSeconds == null ? "" : replicaLabels.secondsSuffix}
@@ -598,9 +751,65 @@ export function DbStatusPage() {
                                     </div>
                                 </div>
                             ))}
-                            {replicaReadings.length === 0 && (
+                            {displayedReplicaReadings.length === 0 && (
                                 <div className="text-sm text-gray-500">{replicaLabels.noReadings}</div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {writeSafetyDrill && (
+                <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <Activity className="h-5 w-5 text-slate-600" />
+                                <h2 className="text-base font-semibold text-gray-950">
+                                    {replicaLabels.writeSafetyDrillTitle}
+                                </h2>
+                            </div>
+                            <p className="mt-1 text-sm text-gray-500">
+                                {writeSafetyDrill.message || replicaLabels.writeSafetyDrillIdle}
+                            </p>
+                        </div>
+                        <TonePill
+                            tone={getWriteSafetyDrillTone(writeSafetyDrill.status)}
+                            label={getWriteSafetyDrillLabel(writeSafetyDrill.status)}
+                        />
+                    </div>
+                    <div className="mt-4 grid gap-3 text-sm md:grid-cols-4">
+                        <div>
+                            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                {replicaLabels.writeSafetyDrillCycle}
+                            </div>
+                            <div className="mt-1 font-semibold text-gray-950">
+                                {writeSafetyDrill.currentCycle ?? "-"} / {writeSafetyDrill.totalCycles ?? "-"}
+                            </div>
+                        </div>
+                        <div>
+                            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                {replicaLabels.writeSafetyDrillPhase}
+                            </div>
+                            <div className="mt-1 font-semibold text-gray-950">
+                                {writeSafetyDrill.phase || "-"}
+                            </div>
+                        </div>
+                        <div>
+                            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                {replicaLabels.writeSafetyDrillUpdated}
+                            </div>
+                            <div className="mt-1 font-semibold text-gray-950">
+                                {formatTimestamp(writeSafetyDrill.updatedAt)}
+                            </div>
+                        </div>
+                        <div>
+                            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                {replicaLabels.writeSafetyDrillMarker}
+                            </div>
+                            <div className="mt-1 truncate font-semibold text-gray-950">
+                                {writeSafetyDrill.marker || "-"}
+                            </div>
                         </div>
                     </div>
                 </div>

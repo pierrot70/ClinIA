@@ -110,6 +110,18 @@ export type DbStatusPayload = {
         backups: DbStatusBackup[];
         error: string | null;
     };
+    writeSafetyDrill: null | {
+        available: boolean;
+        status: "running" | "success" | "failure" | "unavailable" | "unknown" | string;
+        marker: string | null;
+        currentCycle: number | null;
+        totalCycles: number | null;
+        phase: string | null;
+        message: string | null;
+        startedAt: string | null;
+        updatedAt: string | null;
+        completedAt: string | null;
+    };
 };
 
 async function toApiError(response: Response): Promise<ApiError> {
@@ -123,7 +135,10 @@ async function toApiError(response: Response): Promise<ApiError> {
 
 export async function fetchDbStatus(): Promise<ApiResponse<DbStatusPayload>> {
     try {
-        const response = await authFetch("/api/db-status");
+        const response = await authFetch("/api/db-status", {
+            retryOnUnauthorized: false,
+            skipTokenRefresh: true,
+        });
 
         if (!response.ok) {
             return { error: await toApiError(response) };
@@ -135,8 +150,8 @@ export async function fetchDbStatus(): Promise<ApiResponse<DbStatusPayload>> {
             return {
                 error: {
                     code: "INTERNAL_ERROR",
-                    message: "Session expiree.",
-                    retryable: false,
+                    message: "Etat BD temporairement indisponible pendant l'incident Mongo.",
+                    retryable: true,
                 },
             };
         }

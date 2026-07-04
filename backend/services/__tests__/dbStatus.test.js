@@ -133,7 +133,7 @@ describe("dbStatus service", () => {
         expect(status.ping.ok).toBe(false);
         expect(status.replicaSet.available).toBe(false);
         expect(status.replicaSet.summary).toMatchObject({
-            status: "UNKNOWN",
+            status: "INCIDENT",
             majorityAvailable: false,
             maxLagSeconds: null,
         });
@@ -143,6 +143,30 @@ describe("dbStatus service", () => {
         expect(status.backups).toMatchObject({
             directory: expect.any(String),
             backups: expect.any(Array),
+        });
+    });
+
+    it("reports a reachable single member when replica metadata is unavailable", async () => {
+        const connection = createConnectedConnection();
+        connection.db.admin = () => ({
+            ping: async () => ({ ok: 1 }),
+            command: async () => {
+                throw new Error("not primary and secondaryOk=false");
+            },
+        });
+
+        const status = await getDbStatus({ connection });
+
+        expect(status.ping.ok).toBe(true);
+        expect(status.replicaSet.available).toBe(false);
+        expect(status.replicaSet.summary).toMatchObject({
+            status: "INCIDENT",
+            memberCount: 3,
+            healthyCount: 1,
+            primaryCount: 0,
+            secondaryCount: 0,
+            majorityAvailable: false,
+            maxLagSeconds: null,
         });
     });
 

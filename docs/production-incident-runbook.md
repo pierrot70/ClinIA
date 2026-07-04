@@ -241,6 +241,167 @@ HTTP_READY_URL=https://clinique-ai.ca/api/health/ready-does-not-exist \
 Expected result: exit code `2` and one Slack `[failed]` alert for
 `clinia-production-health`.
 
+### Mongo Status BD UI drills
+
+Purpose: prove that the production `Status BD` screen shows Mongo replica
+transitions clearly while the operator follows the terminal drill. These drills
+are operational visibility checks; they must not expose patient data.
+
+#### One-secondary degraded UI drill, validated in production
+
+This drill stops only `mongo-replica-1`, confirms the UI moves from `OK 3/3` to
+`Degrade 2/3`, then restarts the secondary and confirms the UI returns to
+`OK 3/3`.
+
+1. Open `Status BD` as an admin or superadmin.
+2. In `Dernieres transitions replica`, click `Effacer transitions`.
+3. Confirm the baseline:
+
+```bash
+sudo bash -c '
+MONGO_CONTAINER="$(docker ps --format "{{.Names}}" | grep "^mongo-gko400wwcs44csw8000o0sss-" | head -n1)"
+
+MONGO_PASSWORD="$(
+  docker inspect "$MONGO_CONTAINER" \
+    --format "{{range .Config.Env}}{{println .}}{{end}}" |
+  sed -n "s/^MONGO_INITDB_ROOT_PASSWORD=//p" |
+  tail -n1
+)"
+
+docker exec -e MONGO_PASSWORD="$MONGO_PASSWORD" "$MONGO_CONTAINER" \
+  sh -c '"'"'mongosh --quiet \
+    --username root \
+    --password="$MONGO_PASSWORD" \
+    --authenticationDatabase admin \
+    --eval "rs.status().members.map(({name,stateStr,health}) => ({name,stateStr,health}))"'"'"'
+'
+```
+
+Expected baseline:
+
+- `mongo:27017`: `PRIMARY`, `health: 1`
+- `mongo-replica-1:27017`: `SECONDARY`, `health: 1`
+- `mongo-replica-2:27017`: `SECONDARY`, `health: 1`
+
+4. Stop one secondary:
+
+```bash
+sudo bash -c '
+MONGO_SECONDARY_1="$(docker ps --format "{{.Names}}" | grep "^mongo-replica-1-" | head -n1)"
+
+echo "Stopping: $MONGO_SECONDARY_1"
+
+if [ -z "$MONGO_SECONDARY_1" ]; then
+  echo "ERROR: mongo-replica-1 container not found"
+  exit 1
+fi
+
+docker stop "$MONGO_SECONDARY_1"
+'
+```
+
+Expected `Status BD` transition:
+
+- `Resume replica`: `Degrade`
+- `Sante`: `2 / 3`
+- `Primary`: `1`
+- `Secondaries`: `1`
+- `Majorite`: `Disponible`
+- `Dernieres transitions replica`: one `Degrade` card.
+
+5. Restart the stopped secondary:
+
+```bash
+sudo bash -c '
+MONGO_SECONDARY_1_STOPPED="$(docker ps -a --format "{{.Names}}\t{{.Status}}" | awk "/^mongo-replica-1-/ && /Exited/ { print \$1; exit }")"
+
+echo "Starting: $MONGO_SECONDARY_1_STOPPED"
+
+if [ -z "$MONGO_SECONDARY_1_STOPPED" ]; then
+  echo "ERROR: stopped mongo-replica-1 not found"
+  exit 1
+fi
+
+docker start "$MONGO_SECONDARY_1_STOPPED"
+'
+```
+
+Expected final `Status BD` transition:
+
+- `Resume replica`: `OK`
+- `Sante`: `3 / 3`
+- `Primary`: `1`
+- `Secondaries`: `2`
+- `Majorite`: `Disponible`
+- `Dernieres transitions replica`: `Degrade -> OK`.
+
+Validated production evidence observed on 2026-07-01:
+
+- Baseline showed `OK 3/3`.
+- Stopping `mongo-replica-1` showed `Degrade 2/3` with majority still
+  available.
+- Restarting `mongo-replica-1` returned to `OK 3/3`.
+- The UI transition history showed `Degrade -> OK` after using
+  `Effacer transitions`.
+
+#### Severe `1/3` incident UI drill, prepared but run only with approval
+
+This drill intentionally stops both Mongo secondaries. It is more disruptive
+than the one-secondary drill:
+
+- At `2/3`, Mongo still has majority and should remain writable.
+- At `1/3`, Mongo should lose majority. Majority writes should not be trusted
+  until the stopped members are restored.
+- Run only during a planned maintenance window and only if the current baseline
+  is already `OK 3/3`.
+
+Install or refresh the scripts on `clinia-coolify`:
+
+```bash
+sudo mkdir -p /opt/clinia/scripts
+
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/production-health-check.sh \
+  -o /opt/clinia/scripts/production-health-check.sh
+
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/run-production-mongo-incident-drill.sh \
+  -o /opt/clinia/scripts/run-production-mongo-incident-drill.sh
+
+sudo chmod 755 /opt/clinia/scripts/production-health-check.sh \
+  /opt/clinia/scripts/run-production-mongo-incident-drill.sh
+```
+
+Run the guided severe drill:
+
+```bash
+sudo CONFIRM_PRODUCTION_MONGO_INCIDENT_DRILL=RUN_CLINIA_MONGO_1_OF_3_DRILL \
+  ALERT_ORIGIN=PROD \
+  /opt/clinia/scripts/run-production-mongo-incident-drill.sh
+```
+
+The script:
+
+1. Sources root-owned alert env files if present.
+2. Verifies a normal `OK 3/3` baseline.
+3. Stops `mongo-replica-1` and expects health-check exit `1`.
+4. Pauses and asks the operator to confirm the UI shows `Degrade 2/3`.
+5. Requires the operator to type `INCIDENT` before stopping the second
+   secondary.
+6. Stops `mongo-replica-2` and expects health-check exit `2`.
+7. Pauses and asks the operator to confirm `1/3`, incident, or majority
+   unavailable in the UI.
+8. Restarts both stopped secondaries.
+9. Waits until health-check returns `OK 3/3`.
+
+Expected final result:
+
+```text
+INFO PRODUCTION_MONGO_INCIDENT_DRILL_PASSED origin=PROD
+```
+
+If the script exits early, the trap attempts to restart any container it
+stopped. Immediately run the full production health check and keep `Status BD`
+open until the replica summary is back to `OK 3/3`.
+
 ## Operations signal grid
 
 Use this grid when Slack, the dashboard, or a manual check reports a production

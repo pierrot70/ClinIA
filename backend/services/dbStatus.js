@@ -408,16 +408,29 @@ function readStatusMembers(status) {
         : [];
 }
 
-function buildReplicaSetSummary({ available, members, thresholdSeconds }) {
+function expectedReplicaMemberCount() {
+    return parsePositiveInt(process.env.MONGO_REPLICA_EXPECTED_MEMBERS || "3", 3);
+}
+
+function buildReplicaSetSummary({
+    available,
+    members,
+    thresholdSeconds,
+    expectedMemberCount = expectedReplicaMemberCount(),
+    reachableMemberCount = null,
+}) {
     if (!available) {
+        const memberCount = expectedMemberCount;
+        const healthyCount = nullableNumber(reachableMemberCount) ?? 0;
+
         return {
-            status: "UNKNOWN",
-            message: "Replica set metadata unavailable.",
-            memberCount: 0,
-            healthyCount: 0,
+            status: "INCIDENT",
+            message: "Mongo replica set metadata is unavailable; majority may be unavailable.",
+            memberCount,
+            healthyCount,
             primaryCount: 0,
             secondaryCount: 0,
-            majorityCount: null,
+            majorityCount: Math.floor(memberCount / 2) + 1,
             majorityAvailable: false,
             maxLagSeconds: null,
             laggingThresholdSeconds: thresholdSeconds,
@@ -551,6 +564,7 @@ function buildUnavailablePayload({ connection, checkedAt, startedAt, backups }) 
         database: null,
         collections: [],
         backups,
+        writeSafetyDrill: null,
     };
 }
 
@@ -591,19 +605,28 @@ async function readReplicaSetSnapshot(db, connection) {
             error: null,
         };
     } catch (err) {
+        const topologyMembers = readTopologyMembers(connection);
+        const hasTopologyMembers = topologyMembers.length > 0;
+        const reachableMemberCount = hasTopologyMembers
+            ? topologyMembers.filter((member) => member.onlineStatus === "online").length
+            : connection?.readyState === 1
+                ? 1
+                : 0;
+
         return {
-            available: false,
+            available: hasTopologyMembers,
             summary: buildReplicaSetSummary({
-                available: false,
-                members: [],
+                available: hasTopologyMembers,
+                members: topologyMembers,
                 thresholdSeconds: laggingThresholdSeconds,
+                reachableMemberCount,
             }),
             setName: null,
             isWritablePrimary: null,
             secondary: null,
             primary: null,
             hosts: [],
-            members: readTopologyMembers(connection),
+            members: topologyMembers,
             error: err?.message || "Replica set metadata unavailable.",
         };
     }
@@ -676,6 +699,56 @@ async function readCollectionSnapshots(db) {
     return snapshots.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+async function readReplicaWriteSafetyDrillStatus(db) {
+    try {
+        const status = await db
+            .collection("replica_write_safety_drill_status")
+            .findOne({ _id: "latest" });
+
+        if (!status) {
+            return null;
+        }
+
+        return {
+            available: true,
+            status: typeof status.status === "string" ? status.status : "unknown",
+            marker: typeof status.marker === "string" ? status.marker : null,
+            currentCycle: nullableNumber(status.currentCycle),
+            totalCycles: nullableNumber(status.totalCycles),
+            phase: typeof status.phase === "string" ? status.phase : null,
+            message: typeof status.message === "string" ? status.message : null,
+            startedAt: status.startedAt instanceof Date
+                ? status.startedAt.toISOString()
+                : typeof status.startedAt === "string"
+                    ? status.startedAt
+                    : null,
+            updatedAt: status.updatedAt instanceof Date
+                ? status.updatedAt.toISOString()
+                : typeof status.updatedAt === "string"
+                    ? status.updatedAt
+                    : null,
+            completedAt: status.completedAt instanceof Date
+                ? status.completedAt.toISOString()
+                : typeof status.completedAt === "string"
+                    ? status.completedAt
+                    : null,
+        };
+    } catch (err) {
+        return {
+            available: false,
+            status: "unavailable",
+            marker: null,
+            currentCycle: null,
+            totalCycles: null,
+            phase: null,
+            message: err?.message || "Replica write safety drill status unavailable.",
+            startedAt: null,
+            updatedAt: null,
+            completedAt: null,
+        };
+    }
+}
+
 export async function getDbStatus({ connection = mongoose.connection } = {}) {
     const startedAt = Date.now();
     const checkedAt = new Date(startedAt).toISOString();
@@ -703,11 +776,12 @@ export async function getDbStatus({ connection = mongoose.connection } = {}) {
         pingError = err?.message || "Mongo ping failed.";
     }
 
-    const [dbStats, replicaSet, collections, backups] = await Promise.all([
+    const [dbStats, replicaSet, collections, backups, writeSafetyDrill] = await Promise.all([
         db.stats().catch((err) => ({ error: err?.message || "Database stats unavailable." })),
         getReplicaSetStatus({ connection }),
         readCollectionSnapshots(db).catch(() => []),
         backupsPromise,
+        readReplicaWriteSafetyDrillStatus(db),
     ]);
 
     return {
@@ -739,5 +813,6 @@ export async function getDbStatus({ connection = mongoose.connection } = {}) {
             },
         collections,
         backups,
+        writeSafetyDrill,
     };
 }

@@ -10,6 +10,8 @@ type ProtectedRouteProps = {
     redirectTo?: string;
 };
 
+const DB_STATUS_DIAGNOSTIC_PATH = "/admin/db-status";
+
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     children,
     allowedRoles,
@@ -34,6 +36,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
                 if (!cancelled) {
                     setIsVerifyingSession(false);
                 }
+                return;
+            }
+
+            if (location.pathname === DB_STATUS_DIAGNOSTIC_PATH) {
+                setIsVerifyingSession(false);
                 return;
             }
 

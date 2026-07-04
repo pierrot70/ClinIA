@@ -86,6 +86,7 @@ type LoginApiResponse = {
 let inMemoryAccessToken: string | null = null;
 let inMemoryUser: AuthUser | null = null;
 let refreshPromise: Promise<string | null> | null = null;
+let diagnosticAccessTokenSnapshot: string | null = null;
 
 function persistAuthSecurityNotice(notice: AuthSecurityNotice): void {
     try {
@@ -182,10 +183,14 @@ function applySession(session: AuthSession): void {
     inMemoryUser = session.user;
 }
 
-function clearSession(): void {
+function clearSession({ clearDiagnosticToken = false } = {}): void {
     inMemoryAccessToken = null;
     inMemoryUser = null;
     refreshPromise = null;
+
+    if (clearDiagnosticToken) {
+        diagnosticAccessTokenSnapshot = null;
+    }
 }
 
 function extractAuthSecurityNotice(
@@ -419,7 +424,7 @@ export async function logout(): Promise<void> {
     } catch {
         // Ignore network/logout errors to ensure local cleanup.
     } finally {
-        clearSession();
+        clearSession({ clearDiagnosticToken: true });
     }
 }
 
@@ -518,6 +523,7 @@ export async function getValidAccessToken(): Promise<string | null> {
 
 type AuthFetchOptions = RequestInit & {
     retryOnUnauthorized?: boolean;
+    skipTokenRefresh?: boolean;
 };
 
 function resolveApiUrl(input: RequestInfo | URL): RequestInfo | URL {
@@ -535,11 +541,17 @@ function resolveApiUrl(input: RequestInfo | URL): RequestInfo | URL {
 export async function authFetch(input: RequestInfo | URL, init: AuthFetchOptions = {}) {
     const {
         retryOnUnauthorized = true,
+        skipTokenRefresh = false,
         headers,
         ...rest
     } = init;
 
-    const token = await getValidAccessToken();
+    let token = skipTokenRefresh ? (inMemoryAccessToken || diagnosticAccessTokenSnapshot) : await getValidAccessToken();
+
+    if (skipTokenRefresh && inMemoryAccessToken) {
+        diagnosticAccessTokenSnapshot = inMemoryAccessToken;
+        token = inMemoryAccessToken;
+    }
 
     const requestHeaders = new Headers(headers);
     if (token) {

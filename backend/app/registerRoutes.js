@@ -12,12 +12,20 @@ import healthRouter from "../routes/health.js";
 import dbStatusRouter from "../routes/dbStatus.js";
 import writeOperationAuditsRouter from "../routes/writeOperationAudits.js";
 
-import { verifyJWT } from "../middleware/verifyJWT.js";
+import { verifyDiagnosticJWT, verifyJWT } from "../middleware/verifyJWT.js";
 import { attachOptionalAuth } from "../middleware/attachOptionalAuth.js";
 import { requireRole } from "../middleware/requireRole.js";
 import { loi25DataLeakGuard } from "../middleware/loi25DataLeakGuard.js";
 import { AUTH_ROLES } from "../auth/constants.js";
 import { createAiAnalyzeRouter } from "../routes/aiAnalyze.js";
+
+function verifyDbStatusRequest(req, res, next) {
+    if (req.method === "GET" && (req.path === "/" || req.path === "")) {
+        return verifyDiagnosticJWT(req, res, next);
+    }
+
+    return verifyJWT(req, res, next);
+}
 
 export function registerRoutes(app, deps) {
     const {
@@ -91,7 +99,7 @@ export function registerRoutes(app, deps) {
     );
     app.use(
         "/api/db-status",
-        verifyJWT,
+        verifyDbStatusRequest,
         requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
         loi25DataLeakGuard,
         dbStatusRouter
