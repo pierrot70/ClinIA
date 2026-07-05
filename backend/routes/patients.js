@@ -139,6 +139,26 @@ function buildPatientAuditContext(dto) {
     };
 }
 
+function normalizeComparableValue(value) {
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+
+    if (value && typeof value === "object") {
+        return JSON.stringify(value);
+    }
+
+    return value ?? null;
+}
+
+function getActuallyChangedPatientFields(before = {}, updates = {}, after = null) {
+    return Object.keys(updates).filter((field) => {
+        const beforeValue = normalizeComparableValue(before?.[field]);
+        const afterValue = normalizeComparableValue(after?.[field] ?? updates[field]);
+        return beforeValue !== afterValue;
+    });
+}
+
 function buildPatientConflictMessage(err) {
     const conflictFields = [
         ...Object.keys(err?.keyPattern ?? {}),
@@ -465,13 +485,19 @@ router.patch("/:id", async (req, res) => {
     }
 
     try {
+        const beforePatient = await getPatientById(req.params.id, req.auth);
         const patient = await updatePatient(req.params.id, dto, req.auth);
+        const changedFields = getActuallyChangedPatientFields(
+            beforePatient,
+            dto,
+            patient
+        );
 
         const writeVerification = await recordPatientMutationAudit(req, {
             action: "PATIENT_UPDATE",
             operation: "UPDATE",
             patientId: patient?._id ?? req.params.id,
-            changedFields: Object.keys(dto),
+            changedFields,
             context: buildPatientAuditContext(dto),
         });
 

@@ -3,11 +3,13 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 const {
     createPatient,
     listPatientAuditLogs,
+    getPatientById,
     updatePatient,
     deletePatient,
 } = vi.hoisted(() => ({
     createPatient: vi.fn(),
     listPatientAuditLogs: vi.fn(),
+    getPatientById: vi.fn(),
     updatePatient: vi.fn(),
     deletePatient: vi.fn(),
 }));
@@ -36,7 +38,7 @@ vi.mock("../../services/patients.js", () => ({
     createPatient,
     listPatients: vi.fn(),
     listPatientAuditLogs,
-    getPatientById: vi.fn(),
+    getPatientById,
     updatePatient,
     deletePatient,
 }));
@@ -281,6 +283,12 @@ describe("patients routes audit", () => {
         };
 
         toUpdatePatientDTO.mockReturnValue(dto);
+        getPatientById.mockResolvedValue({
+            _id: "patient-2",
+            nom: "Doe",
+            prenom: "Jane",
+            secure_request_profile: null,
+        });
         updatePatient.mockResolvedValue({ _id: "patient-2", ...dto });
 
         const req = {
@@ -315,7 +323,6 @@ describe("patients routes audit", () => {
             ip: "203.0.113.9",
             patientId: "patient-2",
             changedFields: [
-                "nom",
                 "prenom",
                 "secure_request_profile",
             ],
@@ -342,7 +349,6 @@ describe("patients routes audit", () => {
             instanceId: "instance-b",
             resourceId: "patient-2",
             changedFields: [
-                "nom",
                 "prenom",
                 "secure_request_profile",
             ],
