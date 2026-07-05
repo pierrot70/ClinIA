@@ -19,6 +19,10 @@ import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js"
 import { getRequestContext } from "../app/requestContext.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 import { getReplicaSetStatus } from "../services/dbStatus.js";
+import {
+    buildWriteVerificationMeta,
+    createWriteVerificationContext,
+} from "../audit/writeVerification.js";
 
 const router = express.Router();
 
@@ -42,6 +46,8 @@ async function recordPatientMutationAudit(req, {
     const requestContext = getRequestContext(req);
     const ip = getRequestIp(req);
     const requestPath = req.originalUrl || req.path || null;
+    const { verificationId, clientMutationId } =
+        createWriteVerificationContext(req);
 
     const patientAuditLog = await recordPatientAuditEvent({
         action,
@@ -62,6 +68,8 @@ async function recordPatientMutationAudit(req, {
         collectionName: "patientauditlogs",
         operation: "CREATE",
         outcome: "SUCCESS",
+        verificationId,
+        clientMutationId,
         actorUserId: req.auth?.userId ?? null,
         actorUsername: req.auth?.username ?? null,
         actorRole: req.auth?.role ?? null,
@@ -85,10 +93,12 @@ async function recordPatientMutationAudit(req, {
         replicaSet,
     });
 
-    await recordWriteOperationAuditEvent({
+    const writeAuditRecorded = await recordWriteOperationAuditEvent({
         collectionName: "patients",
         operation,
         outcome: "SUCCESS",
+        verificationId,
+        clientMutationId,
         actorUserId: req.auth?.userId ?? null,
         actorUsername: req.auth?.username ?? null,
         actorRole: req.auth?.role ?? null,
@@ -100,6 +110,12 @@ async function recordPatientMutationAudit(req, {
         requestPath,
         writeConcern: CLINICAL_WRITE_CONCERN,
         replicaSet,
+    });
+
+    return buildWriteVerificationMeta({
+        writeAuditRecorded,
+        verificationId,
+        clientMutationId,
     });
 }
 
@@ -172,7 +188,7 @@ router.post("/", async (req, res) => {
     try {
         const patient = await createPatient(dto, req.auth);
 
-        await recordPatientMutationAudit(req, {
+        const writeVerification = await recordPatientMutationAudit(req, {
             action: "PATIENT_CREATE",
             operation: "CREATE",
             patientId: patient?._id ?? null,
@@ -184,6 +200,7 @@ router.post("/", async (req, res) => {
             meta: {
                 source: "real",
                 model: "mongo",
+                writeVerification,
             },
         });
     } catch (err) {
@@ -450,7 +467,7 @@ router.patch("/:id", async (req, res) => {
     try {
         const patient = await updatePatient(req.params.id, dto, req.auth);
 
-        await recordPatientMutationAudit(req, {
+        const writeVerification = await recordPatientMutationAudit(req, {
             action: "PATIENT_UPDATE",
             operation: "UPDATE",
             patientId: patient?._id ?? req.params.id,
@@ -463,6 +480,7 @@ router.patch("/:id", async (req, res) => {
             meta: {
                 source: "real",
                 model: "mongo",
+                writeVerification,
             },
         });
     } catch (err) {
@@ -517,7 +535,7 @@ router.delete(
         try {
             const deleted = await deletePatient(req.params.id, req.auth);
 
-            await recordPatientMutationAudit(req, {
+            const writeVerification = await recordPatientMutationAudit(req, {
                 action: "PATIENT_DELETE",
                 operation: "DELETE",
                 patientId: deleted?._id ?? req.params.id,
@@ -529,6 +547,7 @@ router.delete(
                 meta: {
                     source: "real",
                     model: "mongo",
+                    writeVerification,
                 },
             });
         } catch (err) {

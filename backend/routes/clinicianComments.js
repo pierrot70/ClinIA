@@ -16,6 +16,10 @@ import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js"
 import { getRequestContext } from "../app/requestContext.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 import { getReplicaSetStatus } from "../services/dbStatus.js";
+import {
+    buildWriteVerificationMeta,
+    createWriteVerificationContext,
+} from "../audit/writeVerification.js";
 
 const router = express.Router();
 
@@ -35,10 +39,11 @@ async function recordClinicianCommentWriteAudit(req, {
     actorUsername = null,
     actorRole = null,
     changedFields = [],
+    writeVerification = null,
 }) {
     const requestContext = getRequestContext(req);
 
-    await recordWriteOperationAuditEvent({
+    return await recordWriteOperationAuditEvent({
         collectionName: "cliniciancomments",
         operation,
         outcome: "SUCCESS",
@@ -48,6 +53,8 @@ async function recordClinicianCommentWriteAudit(req, {
         ip: getRequestIp(req),
         requestId: requestContext.requestId,
         instanceId: requestContext.instanceId,
+        verificationId: writeVerification?.verificationId ?? null,
+        clientMutationId: writeVerification?.clientMutationId ?? null,
         resourceId: commentId ? String(commentId) : null,
         changedFields,
         requestPath: req.originalUrl || req.path || null,
@@ -250,6 +257,7 @@ router.get(
 
 router.post("/", clinicianCommentRateLimiter, async (req, res) => {
     try {
+        const writeVerification = createWriteVerificationContext(req);
         const data = await createClinicianComment({
             authUser: req.auth,
             comment: req.body?.comment,
@@ -257,7 +265,7 @@ router.post("/", clinicianCommentRateLimiter, async (req, res) => {
             trackingCode: req.body?.trackingCode,
             category: req.body?.category,
         });
-        await recordClinicianCommentWriteAudit(req, {
+        const writeAuditRecorded = await recordClinicianCommentWriteAudit(req, {
             operation: "CREATE",
             commentId: data.id,
             actorUsername: data.actorUsername,
@@ -268,6 +276,7 @@ router.post("/", clinicianCommentRateLimiter, async (req, res) => {
                 "comment",
                 "trackingCodeHash",
             ],
+            writeVerification,
         });
 
         return res.status(201).json({
@@ -275,6 +284,10 @@ router.post("/", clinicianCommentRateLimiter, async (req, res) => {
             meta: {
                 source: "real",
                 model: "mongo",
+                writeVerification: buildWriteVerificationMeta({
+                    writeAuditRecorded,
+                    ...writeVerification,
+                }),
             },
         });
     } catch (err) {
@@ -315,15 +328,17 @@ router.post(
     requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
     async (req, res) => {
         try {
+            const writeVerification = createWriteVerificationContext(req);
             const data = await replyToClinicianComment({
                 authUser: req.auth,
                 commentId: req.params.id,
                 message: req.body?.message,
             });
-            await recordClinicianCommentWriteAudit(req, {
+            const writeAuditRecorded = await recordClinicianCommentWriteAudit(req, {
                 operation: "REPLY",
                 commentId: data.id,
                 changedFields: ["replies"],
+                writeVerification,
             });
 
             return res.status(200).json({
@@ -331,6 +346,10 @@ router.post(
                 meta: {
                     source: "real",
                     model: "mongo",
+                    writeVerification: buildWriteVerificationMeta({
+                        writeAuditRecorded,
+                        ...writeVerification,
+                    }),
                 },
             });
         } catch (err) {

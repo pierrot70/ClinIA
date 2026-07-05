@@ -62,6 +62,8 @@ function buildWriteAuditQuery({
     actorRole,
     resourceId,
     requestId,
+    verificationId,
+    clientMutationId,
     replicaStatus,
     majorityAvailable,
 }) {
@@ -122,6 +124,16 @@ function buildWriteAuditQuery({
         andClauses.push({ requestId: normalizedRequestId });
     }
 
+    const normalizedVerificationId = normalizeStringFilter(verificationId, 120);
+    if (normalizedVerificationId) {
+        andClauses.push({ verificationId: normalizedVerificationId });
+    }
+
+    const normalizedClientMutationId = normalizeStringFilter(clientMutationId, 120);
+    if (normalizedClientMutationId) {
+        andClauses.push({ clientMutationId: normalizedClientMutationId });
+    }
+
     const normalizedReplicaStatus = normalizeEnumFilter(
         replicaStatus,
         allowedReplicaStatuses,
@@ -148,6 +160,8 @@ function normalizeAuditRow(log) {
         collectionName: log.collectionName,
         operation: log.operation,
         outcome: log.outcome,
+        verificationId: log.verificationId || null,
+        clientMutationId: log.clientMutationId || null,
         actorUserId: log.actorUserId ? String(log.actorUserId) : null,
         actorUsernameMasked: log.actorUsernameMasked,
         actorRole: log.actorRole,
@@ -186,6 +200,8 @@ export async function listWriteOperationAudits({
     actorRole,
     resourceId,
     requestId,
+    verificationId,
+    clientMutationId,
     replicaStatus,
     majorityAvailable,
 }) {
@@ -207,6 +223,8 @@ export async function listWriteOperationAudits({
         actorRole,
         resourceId,
         requestId,
+        verificationId,
+        clientMutationId,
         replicaStatus,
         majorityAvailable,
     });

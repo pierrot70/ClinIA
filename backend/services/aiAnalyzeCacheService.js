@@ -2,6 +2,8 @@ const NON_CLINICAL_FINGERPRINT_KEYS = new Set([
     "forceReal",
     "openaiModel",
     "incidentAckId",
+    "reverifyRequested",
+    "clientMutationId",
 ]);
 
 export function buildFingerprintPatientPayload(patient = {}) {

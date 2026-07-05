@@ -70,8 +70,9 @@ describe("diagnosisPersistence", () => {
             j: true,
             wtimeout: 5000,
         });
-        expect(result).toEqual({
+        expect(result).toMatchObject({
             ok: true,
+            writeAuditRecorded: false,
             doc: {
                 mode: "real",
                 output: { diagnosis: { suspected: "Updated diagnosis" } },

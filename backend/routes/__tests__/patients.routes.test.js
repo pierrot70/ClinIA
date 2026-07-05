@@ -96,6 +96,7 @@ describe("patients routes audit", () => {
                 laggingThresholdSeconds: 10,
             },
         });
+        recordWriteOperationAuditEvent.mockResolvedValue(true);
     });
 
     it("records audit data on patient creation", async () => {
@@ -141,6 +142,8 @@ describe("patients routes audit", () => {
             collectionName: "patients",
             operation: "CREATE",
             outcome: "SUCCESS",
+            verificationId: expect.stringMatching(/^WRV-[A-Z0-9]+-[A-F0-9]{12}$/),
+            clientMutationId: null,
             actorUserId: "user-1",
             actorUsername: "admin.user",
             actorRole: "ADMIN",
@@ -169,6 +172,18 @@ describe("patients routes audit", () => {
             },
         });
         expect(res.status).toHaveBeenCalledWith(201);
+        expect(res.json).toHaveBeenCalledWith({
+            data: patient,
+            meta: {
+                source: "real",
+                model: "mongo",
+                writeVerification: {
+                    status: "CONFIRMED",
+                    verificationId: expect.stringMatching(/^WRV-[A-Z0-9]+-[A-F0-9]{12}$/),
+                    clientMutationId: null,
+                },
+            },
+        });
     });
 
     it("returns a telephone-specific conflict message on patient creation", async () => {
@@ -273,6 +288,7 @@ describe("patients routes audit", () => {
             params: { id: "patient-2" },
             headers: {
                 "x-forwarded-for": "203.0.113.9, 10.0.0.10",
+                "x-client-mutation-id": "patient-update-client-1",
             },
             auth: {
                 userId: "user-2",
@@ -316,6 +332,8 @@ describe("patients routes audit", () => {
             collectionName: "patients",
             operation: "UPDATE",
             outcome: "SUCCESS",
+            verificationId: expect.stringMatching(/^WRV-[A-Z0-9]+-[A-F0-9]{12}$/),
+            clientMutationId: "patient-update-client-1",
             actorUserId: "user-2",
             actorUsername: "doctor.one",
             actorRole: "MEDECIN",
@@ -348,6 +366,18 @@ describe("patients routes audit", () => {
             },
         });
         expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith({
+            data: { _id: "patient-2", ...dto },
+            meta: {
+                source: "real",
+                model: "mongo",
+                writeVerification: {
+                    status: "CONFIRMED",
+                    verificationId: expect.stringMatching(/^WRV-[A-Z0-9]+-[A-F0-9]{12}$/),
+                    clientMutationId: "patient-update-client-1",
+                },
+            },
+        });
     });
 
     it("records delete audit without patient identifiers", async () => {
@@ -390,6 +420,8 @@ describe("patients routes audit", () => {
             collectionName: "patients",
             operation: "DELETE",
             outcome: "SUCCESS",
+            verificationId: expect.stringMatching(/^WRV-[A-Z0-9]+-[A-F0-9]{12}$/),
+            clientMutationId: null,
             actorUserId: "user-3",
             actorUsername: "super.admin",
             actorRole: "SUPERADMIN",

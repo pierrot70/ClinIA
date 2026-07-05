@@ -13,6 +13,7 @@ import {
     buildMockAnalyzeResponse,
     buildPersistedRealAnalyzeResponse,
 } from "../services/aiAnalyzeResponseService.js";
+import { createWriteVerificationContext } from "../audit/writeVerification.js";
 import { resolveAnalyzeExecutionMode } from "../services/aiAnalyzeAccessService.js";
 import { requireRole } from "../middleware/requireRole.js";
 import { getRequestContext } from "../app/requestContext.js";
@@ -138,6 +139,7 @@ export function createAiAnalyzeRouter(deps) {
                 }) || diagnosisSeed || "To be determined by ClinIA";
                 const patient = safeBody;
                 const requestContext = getRequestContext(req);
+                const writeVerification = createWriteVerificationContext(req);
                 const writeAudit = {
                     actorUserId: req.auth?.userId ?? null,
                     actorUsername: req.auth?.username ?? null,
@@ -145,6 +147,8 @@ export function createAiAnalyzeRouter(deps) {
                     ip: getRequestIp(req),
                     requestId: requestContext.requestId,
                     instanceId: requestContext.instanceId,
+                    verificationId: writeVerification.verificationId,
+                    clientMutationId: writeVerification.clientMutationId,
                     requestPath: req.originalUrl || req.path || null,
                 };
                 let cloudSafePatient = buildCloudSafePatientPayload(patient);
@@ -297,6 +301,9 @@ export function createAiAnalyzeRouter(deps) {
                         normalizeClinicalAnalysis,
                         persistOrReuseDiagnosis,
                         writeAudit,
+                        writeVerification,
+                        reverifyRequested: reverifyRequested === true,
+                        reqAuth: req.auth,
                     });
 
                     if (!mockResult.ok) {
@@ -359,6 +366,7 @@ export function createAiAnalyzeRouter(deps) {
                     neutralizationMeta,
                     persistOrReuseDiagnosis,
                     writeAudit,
+                    writeVerification,
                 });
 
                 if (!finalResult.ok) {

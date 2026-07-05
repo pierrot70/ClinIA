@@ -8,6 +8,9 @@ export async function buildMockAnalyzeResponse({
     normalizeClinicalAnalysis,
     persistOrReuseDiagnosis,
     writeAudit,
+    writeVerification = null,
+    reverifyRequested = false,
+    reqAuth = null,
 }) {
     const mock = getMockForDiagnosis(diagnosisSeed || diagnosis);
     const analysis = normalizeClinicalAnalysis(mock, {
@@ -21,6 +24,15 @@ export async function buildMockAnalyzeResponse({
         output: analysis,
         mode: "mock",
         model: "mock",
+        replaceExisting: reverifyRequested,
+        archiveExistingAsDeleted: reverifyRequested,
+        archivedBy: reverifyRequested
+            ? {
+                  userId: reqAuth?.userId ?? null,
+                  username: reqAuth?.username ?? null,
+                  role: reqAuth?.role ?? null,
+              }
+            : undefined,
         writeAudit,
     });
 
@@ -35,6 +47,18 @@ export async function buildMockAnalyzeResponse({
             meta: {
                 source: "mock",
                 model: "mock",
+                ...(reverifyRequested === true ? { reverified: true } : {}),
+                ...(writeVerification
+                    ? {
+                          writeVerification: {
+                              status: persist.writeAuditRecorded ? "CONFIRMED" : "UNAVAILABLE",
+                              verificationId: persist.writeAuditRecorded
+                                  ? writeVerification.verificationId
+                                  : null,
+                              clientMutationId: writeVerification.clientMutationId,
+                          },
+                      }
+                    : {}),
                 ...neutralizationMeta,
             },
         },
@@ -75,6 +99,7 @@ export async function buildPersistedRealAnalyzeResponse({
     neutralizationMeta,
     persistOrReuseDiagnosis,
     writeAudit,
+    writeVerification = null,
     logger = console,
 }) {
     const persist = await persistOrReuseDiagnosis({
@@ -111,6 +136,17 @@ export async function buildPersistedRealAnalyzeResponse({
             source: "real",
             model,
             ...(reverifyRequested === true ? { reverified: true } : {}),
+            ...(writeVerification
+                ? {
+                      writeVerification: {
+                          status: persist.writeAuditRecorded ? "CONFIRMED" : "UNAVAILABLE",
+                          verificationId: persist.writeAuditRecorded
+                              ? writeVerification.verificationId
+                              : null,
+                          clientMutationId: writeVerification.clientMutationId,
+                      },
+                  }
+                : {}),
             ...neutralizationMeta,
         },
     };

@@ -10,10 +10,10 @@ async function recordDiagnosisWriteAudit({
     changedFields,
 }) {
     if (!writeAudit || !doc?._id) {
-        return;
+        return false;
     }
 
-    await recordWriteOperationAuditEvent({
+    return await recordWriteOperationAuditEvent({
         collectionName: "diagnosisresults",
         operation,
         outcome: "SUCCESS",
@@ -23,6 +23,8 @@ async function recordDiagnosisWriteAudit({
         ip: writeAudit.ip ?? null,
         requestId: writeAudit.requestId ?? null,
         instanceId: writeAudit.instanceId ?? null,
+        verificationId: writeAudit.verificationId ?? null,
+        clientMutationId: writeAudit.clientMutationId ?? null,
         resourceId: String(doc._id),
         changedFields,
         requestPath: writeAudit.requestPath ?? null,
@@ -43,13 +45,13 @@ export async function persistOrReuseDiagnosis(payload, deps = {}) {
             [diagnosisPayload],
             CLINICAL_QUERY_WRITE_OPTIONS
         );
-        await recordDiagnosisWriteAudit({
+        const writeAuditRecorded = await recordDiagnosisWriteAudit({
             operation: "CREATE",
             doc: created,
             writeAudit,
             changedFields: ["fingerprint", "input", "output", "mode", "model"],
         });
-        return { ok: true, doc: created };
+        return { ok: true, doc: created, writeAuditRecorded };
     } catch (err) {
         if (err.code === 11000) {
             const existing = await DiagnosisResult.findOne({
@@ -67,11 +69,15 @@ export async function persistOrReuseDiagnosis(payload, deps = {}) {
                     diagnosisPayload.mode === "real" &&
                     existing.mode === "real" &&
                     diagnosisPayload.replaceExisting === true;
+                const shouldReplaceExistingSameMode =
+                    diagnosisPayload.mode === existing.mode &&
+                    diagnosisPayload.replaceExisting === true;
 
                 if (
                     (diagnosisPayload.mode === "real" && existing.mode === "mock") ||
                     (existingIsPlaceholderReal && incomingIsMeaningfulReal) ||
-                    shouldReplaceExistingReal
+                    shouldReplaceExistingReal ||
+                    shouldReplaceExistingSameMode
                 ) {
                     if (diagnosisPayload.archiveExistingAsDeleted === true) {
                         existing.history = Array.isArray(existing.history)
@@ -97,7 +103,7 @@ export async function persistOrReuseDiagnosis(payload, deps = {}) {
                     existing.mode = diagnosisPayload.mode;
                     existing.model = diagnosisPayload.model;
                     await existing.save(CLINICAL_WRITE_CONCERN);
-                    await recordDiagnosisWriteAudit({
+                    const writeAuditRecorded = await recordDiagnosisWriteAudit({
                         operation: "UPDATE",
                         doc: existing,
                         writeAudit,
@@ -109,10 +115,10 @@ export async function persistOrReuseDiagnosis(payload, deps = {}) {
                             ...(diagnosisPayload.archiveExistingAsDeleted === true ? ["history"] : []),
                         ],
                     });
-                    return { ok: true, doc: existing.toObject() };
+                    return { ok: true, doc: existing.toObject(), writeAuditRecorded };
                 }
 
-                return { ok: true, doc: existing.toObject() };
+                return { ok: true, doc: existing.toObject(), writeAuditRecorded: false };
             }
         }
 

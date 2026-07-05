@@ -23,6 +23,8 @@ export type WriteOperationAuditLog = {
     collectionName: string;
     operation: WriteOperationAuditOperation;
     outcome: WriteOperationAuditOutcome;
+    verificationId: string | null;
+    clientMutationId: string | null;
     actorUserId: string | null;
     actorUsernameMasked: string;
     actorRole: string | null;
@@ -86,6 +88,8 @@ export type WriteOperationAuditFilters = {
     actorRole?: "USER" | "MEDECIN" | "ADMIN" | "SUPERADMIN" | "";
     resourceId?: string;
     requestId?: string;
+    verificationId?: string;
+    clientMutationId?: string;
     replicaStatus?: WriteOperationAuditReplicaStatus | "";
     majorityAvailable?: "true" | "false" | "";
 };
@@ -115,6 +119,8 @@ export async function fetchWriteOperationAudits(
     if (params.actorRole) query.set("actorRole", params.actorRole);
     if (params.resourceId) query.set("resourceId", params.resourceId);
     if (params.requestId) query.set("requestId", params.requestId);
+    if (params.verificationId) query.set("verificationId", params.verificationId);
+    if (params.clientMutationId) query.set("clientMutationId", params.clientMutationId);
     if (params.replicaStatus) query.set("replicaStatus", params.replicaStatus);
     if (params.majorityAvailable) {
         query.set("majorityAvailable", params.majorityAvailable);

@@ -26,6 +26,8 @@ describe("write operation audit privacy", () => {
             ip: "203.0.113.10",
             requestId: "request-1",
             instanceId: "instance-1",
+            verificationId: "WRV-TEST-ABCDEF123456",
+            clientMutationId: "client-mutation-1",
             resourceId: "patient-technical-id",
             changedFields: ["nom", "telephone", "nom"],
             requestPath: "/api/patients/patient-technical-id",
@@ -52,6 +54,8 @@ describe("write operation audit privacy", () => {
             collectionName: "patients",
             operation: "UPDATE",
             outcome: "SUCCESS",
+            verificationId: "WRV-TEST-ABCDEF123456",
+            clientMutationId: "client-mutation-1",
             actorUserId: "507f1f77bcf86cd799439011",
             actorUsernameMasked: "do***",
             actorRole: "MEDECIN",
@@ -97,6 +101,6 @@ describe("write operation audit privacy", () => {
                 operation: "CREATE",
                 outcome: "SUCCESS",
             })
-        ).resolves.toBeUndefined();
+        ).resolves.toBe(false);
     });
 });

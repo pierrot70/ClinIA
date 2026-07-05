@@ -15,6 +15,10 @@ import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js"
 import { getRequestContext } from "../app/requestContext.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 import { getReplicaSetStatus } from "../services/dbStatus.js";
+import {
+    buildWriteVerificationMeta,
+    createWriteVerificationContext,
+} from "../audit/writeVerification.js";
 
 const router = express.Router();
 
@@ -34,11 +38,15 @@ async function recordAppointmentWriteAudit(req, {
     changedFields = [],
 }) {
     const requestContext = getRequestContext(req);
+    const { verificationId, clientMutationId } =
+        createWriteVerificationContext(req);
 
-    await recordWriteOperationAuditEvent({
+    const writeAuditRecorded = await recordWriteOperationAuditEvent({
         collectionName: "appointments",
         operation,
         outcome: "SUCCESS",
+        verificationId,
+        clientMutationId,
         actorUserId: req.auth?.userId ?? null,
         actorUsername: req.auth?.username ?? null,
         actorRole: req.auth?.role ?? null,
@@ -50,6 +58,12 @@ async function recordAppointmentWriteAudit(req, {
         requestPath: req.originalUrl || req.path || null,
         writeConcern: CLINICAL_WRITE_CONCERN,
         replicaSet: await getReplicaSetStatus(),
+    });
+
+    return buildWriteVerificationMeta({
+        writeAuditRecorded,
+        verificationId,
+        clientMutationId,
     });
 }
 
@@ -113,7 +127,7 @@ router.post("/", async (req, res) => {
 
     try {
         const appointment = await createAppointment(dto, req.auth);
-        await recordAppointmentWriteAudit(req, {
+        const writeVerification = await recordAppointmentWriteAudit(req, {
             operation: "CREATE",
             appointmentId: appointment._id,
             changedFields: Object.keys(dto),
@@ -124,6 +138,7 @@ router.post("/", async (req, res) => {
             meta: {
                 source: "real",
                 model: "mongo",
+                writeVerification,
             },
         });
     } catch (err) {
@@ -308,7 +323,7 @@ router.get("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
     try {
         const appointment = await cancelAppointment(req.params.id, req.auth);
-        await recordAppointmentWriteAudit(req, {
+        const writeVerification = await recordAppointmentWriteAudit(req, {
             operation: "DELETE",
             appointmentId: appointment._id,
             changedFields: ["status"],
@@ -319,6 +334,7 @@ router.delete("/:id", async (req, res) => {
             meta: {
                 source: "real",
                 model: "mongo",
+                writeVerification,
             },
         });
     } catch (err) {
@@ -378,7 +394,7 @@ router.patch("/:id/status", async (req, res) => {
     try {
         const appointment =
             await updateAppointmentStatus(req.params.id, status, req.auth);
-        await recordAppointmentWriteAudit(req, {
+        const writeVerification = await recordAppointmentWriteAudit(req, {
             operation: "UPDATE",
             appointmentId: appointment._id,
             changedFields: ["status"],
@@ -389,6 +405,7 @@ router.patch("/:id/status", async (req, res) => {
             meta: {
                 source: "real",
                 model: "mongo",
+                writeVerification,
             },
         });
     } catch (err) {
@@ -457,7 +474,7 @@ router.patch("/:id/schedule", async (req, res) => {
             { date, time },
             req.auth
         );
-        await recordAppointmentWriteAudit(req, {
+        const writeVerification = await recordAppointmentWriteAudit(req, {
             operation: "UPDATE",
             appointmentId: appointment._id,
             changedFields: ["date", "time"],
@@ -468,6 +485,7 @@ router.patch("/:id/schedule", async (req, res) => {
             meta: {
                 source: "real",
                 model: "mongo",
+                writeVerification,
             },
         });
     } catch (err) {

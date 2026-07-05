@@ -63,6 +63,18 @@ const WriteOperationAuditLogSchema = new mongoose.Schema(
             required: true,
             index: true,
         },
+        verificationId: {
+            type: String,
+            default: null,
+            index: true,
+            maxlength: 120,
+        },
+        clientMutationId: {
+            type: String,
+            default: null,
+            index: true,
+            maxlength: 120,
+        },
         actorUserId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "AdminUser",
@@ -143,6 +155,8 @@ const WriteOperationAuditLogSchema = new mongoose.Schema(
 
 WriteOperationAuditLogSchema.index({ collectionName: 1, timestamp: -1 });
 WriteOperationAuditLogSchema.index({ "replicaSet.status": 1, timestamp: -1 });
+WriteOperationAuditLogSchema.index({ verificationId: 1, timestamp: -1 });
+WriteOperationAuditLogSchema.index({ clientMutationId: 1, timestamp: -1 });
 
 export const WriteOperationAuditLog =
     mongoose.models.WriteOperationAuditLog ||

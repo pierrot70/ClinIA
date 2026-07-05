@@ -111,6 +111,8 @@ export async function recordWriteOperationAuditEvent({
     collectionName,
     operation,
     outcome,
+    verificationId = null,
+    clientMutationId = null,
     actorUserId = null,
     actorUsername = null,
     actorRole = null,
@@ -129,6 +131,8 @@ export async function recordWriteOperationAuditEvent({
             collectionName: normalizeString(collectionName, 80),
             operation,
             outcome,
+            verificationId: normalizeString(verificationId, 120),
+            clientMutationId: normalizeString(clientMutationId, 120),
             actorUserId,
             actorUsernameMasked: redactUsername(actorUsername),
             actorRole,
@@ -144,8 +148,10 @@ export async function recordWriteOperationAuditEvent({
             errorCode: normalizeString(errorCode, 120),
             timestamp: new Date(),
         });
+        return true;
     } catch (err) {
         // Audit must never block clinical workflows.
         console.warn("Write operation audit failed", err?.message);
+        return false;
     }
 }

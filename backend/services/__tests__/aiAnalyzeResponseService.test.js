@@ -10,6 +10,7 @@ describe("aiAnalyzeResponseService", () => {
     it("builds and persists a mock response payload", async () => {
         const persistOrReuseDiagnosis = vi.fn().mockResolvedValue({
             ok: true,
+            writeAuditRecorded: true,
             doc: {
                 output: { diagnosis: { suspected: "Mock diagnosis" } },
             },
@@ -26,6 +27,16 @@ describe("aiAnalyzeResponseService", () => {
             })),
             normalizeClinicalAnalysis: vi.fn((value) => value),
             persistOrReuseDiagnosis,
+            writeVerification: {
+                verificationId: "WRV-TEST-MOCK",
+                clientMutationId: "mock-client-1",
+            },
+            reverifyRequested: true,
+            reqAuth: {
+                userId: "super-1",
+                username: "root",
+                role: "SUPERADMIN",
+            },
         });
 
         expect(result).toEqual({
@@ -35,10 +46,27 @@ describe("aiAnalyzeResponseService", () => {
                 meta: {
                     source: "mock",
                     model: "mock",
+                    reverified: true,
+                    writeVerification: {
+                        status: "CONFIRMED",
+                        verificationId: "WRV-TEST-MOCK",
+                        clientMutationId: "mock-client-1",
+                    },
                     neutralized: true,
                 },
             },
         });
+        expect(persistOrReuseDiagnosis).toHaveBeenCalledWith(
+            expect.objectContaining({
+                replaceExisting: true,
+                archiveExistingAsDeleted: true,
+                archivedBy: {
+                    userId: "super-1",
+                    username: "root",
+                    role: "SUPERADMIN",
+                },
+            })
+        );
     });
 
     it("builds a degraded fallback response", () => {
@@ -65,6 +93,7 @@ describe("aiAnalyzeResponseService", () => {
         const logger = { log: vi.fn() };
         const persistOrReuseDiagnosis = vi.fn().mockResolvedValue({
             ok: true,
+            writeAuditRecorded: true,
             doc: {
                 output: { diagnosis: { suspected: "Migraine" } },
             },
@@ -78,6 +107,10 @@ describe("aiAnalyzeResponseService", () => {
             forceRealSafe: false,
             neutralizationMeta: null,
             persistOrReuseDiagnosis,
+            writeVerification: {
+                verificationId: "WRV-TEST-REAL",
+                clientMutationId: "real-client-1",
+            },
             logger,
         });
 
@@ -88,6 +121,11 @@ describe("aiAnalyzeResponseService", () => {
                 meta: {
                     source: "real",
                     model: "gpt-4.1-mini",
+                    writeVerification: {
+                        status: "CONFIRMED",
+                        verificationId: "WRV-TEST-REAL",
+                        clientMutationId: "real-client-1",
+                    },
                 },
             },
         });

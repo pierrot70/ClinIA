@@ -16,6 +16,8 @@ function getFilters(req) {
         actorRole: req.query.actorRole,
         resourceId: req.query.resourceId,
         requestId: req.query.requestId,
+        verificationId: req.query.verificationId,
+        clientMutationId: req.query.clientMutationId,
         replicaStatus: req.query.replicaStatus,
         majorityAvailable: req.query.majorityAvailable,
     };

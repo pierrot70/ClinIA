@@ -72,6 +72,8 @@ describe("aiAnalyzeCacheService", () => {
                 forceReal: false,
                 openaiModel: "gpt-4.1-mini",
                 incidentAckId: "incident-123",
+                reverifyRequested: true,
+                clientMutationId: "client-mutation-123",
             })
         ).toEqual({
             age: 55,
