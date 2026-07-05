@@ -524,6 +524,75 @@ Local STAGING collection drills are documented in
 `docs/DEVELOPMENT_SETUP.md`. They intentionally run against the local
 `clinia_mongo_rs` replica set, not against production.
 
+## Clinical write receipts and audit lookup
+
+Purpose: prove whether a clinical write reached the backend and was confirmed
+by MongoDB with the expected write concern. This is the first place to look when
+a physician reports that a saved patient, appointment, diagnosis result, or
+clinician comment cannot be found.
+
+ClinIA returns a write receipt in successful clinical write responses:
+
+```json
+{
+  "meta": {
+    "writeVerification": {
+      "status": "CONFIRMED",
+      "verificationId": "WRV-...",
+      "clientMutationId": "..."
+    }
+  }
+}
+```
+
+Key identifiers:
+
+- `Verification ID`: server-generated receipt, for example `WRV-...`. This is
+  the primary support identifier to ask the physician for.
+- `Client Mutation ID`: client-supplied mutation identifier from
+  `X-Client-Mutation-Id`. Use this when the server receipt was not copied but
+  the client attempt ID is available.
+- `Request ID`: backend request correlation identifier.
+- `Resource ID`: Mongo document identifier touched by the write.
+
+Admin lookup flow in `Audits BD`:
+
+1. If the physician has the receipt, paste it into `Verification ID`.
+2. If the receipt is incomplete or mistyped, paste the available prefix. When
+   there is no exact match, `Recherche de recu` shows nearby receipts using the
+   first 8 to 12 characters.
+3. If the receipt is unavailable, search by period, actor, collection, and
+   operation.
+4. If available, use `Client Mutation ID`, `Request ID`, or `Resource ID` to
+   narrow the result.
+5. Open `Recherche de recu` to copy the likely `Verification ID`.
+6. Open `Audits BD detailles` to inspect write concern, replica status, changed
+   fields, request path, and resource ID.
+
+Expected evidence for a confirmed write:
+
+- `outcome`: `SUCCESS`
+- `writeConcern`: `w=majority`, `j=true`
+- `replicaSet.majorityAvailable`: `true`
+- `verificationId`: present
+- `collectionName`: the expected clinical collection
+- `operation`: the expected operation (`CREATE`, `UPDATE`, `DELETE`, `REPLY`)
+
+Replica interpretation:
+
+- `OK`: normal confirmed write.
+- `DEGRADED`: majority was still available, but redundancy was reduced.
+- `LAGGING`: majority write was confirmed, but at least one secondary lagged at
+  the time of the write. Treat as a warning signal; investigate if persistent.
+- `INCIDENT` or `majorityAvailable=false`: do not treat the write as safely
+  confirmed unless the API response and audit explicitly prove success with
+  majority write concern. Investigate immediately.
+
+If no audit can be found by receipt, client mutation ID, request ID, resource
+ID, period, actor, collection, or operation, the write likely never completed as
+a confirmed backend write. Check frontend/network errors and backend logs for
+that time window.
+
 ## Evidence log template
 
 Use this template after each production incident, restore drill, failover drill,

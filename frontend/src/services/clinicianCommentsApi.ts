@@ -1,5 +1,6 @@
 import { authFetch } from "./authService";
 import { API_URL } from "./config";
+import type { WriteVerificationMeta } from "../types/api";
 
 export type ClinicianComment = {
     id: string;
@@ -37,6 +38,11 @@ type ClinicianCommentsResponse = {
     error?: {
         code?: string;
         message?: string;
+    };
+    meta?: {
+        source?: "real" | "mock" | "degraded";
+        model?: string;
+        writeVerification?: WriteVerificationMeta;
     };
 };
 
@@ -139,6 +145,7 @@ export async function createClinicianComment(
     return {
         ok: true as const,
         data: payload.data as ClinicianComment,
+        meta: payload.meta,
     };
 }
 
@@ -196,6 +203,7 @@ export async function replyToClinicianComment(commentId: string, message: string
     return {
         ok: true as const,
         data: payload.data as ClinicianComment,
+        meta: payload.meta,
     };
 }
 

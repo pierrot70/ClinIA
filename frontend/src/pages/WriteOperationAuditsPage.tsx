@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { DatabaseZap, Eye, RefreshCw } from "lucide-react";
+import { ChevronDown, Copy, DatabaseZap, Eye, RefreshCw } from "lucide-react";
 import { labels } from "../i18n/uiLabels";
 import type { ApiError } from "../types/api";
 import {
@@ -14,6 +14,7 @@ import {
 import { useDebounce } from "../hooks/useDebounce";
 
 const LIMIT = 25;
+const RECEIPT_SEARCH_LIMIT = 100;
 
 const COLLECTION_OPTIONS = [
     "",
@@ -52,6 +53,18 @@ const REPLICA_STATUS_OPTIONS: Array<"" | WriteOperationAuditReplicaStatus> = [
 ];
 
 const ACTOR_ROLE_OPTIONS = ["", "USER", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
+
+type ReceiptSearchResult = {
+    verificationId: string;
+    timestamp: string;
+    actorUsernameMasked: string;
+    actorRole: string | null;
+    collections: string[];
+    operations: string[];
+    outcomes: string[];
+    replicaStatuses: string[];
+    resourceIds: string[];
+};
 
 function formatTimestamp(value?: string | null) {
     if (!value) return "-";
@@ -102,6 +115,45 @@ function Pill({ value }: { value?: string | null }) {
     );
 }
 
+function buildReceiptSearchResults(logs: WriteOperationAuditLog[]): ReceiptSearchResult[] {
+    const byVerificationId = new Map<string, ReceiptSearchResult>();
+
+    logs.forEach((log) => {
+        if (!log.verificationId) return;
+
+        const current = byVerificationId.get(log.verificationId);
+        if (!current) {
+            byVerificationId.set(log.verificationId, {
+                verificationId: log.verificationId,
+                timestamp: log.timestamp,
+                actorUsernameMasked: log.actorUsernameMasked || "unknown",
+                actorRole: log.actorRole,
+                collections: [log.collectionName],
+                operations: [log.operation],
+                outcomes: [log.outcome],
+                replicaStatuses: [log.replicaSet?.status || "UNKNOWN"],
+                resourceIds: log.resourceId ? [log.resourceId] : [],
+            });
+            return;
+        }
+
+        if (new Date(log.timestamp).getTime() > new Date(current.timestamp).getTime()) {
+            current.timestamp = log.timestamp;
+        }
+        if (!current.collections.includes(log.collectionName)) current.collections.push(log.collectionName);
+        if (!current.operations.includes(log.operation)) current.operations.push(log.operation);
+        if (!current.outcomes.includes(log.outcome)) current.outcomes.push(log.outcome);
+
+        const replicaStatus = log.replicaSet?.status || "UNKNOWN";
+        if (!current.replicaStatuses.includes(replicaStatus)) current.replicaStatuses.push(replicaStatus);
+        if (log.resourceId && !current.resourceIds.includes(log.resourceId)) current.resourceIds.push(log.resourceId);
+    });
+
+    return Array.from(byVerificationId.values()).sort(
+        (left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime()
+    );
+}
+
 function SummaryStrip({ summary }: { summary: WriteOperationAuditSummary | null }) {
     const pageLabels = labels.writeOperationAudits;
     const operationSummary = summary?.byOperation || {};
@@ -148,6 +200,8 @@ function SummaryStrip({ summary }: { summary: WriteOperationAuditSummary | null 
 export function WriteOperationAuditsPage() {
     const pageLabels = labels.writeOperationAudits;
     const [logs, setLogs] = useState<WriteOperationAuditLog[]>([]);
+    const [receiptLogs, setReceiptLogs] = useState<WriteOperationAuditLog[]>([]);
+    const [nearReceiptLogs, setNearReceiptLogs] = useState<WriteOperationAuditLog[]>([]);
     const [summary, setSummary] = useState<WriteOperationAuditSummary | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
@@ -165,8 +219,13 @@ export function WriteOperationAuditsPage() {
     const [actorUserId, setActorUserId] = useState("");
     const [resourceId, setResourceId] = useState("");
     const [requestId, setRequestId] = useState("");
+    const [verificationId, setVerificationId] = useState("");
+    const [clientMutationId, setClientMutationId] = useState("");
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
+    const [copiedReceiptId, setCopiedReceiptId] = useState<string | null>(null);
+    const [receiptSearchOpen, setReceiptSearchOpen] = useState(false);
+    const [auditTableOpen, setAuditTableOpen] = useState(false);
 
     const rawFilters = useMemo<WriteOperationAuditFilters>(
         () => ({
@@ -179,6 +238,8 @@ export function WriteOperationAuditsPage() {
             actorUserId: actorUserId.trim() || undefined,
             resourceId: resourceId.trim() || undefined,
             requestId: requestId.trim() || undefined,
+            verificationId: verificationId.trim() || undefined,
+            clientMutationId: clientMutationId.trim() || undefined,
             startDate,
             endDate,
         }),
@@ -192,32 +253,70 @@ export function WriteOperationAuditsPage() {
             actorUserId,
             resourceId,
             requestId,
+            verificationId,
+            clientMutationId,
             startDate,
             endDate,
         ]
     );
 
     const filters = useDebounce(rawFilters, 300);
+    const receiptResults = useMemo(() => buildReceiptSearchResults(receiptLogs), [receiptLogs]);
+    const receiptPrefix = useMemo(() => {
+        const value = verificationId.trim().toUpperCase();
+        if (value.length < 8) return "";
+        return value.slice(0, Math.min(12, value.length));
+    }, [verificationId]);
+    const nearReceiptResults = useMemo(() => {
+        if (!receiptPrefix) return [];
+        return buildReceiptSearchResults(nearReceiptLogs).filter((receipt) =>
+            receipt.verificationId.toUpperCase().startsWith(receiptPrefix)
+        );
+    }, [nearReceiptLogs, receiptPrefix]);
 
     async function loadAudits() {
         setLoading(true);
         setError(null);
 
-        const response = await fetchWriteOperationAudits({
-            ...filters,
-            page,
-            limit: LIMIT,
-        });
+        const [response, receiptResponse] = await Promise.all([
+            fetchWriteOperationAudits({
+                ...filters,
+                page,
+                limit: LIMIT,
+            }),
+            fetchWriteOperationAudits({
+                ...filters,
+                page: 1,
+                limit: RECEIPT_SEARCH_LIMIT,
+            }),
+        ]);
 
         if ("error" in response) {
             setError(response.error);
             setLogs([]);
+            setReceiptLogs([]);
+            setNearReceiptLogs([]);
             setSummary(null);
             setLoading(false);
             return;
         }
 
+        const nextReceiptLogs = "error" in receiptResponse ? [] : receiptResponse.data.logs;
         setLogs(response.data.logs);
+        setReceiptLogs(nextReceiptLogs);
+
+        if (filters.verificationId && filters.verificationId.trim().length >= 8 && nextReceiptLogs.length === 0) {
+            const nearResponse = await fetchWriteOperationAudits({
+                ...filters,
+                verificationId: undefined,
+                page: 1,
+                limit: RECEIPT_SEARCH_LIMIT,
+            });
+            setNearReceiptLogs("error" in nearResponse ? [] : nearResponse.data.logs);
+        } else {
+            setNearReceiptLogs([]);
+        }
+
         setSummary(response.data.summary);
         setSelectedLog((current) => {
             if (!current) return null;
@@ -227,6 +326,18 @@ export function WriteOperationAuditsPage() {
         setTotalPages(response.data.pagination.totalPages);
         setTotal(response.data.pagination.total);
         setLoading(false);
+    }
+
+    async function copyReceiptId(value: string) {
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopiedReceiptId(value);
+            window.setTimeout(() => {
+                setCopiedReceiptId((current) => (current === value ? null : current));
+            }, 1500);
+        } catch {
+            setCopiedReceiptId(null);
+        }
     }
 
     useEffect(() => {
@@ -244,6 +355,8 @@ export function WriteOperationAuditsPage() {
         setActorUserId("");
         setResourceId("");
         setRequestId("");
+        setVerificationId("");
+        setClientMutationId("");
         setStartDate("");
         setEndDate("");
         setPage(1);
@@ -394,6 +507,19 @@ export function WriteOperationAuditsPage() {
                     </label>
 
                     <label className="text-sm text-gray-700">
+                        {pageLabels.filters.verificationId}
+                        <input
+                            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                            value={verificationId}
+                            onChange={(event) => {
+                                setPage(1);
+                                setVerificationId(event.target.value);
+                            }}
+                            placeholder={pageLabels.placeholders.verificationId}
+                        />
+                    </label>
+
+                    <label className="text-sm text-gray-700">
                         {pageLabels.filters.resourceId}
                         <input
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
@@ -403,6 +529,19 @@ export function WriteOperationAuditsPage() {
                                 setResourceId(event.target.value);
                             }}
                             placeholder={pageLabels.placeholders.resourceId}
+                        />
+                    </label>
+
+                    <label className="text-sm text-gray-700">
+                        {pageLabels.filters.clientMutationId}
+                        <input
+                            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                            value={clientMutationId}
+                            onChange={(event) => {
+                                setPage(1);
+                                setClientMutationId(event.target.value);
+                            }}
+                            placeholder={pageLabels.placeholders.clientMutationId}
                         />
                     </label>
 
@@ -470,8 +609,194 @@ export function WriteOperationAuditsPage() {
                 )}
             </section>
 
+            <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <button
+                            type="button"
+                            onClick={() => setReceiptSearchOpen((current) => !current)}
+                            className="inline-flex items-center gap-2 text-sm font-semibold text-gray-950"
+                            aria-expanded={receiptSearchOpen}
+                        >
+                            <ChevronDown
+                                className={`h-4 w-4 transition-transform ${receiptSearchOpen ? "" : "-rotate-90"}`}
+                            />
+                            {pageLabels.receiptSearch.title}
+                        </button>
+                        <p className="mt-1 text-sm text-gray-600">{pageLabels.receiptSearch.description}</p>
+                    </div>
+                    <span className="text-sm text-gray-500">
+                        {formatCount(receiptResults.length)} {pageLabels.receiptSearch.found}
+                    </span>
+                </div>
+
+                {receiptSearchOpen && <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    {receiptResults.length === 0 && (
+                        <div className="rounded border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-500">
+                            {pageLabels.receiptSearch.empty}
+                        </div>
+                    )}
+
+                    {receiptResults.map((receipt) => (
+                        <article
+                            key={receipt.verificationId}
+                            className="rounded-md border border-gray-200 bg-slate-50 p-3"
+                        >
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                    <div className="text-xs font-medium uppercase text-gray-500">
+                                        {pageLabels.receiptSearch.verificationId}
+                                    </div>
+                                    <div className="mt-1 break-all font-mono text-sm font-semibold text-gray-950">
+                                        {receipt.verificationId}
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => void copyReceiptId(receipt.verificationId)}
+                                    className="inline-flex items-center justify-center gap-2 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:border-gray-400"
+                                >
+                                    <Copy className="h-4 w-4" />
+                                    {copiedReceiptId === receipt.verificationId
+                                        ? pageLabels.receiptSearch.copied
+                                        : pageLabels.receiptSearch.copy}
+                                </button>
+                            </div>
+
+                            <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                                <div>
+                                    <dt className="text-xs font-medium uppercase text-gray-500">{pageLabels.receiptSearch.date}</dt>
+                                    <dd className="mt-0.5 text-gray-900">{formatTimestamp(receipt.timestamp)}</dd>
+                                </div>
+                                <div>
+                                    <dt className="text-xs font-medium uppercase text-gray-500">{pageLabels.receiptSearch.actor}</dt>
+                                    <dd className="mt-0.5 text-gray-900">
+                                        {receipt.actorUsernameMasked} · {receipt.actorRole || "-"}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt className="text-xs font-medium uppercase text-gray-500">{pageLabels.receiptSearch.collections}</dt>
+                                    <dd className="mt-0.5 text-gray-900">{receipt.collections.join(", ")}</dd>
+                                </div>
+                                <div>
+                                    <dt className="text-xs font-medium uppercase text-gray-500">{pageLabels.receiptSearch.operations}</dt>
+                                    <dd className="mt-0.5 flex flex-wrap gap-1">
+                                        {receipt.operations.map((value) => <Pill key={`${receipt.verificationId}-${value}`} value={value} />)}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt className="text-xs font-medium uppercase text-gray-500">{pageLabels.receiptSearch.replica}</dt>
+                                    <dd className="mt-0.5 flex flex-wrap gap-1">
+                                        {receipt.replicaStatuses.map((value) => <Pill key={`${receipt.verificationId}-${value}`} value={value} />)}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt className="text-xs font-medium uppercase text-gray-500">{pageLabels.receiptSearch.resources}</dt>
+                                    <dd className="mt-0.5 text-gray-900">
+                                        {receipt.resourceIds.length > 0
+                                            ? receipt.resourceIds.map((value) => shortValue(value, 6)).join(", ")
+                                            : "-"}
+                                    </dd>
+                                </div>
+                            </dl>
+                        </article>
+                    ))}
+                </div>}
+
+                {receiptSearchOpen && receiptResults.length === 0 && nearReceiptResults.length > 0 && (
+                    <div className="mt-5 border-t border-gray-200 pt-4">
+                        <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
+                            <div>
+                                <h3 className="text-sm font-semibold text-gray-950">
+                                    {pageLabels.receiptSearch.nearTitle}
+                                </h3>
+                                <p className="mt-1 text-sm text-gray-600">
+                                    {pageLabels.receiptSearch.nearDescription}{" "}
+                                    <span className="font-mono font-medium">{receiptPrefix}</span>
+                                </p>
+                            </div>
+                            <span className="text-sm text-gray-500">
+                                {formatCount(nearReceiptResults.length)} {pageLabels.receiptSearch.found}
+                            </span>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                            {nearReceiptResults.map((receipt) => (
+                                <article
+                                    key={`near-${receipt.verificationId}`}
+                                    className="rounded-md border border-amber-200 bg-amber-50 p-3"
+                                >
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                        <div>
+                                            <div className="text-xs font-medium uppercase text-amber-700">
+                                                {pageLabels.receiptSearch.verificationId}
+                                            </div>
+                                            <div className="mt-1 break-all font-mono text-sm font-semibold text-gray-950">
+                                                {receipt.verificationId}
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => void copyReceiptId(receipt.verificationId)}
+                                            className="inline-flex items-center justify-center gap-2 rounded border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:border-amber-400"
+                                        >
+                                            <Copy className="h-4 w-4" />
+                                            {copiedReceiptId === receipt.verificationId
+                                                ? pageLabels.receiptSearch.copied
+                                                : pageLabels.receiptSearch.copy}
+                                        </button>
+                                    </div>
+
+                                    <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                                        <div>
+                                            <dt className="text-xs font-medium uppercase text-amber-700">{pageLabels.receiptSearch.date}</dt>
+                                            <dd className="mt-0.5 text-gray-900">{formatTimestamp(receipt.timestamp)}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-xs font-medium uppercase text-amber-700">{pageLabels.receiptSearch.actor}</dt>
+                                            <dd className="mt-0.5 text-gray-900">
+                                                {receipt.actorUsernameMasked} · {receipt.actorRole || "-"}
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-xs font-medium uppercase text-amber-700">{pageLabels.receiptSearch.collections}</dt>
+                                            <dd className="mt-0.5 text-gray-900">{receipt.collections.join(", ")}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-xs font-medium uppercase text-amber-700">{pageLabels.receiptSearch.operations}</dt>
+                                            <dd className="mt-0.5 flex flex-wrap gap-1">
+                                                {receipt.operations.map((value) => (
+                                                    <Pill key={`near-${receipt.verificationId}-${value}`} value={value} />
+                                                ))}
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                </article>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </section>
+
             <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
+                <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+                    <button
+                        type="button"
+                        onClick={() => setAuditTableOpen((current) => !current)}
+                        className="inline-flex items-center gap-2 text-sm font-semibold text-gray-950"
+                        aria-expanded={auditTableOpen}
+                    >
+                        <ChevronDown
+                            className={`h-4 w-4 transition-transform ${auditTableOpen ? "" : "-rotate-90"}`}
+                        />
+                        {pageLabels.table.title}
+                    </button>
+                    <span className="text-sm text-gray-500">
+                        {formatCount(total)} {pageLabels.status.results}
+                    </span>
+                </div>
+
+                {auditTableOpen && <div className="overflow-x-auto">
                     <table className="min-w-full text-left text-sm">
                         <thead className="bg-gray-50 text-gray-600">
                             <tr>
@@ -481,6 +806,7 @@ export function WriteOperationAuditsPage() {
                                 <th className="px-4 py-3">{pageLabels.table.actor}</th>
                                 <th className="px-4 py-3">{pageLabels.table.replica}</th>
                                 <th className="px-4 py-3">{pageLabels.table.writeConcern}</th>
+                                <th className="px-4 py-3">{pageLabels.table.verification}</th>
                                 <th className="px-4 py-3">{pageLabels.table.resource}</th>
                                 <th className="px-4 py-3">{pageLabels.table.changedFields}</th>
                                 <th className="px-4 py-3">{pageLabels.table.details}</th>
@@ -489,14 +815,14 @@ export function WriteOperationAuditsPage() {
                         <tbody>
                             {loading && (
                                 <tr>
-                                    <td className="px-4 py-6 text-gray-500" colSpan={9}>
+                                    <td className="px-4 py-6 text-gray-500" colSpan={10}>
                                         {pageLabels.status.loading}
                                     </td>
                                 </tr>
                             )}
                             {!loading && logs.length === 0 && (
                                 <tr>
-                                    <td className="px-4 py-6 text-gray-500" colSpan={9}>
+                                    <td className="px-4 py-6 text-gray-500" colSpan={10}>
                                         {pageLabels.status.empty}
                                     </td>
                                 </tr>
@@ -537,6 +863,9 @@ export function WriteOperationAuditsPage() {
                                         {formatWriteConcern(log)}
                                     </td>
                                     <td className="px-4 py-3 text-gray-700">
+                                        <span title={log.verificationId || undefined}>{shortValue(log.verificationId, 6)}</span>
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-700">
                                         <span title={log.resourceId || undefined}>{shortValue(log.resourceId)}</span>
                                     </td>
                                     <td className="px-4 py-3 text-gray-700">
@@ -574,9 +903,9 @@ export function WriteOperationAuditsPage() {
                             ))}
                         </tbody>
                     </table>
-                </div>
+                </div>}
 
-                {selectedLog && (
+                {auditTableOpen && selectedLog && (
                     <div className="border-t border-gray-200 bg-slate-50 px-4 py-4">
                         <div className="mb-3 flex items-center justify-between gap-3">
                             <h2 className="text-sm font-semibold text-gray-950">
@@ -598,6 +927,14 @@ export function WriteOperationAuditsPage() {
                             <div>
                                 <dt className="text-xs font-medium uppercase text-gray-500">{pageLabels.details.resourceId}</dt>
                                 <dd className="mt-1 break-all text-gray-900">{selectedLog.resourceId || "-"}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-xs font-medium uppercase text-gray-500">{pageLabels.details.verificationId}</dt>
+                                <dd className="mt-1 break-all text-gray-900">{selectedLog.verificationId || "-"}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-xs font-medium uppercase text-gray-500">{pageLabels.details.clientMutationId}</dt>
+                                <dd className="mt-1 break-all text-gray-900">{selectedLog.clientMutationId || "-"}</dd>
                             </div>
                             <div>
                                 <dt className="text-xs font-medium uppercase text-gray-500">{pageLabels.details.requestId}</dt>
@@ -649,7 +986,7 @@ export function WriteOperationAuditsPage() {
                     </div>
                 )}
 
-                <div className="flex items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 text-sm text-gray-600">
+                {auditTableOpen && <div className="flex items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 text-sm text-gray-600">
                     <span>
                         {pageLabels.pagination.page} {page} / {Math.max(1, totalPages)}
                     </span>
@@ -671,7 +1008,7 @@ export function WriteOperationAuditsPage() {
                             {pageLabels.pagination.next}
                         </button>
                     </div>
-                </div>
+                </div>}
             </section>
         </div>
     );

@@ -18,6 +18,12 @@ import {
     type Specialist,
 } from "../services/specialistsApi";
 import type { ApiError } from "../types/api";
+import type { WriteVerificationMeta } from "../types/api";
+import {
+    formatWriteVerificationMessage,
+    WriteVerificationReceipt,
+} from "../components/system/WriteVerificationReceipt";
+import { labels } from "../i18n/uiLabels";
 
 /* ------------------------------------------------------------------ */
 /* Hook debounce                                                       */
@@ -67,6 +73,8 @@ export function AppointmentsListPage() {
         type: "success" | "error" | "info";
         message: string;
     } | null>(null);
+    const [lastWriteVerification, setLastWriteVerification] =
+        useState<WriteVerificationMeta | null>(null);
     const toastTimerRef = useRef<number | null>(null);
     useEffect(() => {
         return () => {
@@ -367,14 +375,20 @@ export function AppointmentsListPage() {
 
     function showToast(
         type: "success" | "error" | "info",
-        message: string
+        message: string,
+        verification?: WriteVerificationMeta | null
     ) {
-        setToast({ type, message });
+        setToast({
+            type,
+            message: formatWriteVerificationMessage(message, verification),
+        });
+        setLastWriteVerification(verification ?? null);
         if (toastTimerRef.current) {
             window.clearTimeout(toastTimerRef.current);
         }
         toastTimerRef.current = window.setTimeout(() => {
             setToast(null);
+            setLastWriteVerification(null);
         }, 3000);
     }
 
@@ -408,7 +422,11 @@ export function AppointmentsListPage() {
         await loadAppointments();
         setBusyIds((p) => ({ ...p, [id]: false }));
         if (options?.successMessage) {
-            showToast("success", options.successMessage);
+            showToast(
+                "success",
+                options.successMessage,
+                response.meta.writeVerification ?? null
+            );
         }
         return true;
     }
@@ -487,16 +505,26 @@ export function AppointmentsListPage() {
         <div className="max-w-6xl mx-auto p-6 space-y-6">
             {toast && (
                 <div
-                    className={`fixed top-4 right-4 z-50 px-4 py-2 rounded shadow text-sm ${
+                    className={`fixed top-4 right-4 z-50 max-w-xl rounded shadow text-sm ${
                         toast.type === "success"
-                            ? "bg-green-600 text-white"
+                            ? "bg-white text-gray-900 border border-green-200"
                             : toast.type === "error"
-                            ? "bg-red-600 text-white"
-                            : "bg-gray-900 text-white"
+                            ? "bg-red-600 text-white px-4 py-2"
+                            : "bg-gray-900 text-white px-4 py-2"
                     }`}
                     role="status"
                 >
-                    {toast.message}
+                    <div className={toast.type === "success" ? "px-4 py-2" : ""}>
+                        {toast.message}
+                    </div>
+                    {toast.type === "success" && (
+                        <div className="px-4 pb-3">
+                            <WriteVerificationReceipt
+                                verification={lastWriteVerification}
+                                labels={labels.writeVerification}
+                            />
+                        </div>
+                    )}
                 </div>
             )}
 

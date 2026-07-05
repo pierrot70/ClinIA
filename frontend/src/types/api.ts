@@ -53,6 +53,12 @@ export interface SecurityIncidentBlockingData {
     userMessage: string;
 }
 
+export interface WriteVerificationMeta {
+    status: "CONFIRMED" | "UNAVAILABLE";
+    verificationId: string | null;
+    clientMutationId?: string | null;
+}
+
 /* ------------------------------------------------------------------ */
 /* Succès normalisé                                                    */
 /* ------------------------------------------------------------------ */
@@ -68,6 +74,9 @@ export interface ApiSuccess<T> {
 
         /** Modèle utilisé (ou "mock"/"unknown") */
         model: string;
+
+        /** Reçu de sauvegarde clinique, lorsque l'écriture est confirmée. */
+        writeVerification?: WriteVerificationMeta;
     };
 }
 

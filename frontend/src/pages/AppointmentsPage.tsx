@@ -20,7 +20,12 @@ import {
     type Specialist,
 } from "../services/specialistsApi";
 import type { ApiError } from "../types/api";
+import type { WriteVerificationMeta } from "../types/api";
 import { SaveFeedback } from "../components/system/SaveFeedback";
+import {
+    formatWriteVerificationMessage,
+    WriteVerificationReceipt,
+} from "../components/system/WriteVerificationReceipt";
 
 function useAppointmentsPageLabels(targetLang: string) {
     const source = labels.appointmentsPage;
@@ -110,6 +115,8 @@ export function AppointmentsPage() {
     const [loading, setLoading] = useState(false);
     const [apiError, setApiError] = useState<ApiError | null>(null);
     const [success, setSuccess] = useState(false);
+    const [lastWriteVerification, setLastWriteVerification] =
+        useState<WriteVerificationMeta | null>(null);
 
     const [searchNom, setSearchNom] = useState("");
     const [searchPrenom, setSearchPrenom] = useState("");
@@ -455,6 +462,7 @@ export function AppointmentsPage() {
         setLoading(true);
         setApiError(null);
         setSuccess(false);
+        setLastWriteVerification(null);
 
         const response = await createAppointment({
             patient: patientId,
@@ -471,6 +479,7 @@ export function AppointmentsPage() {
             return;
         }
 
+        setLastWriteVerification(response.meta.writeVerification ?? null);
         setSuccess(true);
         await refreshSlots();
 
@@ -753,10 +762,19 @@ export function AppointmentsPage() {
                 )}
 
                 {success && (
-                    <SaveFeedback
-                        type="success"
-                        message={ui.createSuccess}
-                    />
+                    <div>
+                        <SaveFeedback
+                            type="success"
+                            message={formatWriteVerificationMessage(
+                                ui.createSuccess,
+                                lastWriteVerification
+                            )}
+                        />
+                        <WriteVerificationReceipt
+                            verification={lastWriteVerification}
+                            labels={labels.writeVerification}
+                        />
+                    </div>
                 )}
             </div>
         </div>

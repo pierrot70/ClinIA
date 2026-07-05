@@ -9,6 +9,11 @@ import {
     replyToClinicianComment,
     type ClinicianComment,
 } from "../services/clinicianCommentsApi";
+import type { WriteVerificationMeta } from "../types/api";
+import {
+    formatWriteVerificationMessage,
+    WriteVerificationReceipt,
+} from "../components/system/WriteVerificationReceipt";
 
 const CLINICIAN_COMMENT_STORAGE_KEY = "clinia_comment_tracking";
 
@@ -130,6 +135,8 @@ export function ClinicianCommentsPage() {
     const [replying, setReplying] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    const [lastWriteVerification, setLastWriteVerification] =
+        useState<WriteVerificationMeta | null>(null);
 
     useEffect(() => {
         if (isAuthenticated) {
@@ -215,6 +222,7 @@ export function ClinicianCommentsPage() {
         setSubmitting(true);
         setError("");
         setSuccess("");
+        setLastWriteVerification(null);
 
         const response = await createClinicianComment(
             comment,
@@ -245,10 +253,13 @@ export function ClinicianCommentsPage() {
             }
         }
         setSuccess(
-            `${response.data.redactionCount > 0
+            formatWriteVerificationMessage(`${response.data.redactionCount > 0
                 ? ui.savedWithRedactionLabel
-                : ui.savedLabel} ${ui.trackingCodePrefix} ${response.data.trackingCode || trackingCode}`
+                : ui.savedLabel} ${ui.trackingCodePrefix} ${response.data.trackingCode || trackingCode}`,
+                response.meta?.writeVerification ?? null
+            )
         );
+        setLastWriteVerification(response.meta?.writeVerification ?? null);
 
         if (isAuthenticated) {
             const refreshed = await listClinicianComments(
@@ -273,6 +284,7 @@ export function ClinicianCommentsPage() {
         setReplying(true);
         setError("");
         setSuccess("");
+        setLastWriteVerification(null);
 
         const response = await replyToClinicianComment(selectedCommentId, replyMessage);
         setReplying(false);
@@ -283,7 +295,13 @@ export function ClinicianCommentsPage() {
         }
 
         setReplyMessage("");
-        setSuccess(ui.replySaved);
+        setSuccess(
+            formatWriteVerificationMessage(
+                ui.replySaved,
+                response.meta?.writeVerification ?? null
+            )
+        );
+        setLastWriteVerification(response.meta?.writeVerification ?? null);
         setItems((currentItems) =>
             currentItems.map((item) =>
                 item.id === response.data.id ? response.data : item
@@ -404,8 +422,14 @@ export function ClinicianCommentsPage() {
                     )}
 
                     {success && (
-                        <div className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                            {success}
+                        <div className="mt-4">
+                            <div className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                                {success}
+                            </div>
+                            <WriteVerificationReceipt
+                                verification={lastWriteVerification}
+                                labels={labels.writeVerification}
+                            />
                         </div>
                     )}
 

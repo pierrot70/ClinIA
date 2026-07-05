@@ -12,8 +12,13 @@ import {
     type PatientPayload,
 } from "../services/patientsApi";
 import type { ApiError } from "../types/api";
+import type { WriteVerificationMeta } from "../types/api";
 import { useDebounce } from "../hooks/useDebounce";
 import { SaveFeedback } from "../components/system/SaveFeedback";
+import {
+    formatWriteVerificationMessage,
+    WriteVerificationReceipt,
+} from "../components/system/WriteVerificationReceipt";
 
 function usePatientsPageLabels(targetLang: string) {
     const source = labels.patientsPage;
@@ -195,6 +200,8 @@ export function PatientsPage() {
         type: "info" | "success" | "error";
         message: string;
     } | null>(null);
+    const [lastWriteVerification, setLastWriteVerification] =
+        useState<WriteVerificationMeta | null>(null);
 
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
@@ -485,6 +492,7 @@ export function PatientsPage() {
         }
 
         setError(null);
+        setLastWriteVerification(null);
         setSaveFeedback({
             type: "info",
             message: editingId ? ui.statusUpdating : ui.statusCreating,
@@ -492,6 +500,7 @@ export function PatientsPage() {
         setFormSaving(true);
 
         let savedMessage = editingId ? ui.statusUpdated : ui.statusCreated;
+        let writeVerification: WriteVerificationMeta | null = null;
 
         if (editingId) {
             let payload: PatientPayload;
@@ -526,6 +535,7 @@ export function PatientsPage() {
                 setFormSaving(false);
                 return;
             }
+            writeVerification = response.meta.writeVerification ?? null;
         } else {
             let payload: PatientPayload;
             try {
@@ -559,14 +569,19 @@ export function PatientsPage() {
                 setFormSaving(false);
                 return;
             }
+            writeVerification = response.meta.writeVerification ?? null;
         }
 
         resetForm();
         await loadPatients();
         setSaveFeedback({
             type: "success",
-            message: savedMessage,
+            message: formatWriteVerificationMessage(
+                savedMessage,
+                writeVerification
+            ),
         });
+        setLastWriteVerification(writeVerification);
         setFormSaving(false);
     }
 
@@ -594,6 +609,7 @@ export function PatientsPage() {
 
         setBusyIds((p) => ({ ...p, [id]: true }));
         setError(null);
+        setLastWriteVerification(null);
         setSaveFeedback({
             type: "info",
             message: ui.statusDeleting,
@@ -612,10 +628,15 @@ export function PatientsPage() {
 
         setBusyIds((p) => ({ ...p, [id]: false }));
         await loadPatients();
+        const writeVerification = response.meta.writeVerification ?? null;
         setSaveFeedback({
             type: "success",
-            message: ui.statusDeleted,
+            message: formatWriteVerificationMessage(
+                ui.statusDeleted,
+                writeVerification
+            ),
         });
+        setLastWriteVerification(writeVerification);
     }
 
     function toggleSort(
@@ -685,10 +706,16 @@ export function PatientsPage() {
             )}
 
             {saveFeedback && (
-                <SaveFeedback
-                    type={saveFeedback.type}
-                    message={saveFeedback.message}
-                />
+                <div>
+                    <SaveFeedback
+                        type={saveFeedback.type}
+                        message={saveFeedback.message}
+                    />
+                    <WriteVerificationReceipt
+                        verification={lastWriteVerification}
+                        labels={labels.writeVerification}
+                    />
+                </div>
             )}
 
             {viewMode === "create" && (
