@@ -1,6 +1,7 @@
 import { withSecurityIncidentGuard } from "./securityIncidentGuard";
 import { authFetch } from "./authService";
 import type { ApiResponse } from "../types/api";
+import type { ClinicalPayload } from "../types/clinical";
 import { API_URL } from "./config";
 
 /* ------------------------------------------------------------------ */
@@ -25,6 +26,7 @@ export interface Patient {
         sex?: string;
         age?: string;
         current_medications?: string;
+        clinicalAnalysisParameters?: ClinicalPayload;
         selected_document_ids?: string[];
         clinicalScope?: string;
         ageGroup?: string;
@@ -98,6 +100,7 @@ export interface PatientPayload {
         sex?: string;
         age?: string;
         current_medications?: string;
+        clinicalAnalysisParameters?: ClinicalPayload;
         selected_document_ids?: string[];
         clinicalScope?: string;
         ageGroup?: string;

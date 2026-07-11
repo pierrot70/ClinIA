@@ -4,6 +4,33 @@ import mongoose from "mongoose";
 /* Patient Schema                                                      */
 /* ------------------------------------------------------------------ */
 
+const ClinicalAnalysisParametersSchema = new mongoose.Schema(
+    {
+        age: Number,
+        sex: { type: String, trim: true },
+        country: { type: String, trim: true },
+        ethnicity: { type: String, trim: true },
+        diagnosis: { type: String, trim: true },
+        weight: Number,
+        height: Number,
+        blood_pressure: {
+            systolic: Number,
+            diastolic: Number,
+        },
+        symptoms: { type: [String], default: [] },
+        medical_history: { type: [String], default: [] },
+        current_medications: { type: [String], default: [] },
+        diabetes_context: {
+            cardiovascular_risk: { type: String, trim: true },
+            renal_function: { type: String, trim: true },
+            fragility: { type: String, trim: true },
+            tolerance: { type: String, trim: true },
+            glycemic_goals: { type: String, trim: true },
+        },
+    },
+    { _id: false }
+);
+
 const SecureRequestProfileSchema = new mongoose.Schema(
     {
         objective: {
@@ -25,6 +52,10 @@ const SecureRequestProfileSchema = new mongoose.Schema(
             type: String,
             default: "",
             trim: true,
+        },
+        clinicalAnalysisParameters: {
+            type: ClinicalAnalysisParametersSchema,
+            default: undefined,
         },
         selected_document_ids: {
             type: [String],

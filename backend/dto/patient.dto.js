@@ -26,6 +26,50 @@ function normalizeStringArray(value) {
     );
 }
 
+function normalizeOptionalNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) && number > 0 ? number : undefined;
+}
+
+function normalizeClinicalAnalysisParameters(value) {
+    if (!value || typeof value !== "object") {
+        return undefined;
+    }
+
+    const bloodPressure = value.blood_pressure;
+    const diabetesContext = value.diabetes_context;
+
+    return {
+        age: normalizeOptionalNumber(value.age),
+        sex: value.sex?.trim() ?? "",
+        country: value.country?.trim() ?? "",
+        ethnicity: value.ethnicity?.trim() ?? "",
+        diagnosis: value.diagnosis?.trim() ?? "",
+        weight: normalizeOptionalNumber(value.weight),
+        height: normalizeOptionalNumber(value.height),
+        blood_pressure:
+            bloodPressure && typeof bloodPressure === "object"
+                ? {
+                    systolic: normalizeOptionalNumber(bloodPressure.systolic),
+                    diastolic: normalizeOptionalNumber(bloodPressure.diastolic),
+                }
+                : undefined,
+        symptoms: normalizeStringArray(value.symptoms),
+        medical_history: normalizeStringArray(value.medical_history),
+        current_medications: normalizeStringArray(value.current_medications),
+        diabetes_context:
+            diabetesContext && typeof diabetesContext === "object"
+                ? {
+                    cardiovascular_risk: diabetesContext.cardiovascular_risk?.trim() ?? "",
+                    renal_function: diabetesContext.renal_function?.trim() ?? "",
+                    fragility: diabetesContext.fragility?.trim() ?? "",
+                    tolerance: diabetesContext.tolerance?.trim() ?? "",
+                    glycemic_goals: diabetesContext.glycemic_goals?.trim() ?? "",
+                }
+                : undefined,
+    };
+}
+
 function normalizeSecureRequestProfile(value) {
     if (!value || typeof value !== "object") {
         return undefined;
@@ -36,6 +80,9 @@ function normalizeSecureRequestProfile(value) {
         sex: value.sex?.trim() ?? "",
         age: value.age?.trim() ?? "",
         current_medications: value.current_medications?.trim() ?? "",
+        clinicalAnalysisParameters: normalizeClinicalAnalysisParameters(
+            value.clinicalAnalysisParameters
+        ),
         selected_document_ids: normalizeStringArray(
             value.selected_document_ids
         ),

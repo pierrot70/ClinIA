@@ -869,6 +869,17 @@ export const UI_LABELS_FR = {
         close: "Fermer",
         error: "Impossible de sauvegarder la note clinique.",
     },
+    clinicalPatientSelection: {
+        manual: "Saisie manuelle",
+        existingPatient: "Patient existant",
+        searchLabel: "Rechercher un de mes patients",
+        searchPlaceholder: "Nom ou prénom",
+        loading: "Recherche des patients...",
+        empty: "Aucun patient correspondant.",
+        selected: "Patient sélectionné",
+        structuredOnly: "Les paramètres structurés sont préremplis. Les notes cliniques libres ne sont jamais envoyées automatiquement à l'IA.",
+        clear: "Revenir à la saisie manuelle",
+    },
     // AppointmentsPage.tsx - page /appointments, création de rendez-vous.
     appointmentsPage: {
         title: "Créer un rendez-vous",

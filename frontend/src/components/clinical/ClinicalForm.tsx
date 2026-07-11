@@ -1,5 +1,12 @@
 import { useEffect, useState, useContext } from "react";
 import { useTranslation } from "../../hooks/useTranslation";
+import { useAuth } from "../../hooks/useAuth";
+import { useDebounce } from "../../hooks/useDebounce";
+import {
+    fetchPatientsPaginated,
+    updatePatient,
+    type Patient,
+} from "../../services/patientsApi";
 import { HomeI18nContext } from "../../contexts/HomeI18nContext";
 import { labels } from "../../i18n/uiLabels";
 import { getClinicalFormReviewedStrings } from "../../i18n/clinicalFormStrings";
@@ -210,6 +217,54 @@ function normalize(value: string | undefined) {
 
 function formatList(values: string[] | undefined) {
     return Array.isArray(values) ? values.join(", ") : "";
+}
+
+function splitProfileList(value: string | undefined) {
+    return String(value || "")
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+}
+
+function getProfileSex(value: string | undefined): Sex {
+    const normalized = normalize(value);
+
+    if (normalized === "female" || normalized === "femme") {
+        return "female";
+    }
+
+    if (normalized === "male" || normalized === "homme") {
+        return "male";
+    }
+
+    return "other";
+}
+
+function buildPayloadFromPatientProfile(
+    patient: Patient,
+    country: string
+): ClinicalPayload {
+    const profile = patient.secure_request_profile;
+    const savedParameters = profile?.clinicalAnalysisParameters;
+
+    if (savedParameters) {
+        return {
+            ...clonePayload(savedParameters),
+            country: savedParameters.country || country,
+        };
+    }
+
+    const parsedAge = Number(profile?.age);
+
+    return {
+        ...EMPTY_FORM,
+        age: Number.isFinite(parsedAge) && parsedAge > 0 ? parsedAge : 0,
+        sex: getProfileSex(profile?.sex),
+        country,
+        symptoms: splitProfileList(profile?.symptomProfile),
+        medical_history: splitProfileList(profile?.comorbidityContext),
+        current_medications: splitProfileList(profile?.current_medications),
+    };
 }
 
 function normalizeStringArrayInput(value: unknown) {
@@ -501,7 +556,7 @@ export function ClinicalForm({
                                  highlightFields = [],
                                  initialData,
                              }: {
-    onSubmit: (payload: ClinicalPayload) => void;
+    onSubmit: (payload: ClinicalPayload) => void | Promise<void>;
     onCompareSubmit?: (
         firstPayload: ClinicalPayload,
         secondPayload: ClinicalPayload
@@ -512,9 +567,17 @@ export function ClinicalForm({
     highlightFields?: string[];
     initialData?: ClinicalPayload | null;
 }) {
+    const { isAuthenticated } = useAuth();
     const [form, setForm] = useState<ClinicalPayload>(
         initialData ?? loadCachedForm() ?? EMPTY_FORM
     );
+    const [inputMode, setInputMode] = useState<"manual" | "patient">("manual");
+    const [patientSearch, setPatientSearch] = useState("");
+    const [patientMatches, setPatientMatches] = useState<Patient[]>([]);
+    const [patientsLoading, setPatientsLoading] = useState(false);
+    const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+    const [patientSaveError, setPatientSaveError] = useState("");
+    const [savingPatientParameters, setSavingPatientParameters] = useState(false);
     const [selectedClinicalField, setSelectedClinicalField] = useState<
         ClinicalField | ""
     >("");
@@ -561,6 +624,7 @@ export function ClinicalForm({
             (initialData ?? loadCachedForm() ?? EMPTY_FORM).current_medications
         ),
     }));
+    const debouncedPatientSearch = useDebounce(patientSearch, 250);
 
     // 🔁 Recharger le formulaire quand un patient est sélectionné
     useEffect(() => {
@@ -569,6 +633,42 @@ export function ClinicalForm({
             setSelectedExampleCase("");
         }
     }, [initialData]);
+
+    useEffect(() => {
+        let active = true;
+
+        async function loadPatientMatches() {
+            const query = debouncedPatientSearch.trim();
+            if (!isAuthenticated || inputMode !== "patient" || selectedPatient || query.length < 2) {
+                if (active) {
+                    setPatientMatches([]);
+                    setPatientsLoading(false);
+                }
+                return;
+            }
+
+            setPatientsLoading(true);
+            const response = await fetchPatientsPaginated({
+                page: 1,
+                limit: 10,
+                q: query,
+                sortBy: "nom",
+                sortDir: "asc",
+            });
+
+            if (!active) {
+                return;
+            }
+
+            setPatientMatches(response.data?.data ?? []);
+            setPatientsLoading(false);
+        }
+
+        void loadPatientMatches();
+        return () => {
+            active = false;
+        };
+    }, [debouncedPatientSearch, inputMode, isAuthenticated, selectedPatient]);
 
     // 💾 Cache local automatique
     useEffect(() => {
@@ -615,6 +715,66 @@ export function ClinicalForm({
         setSelectedClinicalField("");
         setSelectedExampleCase("");
         setIsDiabetesModalOpen(false);
+    }
+
+    function selectPatient(patient: Patient) {
+        setPatientSaveError("");
+        setSelectedPatient(patient);
+        setPatientSearch("");
+        setPatientMatches([]);
+        setSelectedClinicalField("");
+        setSelectedExampleCase("");
+        setIsDiabetesModalOpen(false);
+        applyFormData(buildPayloadFromPatientProfile(patient, browserCountryCode));
+    }
+
+    function returnToManualInput() {
+        if (inputMode === "manual" && !selectedPatient) {
+            return;
+        }
+
+        setInputMode("manual");
+        setSelectedPatient(null);
+        setPatientSearch("");
+        setPatientMatches([]);
+        setPatientSaveError("");
+        resetPatient();
+    }
+
+    async function saveSelectedPatientParameters() {
+        if (!selectedPatient) {
+            return true;
+        }
+
+        setSavingPatientParameters(true);
+        setPatientSaveError("");
+        const response = await updatePatient(selectedPatient._id, {
+            nom: selectedPatient.nom,
+            prenom: selectedPatient.prenom,
+            secure_request_profile: {
+                ...(selectedPatient.secure_request_profile || {}),
+                clinicalAnalysisParameters: clonePayload(form),
+                lastRequestedAt: new Date().toISOString(),
+            },
+        });
+        setSavingPatientParameters(false);
+
+        if ("error" in response) {
+            setPatientSaveError(response.error.message);
+            return false;
+        }
+
+        setSelectedPatient(response.data);
+        return true;
+    }
+
+    async function handleAnalyze() {
+        const wasSaved = await saveSelectedPatientParameters();
+        if (!wasSaved) {
+            return;
+        }
+
+        await onSubmit(form);
     }
 
     function handleClinicalFieldChange(field: ClinicalField | "") {
@@ -945,6 +1105,8 @@ export function ClinicalForm({
     const countryOptions = buildCountryOptions(targetLang);
     const detectedCountryLabel = getCountryLabel(browserCountryCode, targetLang);
     const hasSelectedExampleCase = Boolean(selectedExampleCase);
+    const canAnalyze = hasSelectedExampleCase || Boolean(selectedPatient);
+    const patientSelectionLabels = labels.clinicalPatientSelection;
     const ethnicityOptions: Array<{ value: PatientEthnicity; label: string }> = [
         { value: "caucasian", label: caucasianLabel },
         { value: "black", label: blackLabel },
@@ -1135,17 +1297,101 @@ export function ClinicalForm({
                 <p className="max-w-2xl text-sm leading-6 text-gray-600">
                     {clinicalParametersHelpLabel}
                 </p>
-                {hasSelectedExampleCase ? (
+                {canAnalyze ? (
                     <button
-                        disabled={loading}
-                        onClick={() => onSubmit(form)}
+                        disabled={loading || savingPatientParameters}
+                        onClick={() => void handleAnalyze()}
                         className="mt-1 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                     >
-                        {loading ? analyzingButtonLabel : analyzeButtonLabel}
+                        {loading || savingPatientParameters
+                            ? analyzingButtonLabel
+                            : analyzeButtonLabel}
                     </button>
                 ) : null}
             </div>
 
+            {isAuthenticated && (
+                <div className="rounded border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex flex-wrap gap-2" role="group" aria-label={patientSelectionLabels.selected}>
+                        <button
+                            type="button"
+                            onClick={returnToManualInput}
+                            className={inputMode === "manual" ? "rounded border border-blue-700 bg-blue-700 px-3 py-2 text-sm font-medium text-white" : "rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700"}
+                        >
+                            {patientSelectionLabels.manual}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setInputMode("patient")}
+                            className={inputMode === "patient" ? "rounded border border-blue-700 bg-blue-700 px-3 py-2 text-sm font-medium text-white" : "rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700"}
+                        >
+                            {patientSelectionLabels.existingPatient}
+                        </button>
+                    </div>
+
+                    {inputMode === "patient" && (
+                        <div className="mt-4 max-w-xl space-y-2">
+                            {selectedPatient ? (
+                                <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-emerald-200 bg-emerald-50 p-3">
+                                    <div>
+                                        <p className="text-sm font-semibold text-emerald-950">
+                                            {patientSelectionLabels.selected}: {selectedPatient.prenom} {selectedPatient.nom}
+                                        </p>
+                                        <p className="mt-1 text-xs text-emerald-900">
+                                            {patientSelectionLabels.structuredOnly}
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={returnToManualInput}
+                                        className="rounded border border-emerald-400 bg-white px-3 py-2 text-sm font-medium text-emerald-900"
+                                    >
+                                        {patientSelectionLabels.clear}
+                                    </button>
+                                </div>
+                            ) : (
+                                <>
+                                    <label htmlFor="clinical-patient-search" className="text-sm font-medium text-gray-700">
+                                        {patientSelectionLabels.searchLabel}
+                                    </label>
+                                    <input
+                                        id="clinical-patient-search"
+                                        className="input w-full"
+                                        value={patientSearch}
+                                        onChange={(event) => setPatientSearch(event.target.value)}
+                                        placeholder={patientSelectionLabels.searchPlaceholder}
+                                        autoComplete="off"
+                                    />
+                                    {patientsLoading && <p className="text-sm text-slate-600">{patientSelectionLabels.loading}</p>}
+                                    {!patientsLoading && patientSearch.trim().length >= 2 && patientMatches.length === 0 && (
+                                        <p className="text-sm text-slate-600">{patientSelectionLabels.empty}</p>
+                                    )}
+                                    {patientMatches.length > 0 && (
+                                        <ul className="divide-y rounded border border-slate-200 bg-white">
+                                            {patientMatches.map((patient) => (
+                                                <li key={patient._id}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => selectPatient(patient)}
+                                                        className="w-full px-3 py-2 text-left text-sm font-medium text-slate-900 hover:bg-slate-50"
+                                                    >
+                                                        {patient.prenom} {patient.nom}
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </>
+                            )}
+                            {patientSaveError && (
+                                <p className="text-sm text-red-700">{patientSaveError}</p>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {inputMode !== "manual" ? null : (
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div className="w-full md:w-auto flex flex-col gap-3 md:flex-row md:items-end">
                     <div className="grid w-full gap-4 md:grid-cols-2">
@@ -1238,8 +1484,9 @@ export function ClinicalForm({
                     )}
                 </div>
             </div>
+            )}
 
-            {!hasSelectedExampleCase ? null : (
+            {!canAnalyze ? null : (
                 <>
             <Field highlight={isHighlighted("json_import")}>
                 <div className="space-y-2">
