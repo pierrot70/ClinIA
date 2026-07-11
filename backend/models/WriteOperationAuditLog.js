@@ -107,6 +107,13 @@ const WriteOperationAuditLogSchema = new mongoose.Schema(
             index: true,
             maxlength: 120,
         },
+        // Technical relationship only. Never stores patient-identifying content.
+        patientId: {
+            type: String,
+            default: null,
+            index: true,
+            maxlength: 120,
+        },
         changedFields: {
             type: [String],
             default: [],
@@ -157,6 +164,7 @@ WriteOperationAuditLogSchema.index({ collectionName: 1, timestamp: -1 });
 WriteOperationAuditLogSchema.index({ "replicaSet.status": 1, timestamp: -1 });
 WriteOperationAuditLogSchema.index({ verificationId: 1, timestamp: -1 });
 WriteOperationAuditLogSchema.index({ clientMutationId: 1, timestamp: -1 });
+WriteOperationAuditLogSchema.index({ actorUserId: 1, patientId: 1, timestamp: -1 });
 
 export const WriteOperationAuditLog =
     mongoose.models.WriteOperationAuditLog ||

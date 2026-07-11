@@ -77,6 +77,7 @@ async function recordPatientMutationAudit(req, {
         requestId: requestContext.requestId,
         instanceId: requestContext.instanceId,
         resourceId: patientAuditLog?._id ? String(patientAuditLog._id) : null,
+        patientId: patientId ? String(patientId) : null,
         changedFields: [
             "action",
             "outcome",
@@ -106,6 +107,7 @@ async function recordPatientMutationAudit(req, {
         requestId: requestContext.requestId,
         instanceId: requestContext.instanceId,
         resourceId: patientId ? String(patientId) : null,
+        patientId: patientId ? String(patientId) : null,
         changedFields,
         requestPath,
         writeConcern: CLINICAL_WRITE_CONCERN,

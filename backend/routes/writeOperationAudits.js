@@ -1,5 +1,8 @@
 import express from "express";
-import { listWriteOperationAudits } from "../services/writeOperationAudits.js";
+import {
+    listMyWriteReceipts,
+    listWriteOperationAudits,
+} from "../services/writeOperationAudits.js";
 
 const router = express.Router();
 
@@ -64,6 +67,41 @@ router.get("/", async (req, res) => {
             error: {
                 code: "PERSISTENCE_FAILED",
                 message: "Impossible de recuperer les audits d'ecriture.",
+                retryable: true,
+            },
+        });
+    }
+});
+
+router.get("/my-receipts", async (req, res) => {
+    try {
+        const data = await listMyWriteReceipts({
+            authUser: req.auth,
+            page: req.query.page,
+            limit: req.query.limit,
+            startDate: req.query.startDate,
+            endDate: req.query.endDate,
+            collectionName: req.query.collectionName,
+            operation: req.query.operation,
+            patientId: req.query.patientId,
+        });
+
+        return res.status(200).json({
+            data,
+            meta: { source: "real", model: "mongo" },
+        });
+    } catch (err) {
+        if (err.code === "FORBIDDEN" || err.code === "INVALID_INPUT") {
+            return res.status(err.code === "FORBIDDEN" ? 403 : 400).json({
+                error: { code: err.code, message: err.message, retryable: false },
+            });
+        }
+
+        console.error("My write receipts list error:", err);
+        return res.status(500).json({
+            error: {
+                code: "PERSISTENCE_FAILED",
+                message: "Impossible de recuperer vos recus d'ecriture.",
                 retryable: true,
             },
         });

@@ -107,7 +107,6 @@ export function registerRoutes(app, deps) {
     app.use(
         "/api/write-operation-audits",
         verifyJWT,
-        requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
         loi25DataLeakGuard,
         writeOperationAuditsRouter
     );

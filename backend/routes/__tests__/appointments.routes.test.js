@@ -131,6 +131,7 @@ describe("appointments routes write verification", () => {
             requestId: "request-appointment-create",
             instanceId: "instance-a",
             resourceId: "appointment-1",
+            patientId: "patient-1",
             changedFields: ["patient", "specialist", "date", "time", "priority"],
             requestPath: "/api/appointments",
             writeConcern: {

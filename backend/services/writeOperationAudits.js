@@ -17,6 +17,12 @@ function assertWriteAuditAccess(authUser) {
     }
 }
 
+function assertClinicianReceiptAccess(authUser) {
+    if (!authUser?.userId || !authUser?.role || !["USER", "MEDECIN", "ADMIN", "SUPERADMIN"].includes(authUser.role)) {
+        throw createWriteAuditError("FORBIDDEN", "Authentification clinique requise.");
+    }
+}
+
 function parseDateFilter(value, label, endOfDay = false) {
     if (typeof value !== "string" || !value.trim()) {
         return null;
@@ -64,6 +70,7 @@ function buildWriteAuditQuery({
     requestId,
     verificationId,
     clientMutationId,
+    patientId,
     replicaStatus,
     majorityAvailable,
 }) {
@@ -134,6 +141,14 @@ function buildWriteAuditQuery({
         andClauses.push({ clientMutationId: normalizedClientMutationId });
     }
 
+    const normalizedPatientId = normalizeStringFilter(patientId, 120);
+    if (normalizedPatientId) {
+        if (!mongoose.Types.ObjectId.isValid(normalizedPatientId)) {
+            throw createWriteAuditError("INVALID_INPUT", "Identifiant patient invalide.");
+        }
+        andClauses.push({ patientId: normalizedPatientId });
+    }
+
     const normalizedReplicaStatus = normalizeEnumFilter(
         replicaStatus,
         allowedReplicaStatuses,
@@ -162,6 +177,7 @@ function normalizeAuditRow(log) {
         outcome: log.outcome,
         verificationId: log.verificationId || null,
         clientMutationId: log.clientMutationId || null,
+        patientId: log.patientId || null,
         actorUserId: log.actorUserId ? String(log.actorUserId) : null,
         actorUsernameMasked: log.actorUsernameMasked,
         actorRole: log.actorRole,
@@ -202,6 +218,7 @@ export async function listWriteOperationAudits({
     requestId,
     verificationId,
     clientMutationId,
+    patientId,
     replicaStatus,
     majorityAvailable,
 }) {
@@ -225,6 +242,7 @@ export async function listWriteOperationAudits({
         requestId,
         verificationId,
         clientMutationId,
+        patientId,
         replicaStatus,
         majorityAvailable,
     });
@@ -261,6 +279,72 @@ export async function listWriteOperationAudits({
             ).length,
         },
         logs: logs.map(normalizeAuditRow),
+        pagination: {
+            page: parsedPage,
+            limit: parsedLimit,
+            total,
+            totalPages: Math.max(1, Math.ceil(total / parsedLimit)),
+        },
+    };
+}
+
+export async function listMyWriteReceipts({
+    authUser,
+    page,
+    limit,
+    startDate,
+    endDate,
+    collectionName,
+    operation,
+    patientId,
+}) {
+    assertClinicianReceiptAccess(authUser);
+
+    const parsedPage = Number.parseInt(page, 10) || 1;
+    const parsedLimit = Number.parseInt(limit, 10) || DEFAULT_PAGE_LIMIT;
+    if (parsedPage < 1 || parsedLimit < 1 || parsedLimit > MAX_PAGE_LIMIT) {
+        throw createWriteAuditError("INVALID_INPUT", "Pagination invalide.");
+    }
+
+    const query = buildWriteAuditQuery({
+        startDate,
+        endDate,
+        collectionName,
+        operation,
+        outcome: "SUCCESS",
+        actorUserId: String(authUser.userId),
+        patientId,
+    });
+    query.$and = [
+        ...(query.$and || []),
+        { verificationId: { $ne: null } },
+        { collectionName: { $ne: "patientauditlogs" } },
+    ];
+
+    const skip = (parsedPage - 1) * parsedLimit;
+    const [total, logs] = await Promise.all([
+        WriteOperationAuditLog.countDocuments(query),
+        WriteOperationAuditLog.find(query)
+            .sort({ timestamp: -1 })
+            .skip(skip)
+            .limit(parsedLimit)
+            .lean(),
+    ]);
+
+    return {
+        logs: logs.map((log) => {
+            const row = normalizeAuditRow(log);
+            return {
+                verificationId: row.verificationId,
+                collectionName: row.collectionName,
+                operation: row.operation,
+                resourceId: row.resourceId,
+                patientId: row.patientId,
+                changedFields: row.changedFields,
+                replicaSet: row.replicaSet,
+                timestamp: row.timestamp,
+            };
+        }),
         pagination: {
             page: parsedPage,
             limit: parsedLimit,

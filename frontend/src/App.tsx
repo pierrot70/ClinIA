@@ -28,6 +28,7 @@ import { PatientAuditLogsPage } from "./pages/PatientAuditLogsPage";
 import { OpenAILogsPage } from "./pages/OpenAILogsPage";
 import { DbStatusPage } from "./pages/DbStatusPage";
 import { WriteOperationAuditsPage } from "./pages/WriteOperationAuditsPage";
+import { MyWriteReceiptsPage } from "./pages/MyWriteReceiptsPage";
 import { CliniquesPage } from "./pages/CliniquesPage";
 import { SpecialistsPage } from "./pages/SpecialistsPage";
 import { ClinicianCommentsPage } from "./pages/ClinicianCommentsPage";
@@ -342,6 +343,14 @@ const App: React.FC = () => {
                         element={
                             <ProtectedRoute allowedRoles={[...CLINICAL_ROLES]}>
                                 <SpecialistsPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/my-write-receipts"
+                        element={
+                            <ProtectedRoute allowedRoles={[...CLINICAL_ROLES]}>
+                                <MyWriteReceiptsPage />
                             </ProtectedRoute>
                         }
                     />

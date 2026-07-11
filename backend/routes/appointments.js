@@ -35,6 +35,7 @@ function getRequestIp(req) {
 async function recordAppointmentWriteAudit(req, {
     operation,
     appointmentId,
+    patientId = null,
     changedFields = [],
 }) {
     const requestContext = getRequestContext(req);
@@ -54,6 +55,7 @@ async function recordAppointmentWriteAudit(req, {
         requestId: requestContext.requestId,
         instanceId: requestContext.instanceId,
         resourceId: appointmentId ? String(appointmentId) : null,
+        patientId: patientId ? String(patientId) : null,
         changedFields,
         requestPath: req.originalUrl || req.path || null,
         writeConcern: CLINICAL_WRITE_CONCERN,
@@ -130,6 +132,7 @@ router.post("/", async (req, res) => {
         const writeVerification = await recordAppointmentWriteAudit(req, {
             operation: "CREATE",
             appointmentId: appointment._id,
+            patientId: appointment.patient,
             changedFields: Object.keys(dto),
         });
 
@@ -326,6 +329,7 @@ router.delete("/:id", async (req, res) => {
         const writeVerification = await recordAppointmentWriteAudit(req, {
             operation: "DELETE",
             appointmentId: appointment._id,
+            patientId: appointment.patient,
             changedFields: ["status"],
         });
 
@@ -397,6 +401,7 @@ router.patch("/:id/status", async (req, res) => {
         const writeVerification = await recordAppointmentWriteAudit(req, {
             operation: "UPDATE",
             appointmentId: appointment._id,
+            patientId: appointment.patient,
             changedFields: ["status"],
         });
 
@@ -477,6 +482,7 @@ router.patch("/:id/schedule", async (req, res) => {
         const writeVerification = await recordAppointmentWriteAudit(req, {
             operation: "UPDATE",
             appointmentId: appointment._id,
+            patientId: appointment.patient,
             changedFields: ["date", "time"],
         });
 

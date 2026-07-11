@@ -32,6 +32,7 @@ export type WriteOperationAuditLog = {
     requestId: string | null;
     instanceId: string | null;
     resourceId: string | null;
+    patientId: string | null;
     changedFields: string[];
     requestPath: string | null;
     writeConcern: {
@@ -94,6 +95,30 @@ export type WriteOperationAuditFilters = {
     majorityAvailable?: "true" | "false" | "";
 };
 
+export type MyWriteReceipt = Pick<
+    WriteOperationAuditLog,
+    | "verificationId"
+    | "collectionName"
+    | "operation"
+    | "resourceId"
+    | "patientId"
+    | "changedFields"
+    | "replicaSet"
+    | "timestamp"
+>;
+
+export type PaginatedMyWriteReceipts = {
+    logs: MyWriteReceipt[];
+    pagination: PaginatedWriteOperationAudits["pagination"];
+};
+
+export type MyWriteReceiptFilters = Pick<
+    WriteOperationAuditFilters,
+    "page" | "limit" | "startDate" | "endDate" | "collectionName" | "operation"
+> & {
+    patientId?: string;
+};
+
 async function toApiError(response: Response): Promise<ApiError> {
     const payload = await response.json().catch(() => ({}));
     return {
@@ -151,6 +176,43 @@ export async function fetchWriteOperationAudits(
             error: {
                 code: "INTERNAL_ERROR",
                 message: "Erreur reseau lors du chargement des audits BD.",
+                retryable: true,
+            },
+        };
+    }
+}
+
+export async function fetchMyWriteReceipts(
+    params: MyWriteReceiptFilters
+): Promise<ApiResponse<PaginatedMyWriteReceipts>> {
+    const query = new URLSearchParams();
+    if (params.page) query.set("page", String(params.page));
+    if (params.limit) query.set("limit", String(params.limit));
+    if (params.startDate) query.set("startDate", params.startDate);
+    if (params.endDate) query.set("endDate", params.endDate);
+    if (params.collectionName) query.set("collectionName", params.collectionName);
+    if (params.operation) query.set("operation", params.operation);
+    if (params.patientId) query.set("patientId", params.patientId);
+
+    try {
+        const response = await authFetch(
+            `/api/write-operation-audits/my-receipts${query.toString() ? `?${query.toString()}` : ""}`
+        );
+
+        if (!response.ok) {
+            return { error: await toApiError(response) };
+        }
+
+        return (await response.json()) as ApiResponse<PaginatedMyWriteReceipts>;
+    } catch (err) {
+        if (err instanceof SessionExpiredError) {
+            return { error: { code: "INTERNAL_ERROR", message: "Session expiree.", retryable: false } };
+        }
+
+        return {
+            error: {
+                code: "INTERNAL_ERROR",
+                message: "Erreur reseau lors du chargement de vos recus.",
                 retryable: true,
             },
         };

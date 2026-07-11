@@ -153,6 +153,7 @@ describe("patients routes audit", () => {
             requestId: "request-create",
             instanceId: "instance-a",
             resourceId: "patient-1",
+            patientId: "patient-1",
             changedFields: ["nom", "prenom"],
             requestPath: "/api/patients",
             writeConcern: {
@@ -348,6 +349,7 @@ describe("patients routes audit", () => {
             requestId: "request-update",
             instanceId: "instance-b",
             resourceId: "patient-2",
+            patientId: "patient-2",
             changedFields: [
                 "prenom",
                 "secure_request_profile",
@@ -435,6 +437,7 @@ describe("patients routes audit", () => {
             requestId: "request-delete",
             instanceId: "instance-c",
             resourceId: "patient-3",
+            patientId: "patient-3",
             changedFields: [],
             requestPath: "/api/patients/patient-3",
             writeConcern: {

@@ -10,7 +10,7 @@ vi.mock("../../models/WriteOperationAuditLog.js", () => ({
     },
 }));
 
-const { listWriteOperationAudits } = await import("../writeOperationAudits.js");
+const { listMyWriteReceipts, listWriteOperationAudits } = await import("../writeOperationAudits.js");
 
 function makeFindChain(rows) {
     return {
@@ -158,5 +158,39 @@ describe("write operation audits service", () => {
         ).rejects.toMatchObject({
             code: "INVALID_INPUT",
         });
+    });
+
+    it("limits clinician receipt searches to the authenticated user and patient", async () => {
+        countDocuments.mockResolvedValue(1);
+        find.mockReturnValueOnce(makeFindChain([{
+            _id: "audit-2",
+            collectionName: "appointments",
+            operation: "UPDATE",
+            outcome: "SUCCESS",
+            verificationId: "WRV-TEST-RECEIPT123",
+            actorUserId: "507f1f77bcf86cd799439011",
+            patientId: "507f1f77bcf86cd799439012",
+            changedFields: ["status"],
+            timestamp: new Date("2026-07-02T12:00:00.000Z"),
+        }]));
+
+        const result = await listMyWriteReceipts({
+            authUser: { role: "MEDECIN", userId: "507f1f77bcf86cd799439011" },
+            patientId: "507f1f77bcf86cd799439012",
+        });
+
+        expect(countDocuments).toHaveBeenCalledWith({
+            $and: [
+                { outcome: "SUCCESS" },
+                { actorUserId: "507f1f77bcf86cd799439011" },
+                { patientId: "507f1f77bcf86cd799439012" },
+                { verificationId: { $ne: null } },
+                { collectionName: { $ne: "patientauditlogs" } },
+            ],
+        });
+        expect(result.logs).toEqual([expect.objectContaining({
+            verificationId: "WRV-TEST-RECEIPT123",
+            patientId: "507f1f77bcf86cd799439012",
+        })]);
     });
 });
