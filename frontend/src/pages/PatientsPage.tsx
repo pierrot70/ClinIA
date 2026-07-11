@@ -19,6 +19,7 @@ import {
     formatWriteVerificationMessage,
     WriteVerificationReceipt,
 } from "../components/system/WriteVerificationReceipt";
+import { PatientClinicalNotesModal } from "../components/clinical/PatientClinicalNotesModal";
 
 function usePatientsPageLabels(targetLang: string) {
     const source = labels.patientsPage;
@@ -252,6 +253,7 @@ export function PatientsPage() {
     }, [error, ui.restrictedAccess]);
 
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [notesPatient, setNotesPatient] = useState<Patient | null>(null);
     const [form, setForm] = useState({
         nom: "",
         prenom: "",
@@ -1040,6 +1042,12 @@ export function PatientsPage() {
                                                     {ui.edit}
                                                 </button>
                                                 <button
+                                                    className="px-2 py-1 border rounded"
+                                                    onClick={() => setNotesPatient(p)}
+                                                >
+                                                    {labels.patientClinicalNotes.open}
+                                                </button>
+                                                <button
                                                     className="px-2 py-1 border rounded text-red-600"
                                                     disabled={
                                                         busyIds[p._id]
@@ -1056,6 +1064,16 @@ export function PatientsPage() {
                             </tbody>
                         </table>
                     </div>
+                    <PatientClinicalNotesModal
+                        patient={notesPatient}
+                        onClose={() => setNotesPatient(null)}
+                        onSaved={(updatedPatient) => {
+                            setPatients((previous) => previous.map((patient) =>
+                                patient._id === updatedPatient._id ? updatedPatient : patient
+                            ));
+                            setNotesPatient(updatedPatient);
+                        }}
+                    />
 
                     <div className="flex items-center gap-3">
                         <button

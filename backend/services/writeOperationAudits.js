@@ -318,7 +318,7 @@ export async function listMyWriteReceipts({
     query.$and = [
         ...(query.$and || []),
         { verificationId: { $ne: null } },
-        { collectionName: { $ne: "patientauditlogs" } },
+        { collectionName: { $nin: ["patientauditlogs", "patientclinicalnoteversions"] } },
     ];
 
     const skip = (parsedPage - 1) * parsedLimit;

@@ -6,8 +6,11 @@ import {
     listPatients,
     listPatientAuditLogs,
     listPatientSecureRequestDocuments,
+    listPatientClinicalNoteVersions,
     getPatientById,
     updatePatient,
+    updatePatientWithClinicalNoteHistory,
+    restorePatientClinicalNoteVersion,
     deletePatient,
 } from "../services/patients.js";
 import {
@@ -42,6 +45,7 @@ async function recordPatientMutationAudit(req, {
     patientId,
     changedFields = [],
     context = null,
+    clinicalNoteVersion = null,
 }) {
     const requestContext = getRequestContext(req);
     const ip = getRequestIp(req);
@@ -63,6 +67,28 @@ async function recordPatientMutationAudit(req, {
     });
 
     const replicaSet = await getReplicaSetStatus();
+
+    if (clinicalNoteVersion) {
+        await recordWriteOperationAuditEvent({
+            collectionName: "patientclinicalnoteversions",
+            operation: "CREATE",
+            outcome: "SUCCESS",
+            verificationId,
+            clientMutationId,
+            actorUserId: req.auth?.userId ?? null,
+            actorUsername: req.auth?.username ?? null,
+            actorRole: req.auth?.role ?? null,
+            ip,
+            requestId: requestContext.requestId,
+            instanceId: requestContext.instanceId,
+            resourceId: String(clinicalNoteVersion._id),
+            patientId: patientId ? String(patientId) : null,
+            changedFields: ["version", "contentHash", "changeType"],
+            requestPath,
+            writeConcern: CLINICAL_WRITE_CONCERN,
+            replicaSet,
+        });
+    }
 
     await recordWriteOperationAuditEvent({
         collectionName: "patientauditlogs",
@@ -420,6 +446,64 @@ router.get("/:id/secure-request-documents", async (req, res) => {
     }
 });
 
+router.get("/:id/clinical-note-versions", async (req, res) => {
+    try {
+        const versions = await listPatientClinicalNoteVersions(req.params.id, req.auth);
+        return res.status(200).json({
+            data: versions,
+            meta: { source: "real", model: "mongo" },
+        });
+    } catch (err) {
+        if (["INVALID_ID", "NOT_FOUND"].includes(err.code)) {
+            return res.status(err.code === "NOT_FOUND" ? 404 : 400).json({
+                error: { code: err.code, message: err.message, retryable: false },
+            });
+        }
+        console.error("Patient clinical note versions error:", err);
+        return res.status(500).json({
+            error: { code: "PERSISTENCE_FAILED", message: "Impossible de recuperer les versions de note.", retryable: true },
+        });
+    }
+});
+
+router.post("/:id/clinical-note-versions/:versionId/restore", async (req, res) => {
+    try {
+        const { patient, noteVersion } = await restorePatientClinicalNoteVersion(
+            req.params.id,
+            req.params.versionId,
+            req.auth
+        );
+        const writeVerification = await recordPatientMutationAudit(req, {
+            action: "PATIENT_UPDATE",
+            operation: "UPDATE",
+            patientId: patient._id,
+            changedFields: ["secure_request_profile.clinicalNotes"],
+            context: {
+                clinicalNoteVersion: {
+                    version: noteVersion?.version ?? null,
+                    changeType: "RESTORE",
+                    restoredFromVersionId: req.params.versionId,
+                },
+            },
+            clinicalNoteVersion: noteVersion,
+        });
+        return res.status(200).json({
+            data: patient,
+            meta: { source: "real", model: "mongo", writeVerification },
+        });
+    } catch (err) {
+        if (["INVALID_ID", "NOT_FOUND", "INVALID_INPUT"].includes(err.code)) {
+            return res.status(err.code === "NOT_FOUND" ? 404 : 400).json({
+                error: { code: err.code, message: err.message, retryable: false },
+            });
+        }
+        console.error("Patient clinical note restore error:", err);
+        return res.status(500).json({
+            error: { code: "PERSISTENCE_FAILED", message: "Impossible de restaurer cette version de note.", retryable: true },
+        });
+    }
+});
+
 /* ------------------------------------------------------------------ */
 /* GET /api/patients/:id                                               */
 /* ------------------------------------------------------------------ */
@@ -489,7 +573,14 @@ router.patch("/:id", async (req, res) => {
 
     try {
         const beforePatient = await getPatientById(req.params.id, req.auth);
-        const patient = await updatePatient(req.params.id, dto, req.auth);
+        const clinicalNotesChanged =
+            dto.secure_request_profile !== undefined &&
+            (beforePatient.secure_request_profile?.clinicalNotes || "") !==
+                (dto.secure_request_profile?.clinicalNotes || "");
+        const result = clinicalNotesChanged
+            ? await updatePatientWithClinicalNoteHistory(req.params.id, dto, req.auth)
+            : { patient: await updatePatient(req.params.id, dto, req.auth), noteVersion: null };
+        const { patient, noteVersion } = result;
         const changedFields = getActuallyChangedPatientFields(
             beforePatient,
             dto,
@@ -500,8 +591,20 @@ router.patch("/:id", async (req, res) => {
             action: "PATIENT_UPDATE",
             operation: "UPDATE",
             patientId: patient?._id ?? req.params.id,
-            changedFields,
-            context: buildPatientAuditContext(dto),
+            changedFields: noteVersion
+                ? changedFields.map((field) => field === "secure_request_profile" ? "secure_request_profile.clinicalNotes" : field)
+                : changedFields,
+            context: {
+                ...buildPatientAuditContext(dto),
+                ...(noteVersion ? {
+                    clinicalNoteVersion: {
+                        version: noteVersion.version,
+                        changeType: noteVersion.changeType,
+                        versionId: String(noteVersion._id),
+                    },
+                } : {}),
+            },
+            clinicalNoteVersion: noteVersion,
         });
 
         return res.status(200).json({

@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
+import crypto from "node:crypto";
 import { Patient } from "../models/Patient.js";
+import { PatientClinicalNoteVersion } from "../models/PatientClinicalNoteVersion.js";
 import { PatientAuditLog } from "../models/PatientAuditLog.js";
 import { geocodeFreeAddress } from "../utils/geocode.js";
 import { buildOwnerScope } from "../auth/resourceAccess.js";
@@ -18,6 +20,21 @@ function createPatientError(code, message) {
 
 function escapeRegex(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function maskUsername(username) {
+    if (!username || typeof username !== "string") return "unknown";
+    return username.trim().toLowerCase().slice(0, 2) + "***";
+}
+
+function clinicalNotesFrom(patient) {
+    return typeof patient?.secure_request_profile?.clinicalNotes === "string"
+        ? patient.secure_request_profile.clinicalNotes
+        : "";
+}
+
+function hashClinicalNote(note) {
+    return crypto.createHash("sha256").update(note, "utf8").digest("hex");
 }
 
 function assertPatientAuditAccess(authUser) {
@@ -402,7 +419,7 @@ export async function getPatientById(id, authUser) {
     return patient;
 }
 
-export async function updatePatient(id, updates, authUser) {
+async function preparePatientUpdate(id, updates, authUser) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
             code: "INVALID_ID",
@@ -447,9 +464,19 @@ export async function updatePatient(id, updates, authUser) {
         }
     }
 
+    return { existing, ownerScope, updates };
+}
+
+export async function updatePatient(id, updates, authUser) {
+    const { ownerScope, updates: preparedUpdates } = await preparePatientUpdate(
+        id,
+        updates,
+        authUser
+    );
+
     const patient = await Patient.findOneAndUpdate(
         { _id: id, ...ownerScope },
-        { $set: updates },
+        { $set: preparedUpdates },
         {
             new: true,
             runValidators: true,
@@ -465,6 +492,160 @@ export async function updatePatient(id, updates, authUser) {
     }
 
     return patient;
+}
+
+function toClinicalNoteVersion({
+    patientId,
+    ownerUserId,
+    version,
+    note,
+    changeType,
+    restoredFromVersionId = null,
+    authUser,
+}) {
+    return {
+        patientId,
+        ownerUserId,
+        version,
+        note,
+        contentHash: hashClinicalNote(note),
+        changeType,
+        restoredFromVersionId,
+        actorUserId: authUser?.userId ?? null,
+        actorUsernameMasked: maskUsername(authUser?.username),
+        actorRole: authUser?.role ?? null,
+    };
+}
+
+export async function updatePatientWithClinicalNoteHistory(
+    id,
+    updates,
+    authUser,
+    { changeType = "UPDATE", restoredFromVersionId = null, forceVersion = false } = {}
+) {
+    const { existing, ownerScope, updates: preparedUpdates } =
+        await preparePatientUpdate(id, updates, authUser);
+    const previousNote = clinicalNotesFrom(existing);
+    const nextNote = clinicalNotesFrom({
+        secure_request_profile: preparedUpdates.secure_request_profile,
+    });
+    const noteChanged =
+        Object.hasOwn(preparedUpdates, "secure_request_profile") &&
+        (previousNote !== nextNote || forceVersion);
+
+    if (!noteChanged) {
+        return { patient: await updatePatient(id, preparedUpdates, authUser), noteVersion: null };
+    }
+
+    const session = await mongoose.startSession();
+    try {
+        let patient;
+        let noteVersion;
+
+        await session.withTransaction(
+            async () => {
+                const latest = await PatientClinicalNoteVersion.findOne({ patientId: id })
+                    .sort({ version: -1 })
+                    .session(session)
+                    .lean();
+                let nextVersion = latest?.version || 0;
+                const ownerUserId = existing.ownerUserId || authUser.userId;
+
+                if (!latest && previousNote) {
+                    nextVersion += 1;
+                    await PatientClinicalNoteVersion.create(
+                        [toClinicalNoteVersion({
+                            patientId: id,
+                            ownerUserId,
+                            version: nextVersion,
+                            note: previousNote,
+                            changeType: "BASELINE",
+                            authUser,
+                        })],
+                        { session }
+                    );
+                }
+
+                patient = await Patient.findOneAndUpdate(
+                    { _id: id, ...ownerScope },
+                    { $set: preparedUpdates },
+                    {
+                        new: true,
+                        runValidators: true,
+                        session,
+                    }
+                );
+                if (!patient) {
+                    throw { code: "NOT_FOUND", message: "Patient introuvable." };
+                }
+
+                nextVersion += 1;
+                const [created] = await PatientClinicalNoteVersion.create(
+                    [toClinicalNoteVersion({
+                        patientId: id,
+                        ownerUserId,
+                        version: nextVersion,
+                        note: nextNote,
+                        changeType,
+                        restoredFromVersionId,
+                        authUser,
+                    })],
+                    { session }
+                );
+                noteVersion = created.toObject();
+            },
+            { writeConcern: CLINICAL_WRITE_CONCERN }
+        );
+
+        return { patient, noteVersion };
+    } finally {
+        await session.endSession();
+    }
+}
+
+export async function listPatientClinicalNoteVersions(id, authUser) {
+    const patient = await getPatientById(id, authUser);
+    const versions = await PatientClinicalNoteVersion.find({ patientId: patient._id })
+        .sort({ version: -1 })
+        .limit(100)
+        .lean();
+    return versions.map((version) => ({
+        id: String(version._id),
+        version: version.version,
+        note: version.note,
+        changeType: version.changeType,
+        restoredFromVersionId: version.restoredFromVersionId
+            ? String(version.restoredFromVersionId)
+            : null,
+        actorUsernameMasked: version.actorUsernameMasked,
+        actorRole: version.actorRole,
+        createdAt: version.createdAt,
+    }));
+}
+
+export async function restorePatientClinicalNoteVersion(id, versionId, authUser) {
+    if (!mongoose.Types.ObjectId.isValid(versionId)) {
+        throw { code: "INVALID_ID", message: "Identifiant de version invalide." };
+    }
+
+    const patient = await getPatientById(id, authUser);
+    const source = await PatientClinicalNoteVersion.findOne({
+        _id: versionId,
+        patientId: patient._id,
+    }).lean();
+    if (!source) {
+        throw { code: "NOT_FOUND", message: "Version de note introuvable." };
+    }
+
+    const profile = { ...(patient.secure_request_profile || {}), clinicalNotes: source.note };
+    const result = await updatePatientWithClinicalNoteHistory(
+        id,
+        { secure_request_profile: profile },
+        authUser,
+        { changeType: "RESTORE", restoredFromVersionId: source._id, forceVersion: true }
+    );
+
+    return result;
 }
 
 export async function deletePatient(id, authUser) {

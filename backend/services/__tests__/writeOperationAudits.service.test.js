@@ -185,7 +185,7 @@ describe("write operation audits service", () => {
                 { actorUserId: "507f1f77bcf86cd799439011" },
                 { patientId: "507f1f77bcf86cd799439012" },
                 { verificationId: { $ne: null } },
-                { collectionName: { $ne: "patientauditlogs" } },
+                { collectionName: { $nin: ["patientauditlogs", "patientclinicalnoteversions"] } },
             ],
         });
         expect(result.logs).toEqual([expect.objectContaining({

@@ -59,6 +59,17 @@ export interface PatientSecureRequestDocument {
     selectedDocumentIds: string[];
 }
 
+export interface PatientClinicalNoteVersion {
+    id: string;
+    version: number;
+    note: string;
+    changeType: "BASELINE" | "UPDATE" | "RESTORE";
+    restoredFromVersionId: string | null;
+    actorUsernameMasked: string;
+    actorRole: string | null;
+    createdAt: string;
+}
+
 export interface PaginatedPatients {
     data: Patient[];
     meta: {
@@ -213,6 +224,40 @@ export async function fetchPatientsPaginated(
                         retryable: true,
                     },
                 };
+            }
+        })()
+    );
+}
+
+export async function fetchPatientClinicalNoteVersions(
+    patientId: string
+): Promise<ApiResponse<PatientClinicalNoteVersion[]>> {
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await authFetch(`/api/patients/${patientId}/clinical-note-versions`);
+                return (await safeJson(response)) as ApiResponse<PatientClinicalNoteVersion[]>;
+            } catch {
+                return { error: { code: "INTERNAL_ERROR", message: "Impossible de recuperer l'historique clinique.", retryable: true } };
+            }
+        })()
+    );
+}
+
+export async function restorePatientClinicalNoteVersion(
+    patientId: string,
+    versionId: string
+): Promise<ApiResponse<Patient>> {
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await authFetch(
+                    `/api/patients/${patientId}/clinical-note-versions/${versionId}/restore`,
+                    { method: "POST" }
+                );
+                return (await safeJson(response)) as ApiResponse<Patient>;
+            } catch {
+                return { error: { code: "INTERNAL_ERROR", message: "Impossible de restaurer la version clinique.", retryable: true } };
             }
         })()
     );
