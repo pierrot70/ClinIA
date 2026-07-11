@@ -16,6 +16,10 @@ function createPatientError(code, message) {
     return { code, message };
 }
 
+function escapeRegex(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function assertPatientAuditAccess(authUser) {
     if (
         !authUser?.role ||
@@ -93,10 +97,25 @@ export async function createPatient(dto, authUser) {
 export async function listPatients(filters = {}, opts = {}, authUser) {
     const query = buildOwnerScope(authUser);
 
-    if (filters.nom) {
+    if (typeof filters.q === "string" && filters.q.trim()) {
+        const terms = filters.q
+            .trim()
+            .slice(0, 120)
+            .split(/\s+/)
+            .filter(Boolean)
+            .map((term) => new RegExp(escapeRegex(term), "i"));
+
+        if (terms.length) {
+            query.$and = terms.map((term) => ({
+                $or: [{ nom: term }, { prenom: term }],
+            }));
+        }
+    }
+
+    if (filters.nom && !filters.q?.trim()) {
         query.nom = { $regex: filters.nom, $options: "i" };
     }
-    if (filters.prenom) {
+    if (filters.prenom && !filters.q?.trim()) {
         query.prenom = { $regex: filters.prenom, $options: "i" };
     }
     if (filters.num_assurance_maladie) {

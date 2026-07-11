@@ -29,6 +29,7 @@ vi.mock("../../utils/geocode.js", () => ({
 }));
 
 const {
+    listPatients,
     listPatientAuditLogs,
     listPatientSecureRequestDocuments,
 } = await import("../patients.js");
@@ -38,6 +39,34 @@ beforeEach(() => {
 });
 
 describe("patients service audit logs", () => {
+    it("searches a clinician's patients by first and last name without regex injection", async () => {
+        patientCountDocuments.mockResolvedValue(1);
+        patientFind.mockReturnValue({
+            sort: vi.fn().mockReturnValue({
+                skip: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockReturnValue({
+                        lean: vi.fn().mockResolvedValue([{ _id: "patient-1", prenom: "Pierre", nom: "Lasante" }]),
+                    }),
+                }),
+            }),
+        });
+
+        const result = await listPatients(
+            { q: "Pierre Lasante" },
+            { page: "1", limit: "50", sortBy: "nom" },
+            { userId: "507f1f77bcf86cd799439011", role: "MEDECIN" }
+        );
+
+        expect(patientFind).toHaveBeenCalledWith({
+            ownerUserId: "507f1f77bcf86cd799439011",
+            $and: [
+                { $or: [{ nom: /Pierre/i }, { prenom: /Pierre/i }] },
+                { $or: [{ nom: /Lasante/i }, { prenom: /Lasante/i }] },
+            ],
+        });
+        expect(result.data).toHaveLength(1);
+    });
+
     it("lists patient audit logs with pagination for admins", async () => {
         auditCountDocuments.mockResolvedValue(1);
         auditFind.mockReturnValue({

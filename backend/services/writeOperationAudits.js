@@ -341,6 +341,7 @@ export async function listMyWriteReceipts({
                 resourceId: row.resourceId,
                 patientId: row.patientId,
                 changedFields: row.changedFields,
+                writeConcern: row.writeConcern,
                 replicaSet: row.replicaSet,
                 timestamp: row.timestamp,
             };

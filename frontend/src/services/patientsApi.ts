@@ -164,6 +164,7 @@ export async function fetchPatientsPaginated(
     params: {
         page?: number;
         limit?: number;
+        q?: string;
         nom?: string;
         prenom?: string;
         num_assurance_maladie?: string;
@@ -177,6 +178,7 @@ export async function fetchPatientsPaginated(
 
     if (params.page) query.set("page", String(params.page));
     if (params.limit) query.set("limit", String(params.limit));
+    if (params.q) query.set("q", params.q);
 
     if (params.nom) query.set("nom", params.nom);
     if (params.prenom) query.set("prenom", params.prenom);

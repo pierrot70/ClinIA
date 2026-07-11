@@ -174,6 +174,7 @@ ensure_staging_user() {
               isActive: true,
               passwordResetRequired: false,
               mustChangePasswordOnNextLogin: false,
+              massDownloadRestrictedUntil: null,
               failedLoginAttempts: 0,
               lockUntil: null,
               updatedAt: now

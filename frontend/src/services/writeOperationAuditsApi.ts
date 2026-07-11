@@ -103,6 +103,7 @@ export type MyWriteReceipt = Pick<
     | "resourceId"
     | "patientId"
     | "changedFields"
+    | "writeConcern"
     | "replicaSet"
     | "timestamp"
 >;

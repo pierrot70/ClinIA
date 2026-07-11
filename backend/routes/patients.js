@@ -261,6 +261,7 @@ router.get("/", async (req, res) => {
     try {
         const { data, meta } = await listPatients(
             {
+                q: req.query.q,
                 nom: req.query.nom,
                 prenom: req.query.prenom,
                 num_assurance_maladie:
