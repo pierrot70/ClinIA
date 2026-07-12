@@ -9,6 +9,7 @@ import {
     fetchPatientsPaginated,
     updatePatient,
     type Patient,
+    type PatientLanguage,
     type PatientPayload,
 } from "../services/patientsApi";
 import type { ApiError } from "../types/api";
@@ -43,6 +44,7 @@ function usePatientsPageLabels(targetLang: string) {
     const { translated: phonePlaceholder } = useTranslation({ text: source.form.phonePlaceholder, ...options });
     const { translated: emailPlaceholder } = useTranslation({ text: source.form.emailPlaceholder, ...options });
     const { translated: addressPlaceholder } = useTranslation({ text: source.form.addressPlaceholder, ...options });
+    const { translated: languageLabel } = useTranslation({ text: source.form.languageLabel, ...options });
     const { translated: latitudePlaceholder } = useTranslation({ text: source.form.latitudePlaceholder, ...options });
     const { translated: longitudePlaceholder } = useTranslation({ text: source.form.longitudePlaceholder, ...options });
     const { translated: smsEnabled } = useTranslation({ text: source.form.smsEnabled, ...options });
@@ -99,6 +101,8 @@ function usePatientsPageLabels(targetLang: string) {
         phonePlaceholder,
         emailPlaceholder,
         addressPlaceholder,
+        languageLabel,
+        languageOptions: source.form.languageOptions,
         latitudePlaceholder,
         longitudePlaceholder,
         smsEnabled,
@@ -261,6 +265,7 @@ export function PatientsPage() {
         addresse: "",
         telephone: "",
         courriel: "",
+        language: "fr" as PatientLanguage,
         lat: "",
         long: "",
         texto: false,
@@ -431,6 +436,7 @@ export function PatientsPage() {
             addresse: "",
             telephone: "",
             courriel: "",
+            language: "fr" as PatientLanguage,
             lat: "",
             long: "",
             texto: false,
@@ -442,6 +448,7 @@ export function PatientsPage() {
             nom: values.nom.trim(),
             prenom: values.prenom.trim(),
             texto: values.texto,
+            language: values.language,
         };
 
         if (values.num_assurance_maladie.trim()) {
@@ -597,6 +604,10 @@ export function PatientsPage() {
                 addresse: patient.addresse ?? "",
                 telephone: patient.telephone ?? "",
                 courriel: patient.courriel ?? "",
+                language:
+                    patient.language === "sp"
+                        ? "es"
+                        : patient.language ?? "fr",
                 lat: patient.lat?.toString() ?? "",
                 long: patient.long?.toString() ?? "",
                 texto: Boolean(patient.texto),
@@ -740,6 +751,29 @@ export function PatientsPage() {
                                 }))
                             }
                         />
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span>{ui.languageLabel}</span>
+                            <select
+                                className="border rounded p-2"
+                                value={form.language}
+                                onChange={(e) =>
+                                    setForm((p) => ({
+                                        ...p,
+                                        language: e.target.value as PatientLanguage,
+                                    }))
+                                }
+                            >
+                                <option value="fr">{ui.languageOptions.frenchCanada}</option>
+                                <option value="en">{ui.languageOptions.englishCanada}</option>
+                                <option value="es">{ui.languageOptions.spanish}</option>
+                                <option value="ko">{ui.languageOptions.korean}</option>
+                                <option value="vi">{ui.languageOptions.vietnamese}</option>
+                                <option value="no">{ui.languageOptions.norwegian}</option>
+                                <option value="ja">{ui.languageOptions.japanese}</option>
+                                <option value="zh">{ui.languageOptions.chinese}</option>
+                                <option value="he">{ui.languageOptions.hebrew}</option>
+                            </select>
+                        </label>
                         <input
                             className="border rounded p-2"
                             placeholder={ui.lastNamePlaceholder}

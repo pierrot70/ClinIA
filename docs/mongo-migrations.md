@@ -10,6 +10,7 @@ Les migrations Mongo ClinIA sont explicites, ordonnees et tracees dans la collec
 - Une seule execution est autorisee par verrou temporaire dans `schemamigrationlocks`.
 - Les migrations irreversibles exigent `--allow-irreversible` et ne doivent jamais reduire ou tronquer une donnee clinique sans migration de remplacement verifiee.
 - Les journaux de migration ne contiennent aucune donnee patient ni contenu clinique.
+- Toute modification de schema est enregistree dans une migration. Une extension compatible sans transformation de donnees, comme l'ajout d'une valeur autorisee a un enum, utilise une migration de registre reversible et sans backfill.
 
 ## Local STAGING
 

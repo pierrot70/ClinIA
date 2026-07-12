@@ -8,6 +8,17 @@ import { API_URL } from "./config";
 /* Types                                                               */
 /* ------------------------------------------------------------------ */
 
+export type PatientLanguage =
+    | "fr"
+    | "en"
+    | "es"
+    | "ko"
+    | "vi"
+    | "no"
+    | "ja"
+    | "zh"
+    | "he";
+
 export interface Patient {
     _id: string;
     nom: string;
@@ -18,6 +29,7 @@ export interface Patient {
     courriel?: string;
     created_by_reference?: string;
     texto?: boolean;
+    language?: PatientLanguage | "sp";
     lat?: number;
     long?: number;
     documents?: PatientDocument[];
@@ -93,6 +105,7 @@ export interface PatientPayload {
     courriel?: string;
     created_by_reference?: string;
     texto?: boolean;
+    language?: PatientLanguage;
     lat?: number;
     long?: number;
     secure_request_profile?: {

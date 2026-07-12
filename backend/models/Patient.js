@@ -199,7 +199,7 @@ const PatientSchema = new mongoose.Schema(
         },
         language: {
             type: String,
-            enum: ["fr", "en"],
+            enum: ["fr", "en", "es", "ko", "vi", "no", "ja", "zh", "he"],
             default: "fr",
             trim: true,
         },

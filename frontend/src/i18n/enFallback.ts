@@ -115,6 +115,7 @@ export const enFallback: Record<string, string> = {
   "Téléphone (optionnel)": "Phone (optional)",
   "Courriel (optionnel)": "Email (optional)",
   "Adresse (optionnel)": "Address (optional)",
+  "Langue": "Language",
   "Latitude (optionnel)": "Latitude (optional)",
   "Longitude (optionnel)": "Longitude (optional)",
   "SMS activé": "SMS enabled",

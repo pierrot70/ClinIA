@@ -31,6 +31,21 @@ function normalizeOptionalNumber(value) {
     return Number.isFinite(number) && number > 0 ? number : undefined;
 }
 
+function normalizePatientLanguage(value, defaultValue) {
+    if (typeof value !== "string") {
+        return defaultValue;
+    }
+
+    const language = value.trim().toLowerCase();
+    if (language === "sp") {
+        return "es";
+    }
+
+    return ["fr", "en", "es", "ko", "vi", "no", "ja", "zh", "he"].includes(language)
+        ? language
+        : defaultValue;
+}
+
 function normalizeClinicalAnalysisParameters(value) {
     if (!value || typeof value !== "object") {
         return undefined;
@@ -125,6 +140,7 @@ export function toCreatePatientDTO(body) {
         created_by_reference:
             body.created_by_reference?.trim() ?? "",
         texto: normalizeBoolean(body.texto),
+        language: normalizePatientLanguage(body.language, "fr"),
         lat: typeof body.lat === "number" ? body.lat : undefined,
         long: typeof body.long === "number" ? body.long : undefined,
         secure_request_profile: normalizeSecureRequestProfile(
@@ -158,6 +174,8 @@ export function toUpdatePatientDTO(body) {
     }
     if (body.texto !== undefined)
         dto.texto = normalizeBoolean(body.texto);
+    if (body.language !== undefined)
+        dto.language = normalizePatientLanguage(body.language, "fr");
     if (body.lat !== undefined)
         dto.lat =
             typeof body.lat === "number" ? body.lat : undefined;
