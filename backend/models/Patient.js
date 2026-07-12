@@ -197,6 +197,12 @@ const PatientSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        language: {
+            type: String,
+            enum: ["fr", "en"],
+            default: "fr",
+            trim: true,
+        },
         lat: {
             type: Number,
         },

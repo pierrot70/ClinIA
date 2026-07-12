@@ -722,6 +722,41 @@ ACTIVE_MONGO="$(docker ps --format '{{.Names}}' |
 
 Then run the same `rs.status()` command against `$ACTIVE_MONGO`.
 
+## Mongo data migrations
+
+Mongo migrations are executed manually and never at backend startup. Before a production `--apply`, the migration launcher requires:
+
+- a healthy primary backend container;
+- a local backup archive no older than 24 hours by default;
+- successful checksum and gzip verification of that archive;
+- `MIGRATION_BACKUP_CONFIRMED=YES` after reviewing the archive;
+- `CONFIRM_PRODUCTION_MONGO_MIGRATIONS=RUN_CLINIA_MONGO_MIGRATIONS`.
+
+Install the launcher on the Coolify droplet after deploying the backend code:
+
+```bash
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/run-production-mongo-migrations.sh \
+  -o /opt/clinia/scripts/run-production-mongo-migrations.sh
+sudo chmod 755 /opt/clinia/scripts/run-production-mongo-migrations.sh
+```
+
+Review pending migrations without writing:
+
+```bash
+sudo /opt/clinia/scripts/run-production-mongo-migrations.sh --dry-run
+```
+
+Apply only after reviewing the preflight output:
+
+```bash
+sudo CONFIRM_PRODUCTION_MONGO_MIGRATIONS=RUN_CLINIA_MONGO_MIGRATIONS \
+  MIGRATION_BACKUP_CONFIRMED=YES \
+  MAX_BACKUP_AGE_HOURS=24 \
+  /opt/clinia/scripts/run-production-mongo-migrations.sh --apply
+```
+
+For a destructive or precision-reducing change, use a separate migration with an explicit compatibility period. Never delete the source field in the same migration that creates a replacement field.
+
 ## Mongo backup and restore drill
 
 Run this drill from `clinia-coolify` before risky infrastructure work and at
