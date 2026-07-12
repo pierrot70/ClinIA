@@ -44,10 +44,11 @@ function useAppointmentsPageLabels(targetLang: string) {
     const { translated: patientSearchEmpty } = useTranslation({ text: source.patientSearch.empty, ...options });
     const { translated: specialistsLoading } = useTranslation({ text: source.specialist.loading, ...options });
     const { translated: chooseSpecialist } = useTranslation({ text: source.specialist.choose, ...options });
-    const { translated: nearestClinicMissing } = useTranslation({ text: source.specialist.nearestClinicMissing, ...options });
+    const { translated: noSpecialist } = useTranslation({ text: source.specialist.none, ...options });
     const { translated: selectPatient } = useTranslation({ text: source.specialist.selectPatient, ...options });
-    const { translated: noneInNearestClinic } = useTranslation({ text: source.specialist.noneInNearestClinic, ...options });
-    const { translated: missingCoordinates } = useTranslation({ text: source.specialist.missingCoordinates, ...options });
+    const { translated: cliniquesLoading } = useTranslation({ text: source.clinique.loading, ...options });
+    const { translated: chooseClinique } = useTranslation({ text: source.clinique.choose, ...options });
+    const { translated: noClinique } = useTranslation({ text: source.clinique.none, ...options });
     const { translated: priorityLabel } = useTranslation({ text: source.priority.label, ...options });
     const { translated: normalPriority } = useTranslation({ text: source.priority.normal, ...options });
     const { translated: urgentPriority } = useTranslation({ text: source.priority.urgent, ...options });
@@ -73,10 +74,11 @@ function useAppointmentsPageLabels(targetLang: string) {
         patientSearchEmpty,
         specialistsLoading,
         chooseSpecialist,
-        nearestClinicMissing,
+        noSpecialist,
         selectPatient,
-        noneInNearestClinic,
-        missingCoordinates,
+        cliniquesLoading,
+        chooseClinique,
+        noClinique,
         priorityLabel,
         normalPriority,
         urgentPriority,
@@ -103,6 +105,7 @@ export function AppointmentsPage() {
     const [patientId, setPatientId] = useState("");
     const [selectedPatient, setSelectedPatient] =
         useState<Patient | null>(null);
+    const [clinique, setClinique] = useState("");
     const [specialist, setSpecialist] = useState("");
     const [date, setDate] = useState("");
     const [time, setTime] = useState("");
@@ -138,28 +141,6 @@ export function AppointmentsPage() {
     const [cliniquesLoading, setCliniquesLoading] = useState(false);
     const [cliniquesError, setCliniquesError] =
         useState<ApiError | null>(null);
-
-    function toRad(value: number) {
-        return (value * Math.PI) / 180;
-    }
-
-    function distanceKm(
-        lat1: number,
-        lon1: number,
-        lat2: number,
-        lon2: number
-    ) {
-        const r = 6371;
-        const dLat = toRad(lat2 - lat1);
-        const dLon = toRad(lon2 - lon1);
-        const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(toRad(lat1)) *
-                Math.cos(toRad(lat2)) *
-                Math.sin(dLon / 2) *
-                Math.sin(dLon / 2);
-        return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    }
 
     /* ------------------------------------------------------------------ */
     /* Initialisation date                                                */
@@ -359,55 +340,15 @@ export function AppointmentsPage() {
         };
     }, [searchNom, searchPrenom, searchTelephone]);
 
-    const nearestCliniqueId = useMemo(() => {
-        if (
-            !selectedPatient ||
-            typeof selectedPatient.lat !== "number" ||
-            typeof selectedPatient.long !== "number"
-        ) {
-            return null;
-        }
-
-        let nearestId: string | null = null;
-        let nearestDistance = Number.POSITIVE_INFINITY;
-
-        cliniques.forEach((clinique) => {
-            if (
-                typeof clinique.lat !== "number" ||
-                typeof clinique.long !== "number" ||
-                !selectedPatient ||
-                typeof selectedPatient.lat !== "number" ||
-                typeof selectedPatient.long !== "number"
-            ) {
-                return;
-            }
-
-            const d = distanceKm(
-                selectedPatient.lat,
-                selectedPatient.long,
-                clinique.lat,
-                clinique.long
-            );
-
-            if (d < nearestDistance) {
-                nearestDistance = d;
-                nearestId = clinique._id;
-            }
-        });
-
-        return nearestId;
-    }, [cliniques, selectedPatient]);
-
     const filteredSpecialists = useMemo(() => {
-        if (!selectedPatient) return specialists;
-        if (!nearestCliniqueId) return [];
+        if (!clinique) return [];
         return specialists.filter(
-            (sp) => sp.clinique_associer === nearestCliniqueId
+            (sp) => sp.clinique_associer === clinique
         );
-    }, [nearestCliniqueId, selectedPatient, specialists]);
+    }, [clinique, specialists]);
 
     useEffect(() => {
-        if (!nearestCliniqueId || !specialist) return;
+        if (!clinique || !specialist) return;
         const stillValid = filteredSpecialists.some(
             (sp) => sp._id === specialist
         );
@@ -415,7 +356,7 @@ export function AppointmentsPage() {
             setSpecialist("");
             setAvailableSlots([]);
         }
-    }, [filteredSpecialists, nearestCliniqueId, specialist]);
+    }, [clinique, filteredSpecialists, specialist]);
 
     /* ------------------------------------------------------------------ */
     /* Chargement des créneaux                                            */
@@ -448,6 +389,7 @@ export function AppointmentsPage() {
 
     const isComplete =
         patientId.trim() &&
+        clinique.trim() &&
         specialist.trim() &&
         date.trim() &&
         time.trim();
@@ -466,6 +408,7 @@ export function AppointmentsPage() {
 
         const response = await createAppointment({
             patient: patientId,
+            clinique,
             specialist,
             date,
             time,
@@ -616,21 +559,47 @@ export function AppointmentsPage() {
 
                 <select
                     className="border rounded p-2"
+                    value={clinique}
+                    onChange={(e) => setClinique(e.target.value)}
+                    disabled={cliniquesLoading}
+                >
+                    <option value="">
+                        {cliniquesLoading
+                            ? ui.cliniquesLoading
+                            : ui.chooseClinique}
+                    </option>
+                    {cliniques
+                        .slice()
+                        .sort((a, b) => a.nom.localeCompare(b.nom, "fr"))
+                        .map((item) => (
+                            <option key={item._id} value={item._id}>
+                                {item.nom}
+                            </option>
+                        ))}
+                </select>
+                {!cliniquesLoading && cliniques.length === 0 && (
+                    <div className="text-xs text-gray-500">
+                        {ui.noClinique}
+                    </div>
+                )}
+
+                <select
+                    className="border rounded p-2"
                     value={specialist}
                     onChange={(e) => setSpecialist(e.target.value)}
                     disabled={
                         !patientId ||
                         cliniquesLoading ||
-                        (!!patientId && !nearestCliniqueId)
+                        !clinique
                     }
                 >
                     <option value="">
-                        {specialistsLoading || cliniquesLoading
+                        {specialistsLoading
                             ? ui.specialistsLoading
-                            : patientId && nearestCliniqueId
+                            : patientId && clinique
                                 ? ui.chooseSpecialist
                                 : patientId
-                                    ? ui.nearestClinicMissing
+                                    ? ui.chooseClinique
                                     : ui.selectPatient}
                     </option>
                     {filteredSpecialists.map((sp) => (
@@ -653,16 +622,9 @@ export function AppointmentsPage() {
                         {cliniquesError.message}
                     </div>
                 )}
-                {patientId &&
-                    nearestCliniqueId &&
-                    filteredSpecialists.length === 0 && (
+                {patientId && clinique && filteredSpecialists.length === 0 && (
                     <div className="text-xs text-gray-500">
-                        {ui.noneInNearestClinic}
-                    </div>
-                )}
-                {patientId && !nearestCliniqueId && (
-                    <div className="text-xs text-gray-500">
-                        {ui.missingCoordinates}
+                        {ui.noSpecialist}
                     </div>
                 )}
 

@@ -88,6 +88,7 @@ describe("appointments routes write verification", () => {
         const dto = {
             patient: "patient-1",
             specialist: "specialist-1",
+            clinique: "clinique-1",
             date: "2026-07-20",
             time: "09:00",
             priority: "normal",
@@ -132,7 +133,7 @@ describe("appointments routes write verification", () => {
             instanceId: "instance-a",
             resourceId: "appointment-1",
             patientId: "patient-1",
-            changedFields: ["patient", "specialist", "date", "time", "priority"],
+            changedFields: ["patient", "specialist", "clinique", "date", "time", "priority"],
             requestPath: "/api/appointments",
             writeConcern: {
                 w: "majority",

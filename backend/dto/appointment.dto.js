@@ -12,6 +12,7 @@ export function toCreateAppointmentDTO(body) {
     return {
         patient: body.patient?.trim(),
         specialist: body.specialist?.trim(),
+        clinique: body.clinique?.trim() || undefined,
         date: body.date,
         time: body.time,
         reason: body.reason ?? "",

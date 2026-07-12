@@ -39,6 +39,14 @@ const AppointmentSchema = new mongoose.Schema(
             index: true,
         },
 
+        /** Clinique où le rendez-vous est prévu */
+        clinique: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Clinique",
+            default: null,
+            index: true,
+        },
+
         /** Date du rendez-vous (YYYY-MM-DD) */
         date: {
             type: String,

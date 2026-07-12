@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const findOne = vi.fn();
+const patientFindOne = vi.fn();
+const specialistFindById = vi.fn();
+const cliniqueExists = vi.fn();
 
 vi.mock("../../models/Appointment.js", () => ({
     Appointment: {
@@ -8,8 +11,21 @@ vi.mock("../../models/Appointment.js", () => ({
     },
 }));
 
+vi.mock("../../models/Patient.js", () => ({
+    Patient: { findOne: patientFindOne },
+}));
+
+vi.mock("../../models/Specialist.js", () => ({
+    Specialist: { findById: specialistFindById },
+}));
+
+vi.mock("../../models/Clinique.js", () => ({
+    Clinique: { exists: cliniqueExists },
+}));
+
 const {
     cancelAppointment,
+    createAppointment,
     updateAppointmentSchedule,
     updateAppointmentStatus,
 } = await import("../appointments.js");
@@ -98,6 +114,40 @@ describe("appointments service", () => {
 
         expect(findOne).toHaveBeenCalledWith({
             _id: appointment._id,
+        });
+    });
+
+    it("rejects a specialist assigned to another clinic", async () => {
+        patientFindOne.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                _id: "507f1f77bcf86cd799439012",
+                num_assurance_maladie: "RAMQ1234567890",
+                ownerUserId: authUser.userId,
+            }),
+        });
+        specialistFindById.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                clinique_associer: "507f1f77bcf86cd799439022",
+            }),
+        });
+        cliniqueExists.mockResolvedValue(true);
+
+        await expect(
+            createAppointment(
+                {
+                    patient: "507f1f77bcf86cd799439012",
+                    specialist: "507f1f77bcf86cd799439021",
+                    clinique: "507f1f77bcf86cd799439023",
+                    date: "2099-01-01",
+                    time: "10:00",
+                    priority: "normal",
+                },
+                authUser
+            )
+        ).rejects.toEqual({
+            code: "INVALID_INPUT",
+            message:
+                "Le spécialiste sélectionné n'est pas associé à cette clinique.",
         });
     });
 });

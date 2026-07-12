@@ -5,7 +5,6 @@ import { PatientClinicalNoteVersion } from "../models/PatientClinicalNoteVersion
 import { PatientAuditLog } from "../models/PatientAuditLog.js";
 import { recordPatientAuditEvent } from "../audit/patientAudit.js";
 import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
-import { geocodeFreeAddress } from "../utils/geocode.js";
 import { buildOwnerScope } from "../auth/resourceAccess.js";
 import {
     CLINICAL_QUERY_WRITE_OPTIONS,
@@ -92,17 +91,6 @@ export async function createPatient(dto, authUser) {
     if (!dto.num_assurance_maladie) {
         dto.num_assurance_maladie =
             await ensureUniqueRamqNumber();
-    }
-
-    if (
-        dto.addresse &&
-        (dto.lat === undefined || dto.long === undefined)
-    ) {
-        const coords = await geocodeFreeAddress(dto.addresse);
-        if (coords) {
-            if (dto.lat === undefined) dto.lat = coords.lat;
-            if (dto.long === undefined) dto.long = coords.long;
-        }
     }
 
     const patient = new Patient({
@@ -451,19 +439,6 @@ async function preparePatientUpdate(id, updates, authUser) {
             message:
                 "Les champs 'nom', 'prenom' et 'num_assurance_maladie' ne peuvent pas être vides.",
         };
-    }
-
-    if (
-        (updates.lat === undefined || updates.long === undefined) &&
-        (updates.addresse ?? existing.addresse)
-    ) {
-        const coords = await geocodeFreeAddress(
-            updates.addresse ?? existing.addresse
-        );
-        if (coords) {
-            if (updates.lat === undefined) updates.lat = coords.lat;
-            if (updates.long === undefined) updates.long = coords.long;
-        }
     }
 
     return { existing, ownerScope, updates };

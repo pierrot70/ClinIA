@@ -12,6 +12,7 @@ export interface Appointment {
     patient?: string;
     patientInsuranceNumber?: string;
     specialist: string;
+    clinique?: string | null;
     date: string;
     time: string;
     reason?: string;
@@ -40,6 +41,7 @@ export interface PaginatedAppointments {
 export interface CreateAppointmentPayload {
     patient: string;
     specialist: string;
+    clinique?: string;
     date: string; // YYYY-MM-DD
     time: string; // HH:mm
     reason?: string;

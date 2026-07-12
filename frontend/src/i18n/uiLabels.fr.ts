@@ -902,12 +902,18 @@ export const UI_LABELS_FR = {
         specialist: {
             loading: "Chargement des spécialistes...",
             choose: "Choisir un spécialiste *",
+            none: "Aucun spécialiste disponible dans cette clinique.",
             nearestClinicMissing: "Clinique la plus proche introuvable",
             selectPatient: "Sélectionnez un patient",
             noneInNearestClinic:
                 "Aucun spécialiste disponible dans la clinique la plus proche.",
             missingCoordinates:
                 "Coordonnées manquantes pour déterminer la clinique la plus proche.",
+        },
+        clinique: {
+            loading: "Chargement des cliniques...",
+            choose: "Choisir une clinique *",
+            none: "Aucune clinique disponible.",
         },
         priority: {
             label: "Priorité",

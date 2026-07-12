@@ -24,10 +24,6 @@ vi.mock("../../models/PatientAuditLog.js", () => ({
     },
 }));
 
-vi.mock("../../utils/geocode.js", () => ({
-    geocodeFreeAddress: vi.fn(),
-}));
-
 const {
     listPatients,
     listPatientAuditLogs,

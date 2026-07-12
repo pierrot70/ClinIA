@@ -27,6 +27,22 @@ function verifyDbStatusRequest(req, res, next) {
     return verifyJWT(req, res, next);
 }
 
+function requireDirectoryAccess(req, res, next) {
+    const readRoles = [
+        AUTH_ROLES.USER,
+        AUTH_ROLES.MEDECIN,
+        AUTH_ROLES.ADMIN,
+        AUTH_ROLES.SUPERADMIN,
+    ];
+    const writeRoles = [AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN];
+
+    return requireRole(...(req.method === "GET" ? readRoles : writeRoles))(
+        req,
+        res,
+        next
+    );
+}
+
 export function registerRoutes(app, deps) {
     const {
         massDownloadRestrictionGuard,
@@ -70,14 +86,14 @@ export function registerRoutes(app, deps) {
     app.use(
         "/api/cliniques",
         verifyJWT,
-        requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+        requireDirectoryAccess,
         loi25DataLeakGuard,
         cliniquesRouter
     );
     app.use(
         "/api/specialists",
         verifyJWT,
-        requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+        requireDirectoryAccess,
         loi25DataLeakGuard,
         specialistsRouter
     );

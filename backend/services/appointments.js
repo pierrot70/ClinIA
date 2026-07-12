@@ -1,6 +1,7 @@
 import { Appointment } from "../models/Appointment.js";
 import { Specialist } from "../models/Specialist.js";
 import { Patient } from "../models/Patient.js";
+import { Clinique } from "../models/Clinique.js";
 import mongoose from "mongoose";
 import { isValidRamq } from "../utils/validators.js";
 import { buildOwnerScope } from "../auth/resourceAccess.js";
@@ -54,6 +55,13 @@ export async function createAppointment(dto, authUser) {
         };
     }
 
+    if (dto.clinique && !mongoose.Types.ObjectId.isValid(dto.clinique)) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Identifiant de clinique invalide.",
+        };
+    }
+
     const patient = await Patient.findOne({
         _id: dto.patient,
         ...buildOwnerScope(authUser),
@@ -73,14 +81,33 @@ export async function createAppointment(dto, authUser) {
         };
     }
 
-    const specialistExists = await Specialist.exists({
-        _id: dto.specialist,
-    });
-    if (!specialistExists) {
+    const specialist = await Specialist.findById(dto.specialist, {
+        clinique_associer: 1,
+    }).lean();
+    if (!specialist) {
         throw {
             code: "INVALID_INPUT",
             message: "Spécialiste introuvable.",
         };
+    }
+
+    if (dto.clinique) {
+        const cliniqueExists = await Clinique.exists({ _id: dto.clinique });
+
+        if (!cliniqueExists) {
+            throw {
+                code: "INVALID_INPUT",
+                message: "Clinique introuvable.",
+            };
+        }
+
+        if (String(specialist.clinique_associer || "") !== dto.clinique) {
+            throw {
+                code: "INVALID_INPUT",
+                message:
+                    "Le spécialiste sélectionné n'est pas associé à cette clinique.",
+            };
+        }
     }
 
     const availableSlots = await getAvailableSlots(
