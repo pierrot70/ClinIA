@@ -126,9 +126,11 @@ export async function recordWriteOperationAuditEvent({
     writeConcern = null,
     replicaSet = null,
     errorCode = null,
+    session = null,
+    throwOnError = false,
 }) {
     try {
-        await WriteOperationAuditLog.create({
+        const document = {
             collectionName: normalizeString(collectionName, 80),
             operation,
             outcome,
@@ -149,9 +151,18 @@ export async function recordWriteOperationAuditEvent({
             dataClassification: "NO_PATIENT_IDENTIFIERS",
             errorCode: normalizeString(errorCode, 120),
             timestamp: new Date(),
-        });
+        };
+
+        if (session) {
+            await WriteOperationAuditLog.create([document], { session });
+        } else {
+            await WriteOperationAuditLog.create(document);
+        }
         return true;
     } catch (err) {
+        if (throwOnError) {
+            throw err;
+        }
         // Audit must never block clinical workflows.
         console.warn("Write operation audit failed", err?.message);
         return false;

@@ -85,9 +85,11 @@ export async function recordPatientAuditEvent({
     changedFields = [],
     requestPath = null,
     context = null,
+    session = null,
+    throwOnError = false,
 }) {
     try {
-        return await PatientAuditLog.create({
+        const document = {
             action,
             outcome,
             actorUserId,
@@ -99,8 +101,18 @@ export async function recordPatientAuditEvent({
             requestPath,
             context: normalizeAuditContext(context),
             timestamp: new Date(),
-        });
+        };
+
+        if (session) {
+            const [created] = await PatientAuditLog.create([document], { session });
+            return created;
+        }
+
+        return await PatientAuditLog.create(document);
     } catch (err) {
+        if (throwOnError) {
+            throw err;
+        }
         // Never block patient flows due to audit persistence issues.
         console.warn("⚠️ Patient audit write failed", err?.message);
         return null;

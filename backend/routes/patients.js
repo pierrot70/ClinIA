@@ -147,6 +147,34 @@ async function recordPatientMutationAudit(req, {
     });
 }
 
+async function buildClinicalNoteTransactionAudit(req, {
+    action,
+    operation,
+    changedFields,
+    context = null,
+}) {
+    const requestContext = getRequestContext(req);
+    const { verificationId, clientMutationId } =
+        createWriteVerificationContext(req);
+
+    return {
+        action,
+        operation,
+        verificationId,
+        clientMutationId,
+        actorUserId: req.auth?.userId ?? null,
+        actorUsername: req.auth?.username ?? null,
+        actorRole: req.auth?.role ?? null,
+        ip: getRequestIp(req),
+        requestId: requestContext.requestId,
+        instanceId: requestContext.instanceId,
+        requestPath: req.originalUrl || req.path || null,
+        changedFields,
+        context,
+        replicaSet: await getReplicaSetStatus(),
+    };
+}
+
 function buildPatientAuditContext(dto) {
     const secureRequestProfile = dto?.secure_request_profile;
 
@@ -468,25 +496,23 @@ router.get("/:id/clinical-note-versions", async (req, res) => {
 
 router.post("/:id/clinical-note-versions/:versionId/restore", async (req, res) => {
     try {
-        const { patient, noteVersion } = await restorePatientClinicalNoteVersion(
-            req.params.id,
-            req.params.versionId,
-            req.auth
-        );
-        const writeVerification = await recordPatientMutationAudit(req, {
+        const transactionAudit = await buildClinicalNoteTransactionAudit(req, {
             action: "PATIENT_UPDATE",
             operation: "UPDATE",
-            patientId: patient._id,
             changedFields: ["secure_request_profile.clinicalNotes"],
             context: {
                 clinicalNoteVersion: {
-                    version: noteVersion?.version ?? null,
                     changeType: "RESTORE",
                     restoredFromVersionId: req.params.versionId,
                 },
             },
-            clinicalNoteVersion: noteVersion,
         });
+        const { patient, noteVersion, writeVerification } = await restorePatientClinicalNoteVersion(
+            req.params.id,
+            req.params.versionId,
+            req.auth,
+            { audit: transactionAudit }
+        );
         return res.status(200).json({
             data: patient,
             meta: { source: "real", model: "mongo", writeVerification },
@@ -577,8 +603,23 @@ router.patch("/:id", async (req, res) => {
             dto.secure_request_profile !== undefined &&
             (beforePatient.secure_request_profile?.clinicalNotes || "") !==
                 (dto.secure_request_profile?.clinicalNotes || "");
+        const noteChangedFields = Object.keys(dto).map((field) =>
+            field === "secure_request_profile"
+                ? "secure_request_profile.clinicalNotes"
+                : field
+        );
+        const transactionAudit = clinicalNotesChanged
+            ? await buildClinicalNoteTransactionAudit(req, {
+                action: "PATIENT_UPDATE",
+                operation: "UPDATE",
+                changedFields: noteChangedFields,
+                context: buildPatientAuditContext(dto),
+            })
+            : null;
         const result = clinicalNotesChanged
-            ? await updatePatientWithClinicalNoteHistory(req.params.id, dto, req.auth)
+            ? await updatePatientWithClinicalNoteHistory(req.params.id, dto, req.auth, {
+                audit: transactionAudit,
+            })
             : { patient: await updatePatient(req.params.id, dto, req.auth), noteVersion: null };
         const { patient, noteVersion } = result;
         const changedFields = getActuallyChangedPatientFields(
@@ -587,7 +628,9 @@ router.patch("/:id", async (req, res) => {
             patient
         );
 
-        const writeVerification = await recordPatientMutationAudit(req, {
+        const writeVerification = noteVersion
+            ? result.writeVerification
+            : await recordPatientMutationAudit(req, {
             action: "PATIENT_UPDATE",
             operation: "UPDATE",
             patientId: patient?._id ?? req.params.id,

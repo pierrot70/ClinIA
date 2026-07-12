@@ -3,6 +3,8 @@ import crypto from "node:crypto";
 import { Patient } from "../models/Patient.js";
 import { PatientClinicalNoteVersion } from "../models/PatientClinicalNoteVersion.js";
 import { PatientAuditLog } from "../models/PatientAuditLog.js";
+import { recordPatientAuditEvent } from "../audit/patientAudit.js";
+import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
 import { geocodeFreeAddress } from "../utils/geocode.js";
 import { buildOwnerScope } from "../auth/resourceAccess.js";
 import {
@@ -517,11 +519,102 @@ function toClinicalNoteVersion({
     };
 }
 
+async function recordClinicalNoteMutationInTransaction({
+    audit,
+    patientId,
+    noteVersion,
+    session,
+}) {
+    if (!audit) {
+        return null;
+    }
+
+    const patientAuditLog = await recordPatientAuditEvent({
+        action: audit.action,
+        outcome: "SUCCESS",
+        actorUserId: audit.actorUserId,
+        actorUsername: audit.actorUsername,
+        actorRole: audit.actorRole,
+        ip: audit.ip,
+        patientId,
+        changedFields: audit.changedFields,
+        requestPath: audit.requestPath,
+        context: audit.context,
+        session,
+        throwOnError: true,
+    });
+
+    const common = {
+        verificationId: audit.verificationId,
+        clientMutationId: audit.clientMutationId,
+        actorUserId: audit.actorUserId,
+        actorUsername: audit.actorUsername,
+        actorRole: audit.actorRole,
+        ip: audit.ip,
+        requestId: audit.requestId,
+        instanceId: audit.instanceId,
+        patientId: String(patientId),
+        requestPath: audit.requestPath,
+        writeConcern: CLINICAL_WRITE_CONCERN,
+        replicaSet: audit.replicaSet,
+        session,
+        throwOnError: true,
+    };
+
+    await recordWriteOperationAuditEvent({
+        ...common,
+        collectionName: "patientclinicalnoteversions",
+        operation: "CREATE",
+        outcome: "SUCCESS",
+        resourceId: String(noteVersion._id),
+        changedFields: ["version", "contentHash", "changeType"],
+    });
+
+    await recordWriteOperationAuditEvent({
+        ...common,
+        collectionName: "patientauditlogs",
+        operation: "CREATE",
+        outcome: "SUCCESS",
+        resourceId: String(patientAuditLog._id),
+        changedFields: [
+            "action",
+            "outcome",
+            "actorUserId",
+            "actorUsernameMasked",
+            "actorRole",
+            "patientId",
+            "changedFields",
+            "requestPath",
+            "context",
+        ],
+    });
+
+    await recordWriteOperationAuditEvent({
+        ...common,
+        collectionName: "patients",
+        operation: audit.operation,
+        outcome: "SUCCESS",
+        resourceId: String(patientId),
+        changedFields: audit.changedFields,
+    });
+
+    return {
+        status: "CONFIRMED",
+        verificationId: audit.verificationId,
+        clientMutationId: audit.clientMutationId,
+    };
+}
+
 export async function updatePatientWithClinicalNoteHistory(
     id,
     updates,
     authUser,
-    { changeType = "UPDATE", restoredFromVersionId = null, forceVersion = false } = {}
+    {
+        changeType = "UPDATE",
+        restoredFromVersionId = null,
+        forceVersion = false,
+        audit = null,
+    } = {}
 ) {
     const { existing, ownerScope, updates: preparedUpdates } =
         await preparePatientUpdate(id, updates, authUser);
@@ -541,6 +634,7 @@ export async function updatePatientWithClinicalNoteHistory(
     try {
         let patient;
         let noteVersion;
+        let writeVerification;
 
         await session.withTransaction(
             async () => {
@@ -593,11 +687,17 @@ export async function updatePatientWithClinicalNoteHistory(
                     { session }
                 );
                 noteVersion = created.toObject();
+                writeVerification = await recordClinicalNoteMutationInTransaction({
+                    audit,
+                    patientId: patient._id,
+                    noteVersion,
+                    session,
+                });
             },
             { writeConcern: CLINICAL_WRITE_CONCERN }
         );
 
-        return { patient, noteVersion };
+        return { patient, noteVersion, writeVerification };
     } finally {
         await session.endSession();
     }
@@ -623,7 +723,12 @@ export async function listPatientClinicalNoteVersions(id, authUser) {
     }));
 }
 
-export async function restorePatientClinicalNoteVersion(id, versionId, authUser) {
+export async function restorePatientClinicalNoteVersion(
+    id,
+    versionId,
+    authUser,
+    { audit = null } = {}
+) {
     if (!mongoose.Types.ObjectId.isValid(versionId)) {
         throw { code: "INVALID_ID", message: "Identifiant de version invalide." };
     }
@@ -642,7 +747,12 @@ export async function restorePatientClinicalNoteVersion(id, versionId, authUser)
         id,
         { secure_request_profile: profile },
         authUser,
-        { changeType: "RESTORE", restoredFromVersionId: source._id, forceVersion: true }
+        {
+            changeType: "RESTORE",
+            restoredFromVersionId: source._id,
+            forceVersion: true,
+            audit,
+        }
     );
 
     return result;
