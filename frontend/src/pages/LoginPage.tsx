@@ -19,12 +19,13 @@ type LoginPageProps = {
 
 type RecoveryStep = "request" | "verify" | "complete";
 
-function useLoginLabel(text: string) {
+function useLoginLabel(text: string, translationKey: string) {
     const { locale } = useHomeI18n();
     return useTranslation({
         text,
         targetLang: locale,
         namespace: "login",
+        translationKey,
     }).translated;
 }
 
@@ -56,30 +57,46 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
         mustChangePasswordOnNextLogin,
     } = useAuth();
     const loginLabels = labels.loginPage;
-    const titleAdmin = useLoginLabel(loginLabels.title.admin);
-    const titleRegister = useLoginLabel(loginLabels.title.register);
-    const titleLogin = useLoginLabel(loginLabels.title.login);
-    const descriptionAdmin = useLoginLabel(loginLabels.description.admin);
-    const descriptionRegister = useLoginLabel(loginLabels.description.register);
-    const descriptionLogin = useLoginLabel(loginLabels.description.login);
-    const alreadyHaveAccountLabel = useLoginLabel(loginLabels.modeToggle.alreadyHaveAccount);
-    const createAccountModeLabel = useLoginLabel(loginLabels.modeToggle.createAccount);
-    const emailLabel = useLoginLabel(loginLabels.fields.email);
-    const identifierLabel = useLoginLabel(loginLabels.fields.identifier);
-    const passwordLabel = useLoginLabel(loginLabels.fields.password);
-    const accountRoleLabel = useLoginLabel(loginLabels.fields.accountRole);
-    const creatingLabel = useLoginLabel(loginLabels.action.creating);
-    const loggingInLabel = useLoginLabel(loginLabels.action.loggingIn);
-    const createAccountLabel = useLoginLabel(loginLabels.action.createAccount);
-    const loginActionLabel = useLoginLabel(loginLabels.action.login);
-    const adminOnlyErrorLabel = useLoginLabel(loginLabels.errors.adminOnly);
-    const createFailedLabel = useLoginLabel(loginLabels.errors.createFailed);
-    const loginFailedLabel = useLoginLabel(loginLabels.errors.loginFailed);
-    const revokedTitleLabel = useLoginLabel(labels.auth.session.revokedTitle);
-    const revokedBodyLabel = useLoginLabel(labels.auth.session.revokedBody);
-    const restrictedTitleLabel = useLoginLabel(labels.auth.session.restrictedTitle);
-    const restrictedBodyLabel = useLoginLabel(labels.auth.session.restrictedBody);
-    const restrictedUntilPrefixLabel = useLoginLabel(labels.auth.session.restrictedUntilPrefix);
+    const titleAdmin = useLoginLabel(loginLabels.title.admin, "login.title.admin");
+    const titleRegister = useLoginLabel(loginLabels.title.register, "login.title.register");
+    const titleLogin = useLoginLabel(loginLabels.title.login, "login.title.login");
+    const descriptionAdmin = useLoginLabel(loginLabels.description.admin, "login.description.admin");
+    const descriptionRegister = useLoginLabel(loginLabels.description.register, "login.description.register");
+    const descriptionLogin = useLoginLabel(loginLabels.description.login, "login.description.login");
+    const alreadyHaveAccountLabel = useLoginLabel(loginLabels.modeToggle.alreadyHaveAccount, "login.modeToggle.alreadyHaveAccount");
+    const createAccountModeLabel = useLoginLabel(loginLabels.modeToggle.createAccount, "login.modeToggle.createAccount");
+    const emailLabel = useLoginLabel(loginLabels.fields.email, "login.fields.email");
+    const identifierLabel = useLoginLabel(loginLabels.fields.identifier, "login.fields.identifier");
+    const passwordLabel = useLoginLabel(loginLabels.fields.password, "login.fields.password");
+    const accountRoleLabel = useLoginLabel(loginLabels.fields.accountRole, "login.fields.accountRole");
+    const creatingLabel = useLoginLabel(loginLabels.action.creating, "login.action.creating");
+    const loggingInLabel = useLoginLabel(loginLabels.action.loggingIn, "login.action.loggingIn");
+    const createAccountLabel = useLoginLabel(loginLabels.action.createAccount, "login.action.createAccount");
+    const loginActionLabel = useLoginLabel(loginLabels.action.login, "login.action.login");
+    const forgotPasswordLabel = useLoginLabel(loginLabels.action.forgotPassword, "login.action.forgotPassword");
+    const adminOnlyErrorLabel = useLoginLabel(loginLabels.errors.adminOnly, "login.errors.adminOnly");
+    const createFailedLabel = useLoginLabel(loginLabels.errors.createFailed, "login.errors.createFailed");
+    const loginFailedLabel = useLoginLabel(loginLabels.errors.loginFailed, "login.errors.loginFailed");
+    const recoveryLabels = loginLabels.recovery;
+    const recoveryEmailLabel = useLoginLabel(recoveryLabels.emailLabel, "login.recovery.emailLabel");
+    const recoveryVerificationCodeLabel = useLoginLabel(recoveryLabels.verificationCodeLabel, "login.recovery.verificationCodeLabel");
+    const recoveryNewPasswordLabel = useLoginLabel(recoveryLabels.newPasswordLabel, "login.recovery.newPasswordLabel");
+    const recoveryConfirmPasswordLabel = useLoginLabel(recoveryLabels.confirmPasswordLabel, "login.recovery.confirmPasswordLabel");
+    const recoveryProcessingLabel = useLoginLabel(recoveryLabels.processing, "login.recovery.processing");
+    const recoverySendCodeLabel = useLoginLabel(recoveryLabels.sendCode, "login.recovery.sendCode");
+    const recoveryVerifyCodeLabel = useLoginLabel(recoveryLabels.verifyCode, "login.recovery.verifyCode");
+    const recoveryChangePasswordLabel = useLoginLabel(recoveryLabels.changePassword, "login.recovery.changePassword");
+    const recoveryBackToLoginLabel = useLoginLabel(recoveryLabels.backToLogin, "login.recovery.backToLogin");
+    const recoveryRequestSentLabel = useLoginLabel(recoveryLabels.requestSent, "login.recovery.requestSent");
+    const recoveryCodeVerifiedLabel = useLoginLabel(recoveryLabels.codeVerified, "login.recovery.codeVerified");
+    const recoveryPasswordsMismatchLabel = useLoginLabel(recoveryLabels.passwordsMismatch, "login.recovery.passwordsMismatch");
+    const recoveryPasswordChangedLabel = useLoginLabel(recoveryLabels.passwordChanged, "login.recovery.passwordChanged");
+    const recoveryContinueFailedLabel = useLoginLabel(recoveryLabels.continueFailed, "login.recovery.continueFailed");
+    const revokedTitleLabel = useLoginLabel(labels.auth.session.revokedTitle, "auth.session.revokedTitle");
+    const revokedBodyLabel = useLoginLabel(labels.auth.session.revokedBody, "auth.session.revokedBody");
+    const restrictedTitleLabel = useLoginLabel(labels.auth.session.restrictedTitle, "auth.session.restrictedTitle");
+    const restrictedBodyLabel = useLoginLabel(labels.auth.session.restrictedBody, "auth.session.restrictedBody");
+    const restrictedUntilPrefixLabel = useLoginLabel(labels.auth.session.restrictedUntilPrefix, "auth.session.restrictedUntilPrefix");
 
     const redirectTarget = useMemo(() => {
         const from = (location.state as { from?: string } | null)?.from;
@@ -178,7 +195,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
             if (recoveryStep === "request") {
                 await requestPasswordRecovery(email);
                 setRecoveryStep("verify");
-                setSuccess("Si ce compte existe, un code a ete envoye par courriel.");
+                setSuccess(recoveryRequestSentLabel);
                 return;
             }
 
@@ -186,24 +203,24 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                 const grant = await verifyPasswordRecoveryCode(email, recoveryCode);
                 setRecoveryGrant(grant);
                 setRecoveryStep("complete");
-                setSuccess("Code confirme. Choisissez maintenant un nouveau mot de passe.");
+                setSuccess(recoveryCodeVerifiedLabel);
                 return;
             }
 
             if (newPassword !== confirmPassword) {
-                setError("Les mots de passe ne correspondent pas.");
+                setError(recoveryPasswordsMismatchLabel);
                 return;
             }
 
             await completePasswordRecovery(email, recoveryGrant, newPassword);
             resetRecovery();
             setEmail(email);
-            setSuccess("Mot de passe modifie. Vous pouvez maintenant vous connecter.");
+            setSuccess(recoveryPasswordChangedLabel);
         } catch (err: unknown) {
             setError(
                 err instanceof Error && err.message
                     ? err.message
-                    : "Impossible de poursuivre la reinitialisation."
+                    : recoveryContinueFailedLabel
             );
         } finally {
             setLoading(false);
@@ -276,7 +293,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                 <form onSubmit={handleRecoverySubmit} className="space-y-4">
                     <div>
                         <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="recovery-email">
-                            Courriel du compte
+                            {recoveryEmailLabel}
                         </label>
                         <input
                             id="recovery-email"
@@ -293,7 +310,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                     {recoveryStep === "verify" && (
                         <div>
                             <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="recovery-code">
-                                Code de verification
+                                {recoveryVerificationCodeLabel}
                             </label>
                             <input
                                 id="recovery-code"
@@ -316,7 +333,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                         <>
                             <div>
                                 <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="recovery-new-password">
-                                    Nouveau mot de passe
+                                    {recoveryNewPasswordLabel}
                                 </label>
                                 <input
                                     id="recovery-new-password"
@@ -332,7 +349,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                             </div>
                             <div>
                                 <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="recovery-confirm-password">
-                                    Confirmer le nouveau mot de passe
+                                    {recoveryConfirmPasswordLabel}
                                 </label>
                                 <input
                                     id="recovery-confirm-password"
@@ -355,19 +372,19 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                         className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                     >
                         {loading
-                            ? "Traitement..."
+                            ? recoveryProcessingLabel
                             : recoveryStep === "request"
-                                ? "Envoyer le code"
+                                ? recoverySendCodeLabel
                                 : recoveryStep === "verify"
-                                    ? "Verifier le code"
-                                    : "Modifier le mot de passe"}
+                                    ? recoveryVerifyCodeLabel
+                                    : recoveryChangePasswordLabel}
                     </button>
                     <button
                         type="button"
                         onClick={resetRecovery}
                         className="w-full text-sm text-blue-600 hover:text-blue-700"
                     >
-                        Retour a la connexion
+                        {recoveryBackToLoginLabel}
                     </button>
                 </form>
             ) : (
@@ -449,7 +466,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                         }}
                         className="w-full text-sm text-blue-600 hover:text-blue-700"
                     >
-                        Mot de passe oublie?
+                        {forgotPasswordLabel}
                     </button>
                 )}
             </form>

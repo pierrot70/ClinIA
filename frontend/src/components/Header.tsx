@@ -40,6 +40,55 @@ import {
     YAxis,
 } from "recharts";
 
+const HEADER_TRANSLATION_KEYS: Record<string, string> = {
+    "Assistant clinique IA - Prototype": "header.brand.subtitle",
+    Langue: "header.controls.language",
+    "Ouvrir le menu": "header.controls.openMenu",
+    Menu: "header.controls.menu",
+    Fermer: "header.controls.close",
+    Rafraichir: "header.controls.refresh",
+    Rechercher: "header.controls.search",
+    Reinitialiser: "header.controls.reset",
+    "Vous pouvez sélectionner la langue de votre choix.": "header.publicHome.languageTooltip",
+    "IA réelle": "header.aiMode.real",
+    "IA mock": "header.aiMode.mock",
+    "Forcer IA réelle": "header.aiMode.forceRealTitle",
+    "Utiliser le mode mock": "header.aiMode.mockTitle",
+    Accueil: "header.nav.home",
+    "Analyse clinique": "header.nav.clinicalAnalysis",
+    Commentaires: "header.nav.comments",
+    "Gestion clinique": "header.nav.clinicManagement",
+    "Rendez-vous": "header.nav.appointments",
+    Patients: "header.nav.patients",
+    Cliniques: "header.nav.cliniques",
+    "Spécialistes": "header.nav.specialists",
+    "OpenAI logs": "header.nav.openaiLogs",
+    "Gestion Application": "header.nav.appManagement",
+    "Mode rapide": "header.nav.quickMode",
+    "Résumé patient": "header.nav.patientSummary",
+    Connexion: "header.nav.login",
+    Admin: "header.nav.admin",
+    "Mock Studio": "header.nav.mockStudio",
+    "Audits patient": "header.nav.patientAudits",
+    "Audits OpenAI": "header.nav.openaiAudits",
+    "Audits BD": "header.nav.dbAudits",
+    "Mes reçus": "header.nav.myWriteReceipts",
+    "Etat BD": "header.nav.dbStatus",
+    Utilisateurs: "header.nav.users",
+    "Déconnexion": "header.nav.logout",
+    "Montrer Usager Actif": "header.appManagement.activeUsers",
+    "Montrer Auth Log": "header.appManagement.authLogs",
+    "Graphiques Auth": "header.appManagement.authGraphs",
+    "Nouveaux commentaires médecins": "header.appManagement.newComments",
+    "Incidents sécurité": "header.appManagement.securityIncidents",
+    "x-y graph": "header.appManagement.xyGraph",
+    "Pie graph": "header.appManagement.pieGraph",
+    "Histogramme graph": "header.appManagement.histogramGraph",
+    "Arret de l'application": "header.appManagement.shutdown",
+    "Fin de maintenance": "header.appManagement.clearMaintenance",
+    "Forcer reouverture normale": "header.appManagement.forceReopen",
+};
+
 type ActiveUser = {
     id: string;
     username: string;
@@ -106,6 +155,7 @@ const HeaderLabel: React.FC<{ text: string }> = ({ text }) => {
         text,
         targetLang: locale,
         namespace: "header",
+        translationKey: HEADER_TRANSLATION_KEYS[text],
     });
 
     return <>{translated}</>;
@@ -1382,7 +1432,7 @@ const Header: React.FC = () => {
                                         }
                                         aria-label={securityIncidentLabels.refresh}
                                     >
-                                        <span>{securityIncidentLabels.label}</span>
+                                        <span><HeaderLabel text={securityIncidentLabels.label} /></span>
                                         <span className="font-semibold">
                                             {securityIncidentIndicatorError ? "!" : securityIncidentCount ?? "…"}
                                         </span>

@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom";
 import { Loader2, Mic, MicOff } from "lucide-react";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
+import { useTranslation } from "../hooks/useTranslation";
+import { labels } from "../i18n/uiLabels";
 
 type NavCommand = {
     label: string;
@@ -619,6 +621,52 @@ const VoiceNavButton: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { setLocaleFromVoice, isTranslating, locale } = useHomeI18n();
+    const voiceLabels = labels.header.voice;
+    const { translated: activateVoiceMode } = useTranslation({
+        text: voiceLabels.activateVoiceMode,
+        targetLang: locale,
+        translationKey: "header.voice.activateVoiceMode",
+    });
+    const { translated: deactivateVoiceMode } = useTranslation({
+        text: voiceLabels.deactivateVoiceMode,
+        targetLang: locale,
+        translationKey: "header.voice.deactivateVoiceMode",
+    });
+    const { translated: micTestTitle } = useTranslation({
+        text: voiceLabels.micTestTitle,
+        targetLang: locale,
+        translationKey: "header.voice.micTestTitle",
+    });
+    const { translated: micTest } = useTranslation({
+        text: voiceLabels.micTest,
+        targetLang: locale,
+        translationKey: "header.voice.micTest",
+    });
+    const { translated: micTestActive } = useTranslation({
+        text: voiceLabels.micTestActive,
+        targetLang: locale,
+        translationKey: "header.voice.micTestActive",
+    });
+    const { translated: micLevelPrefix } = useTranslation({
+        text: voiceLabels.micLevelPrefix,
+        targetLang: locale,
+        translationKey: "header.voice.micLevelPrefix",
+    });
+    const { translated: enablePersistentWakeLabel } = useTranslation({
+        text: voiceLabels.enablePersistentWake,
+        targetLang: locale,
+        translationKey: "header.voice.enablePersistentWake",
+    });
+    const { translated: disablePersistentWakeLabel } = useTranslation({
+        text: voiceLabels.disablePersistentWake,
+        targetLang: locale,
+        translationKey: "header.voice.disablePersistentWake",
+    });
+    const { translated: persistentWakeOn } = useTranslation({
+        text: voiceLabels.persistentWakeOn,
+        targetLang: locale,
+        translationKey: "header.voice.persistentWakeOn",
+    });
     // Vite exposes `import.meta.env.DEV` as `true` in development builds.
     // Keep the mic-test UI strictly for dev mode only.
     const isDev =
@@ -1717,7 +1765,7 @@ const VoiceNavButton: React.FC = () => {
                             : "border-gray-200 text-gray-700 hover:bg-gray-50")
                 }
                 title="Dire: ouvre la page des rendez-vous, patients, cliniques, specialistes; retourne a la maison; execute; efface; arrete"
-                aria-label={isHandsFree ? "Désactiver mode vocal" : "Activer mode vocal"}
+                aria-label={isHandsFree ? deactivateVoiceMode : activateVoiceMode}
             >
                 {isTranslating ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -1737,14 +1785,14 @@ const VoiceNavButton: React.FC = () => {
                             ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                             : "border-gray-200 text-gray-700 hover:bg-gray-50")
                     }
-                    title="Test rapide du micro (niveau sonore)"
+                    title={micTestTitle}
                 >
-                    {isMicTestActive ? "Test micro actif" : "Tester micro"}
+                    {isMicTestActive ? micTestActive : micTest}
                 </button>
             )}
             {isDev && micLevel !== null && (
                 <span className="text-xs text-gray-500">
-                    Niveau micro: {micLevel}%
+                    {micLevelPrefix} {micLevel}%
                 </span>
             )}
             {isSupported && (
@@ -1760,9 +1808,9 @@ const VoiceNavButton: React.FC = () => {
                             ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                             : "border-gray-200 text-gray-700 hover:bg-gray-50")
                     }
-                    title={wakeEnabled ? "Désactiver écoute persistante" : "Activer écoute persistante"}
+                    title={wakeEnabled ? disablePersistentWakeLabel : enablePersistentWakeLabel}
                 >
-                    {wakeEnabled ? "Écoute persistante: ON" : "Activer écoute persistante"}
+                    {wakeEnabled ? persistentWakeOn : enablePersistentWakeLabel}
                 </button>
             )}
             {status && (
