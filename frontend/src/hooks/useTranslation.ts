@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { translateText, saveLocalTranslation } from "../services/translationApi";
+import { translateText } from "../services/translationApi";
 import { enFallback } from "../i18n/enFallback";
 
 // Fallbacks locaux pour les labels critiques (clé = texte source)
@@ -83,15 +83,16 @@ function shouldTranslateText(text: string) {
   return /[\p{L}\p{N}]/u.test(text.trim());
 }
 
-export function useTranslation({ text, targetLang, namespace = "clinical-demo", sourceLocale = "fr", openaiModel }: {
+export function useTranslation({ text, targetLang, namespace = "clinical-demo", sourceLocale = "fr", openaiModel, translationKey }: {
   text: string;
   targetLang: string;
   namespace?: string;
   sourceLocale?: string;
   openaiModel?: string;
+  translationKey?: string;
 }) {
   const [error, setError] = useState<string | null>(null);
-  const cacheKey = `${namespace}|${sourceLocale}|${targetLang}|${text}`;
+  const cacheKey = `${translationKey || "local"}|${targetLang}`;
   const isSourceLocale = baseLocale(targetLang) === baseLocale(sourceLocale);
   const [translated, setTranslated] = useState(text);
   const [loading, setLoading] = useState(!isSourceLocale);
@@ -113,18 +114,15 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
     if (fallback) {
       setTranslated(fallback);
       setLoading(false);
-      // Sauvegarde explicite du fallback local dans la base
-      saveLocalTranslation({
-        text,
-        translated: fallback,
-        targetLang,
-        namespace,
-        sourceLocale,
-      }).catch(() => {});
       return;
     }
     if (isSourceLocale) {
       setTranslated(text);
+      setLoading(false);
+      return;
+    }
+    if (!translationKey) {
+      setTranslated(enFallback[text] || text);
       setLoading(false);
       return;
     }
@@ -134,7 +132,7 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
       return;
     }
     setLoading(true);
-    translateText({ text, targetLang, namespace, sourceLocale, openaiModel })
+    translateText({ translationKey, targetLang })
       .then((result) => {
         if (requestVersionRef.current === requestVersion) {
           let clean = result;
@@ -155,14 +153,6 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
             criticalLabelFallbacks[text]?.["default"];
           if (fallback) {
             setTranslated(fallback);
-            // Sauvegarde explicite du fallback local dans la base
-            saveLocalTranslation({
-              text,
-              translated: fallback,
-              targetLang,
-              namespace,
-              sourceLocale,
-            }).catch(() => {});
           } else if (enFallback[text]) {
             setTranslated(enFallback[text]);
           } else {
@@ -173,7 +163,7 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
         }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, targetLang, namespace, sourceLocale]);
+  }, [text, targetLang, namespace, sourceLocale, translationKey]);
 
   return { translated, loading, error };
 }

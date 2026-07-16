@@ -7,15 +7,8 @@ import {
   HOME_STRINGS_KO,
   HOME_STRINGS_VI,
   HOME_STRINGS_ZH,
-  hasValidHomeStringsShape,
   type HomeStrings,
 } from "../i18n/homeStrings";
-import { authFetch } from "./authService";
-
-const RAW_API_URL = (import.meta.env.VITE_API_URL as string | undefined) || "";
-const API_URL = RAW_API_URL.endsWith("/")
-  ? RAW_API_URL.slice(0, -1)
-  : RAW_API_URL;
 
 const VOICE_ACK_LABELS: Record<string, string> = {
   en: "english",
@@ -88,10 +81,6 @@ export async function translateHomeStrings(
 ): Promise<HomeTranslationResult> {
   const normalizedTarget = (targetLang || "").toLowerCase();
 
-  if (normalizedTarget === "he" || normalizedTarget === "ja") {
-    return buildFallbackResult(normalizedTarget);
-  }
-
   if (targetLang === "fr") {
     return {
       strings: HOME_STRINGS_FR,
@@ -103,97 +92,6 @@ export async function translateHomeStrings(
     };
   }
 
-  if (normalizedTarget === "en") {
-    try {
-      const response = await authFetch(`${API_URL}/api/i18n/home-translate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          targetLang,
-          sourceStrings: HOME_STRINGS_FR,
-        }),
-      });
 
-      if (response.ok) {
-        const json = await response.json();
-        if (hasValidHomeStringsShape(json?.data)) {
-          return {
-            strings: json.data,
-            voiceAck:
-              typeof json?.meta?.voiceAck === "string"
-                ? json.meta.voiceAck
-                : "Back in english.",
-            resolvedLang:
-              typeof json?.meta?.lang === "string"
-                ? json.meta.lang
-                : "en",
-            voicePrompts:
-              typeof json?.meta?.voicePrompts?.dictationInstruction === "string"
-                ? {
-                    dictationInstruction:
-                      json.meta.voicePrompts.dictationInstruction,
-                  }
-                : { dictationInstruction: "Please dictate or type your diagnosis." },
-          };
-        }
-      }
-    } catch (e) {
-      // Ignore remote failure: local EN fallback below keeps voice command reliable in prod.
-    }
-
-    return buildFallbackResult("en");
-  }
-
-  try {
-    const response = await authFetch(`${API_URL}/api/i18n/home-translate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        targetLang,
-        sourceStrings: HOME_STRINGS_FR,
-      }),
-    });
-
-    if (!response.ok) {
-      return buildFallbackResult(normalizedTarget);
-    }
-
-    const json = await response.json();
-    if (!hasValidHomeStringsShape(json?.data)) {
-      return buildFallbackResult(normalizedTarget);
-    }
-
-    const apiResolvedLang =
-      typeof json?.meta?.lang === "string" ? json.meta.lang : normalizedTarget;
-    const apiResolvedBase = apiResolvedLang.toLowerCase().slice(0, 2);
-    const targetBase = normalizedTarget.slice(0, 2);
-
-    // If upstream reports another locale, keep UX stable by serving
-    // the local bundle for the requested target language.
-    if (apiResolvedBase && apiResolvedBase !== targetBase) {
-      return buildFallbackResult(normalizedTarget);
-    }
-
-    return {
-      strings: json.data,
-      voiceAck:
-        typeof json?.meta?.voiceAck === "string"
-          ? json.meta.voiceAck
-          : buildFallbackResult(normalizedTarget).voiceAck,
-      resolvedLang:
-        typeof json?.meta?.lang === "string"
-          ? json.meta.lang
-          : normalizedTarget,
-      voicePrompts:
-        typeof json?.meta?.voicePrompts?.dictationInstruction === "string"
-          ? { dictationInstruction: json.meta.voicePrompts.dictationInstruction }
-          : buildFallbackResult(normalizedTarget).voicePrompts,
-    };
-  } catch (e) {
-    return buildFallbackResult(normalizedTarget);
-  }
+  return buildFallbackResult(normalizedTarget);
 }

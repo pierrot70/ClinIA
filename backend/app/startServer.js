@@ -39,7 +39,7 @@ export function createStartServer(deps) {
         openaiModel = process.env.OPENAI_MODEL,
     } = deps;
 
-    return async function startServer({ app, warmTranslationMemoryCache }) {
+    return async function startServer({ app }) {
         return Promise.resolve()
             .then(() => {
                 assertProductionMongoLeastPrivilege({ mongoUri, nodeEnv });
@@ -52,12 +52,6 @@ export function createStartServer(deps) {
                 logger.log("✅ MongoDB connecté (ClinIA)");
                 logger.log("CLINIA_MOCK_AI =", mockAi);
                 logger.log("OPENAI_MODEL =", openaiModel);
-
-                try {
-                    await warmTranslationMemoryCache();
-                } catch (err) {
-                    logger.warn("⚠️ I18N warmup failed", err?.message);
-                }
 
                 try {
                     await initShutdownState();

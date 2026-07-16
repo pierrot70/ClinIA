@@ -64,17 +64,17 @@ function CoolifyLandingPage() {
     const landingLabels = labels.app.landing;
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
-    const { translated: title } = useTranslation({ text: landingLabels.title, targetLang, namespace: "app-landing" });
-    const { translated: subtitle } = useTranslation({ text: landingLabels.subtitle, targetLang, namespace: "app-landing" });
-    const { translated: supportingText } = useTranslation({ text: landingLabels.supportingText, targetLang, namespace: "app-landing" });
-    const { translated: clinicalDemoTitle } = useTranslation({ text: landingLabels.clinicalDemoTitle, targetLang, namespace: "app-landing" });
-    const { translated: clinicalDemoBody } = useTranslation({ text: landingLabels.clinicalDemoBody, targetLang, namespace: "app-landing" });
-    const { translated: doctorLoginTitle } = useTranslation({ text: landingLabels.doctorLoginTitle, targetLang, namespace: "app-landing" });
-    const { translated: doctorLoginBody } = useTranslation({ text: landingLabels.doctorLoginBody, targetLang, namespace: "app-landing" });
-    const { translated: adminLoginTitle } = useTranslation({ text: landingLabels.adminLoginTitle, targetLang, namespace: "app-landing" });
-    const { translated: adminLoginBody } = useTranslation({ text: landingLabels.adminLoginBody, targetLang, namespace: "app-landing" });
-    const { translated: demoTooltip } = useTranslation({ text: landingLabels.demoTooltip, targetLang, namespace: "app-landing" });
-    const { translated: tooltipOk } = useTranslation({ text: landingLabels.tooltipOk, targetLang, namespace: "app-landing" });
+    const { translated: title } = useTranslation({ text: landingLabels.title, targetLang, translationKey: "app.landing.title" });
+    const { translated: subtitle } = useTranslation({ text: landingLabels.subtitle, targetLang, translationKey: "app.landing.subtitle" });
+    const { translated: supportingText } = useTranslation({ text: landingLabels.supportingText, targetLang, translationKey: "app.landing.supportingText" });
+    const { translated: clinicalDemoTitle } = useTranslation({ text: landingLabels.clinicalDemoTitle, targetLang, translationKey: "app.landing.clinicalDemoTitle" });
+    const { translated: clinicalDemoBody } = useTranslation({ text: landingLabels.clinicalDemoBody, targetLang, translationKey: "app.landing.clinicalDemoBody" });
+    const { translated: doctorLoginTitle } = useTranslation({ text: landingLabels.doctorLoginTitle, targetLang, translationKey: "app.landing.doctorLoginTitle" });
+    const { translated: doctorLoginBody } = useTranslation({ text: landingLabels.doctorLoginBody, targetLang, translationKey: "app.landing.doctorLoginBody" });
+    const { translated: adminLoginTitle } = useTranslation({ text: landingLabels.adminLoginTitle, targetLang, translationKey: "app.landing.adminLoginTitle" });
+    const { translated: adminLoginBody } = useTranslation({ text: landingLabels.adminLoginBody, targetLang, translationKey: "app.landing.adminLoginBody" });
+    const { translated: demoTooltip } = useTranslation({ text: landingLabels.demoTooltip, targetLang, translationKey: "app.landing.demoTooltip" });
+    const { translated: tooltipOk } = useTranslation({ text: landingLabels.tooltipOk, targetLang, translationKey: "app.landing.tooltipOk" });
     const [showDemoTooltip, setShowDemoTooltip] = useState(false);
 
     const dismissDemoTooltip = () => {
@@ -203,7 +203,7 @@ const App: React.FC = () => {
     const { translated: maintenanceLabel } = useTranslation({
         text: labels.app.status.maintenance,
         targetLang,
-        namespace: "app-status",
+        translationKey: "app.status.maintenance",
     });
         // Handler for acknowledgment
         const handleAcknowledge = async () => {

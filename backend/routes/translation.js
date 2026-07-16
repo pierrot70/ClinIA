@@ -1,63 +1,92 @@
 import express from "express";
-import { getOrCreateTranslation } from "../services/translationService.js";
-import { attachOptionalAuth } from "../middleware/attachOptionalAuth.js";
-import { AUTH_ROLES } from "../auth/constants.js";
+import { getCachedTranslation } from "../services/translationService.js";
+import { APPROVED_UI_TRANSLATION_CATALOG } from "../scripts/i18n/approvedUiTranslationCatalog.js";
 
 const router = express.Router();
 
+// These values mirror the language and model choices exposed by the UI.
+// The translation endpoint must not be a client-controlled OpenAI proxy.
+const ALLOWED_TRANSLATION_LANGUAGES = new Set([
+  "fr",
+  "fr-CA",
+  "en",
+  "en-CA",
+  "es",
+  "ko-KR",
+  "vi",
+  "no-NO",
+  "ja",
+  "zh",
+  "he",
+]);
+
+const APPROVED_TRANSLATIONS_BY_KEY = new Map(
+  APPROVED_UI_TRANSLATION_CATALOG.map((entry) => [entry.key, entry])
+);
+
+function validateTranslationRequest({ targetLang, translationKey }) {
+  if (!ALLOWED_TRANSLATION_LANGUAGES.has(targetLang)) {
+    return {
+      code: "INVALID_TRANSLATION_LANGUAGE",
+      message: "Langue de traduction non autorisee.",
+    };
+  }
+
+  if (!APPROVED_TRANSLATIONS_BY_KEY.has(translationKey)) {
+    return {
+      code: "INVALID_TRANSLATION_KEY",
+      message: "Libelle de traduction non autorise.",
+    };
+  }
+
+  return null;
+}
+
 // POST /translation
-router.post("/", attachOptionalAuth, async (req, res) => {
+// The browser supplies an opaque UI key only. It can never submit text to the
+// backend for translation or cache lookup.
+router.post("/", async (req, res) => {
   try {
-    const { text, targetLang, namespace, sourceLocale, translated, forceSave, openaiModel } = req.body;
-    if (!text || !targetLang) {
-      return res.status(400).json({ error: "Missing text or targetLang" });
+    const { translationKey, targetLang, translated, forceSave } = req.body;
+    if (!translationKey || !targetLang) {
+      return res.status(400).json({ error: "Missing translationKey or targetLang" });
     }
-    // Si forceSave et translated sont fournis, on sauvegarde explicitement la traduction locale
-    if (forceSave && translated) {
-      if (![AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN].includes(req.auth?.role)) {
-        return res.status(req.auth ? 403 : 401).json({
-          error: {
-            code: req.auth ? "FORBIDDEN" : "UNAUTHORIZED",
-            message: req.auth
-              ? "Permissions insuffisantes."
-              : "Authentification requise.",
-            retryable: false,
-          },
-        });
-      }
-      const { UiTranslationCache } = await import("../models/UiTranslationCache.js");
-      const crypto = await import("crypto");
-      const sourceHash = crypto.createHash("sha256").update(text).digest("hex");
-      let cache = await UiTranslationCache.findOne({
-        namespace: namespace || "clinical-demo",
-        sourceLocale: sourceLocale || "fr",
-        targetLang,
-        sourceHash,
-      });
-      if (!cache) {
-        cache = await UiTranslationCache.create({
-          namespace: namespace || "clinical-demo",
-          sourceLocale: sourceLocale || "fr",
-          targetLang,
-          sourceHash,
-          payload: { text: translated },
-        });
-      }
-      return res.json({ translation: translated });
-    }
-    // Sinon, comportement normal
-    const payload = await getOrCreateTranslation({
-      text,
+
+    const validationError = validateTranslationRequest({
       targetLang,
-      namespace: namespace || "clinical-demo",
-      sourceLocale: sourceLocale || "fr",
-      openaiModel,
-      allowCreate: Boolean(req.auth),
+      translationKey,
+    });
+    if (validationError) {
+      return res.status(400).json({
+        error: {
+          ...validationError,
+          retryable: false,
+        },
+      });
+    }
+
+    if (forceSave || translated) {
+      return res.status(403).json({
+        error: {
+          code: "TRANSLATION_CACHE_READ_ONLY",
+          message: "Le cache de traduction est en lecture seule.",
+          retryable: false,
+        },
+      });
+    }
+
+    const approvedTranslation = APPROVED_TRANSLATIONS_BY_KEY.get(translationKey);
+
+    const payload = await getCachedTranslation({
+      text: approvedTranslation.text,
+      targetLang,
+      namespace: approvedTranslation.namespace,
+      sourceLocale: "fr",
     });
     res.json({ translation: payload.text });
   } catch (err) {
     if (err.code === "TRANSLATION_CACHE_MISS") {
-      return res.status(401).json({
+      return res.status(404).json({
         error: {
           code: err.code,
           message: err.message,

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createStartServer } from "../startServer.js";
 
 describe("startServer", () => {
-    it("connects to mongo, warms caches, initializes shutdown state, and listens", async () => {
+    it("connects to mongo, initializes shutdown state, and listens", async () => {
         const connect = vi.fn().mockResolvedValue({});
         const mongoose = { connect };
         const initShutdownState = vi.fn().mockResolvedValue(undefined);
@@ -14,7 +14,6 @@ describe("startServer", () => {
         };
         const listen = vi.fn((port, callback) => callback());
         const app = { listen };
-        const warmTranslationMemoryCache = vi.fn().mockResolvedValue(undefined);
         const registerGracefulShutdown = vi.fn();
         const server = {};
         listen.mockReturnValue(server);
@@ -30,12 +29,11 @@ describe("startServer", () => {
             registerGracefulShutdown,
         });
 
-        await startServer({ app, warmTranslationMemoryCache });
+        await startServer({ app });
 
         expect(connect).toHaveBeenCalledWith("mongodb://example/clinia", {
             serverSelectionTimeoutMS: 2000,
         });
-        expect(warmTranslationMemoryCache).toHaveBeenCalledTimes(1);
         expect(initShutdownState).toHaveBeenCalledTimes(1);
         expect(listen).toHaveBeenCalledWith(4010, expect.any(Function));
         expect(registerGracefulShutdown).toHaveBeenCalledWith({
@@ -57,7 +55,6 @@ describe("startServer", () => {
         };
         const listen = vi.fn();
         const app = { listen };
-        const warmTranslationMemoryCache = vi.fn();
 
         const startServer = createStartServer({
             mongoose,
@@ -67,10 +64,9 @@ describe("startServer", () => {
             mongoUri: "mongodb://example/clinia",
         });
 
-        await startServer({ app, warmTranslationMemoryCache });
+        await startServer({ app });
 
         expect(listen).not.toHaveBeenCalled();
-        expect(warmTranslationMemoryCache).not.toHaveBeenCalled();
         expect(initShutdownState).not.toHaveBeenCalled();
         expect(logger.error).toHaveBeenCalledWith(
             "❌ Mongo connection error (FAIL-FAST):",
@@ -89,7 +85,6 @@ describe("startServer", () => {
         };
         const listen = vi.fn();
         const app = { listen };
-        const warmTranslationMemoryCache = vi.fn();
 
         const startServer = createStartServer({
             mongoose,
@@ -99,7 +94,7 @@ describe("startServer", () => {
             nodeEnv: "production",
         });
 
-        await startServer({ app, warmTranslationMemoryCache });
+        await startServer({ app });
 
         expect(connect).not.toHaveBeenCalled();
         expect(listen).not.toHaveBeenCalled();

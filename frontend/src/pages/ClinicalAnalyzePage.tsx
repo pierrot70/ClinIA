@@ -110,12 +110,12 @@ export function ClinicalAnalyzePage() {
     const { translated: introTaglineLabel } = useTranslation({
         text: clinicalIntroLabels.tagline,
         targetLang,
-        openaiModel: effectiveOpenaiModel,
+        translationKey: "clinicalDemo.intro.tagline",
     });
     const { translated: introSubtitleLabel } = useTranslation({
         text: clinicalIntroLabels.subtitle,
         targetLang,
-        openaiModel: effectiveOpenaiModel,
+        translationKey: "clinicalDemo.intro.subtitle",
     });
 
     /* ------------------------------------------------------------------ */
@@ -566,11 +566,11 @@ export function ClinicalAnalyzePage() {
     /* ------------------------------------------------------------------ */
 
     // Traductions dynamiques
-    const { translated: modelLabel, loading: loadingModel, error: errorModel } = useTranslation({ text: "Modèle OpenAI", targetLang, openaiModel: effectiveOpenaiModel });
+    const { translated: modelLabel, loading: loadingModel, error: errorModel } = useTranslation({ text: labels.clinicalDemo.form.openAiModelLabel, targetLang, translationKey: "clinicalDemo.form.openAiModelLabel" });
     const { translated: gptMiniLabel, loading: loadingMini, error: errorMini } = useTranslation({ text: "gpt-4.1-mini (JSON natif)", targetLang, openaiModel: effectiveOpenaiModel });
     const { translated: gptLegacyLabel, loading: loadingLegacy, error: errorLegacy } = useTranslation({ text: "gpt-4-0613 (legacy)", targetLang, openaiModel: effectiveOpenaiModel });
     const { translated: realIaLabel, loading: loadingReal, error: errorReal } = useTranslation({ text: "IA réelle activée", targetLang, openaiModel: effectiveOpenaiModel });
-    const { translated: simModeLabel, loading: loadingSim, error: errorSim } = useTranslation({ text: "Mode simulation", targetLang, openaiModel: effectiveOpenaiModel });
+    const { translated: simModeLabel, loading: loadingSim, error: errorSim } = useTranslation({ text: labels.clinicalDemo.form.simulationMode, targetLang, translationKey: "clinicalDemo.form.simulationMode" });
     const { translated: backendErrorLabel, loading: loadingBackend, error: errorBackend } = useTranslation({ text: "Erreur backend brute (sans flafla)", targetLang, openaiModel: effectiveOpenaiModel });
     const { translated: loadingLabel } = useTranslation({ text: "Chargement...", targetLang, openaiModel: effectiveOpenaiModel });
     const commentLabels = labels.clinicalDemo.comments;
@@ -630,10 +630,10 @@ export function ClinicalAnalyzePage() {
             current === section ? null : section
         );
     }
-    const { translated: leaveCommentLabel, loading: loadingLeaveComment, error: errorLeaveComment } = useTranslation({ text: commentLabels.leaveComment, targetLang, openaiModel });
+    const { translated: leaveCommentLabel, loading: loadingLeaveComment, error: errorLeaveComment } = useTranslation({ text: commentLabels.leaveComment, targetLang, translationKey: "clinicalDemo.comments.leaveComment" });
     const { translated: leaveCommentTooltipLabel } = useTranslation({ text: commentLabels.leaveCommentTooltip, targetLang, openaiModel });
     const { translated: openaiModelTooltipLabel } = useTranslation({ text: commentLabels.openaiModelTooltip, targetLang, openaiModel });
-    const { translated: replyLookupTitleLabel, loading: loadingReplyLookupTitle, error: errorReplyLookupTitle } = useTranslation({ text: commentLabels.replyLookupTitle, targetLang, openaiModel });
+    const { translated: replyLookupTitleLabel, loading: loadingReplyLookupTitle, error: errorReplyLookupTitle } = useTranslation({ text: commentLabels.replyLookupTitle, targetLang, translationKey: "clinicalDemo.comments.replyLookupTitle" });
     const { translated: replyLookupDescriptionLabel, loading: loadingReplyLookupDescription, error: errorReplyLookupDescription } = useTranslation({ text: commentLabels.replyLookupDescription, targetLang, openaiModel });
     const { translated: namePlaceholderLabel } = useTranslation({ text: commentLabels.namePlaceholder, targetLang, openaiModel });
     const { translated: trackingCodePlaceholderLabel } = useTranslation({ text: commentLabels.trackingCodePlaceholder, targetLang, openaiModel });

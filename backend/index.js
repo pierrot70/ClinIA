@@ -12,7 +12,6 @@ import {
     normalizeClinicalAnalysis,
 } from "./utils/clinicalAnalysis.js";
 import { getMockForDiagnosis } from "./utils/mockLoader.js";
-import { UiTranslationCache } from "./models/UiTranslationCache.js";
 import {
     buildBlockingIncidentResponse,
     detectNonSecureContent,
@@ -57,15 +56,6 @@ import {
     persistOrReuseDiagnosis,
     upgradePersistedDiagnosisOutput,
 } from "./services/diagnosisPersistence.js";
-import {
-    VOICE_PROMPTS_SOURCE_FR,
-    buildVoiceAck,
-    buildVoicePrompts,
-    hasVoicePromptsShape,
-} from "./services/voicePromptsService.js";
-import { createTranslationCacheService } from "./services/translationCacheService.js";
-import { createHomeTranslationService } from "./services/homeTranslationService.js";
-import { attachOptionalAuth } from "./middleware/attachOptionalAuth.js";
 
 dotenv.config();
 
@@ -127,47 +117,6 @@ function supportsJsonResponseFormat(model = "") {
     return JSON_MODELS.has(model);
 }
 
-function hasHomeI18nShape(obj) {
-    const requiredOptionKeys = [
-        "objectives",
-        "clinicalScopes",
-        "ageGroups",
-        "symptomProfiles",
-        "durations",
-        "severityLevels",
-        "redFlagStatuses",
-        "comorbidityContexts",
-    ];
-
-    const hasStringArray = (value) =>
-        Array.isArray(value) && value.every((entry) => typeof entry === "string");
-
-    return (
-        obj &&
-        typeof obj === "object" &&
-        obj.home &&
-        obj.search &&
-        obj.options &&
-        requiredOptionKeys.every((key) => hasStringArray(obj.options[key]))
-    );
-}
-
-const {
-    translationMemoryCache,
-    translationInFlightLocks,
-    makeTranslationCacheKey,
-    isUntranslatedPayload,
-    cacheTranslationInMemory,
-} = createTranslationCacheService({
-    buildVoiceAck,
-    buildVoicePrompts,
-    hasVoicePromptsShape,
-});
-
-async function warmTranslationMemoryCache() {
-    return homeTranslationService.warmTranslationMemoryCache();
-}
-
 const startServer = createStartServer({
     mongoose,
     initShutdownState,
@@ -179,23 +128,6 @@ const respondWithSecurityIncident = createRespondWithSecurityIncident({
     recordOpenAIRequestAuditEvent,
     buildBlockingIncidentResponse,
     makeSourceHash,
-});
-
-const homeTranslationService = createHomeTranslationService({
-    UiTranslationCache,
-    openai,
-    makeSourceHash,
-    supportsJsonResponseFormat,
-    hasHomeI18nShape,
-    VOICE_PROMPTS_SOURCE_FR,
-    buildVoiceAck,
-    buildVoicePrompts,
-    hasVoicePromptsShape,
-    translationMemoryCache,
-    translationInFlightLocks,
-    makeTranslationCacheKey,
-    isUntranslatedPayload,
-    cacheTranslationInMemory,
 });
 
 const aiAnalyzeRouter = createAiAnalyzeRouter({
@@ -226,16 +158,6 @@ const aiAnalyzeRouter = createAiAnalyzeRouter({
     sanitizeNonSecureContent,
 });
 
-/* ================================================================== */
-/* /api/i18n/home-translate                                           */
-/* ================================================================== */
-
-app.post(
-    "/api/i18n/home-translate",
-    attachOptionalAuth,
-    homeTranslationService.handleHomeTranslate
-);
-
 registerRoutes(app, {
     massDownloadRestrictionGuard,
     patientsMassDownloadDetector,
@@ -247,5 +169,4 @@ registerErrorHandlers(app);
 
 startServer({
     app,
-    warmTranslationMemoryCache,
 });

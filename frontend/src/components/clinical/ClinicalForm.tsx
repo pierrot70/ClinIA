@@ -1107,6 +1107,16 @@ export function ClinicalForm({
     const hasSelectedExampleCase = Boolean(selectedExampleCase);
     const canAnalyze = hasSelectedExampleCase || Boolean(selectedPatient);
     const patientSelectionLabels = labels.clinicalPatientSelection;
+    const { translated: manualPatientEntryLabel } = useTranslation({
+        text: patientSelectionLabels.manual,
+        targetLang,
+        translationKey: "clinicalPatientSelection.manual",
+    });
+    const { translated: existingPatientEntryLabel } = useTranslation({
+        text: patientSelectionLabels.existingPatient,
+        targetLang,
+        translationKey: "clinicalPatientSelection.existingPatient",
+    });
     const ethnicityOptions: Array<{ value: PatientEthnicity; label: string }> = [
         { value: "caucasian", label: caucasianLabel },
         { value: "black", label: blackLabel },
@@ -1318,14 +1328,14 @@ export function ClinicalForm({
                             onClick={returnToManualInput}
                             className={inputMode === "manual" ? "rounded border border-blue-700 bg-blue-700 px-3 py-2 text-sm font-medium text-white" : "rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700"}
                         >
-                            {patientSelectionLabels.manual}
+                            {manualPatientEntryLabel}
                         </button>
                         <button
                             type="button"
                             onClick={() => setInputMode("patient")}
                             className={inputMode === "patient" ? "rounded border border-blue-700 bg-blue-700 px-3 py-2 text-sm font-medium text-white" : "rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700"}
                         >
-                            {patientSelectionLabels.existingPatient}
+                            {existingPatientEntryLabel}
                         </button>
                     </div>
 

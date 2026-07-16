@@ -10,7 +10,6 @@ const { translateTextMock } = vi.hoisted(() => ({
 
 vi.mock("../services/translationApi", () => ({
     translateText: translateTextMock,
-    saveLocalTranslation: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe("useTranslation", () => {
@@ -208,14 +207,14 @@ describe("useTranslation", () => {
         expect(translateTextMock).not.toHaveBeenCalled();
     });
 
-    it("falls back to the English label when the translation API fails", async () => {
+    it("uses the approved translation key and falls back to English when the cache misses", async () => {
         translateTextMock.mockRejectedValue(new Error("Translation API error"));
 
         const { result } = renderHook(() =>
             useTranslation({
                 text: labels.app.landing.doctorLoginTitle,
                 targetLang: "en-CA",
-                namespace: "app-landing",
+                translationKey: "app.landing.doctorLoginTitle",
             })
         );
 
@@ -225,6 +224,29 @@ describe("useTranslation", () => {
 
         expect(result.current.translated).toBe("Doctor sign-in");
         expect(result.current.error).toBe("Translation API error");
+        expect(translateTextMock).toHaveBeenCalledWith({
+            translationKey: "app.landing.doctorLoginTitle",
+            targetLang: "en-CA",
+        });
+    });
+
+    it("does not send an unapproved dynamic label to the backend", async () => {
+        translateTextMock.mockClear();
+        const { result } = renderHook(() =>
+            useTranslation({
+                text: "Texte clinique dynamique qui ne doit jamais quitter le navigateur",
+                targetLang: "en-CA",
+            })
+        );
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        expect(result.current.translated).toBe(
+            "Texte clinique dynamique qui ne doit jamais quitter le navigateur"
+        );
+        expect(translateTextMock).not.toHaveBeenCalled();
     });
 
     it("does not let an old English translation overwrite a newer French locale", async () => {
@@ -241,7 +263,7 @@ describe("useTranslation", () => {
                 useTranslation({
                     text: labels.app.landing.doctorLoginTitle,
                     targetLang,
-                    namespace: "app-landing",
+                    translationKey: "app.landing.doctorLoginTitle",
                 }),
             {
                 initialProps: { targetLang: "en-CA" },

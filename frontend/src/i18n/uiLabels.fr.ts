@@ -422,6 +422,8 @@ export const UI_LABELS_FR = {
                 "Recherche clinique plus rapide. Alternatives comparables. References consultables.",
         },
         form: {
+            openAiModelLabel: "Modèle OpenAI",
+            simulationMode: "Mode simulation",
             clinicalParametersTitle:
                 "Definir les parametres cliniques de l'analyse",
             clinicalParametersHelp:
