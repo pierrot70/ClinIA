@@ -63,6 +63,7 @@ describe("write operation audit privacy", () => {
             requestId: "request-1",
             instanceId: "instance-1",
             resourceId: "patient-technical-id",
+            patientId: null,
             changedFields: ["nom", "telephone"],
             requestPath: "/api/patients/patient-technical-id",
             writeConcern: {

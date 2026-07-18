@@ -7,6 +7,9 @@ vi.mock('../services/securityIncidentApi', () => ({
 vi.mock('../services/config', () => ({
   API_URL: 'http://localhost:4000',
 }));
+vi.mock('../hooks/useAuth', () => ({
+  useAuth: () => ({ user: { role: 'SUPERADMIN' } }),
+}));
 // beforeAll(() => {
 //   process.env.VITE_API_URL = 'http://localhost:4000';
 // });

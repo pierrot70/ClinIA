@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ClinicalForm } from "./ClinicalForm";
@@ -8,6 +8,13 @@ vi.mock("../../hooks/useTranslation", () => ({
         translated: text,
         loading: false,
         error: null,
+    }),
+}));
+
+vi.mock("../../hooks/useAuth", () => ({
+    useAuth: () => ({
+        isAuthenticated: true,
+        user: { role: "MEDECIN" },
     }),
 }));
 
@@ -72,7 +79,7 @@ describe("ClinicalForm", () => {
         expect(screen.queryByRole("button", { name: "Analyser" })).not.toBeInTheDocument();
     });
 
-    it("defaults the country from the browser locale and submits the selected ethnicity", () => {
+    it("defaults the country from the browser locale and submits the selected ethnicity", async () => {
         const onSubmit = vi.fn();
 
         Object.defineProperty(window.navigator, "languages", {
@@ -110,12 +117,14 @@ describe("ClinicalForm", () => {
         });
         fireEvent.click(screen.getByRole("button", { name: "Analyser" }));
 
-        expect(onSubmit).toHaveBeenCalledWith(
-            expect.objectContaining({
-                country: "CA",
-                ethnicity: "asian",
-            })
-        );
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    country: "CA",
+                    ethnicity: "asian",
+                })
+            );
+        });
     });
 
     it("preserves spaces while typing in medical history", () => {
@@ -408,7 +417,7 @@ describe("ClinicalForm", () => {
         ).toBeInTheDocument();
     });
 
-    it("opens the diabetes modal with default values and saves them into the payload", () => {
+    it("opens the diabetes modal with default values and saves them into the payload", async () => {
         const onSubmit = vi.fn();
 
         render(
@@ -448,14 +457,16 @@ describe("ClinicalForm", () => {
         fireEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
         fireEvent.click(screen.getByRole("button", { name: "Analyser" }));
 
-        expect(onSubmit).toHaveBeenCalledWith(
-            expect.objectContaining({
-                weight: 94,
-                diabetes_context: expect.objectContaining({
-                    cardiovascular_risk: "Modere a eleve",
-                    tolerance: "Tolerance digestive a reevaluer",
-                }),
-            })
-        );
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    weight: 94,
+                    diabetes_context: expect.objectContaining({
+                        cardiovascular_risk: "Modere a eleve",
+                        tolerance: "Tolerance digestive a reevaluer",
+                    }),
+                })
+            );
+        });
     });
 });
