@@ -12,6 +12,7 @@ const ACTION_OPTIONS = [
     { value: "", label: "Toutes les actions" },
     { value: "PATIENT_CREATE", label: "Création" },
     { value: "PATIENT_UPDATE", label: "Modification" },
+    { value: "PATIENT_ARCHIVE", label: "Archivage" },
     { value: "PATIENT_DELETE", label: "Suppression" },
 ] as const;
 
@@ -27,6 +28,7 @@ function formatTimestamp(value: string) {
 function formatAction(action: PatientAuditLog["action"]) {
     if (action === "PATIENT_CREATE") return "Création";
     if (action === "PATIENT_UPDATE") return "Modification";
+    if (action === "PATIENT_ARCHIVE") return "Archivage";
     if (action === "PATIENT_DELETE") return "Suppression";
     return action;
 }
@@ -68,7 +70,11 @@ export function PatientAuditLogsPage() {
     const limit = 20;
 
     const [action, setAction] = useState<
-        "" | "PATIENT_CREATE" | "PATIENT_UPDATE" | "PATIENT_DELETE"
+        | ""
+        | "PATIENT_CREATE"
+        | "PATIENT_UPDATE"
+        | "PATIENT_ARCHIVE"
+        | "PATIENT_DELETE"
     >("");
     const [patientSearch, setPatientSearch] = useState("");
     const [patientId, setPatientId] = useState("");
@@ -200,6 +206,7 @@ export function PatientAuditLogsPage() {
                                         | ""
                                         | "PATIENT_CREATE"
                                         | "PATIENT_UPDATE"
+                                        | "PATIENT_ARCHIVE"
                                         | "PATIENT_DELETE"
                                 );
                             }}

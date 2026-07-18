@@ -982,6 +982,7 @@ export const UI_LABELS_FR = {
         tabs: {
             create: "Créer un patient",
             search: "Rechercher les patients",
+            archived: "Dossiers archivés",
         },
         validation: {
             invalidServerResponse:
@@ -990,7 +991,13 @@ export const UI_LABELS_FR = {
             invalidLongitude: "Longitude invalide.",
             requiredName: "Nom et prénom sont requis.",
             invalidCoordinates: "Coordonnées invalides.",
-            deleteConfirm: "Supprimer ce patient définitivement ?",
+            potentialDuplicateConfirm:
+                "Un patient avec le même nom et prénom existe déjà. Recherchez-le d'abord. Voulez-vous tout de même créer un nouveau dossier?",
+            archiveConfirm:
+                "Archiver ce dossier patient? Il ne sera plus affiché dans les recherches actives, mais les notes, versions et reçus seront conservés.",
+            archiveReasonPrompt:
+                "Indiquez la raison de l'archivage (obligatoire, sans renseignements cliniques).",
+            archiveReasonRequired: "Une raison d'archivage est requise.",
             restrictedAccess:
                 "Acces temporairement restreint: ClinIA a bloque cette zone sensible apres une activite inhabituelle detectee sur ce compte. Reessayez plus tard ou contactez un SUPERADMIN.",
         },
@@ -1000,6 +1007,27 @@ export const UI_LABELS_FR = {
             firstNamePlaceholder: "Prénom *",
             lastNamePlaceholder: "Nom *",
             ramqPlaceholder: "Numéro d'assurance maladie (optionnel)",
+            countryLabel: "Pays",
+            countryOptions: {
+                CA: "Canada",
+            },
+            healthInsuranceJurisdictionLabel: "Province ou territoire d'assurance",
+            healthInsuranceJurisdictionOptions: {
+                AB: "Alberta",
+                BC: "Colombie-Britannique",
+                MB: "Manitoba",
+                NB: "Nouveau-Brunswick",
+                NL: "Terre-Neuve-et-Labrador",
+                NS: "Nouvelle-Écosse",
+                NT: "Territoires du Nord-Ouest",
+                NU: "Nunavut",
+                ON: "Ontario",
+                PE: "Île-du-Prince-Édouard",
+                QC: "Québec",
+                SK: "Saskatchewan",
+                YT: "Yukon",
+                UNKNOWN: "Non précisé",
+            },
             phonePlaceholder: "Téléphone (optionnel)",
             emailPlaceholder: "Courriel (optionnel)",
             addressPlaceholder: "Adresse (optionnel)",
@@ -1027,10 +1055,10 @@ export const UI_LABELS_FR = {
         status: {
             creating: "Sauvegarde du patient en cours...",
             updating: "Sauvegarde des modifications en cours...",
-            deleting: "Suppression du patient en cours...",
+            archiving: "Archivage du patient en cours...",
             created: "Patient sauvegardé avec succès.",
             updated: "Modifications du patient sauvegardées avec succès.",
-            deleted: "Patient supprimé avec succès.",
+            archived: "Patient archivé avec succès.",
             failed:
                 "La sauvegarde n'a pas pu être confirmée. Vérifiez la connexion et réessayez.",
         },
@@ -1053,7 +1081,9 @@ export const UI_LABELS_FR = {
             loading: "Chargement...",
             createAppointment: "Créer rendez-vous",
             edit: "Éditer",
-            delete: "Supprimer",
+            archive: "Archiver",
+            archived: "Dossier archivé",
+            archivedAt: "Archivé le",
         },
         pagination: {
             previous: "Précédent",

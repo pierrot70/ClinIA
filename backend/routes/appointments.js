@@ -10,7 +10,6 @@ import {
 } from "../services/appointments.js";
 import { toCreateAppointmentDTO } from "../dto/appointment.dto.js";
 import mongoose from "mongoose";
-import { isValidRamq } from "../utils/validators.js";
 import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
 import { getRequestContext } from "../app/requestContext.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
@@ -150,7 +149,8 @@ router.post("/", async (req, res) => {
             err.code === "INVALID_INPUT" ||
             err.code === "INVALID_TIME" ||
             err.code === "INVALID_DATE" ||
-            err.code === "NO_AVAILABILITY"
+            err.code === "NO_AVAILABILITY" ||
+            err.code === "PATIENT_ARCHIVED"
         ) {
             return res.status(400).json({
                 error: {
@@ -221,18 +221,19 @@ router.get("/", async (req, res) => {
         filters.status = req.query.status;
     }
     if (req.query.patientInsuranceNumber !== undefined) {
-        if (!isValidRamq(req.query.patientInsuranceNumber)) {
+        const patientInsuranceNumber = String(
+            req.query.patientInsuranceNumber
+        ).trim();
+        if (patientInsuranceNumber.length > 80) {
             return res.status(400).json({
                 error: {
                     code: "INVALID_INPUT",
-                    message:
-                        "Numéro RAMQ invalide. Format requis : RAMQXXXXXXXXXX.",
+                    message: "Numéro d'assurance maladie invalide.",
                     retryable: false,
                 },
             });
         }
-        filters.patientInsuranceNumber =
-            req.query.patientInsuranceNumber;
+        filters.patientInsuranceNumber = patientInsuranceNumber;
     }
 
     try {

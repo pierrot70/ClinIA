@@ -150,4 +150,29 @@ describe("appointments service", () => {
                 "Le spécialiste sélectionné n'est pas associé à cette clinique.",
         });
     });
+
+    it("rejects an appointment for an archived patient", async () => {
+        patientFindOne.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                _id: "507f1f77bcf86cd799439012",
+                archivedAt: new Date(),
+            }),
+        });
+
+        await expect(
+            createAppointment(
+                {
+                    patient: "507f1f77bcf86cd799439012",
+                    specialist: "507f1f77bcf86cd799439021",
+                    date: "2099-01-01",
+                    time: "10:00",
+                    priority: "normal",
+                },
+                authUser
+            )
+        ).rejects.toEqual({
+            code: "PATIENT_ARCHIVED",
+            message: "Ce dossier patient est archivé. Aucun rendez-vous ne peut y être ajouté.",
+        });
+    });
 });

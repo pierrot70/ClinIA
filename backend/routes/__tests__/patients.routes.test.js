@@ -5,20 +5,22 @@ const {
     listPatientAuditLogs,
     getPatientById,
     updatePatient,
-    deletePatient,
+    archivePatient,
 } = vi.hoisted(() => ({
     createPatient: vi.fn(),
     listPatientAuditLogs: vi.fn(),
     getPatientById: vi.fn(),
     updatePatient: vi.fn(),
-    deletePatient: vi.fn(),
+    archivePatient: vi.fn(),
 }));
 
 const {
     toCreatePatientDTO,
+    toArchivePatientDTO,
     toUpdatePatientDTO,
 } = vi.hoisted(() => ({
     toCreatePatientDTO: vi.fn(),
+    toArchivePatientDTO: vi.fn(),
     toUpdatePatientDTO: vi.fn(),
 }));
 
@@ -40,11 +42,12 @@ vi.mock("../../services/patients.js", () => ({
     listPatientAuditLogs,
     getPatientById,
     updatePatient,
-    deletePatient,
+    archivePatient,
 }));
 
 vi.mock("../../dto/patient.dto.js", () => ({
     toCreatePatientDTO,
+    toArchivePatientDTO,
     toUpdatePatientDTO,
 }));
 
@@ -230,6 +233,41 @@ describe("patients routes audit", () => {
         expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
     });
 
+    it("requires an explicit confirmation when a patient may be an accidental duplicate", async () => {
+        const handler = getRouteHandler("post", "/");
+        const dto = { nom: "Spenard", prenom: "Mickey" };
+        toCreatePatientDTO.mockReturnValue(dto);
+        createPatient.mockRejectedValue({
+            code: "POTENTIAL_DUPLICATE",
+            message: "Un patient avec le même nom et prénom existe déjà.",
+        });
+
+        const req = {
+            body: dto,
+            get: vi.fn().mockReturnValue(undefined),
+            headers: {},
+            auth: { userId: "user-1", username: "doctor.one", role: "MEDECIN" },
+            ip: "10.0.0.10",
+            originalUrl: "/api/patients",
+        };
+        const res = makeRes();
+
+        await handler(req, res);
+
+        expect(createPatient).toHaveBeenCalledWith(dto, req.auth, {
+            allowPotentialDuplicate: false,
+        });
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "POTENTIAL_DUPLICATE",
+                message: "Un patient avec le même nom et prénom existe déjà.",
+                retryable: false,
+                action: "CONFIRM_POTENTIAL_DUPLICATE",
+            },
+        });
+    });
+
     it("returns a RAMQ-specific conflict message on patient update", async () => {
         const handler = getRouteHandler("patch", "/:id");
         const dto = {
@@ -388,10 +426,11 @@ describe("patients routes audit", () => {
         });
     });
 
-    it("records delete audit without patient identifiers", async () => {
+    it("records archive audit without patient identifiers", async () => {
         const handler = getRouteHandler("delete", "/:id");
 
-        deletePatient.mockResolvedValue({ _id: "patient-3" });
+        toArchivePatientDTO.mockReturnValue({ reason: "Doublon confirmé" });
+        archivePatient.mockResolvedValue({ _id: "patient-3" });
 
         const req = {
             params: { id: "patient-3" },
@@ -412,21 +451,27 @@ describe("patients routes audit", () => {
 
         await handler(req, res);
 
+        expect(archivePatient).toHaveBeenCalledWith(
+            "patient-3",
+            "Doublon confirmé",
+            req.auth
+        );
+
         expect(recordPatientAuditEvent).toHaveBeenCalledWith({
-            action: "PATIENT_DELETE",
+            action: "PATIENT_ARCHIVE",
             outcome: "SUCCESS",
             actorUserId: "user-3",
             actorUsername: "super.admin",
             actorRole: "SUPERADMIN",
             ip: "127.0.0.1",
             patientId: "patient-3",
-            changedFields: [],
+            changedFields: ["archivedAt", "archivedByUserId", "archiveReason"],
             requestPath: "/api/patients/patient-3",
             context: null,
         });
         expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith({
             collectionName: "patients",
-            operation: "DELETE",
+            operation: "UPDATE",
             outcome: "SUCCESS",
             verificationId: expect.stringMatching(/^WRV-[A-Z0-9]+-[A-F0-9]{12}$/),
             clientMutationId: null,
@@ -438,7 +483,7 @@ describe("patients routes audit", () => {
             instanceId: "instance-c",
             resourceId: "patient-3",
             patientId: "patient-3",
-            changedFields: [],
+            changedFields: ["archivedAt", "archivedByUserId", "archiveReason"],
             requestPath: "/api/patients/patient-3",
             writeConcern: {
                 w: "majority",

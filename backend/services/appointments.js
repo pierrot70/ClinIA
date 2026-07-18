@@ -3,7 +3,6 @@ import { Specialist } from "../models/Specialist.js";
 import { Patient } from "../models/Patient.js";
 import { Clinique } from "../models/Clinique.js";
 import mongoose from "mongoose";
-import { isValidRamq } from "../utils/validators.js";
 import { buildOwnerScope } from "../auth/resourceAccess.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 
@@ -73,11 +72,10 @@ export async function createAppointment(dto, authUser) {
         };
     }
 
-    if (!isValidRamq(patient.num_assurance_maladie)) {
+    if (patient.archivedAt) {
         throw {
-            code: "INVALID_INPUT",
-            message:
-                "Numéro RAMQ invalide. Format requis : RAMQXXXXXXXXXX.",
+            code: "PATIENT_ARCHIVED",
+            message: "Ce dossier patient est archivé. Aucun rendez-vous ne peut y être ajouté.",
         };
     }
 
@@ -145,7 +143,11 @@ export async function createAppointment(dto, authUser) {
 
     const appointment = new Appointment({
         ...dto,
-        patientInsuranceNumber: patient.num_assurance_maladie,
+        patientInsuranceNumber: patient.num_assurance_maladie || undefined,
+        patientInsuranceJurisdiction:
+            patient.num_assurance_maladie
+                ? patient.healthInsuranceJurisdiction || undefined
+                : undefined,
         ownerUserId: patient.ownerUserId || authUser.userId,
     });
 

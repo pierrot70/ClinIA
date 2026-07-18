@@ -14,7 +14,7 @@ VERBOSE="${VERBOSE:-1}"
 DRILL_MARKER="clinia-staging-patient-write-drill-$(date +%s)-$RANDOM"
 PATIENT_ID=""
 TOKEN=""
-PATIENT_DELETED="false"
+PATIENT_ARCHIVED="false"
 PATIENT_COUNT_BEFORE=""
 PATIENT_COUNT_AFTER=""
 
@@ -112,10 +112,12 @@ cleanup_drill_patients() {
   local remaining
   local service
 
-  if [[ -n "$PATIENT_ID" && -n "$TOKEN" && "$PATIENT_DELETED" != "true" ]]; then
-    info "cleanup_api_delete patient_id=$PATIENT_ID"
+  if [[ -n "$PATIENT_ID" && -n "$TOKEN" && "$PATIENT_ARCHIVED" != "true" ]]; then
+    info "cleanup_api_archive patient_id=$PATIENT_ID"
     curl -sS -X DELETE "$BASE_URL/api/patients/$PATIENT_ID" \
-      -H "Authorization: Bearer $TOKEN" >/dev/null || true
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      --data '{"reason":"Nettoyage du drill staging"}' >/dev/null || true
   fi
 
   info "cleanup_marker marker=$DRILL_MARKER"
@@ -355,24 +357,26 @@ update_patient() {
   report_ok "updating patient"
 }
 
-delete_patient() {
+archive_patient() {
   local response="/tmp/clinia-staging-patient-delete.json"
 
-  info "patient_delete patient_id=$PATIENT_ID"
+  info "patient_archive patient_id=$PATIENT_ID"
 
   curl -sS -X DELETE "$BASE_URL/api/patients/$PATIENT_ID" \
     -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    --data '{"reason":"Nettoyage du drill staging"}' \
     > "$response"
 
   if [[ "$(jq -r '.data._id // empty' "$response")" != "$PATIENT_ID" ]]; then
     jq . "$response" || cat "$response"
-    report_failed "deleting patient"
-    fail "patient_delete_missing_id"
+    report_failed "archiving patient"
+    fail "patient_archive_missing_id"
   fi
 
-  PATIENT_DELETED="true"
-  info "patient_delete_ok patient_id=$PATIENT_ID"
-  report_ok "deleting patient"
+  PATIENT_ARCHIVED="true"
+  info "patient_archive_ok patient_id=$PATIENT_ID"
+  report_ok "archiving patient"
 }
 
 verify_no_zombies() {
@@ -410,7 +414,7 @@ printf 'Patient documents before drill: %s\n' "$PATIENT_COUNT_BEFORE"
 create_patient
 read_patient
 update_patient
-delete_patient
+archive_patient
 verify_no_zombies
 PATIENT_COUNT_AFTER="$(patient_count)"
 printf 'Patient documents after drill: %s\n' "$PATIENT_COUNT_AFTER"

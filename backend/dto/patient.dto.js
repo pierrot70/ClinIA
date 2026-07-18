@@ -2,6 +2,12 @@
 /* Patient DTO                                                         */
 /* ------------------------------------------------------------------ */
 
+import {
+    HEALTH_INSURANCE_JURISDICTIONS,
+    normalizeHealthInsuranceJurisdiction,
+    normalizePatientCountry,
+} from "../utils/patientSearchKeys.js";
+
 function normalizeBoolean(value) {
     if (typeof value === "boolean") return value;
     if (typeof value === "string") {
@@ -44,6 +50,13 @@ function normalizePatientLanguage(value, defaultValue) {
     return ["fr", "en", "es", "ko", "vi", "no", "ja", "zh", "he"].includes(language)
         ? language
         : defaultValue;
+}
+
+function normalizePatientHealthInsuranceJurisdiction(value, number, fallback) {
+    const jurisdiction = normalizeHealthInsuranceJurisdiction(value, number);
+    return HEALTH_INSURANCE_JURISDICTIONS.includes(jurisdiction)
+        ? jurisdiction
+        : fallback;
 }
 
 function normalizeClinicalAnalysisParameters(value) {
@@ -131,6 +144,12 @@ export function toCreatePatientDTO(body) {
         prenom: body.prenom?.trim(),
         num_assurance_maladie:
             body.num_assurance_maladie?.trim(),
+        country: normalizePatientCountry(body.country),
+        healthInsuranceJurisdiction: normalizePatientHealthInsuranceJurisdiction(
+            body.healthInsuranceJurisdiction,
+            body.num_assurance_maladie,
+            "UNKNOWN"
+        ),
         addresse: body.addresse?.trim() ?? "",
         telephone:
             telephoneRaw && telephoneRaw.length > 0
@@ -158,6 +177,17 @@ export function toUpdatePatientDTO(body) {
     if (body.num_assurance_maladie !== undefined)
         dto.num_assurance_maladie =
             body.num_assurance_maladie?.trim();
+    if (body.country !== undefined) {
+        dto.country = normalizePatientCountry(body.country);
+    }
+    if (body.healthInsuranceJurisdiction !== undefined) {
+        dto.healthInsuranceJurisdiction =
+            normalizePatientHealthInsuranceJurisdiction(
+                body.healthInsuranceJurisdiction,
+                body.num_assurance_maladie,
+                "UNKNOWN"
+            );
+    }
     if (body.addresse !== undefined)
         dto.addresse = body.addresse?.trim() ?? "";
     if (body.telephone !== undefined) {
@@ -189,4 +219,24 @@ export function toUpdatePatientDTO(body) {
     }
 
     return dto;
+}
+
+export function toArchivePatientDTO(body = {}) {
+    const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+
+    if (!reason) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Une raison d'archivage est requise.",
+        };
+    }
+
+    if (reason.length > 500) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "La raison d'archivage ne peut pas dépasser 500 caractères.",
+        };
+    }
+
+    return { reason };
 }

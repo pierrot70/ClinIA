@@ -11,10 +11,11 @@ import {
     updatePatient,
     updatePatientWithClinicalNoteHistory,
     restorePatientClinicalNoteVersion,
-    deletePatient,
+    archivePatient,
 } from "../services/patients.js";
 import {
     toCreatePatientDTO,
+    toArchivePatientDTO,
     toUpdatePatientDTO,
 } from "../dto/patient.dto.js";
 import { recordPatientAuditEvent } from "../audit/patientAudit.js";
@@ -227,7 +228,11 @@ function buildPatientConflictMessage(err) {
         return "Ce numéro de téléphone existe déjà.";
     }
 
-    if (uniqueFields.has("num_assurance_maladie")) {
+    if (
+        uniqueFields.has("num_assurance_maladie") ||
+        uniqueFields.has("healthInsuranceJurisdiction") ||
+        uniqueFields.has("healthInsuranceNumberSearch")
+    ) {
         return "Ce numéro d'assurance maladie existe déjà.";
     }
 
@@ -263,7 +268,11 @@ router.post("/", async (req, res) => {
     }
 
     try {
-        const patient = await createPatient(dto, req.auth);
+        const patient = await createPatient(dto, req.auth, {
+            allowPotentialDuplicate:
+                (req.get?.("X-Confirm-Potential-Duplicate") ||
+                    req.headers?.["x-confirm-potential-duplicate"]) === "true",
+        });
 
         const writeVerification = await recordPatientMutationAudit(req, {
             action: "PATIENT_CREATE",
@@ -293,6 +302,17 @@ router.post("/", async (req, res) => {
 
         if (err.code === 11000) {
             return sendPatientConflict(res, err);
+        }
+
+        if (err.code === "POTENTIAL_DUPLICATE") {
+            return res.status(409).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                    action: "CONFIRM_POTENTIAL_DUPLICATE",
+                },
+            });
         }
 
         console.error("❌ Patient create error:", err);
@@ -329,6 +349,7 @@ router.get("/", async (req, res) => {
                 limit: req.query.limit,
                 sortBy: req.query.sortBy,
                 sortDir: req.query.sortDir,
+                archiveStatus: req.query.archiveStatus,
             },
             req.auth
         );
@@ -454,6 +475,16 @@ router.get("/:id/secure-request-documents", async (req, res) => {
 
         if (err.code === "NOT_FOUND") {
             return res.status(404).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        if (err.code === "PATIENT_ARCHIVED") {
+            return res.status(409).json({
                 error: {
                     code: err.code,
                     message: err.message,
@@ -683,6 +714,16 @@ router.patch("/:id", async (req, res) => {
             });
         }
 
+        if (err.code === "PATIENT_ARCHIVED") {
+            return res.status(409).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
         if (err.code === 11000) {
             return sendPatientConflict(res, err);
         }
@@ -701,7 +742,7 @@ router.patch("/:id", async (req, res) => {
 });
 
 /* ------------------------------------------------------------------ */
-/* DELETE /api/patients/:id                                            */
+/* DELETE /api/patients/:id - archive, never physical deletion         */
 /* ------------------------------------------------------------------ */
 
 router.delete(
@@ -709,17 +750,18 @@ router.delete(
     requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
     async (req, res) => {
         try {
-            const deleted = await deletePatient(req.params.id, req.auth);
+            const { reason } = toArchivePatientDTO(req.body);
+            const archived = await archivePatient(req.params.id, reason, req.auth);
 
             const writeVerification = await recordPatientMutationAudit(req, {
-                action: "PATIENT_DELETE",
-                operation: "DELETE",
-                patientId: deleted?._id ?? req.params.id,
-                changedFields: [],
+                action: "PATIENT_ARCHIVE",
+                operation: "UPDATE",
+                patientId: archived?._id ?? req.params.id,
+                changedFields: ["archivedAt", "archivedByUserId", "archiveReason"],
             });
 
             return res.status(200).json({
-                data: deleted,
+                data: archived,
                 meta: {
                     source: "real",
                     model: "mongo",
@@ -727,7 +769,7 @@ router.delete(
                 },
             });
         } catch (err) {
-            if (err.code === "INVALID_ID") {
+            if (["INVALID_ID", "INVALID_INPUT"].includes(err.code)) {
                 return res.status(400).json({
                     error: {
                         code: err.code,
@@ -747,13 +789,13 @@ router.delete(
                 });
             }
 
-            console.error("❌ Patient delete error:", err);
+            console.error("❌ Patient archive error:", err);
 
             return res.status(500).json({
                 error: {
                     code: "PERSISTENCE_FAILED",
                     message:
-                        "Impossible de supprimer le patient.",
+                        "Impossible d'archiver le patient.",
                     retryable: true,
                 },
             });

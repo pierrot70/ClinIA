@@ -1,4 +1,10 @@
 import mongoose from "mongoose";
+import {
+    buildPatientSearchKeys,
+    HEALTH_INSURANCE_JURISDICTIONS,
+    normalizeHealthInsuranceJurisdiction,
+    normalizePatientCountry,
+} from "../utils/patientSearchKeys.js";
 
 /* ------------------------------------------------------------------ */
 /* Patient Schema                                                      */
@@ -160,9 +166,7 @@ const PatientSchema = new mongoose.Schema(
         },
         num_assurance_maladie: {
             type: String,
-            required: true,
-            unique: true,
-            index: true,
+            default: "",
             trim: true,
         },
         addresse: {
@@ -193,6 +197,59 @@ const PatientSchema = new mongoose.Schema(
             ref: "AdminUser",
             index: true,
         },
+        archivedAt: {
+            type: Date,
+            default: null,
+            index: true,
+        },
+        archivedByUserId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "AdminUser",
+            default: null,
+        },
+        archiveReason: {
+            type: String,
+            default: "",
+            trim: true,
+            maxlength: 500,
+        },
+        country: {
+            type: String,
+            enum: ["CA"],
+            default: "CA",
+            trim: true,
+        },
+        healthInsuranceJurisdiction: {
+            type: String,
+            enum: HEALTH_INSURANCE_JURISDICTIONS,
+            default: "UNKNOWN",
+            trim: true,
+        },
+        nomSearch: {
+            type: String,
+            default: "",
+            select: false,
+        },
+        prenomSearch: {
+            type: String,
+            default: "",
+            select: false,
+        },
+        addresseSearch: {
+            type: String,
+            default: "",
+            select: false,
+        },
+        telephoneSearch: {
+            type: String,
+            default: "",
+            select: false,
+        },
+        healthInsuranceNumberSearch: {
+            type: String,
+            default: null,
+            select: false,
+        },
         texto: {
             type: Boolean,
             default: false,
@@ -220,6 +277,46 @@ const PatientSchema = new mongoose.Schema(
     },
     {
         timestamps: true,
+    }
+);
+
+PatientSchema.pre("validate", function populateSearchKeys() {
+    this.country = normalizePatientCountry(this.country);
+    this.healthInsuranceJurisdiction = normalizeHealthInsuranceJurisdiction(
+        this.healthInsuranceJurisdiction,
+        this.num_assurance_maladie
+    );
+    Object.assign(this, buildPatientSearchKeys(this));
+});
+
+PatientSchema.index(
+    { ownerUserId: 1, nomSearch: 1 },
+    { name: "owner_nom_search_idx" }
+);
+PatientSchema.index(
+    { ownerUserId: 1, prenomSearch: 1 },
+    { name: "owner_prenom_search_idx" }
+);
+PatientSchema.index(
+    { ownerUserId: 1, addresseSearch: 1 },
+    { name: "owner_addresse_search_idx" }
+);
+PatientSchema.index(
+    { ownerUserId: 1, telephoneSearch: 1 },
+    { name: "owner_telephone_search_idx" }
+);
+PatientSchema.index(
+    { ownerUserId: 1, healthInsuranceNumberSearch: 1 },
+    { name: "owner_health_insurance_number_search_idx" }
+);
+PatientSchema.index(
+    { country: 1, healthInsuranceJurisdiction: 1, healthInsuranceNumberSearch: 1 },
+    {
+        name: "health_insurance_number_unique_idx",
+        unique: true,
+        partialFilterExpression: {
+            healthInsuranceNumberSearch: { $type: "string" },
+        },
     }
 );
 

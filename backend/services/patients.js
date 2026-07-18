@@ -7,6 +7,12 @@ import { recordPatientAuditEvent } from "../audit/patientAudit.js";
 import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
 import { buildOwnerScope } from "../auth/resourceAccess.js";
 import {
+    buildPatientSearchKeys,
+    normalizeHealthInsuranceJurisdiction,
+    normalizePatientIdentifierSearch,
+    normalizePatientTextSearch,
+} from "../utils/patientSearchKeys.js";
+import {
     CLINICAL_QUERY_WRITE_OPTIONS,
     CLINICAL_WRITE_CONCERN,
 } from "../db/clinicalWriteConcern.js";
@@ -21,6 +27,30 @@ function createPatientError(code, message) {
 
 function escapeRegex(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const MAX_PATIENT_SEARCH_LENGTH = 80;
+const MAX_PATIENT_SEARCH_TERMS = 4;
+
+function normalizePatientSearchValue(value, normalizer = normalizePatientTextSearch) {
+    if (typeof value !== "string") {
+        return "";
+    }
+
+    return normalizer(value).slice(0, MAX_PATIENT_SEARCH_LENGTH);
+}
+
+function buildPatientSearchRegex(value, normalizer) {
+    const normalized = normalizePatientSearchValue(value, normalizer);
+    return normalized ? new RegExp(`^${escapeRegex(normalized)}`) : null;
+}
+
+function buildPatientSearchTerms(value) {
+    return normalizePatientSearchValue(value)
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, MAX_PATIENT_SEARCH_TERMS)
+        .map((term) => new RegExp(`^${escapeRegex(term)}`));
 }
 
 function maskUsername(username) {
@@ -50,36 +80,12 @@ function assertPatientAuditAccess(authUser) {
     }
 }
 
-function randomDigits(length) {
-    let out = "";
-    for (let i = 0; i < length; i++) {
-        out += Math.floor(Math.random() * 10).toString();
-    }
-    return out;
-}
-
-function generateRamqNumber() {
-    return `RAMQ${randomDigits(10)}`;
-}
-
-async function ensureUniqueRamqNumber() {
-    for (let i = 0; i < 5; i++) {
-        const candidate = generateRamqNumber();
-        const existing = await Patient.findOne({
-            num_assurance_maladie: candidate,
-        }).lean();
-        if (!existing) return candidate;
-    }
-
-    throw {
-        code: "RAMQ_GENERATION_FAILED",
-        message:
-            "Impossible de générer un numéro RAMQ unique.",
-    };
-}
-
-export async function createPatient(dto, authUser) {
-    buildOwnerScope(authUser);
+export async function createPatient(
+    dto,
+    authUser,
+    { allowPotentialDuplicate = false } = {}
+) {
+    const ownerScope = buildOwnerScope(authUser);
 
     if (!dto.nom || !dto.prenom) {
         throw {
@@ -88,13 +94,34 @@ export async function createPatient(dto, authUser) {
         };
     }
 
-    if (!dto.num_assurance_maladie) {
-        dto.num_assurance_maladie =
-            await ensureUniqueRamqNumber();
+    const hasHealthInsuranceNumber = Boolean(
+        normalizePatientIdentifierSearch(dto.num_assurance_maladie)
+    );
+    if (!hasHealthInsuranceNumber && !allowPotentialDuplicate) {
+        const keys = buildPatientSearchKeys(dto);
+        const potentialDuplicate = await Patient.exists({
+            ...ownerScope,
+            archivedAt: null,
+            nomSearch: keys.nomSearch,
+            prenomSearch: keys.prenomSearch,
+        });
+
+        if (potentialDuplicate) {
+            throw {
+                code: "POTENTIAL_DUPLICATE",
+                message:
+                    "Un patient avec le même nom et prénom existe déjà. Vérifiez-le avant de créer un nouveau dossier.",
+            };
+        }
     }
 
     const patient = new Patient({
         ...dto,
+        healthInsuranceJurisdiction: normalizeHealthInsuranceJurisdiction(
+            dto.healthInsuranceJurisdiction,
+            dto.num_assurance_maladie
+        ),
+        ...buildPatientSearchKeys(dto),
         ownerUserId: authUser.userId,
     });
 
@@ -102,46 +129,55 @@ export async function createPatient(dto, authUser) {
 }
 
 export async function listPatients(filters = {}, opts = {}, authUser) {
-    const query = buildOwnerScope(authUser);
+    const archiveStatus = opts.archiveStatus === "archived" ? "archived" : "active";
+    const query = {
+        ...buildOwnerScope(authUser),
+        archivedAt: archiveStatus === "archived" ? { $ne: null } : null,
+    };
+    const hasGeneralSearch =
+        typeof filters.q === "string" && Boolean(filters.q.trim());
 
-    if (typeof filters.q === "string" && filters.q.trim()) {
-        const terms = filters.q
-            .trim()
-            .slice(0, 120)
-            .split(/\s+/)
-            .filter(Boolean)
-            .map((term) => new RegExp(escapeRegex(term), "i"));
+    if (hasGeneralSearch) {
+        const terms = buildPatientSearchTerms(filters.q);
 
         if (terms.length) {
             query.$and = terms.map((term) => ({
-                $or: [{ nom: term }, { prenom: term }],
+                $or: [{ nomSearch: term }, { prenomSearch: term }],
             }));
         }
     }
 
-    if (filters.nom && !filters.q?.trim()) {
-        query.nom = { $regex: filters.nom, $options: "i" };
+    if (!hasGeneralSearch) {
+        const nomRegex = buildPatientSearchRegex(filters.nom);
+        if (nomRegex) {
+            query.nomSearch = { $regex: nomRegex };
+        }
     }
-    if (filters.prenom && !filters.q?.trim()) {
-        query.prenom = { $regex: filters.prenom, $options: "i" };
+    if (!hasGeneralSearch) {
+        const prenomRegex = buildPatientSearchRegex(filters.prenom);
+        if (prenomRegex) {
+            query.prenomSearch = { $regex: prenomRegex };
+        }
     }
-    if (filters.num_assurance_maladie) {
-        query.num_assurance_maladie = {
-            $regex: filters.num_assurance_maladie,
-            $options: "i",
+    const healthInsuranceNumberRegex = buildPatientSearchRegex(
+        filters.num_assurance_maladie,
+        normalizePatientIdentifierSearch
+    );
+    if (healthInsuranceNumberRegex) {
+        query.healthInsuranceNumberSearch = {
+            $regex: healthInsuranceNumberRegex,
         };
     }
-    if (filters.telephone) {
-        query.telephone = {
-            $regex: filters.telephone,
-            $options: "i",
-        };
+    const telephoneRegex = buildPatientSearchRegex(
+        filters.telephone,
+        normalizePatientIdentifierSearch
+    );
+    if (telephoneRegex) {
+        query.telephoneSearch = { $regex: telephoneRegex };
     }
-    if (filters.addresse) {
-        query.addresse = {
-            $regex: filters.addresse,
-            $options: "i",
-        };
+    const addressRegex = buildPatientSearchRegex(filters.addresse);
+    if (addressRegex) {
+        query.addresseSearch = { $regex: addressRegex };
     }
 
     const page = Math.max(parseInt(opts.page) || 1, 1);
@@ -205,6 +241,7 @@ export async function listPatientAuditLogs({
     const allowedActions = new Set([
         "PATIENT_CREATE",
         "PATIENT_UPDATE",
+        "PATIENT_ARCHIVE",
         "PATIENT_DELETE",
     ]);
 
@@ -429,15 +466,21 @@ async function preparePatientUpdate(id, updates, authUser) {
         };
     }
 
+    if (existing.archivedAt) {
+        throw {
+            code: "PATIENT_ARCHIVED",
+            message: "Ce dossier patient est archivé et ne peut plus être modifié.",
+        };
+    }
+
     if (
-        updates.num_assurance_maladie === "" ||
         updates.nom === "" ||
         updates.prenom === ""
     ) {
         throw {
             code: "INVALID_INPUT",
             message:
-                "Les champs 'nom', 'prenom' et 'num_assurance_maladie' ne peuvent pas être vides.",
+                "Les champs 'nom' et 'prenom' ne peuvent pas être vides.",
         };
     }
 
@@ -445,15 +488,25 @@ async function preparePatientUpdate(id, updates, authUser) {
 }
 
 export async function updatePatient(id, updates, authUser) {
-    const { ownerScope, updates: preparedUpdates } = await preparePatientUpdate(
+    const { existing, ownerScope, updates: preparedUpdates } = await preparePatientUpdate(
         id,
         updates,
         authUser
     );
+    const updatesWithSearchKeys = {
+        ...preparedUpdates,
+        healthInsuranceJurisdiction: normalizeHealthInsuranceJurisdiction(
+            preparedUpdates.healthInsuranceJurisdiction ||
+                existing.healthInsuranceJurisdiction,
+            preparedUpdates.num_assurance_maladie ??
+                existing.num_assurance_maladie
+        ),
+        ...buildPatientSearchKeys({ ...existing, ...preparedUpdates }),
+    };
 
     const patient = await Patient.findOneAndUpdate(
         { _id: id, ...ownerScope },
-        { $set: preparedUpdates },
+        { $set: updatesWithSearchKeys },
         {
             new: true,
             runValidators: true,
@@ -593,6 +646,16 @@ export async function updatePatientWithClinicalNoteHistory(
 ) {
     const { existing, ownerScope, updates: preparedUpdates } =
         await preparePatientUpdate(id, updates, authUser);
+    const updatesWithSearchKeys = {
+        ...preparedUpdates,
+        healthInsuranceJurisdiction: normalizeHealthInsuranceJurisdiction(
+            preparedUpdates.healthInsuranceJurisdiction ||
+                existing.healthInsuranceJurisdiction,
+            preparedUpdates.num_assurance_maladie ??
+                existing.num_assurance_maladie
+        ),
+        ...buildPatientSearchKeys({ ...existing, ...preparedUpdates }),
+    };
     const previousNote = clinicalNotesFrom(existing);
     const nextNote = clinicalNotesFrom({
         secure_request_profile: preparedUpdates.secure_request_profile,
@@ -637,7 +700,7 @@ export async function updatePatientWithClinicalNoteHistory(
 
                 patient = await Patient.findOneAndUpdate(
                     { _id: id, ...ownerScope },
-                    { $set: preparedUpdates },
+                    { $set: updatesWithSearchKeys },
                     {
                         new: true,
                         runValidators: true,
@@ -733,7 +796,7 @@ export async function restorePatientClinicalNoteVersion(
     return result;
 }
 
-export async function deletePatient(id, authUser) {
+export async function archivePatient(id, reason, authUser) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
             code: "INVALID_ID",
@@ -741,20 +804,39 @@ export async function deletePatient(id, authUser) {
         };
     }
 
-    const deleted = await Patient.findOneAndDelete(
+    if (typeof reason !== "string" || !reason.trim() || reason.trim().length > 500) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Une raison d'archivage valide est requise.",
+        };
+    }
+
+    const archived = await Patient.findOneAndUpdate(
         {
             _id: id,
             ...buildOwnerScope(authUser),
+            archivedAt: null,
         },
-        CLINICAL_QUERY_WRITE_OPTIONS
+        {
+            $set: {
+                archivedAt: new Date(),
+                archivedByUserId: authUser.userId,
+                archiveReason: reason.trim(),
+            },
+        },
+        {
+            new: true,
+            runValidators: true,
+            ...CLINICAL_QUERY_WRITE_OPTIONS,
+        }
     );
 
-    if (!deleted) {
+    if (!archived) {
         throw {
             code: "NOT_FOUND",
             message: "Patient introuvable.",
         };
     }
 
-    return deleted;
+    return archived;
 }

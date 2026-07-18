@@ -5,10 +5,12 @@ import { labels } from "../i18n/uiLabels";
 import { useTranslation } from "../hooks/useTranslation";
 import {
     createPatient,
-    deletePatient,
+    archivePatient,
     fetchPatientsPaginated,
     updatePatient,
     type Patient,
+    type PatientCountry,
+    type HealthInsuranceJurisdiction,
     type PatientLanguage,
     type PatientPayload,
 } from "../services/patientsApi";
@@ -29,18 +31,24 @@ function usePatientsPageLabels(targetLang: string) {
     const { translated: title } = useTranslation({ text: source.title, ...options });
     const { translated: createTab } = useTranslation({ text: source.tabs.create, ...options });
     const { translated: searchTab } = useTranslation({ text: source.tabs.search, ...options });
+    const { translated: archivedTab } = useTranslation({ text: source.tabs.archived, ...options });
     const { translated: invalidServerResponse } = useTranslation({ text: source.validation.invalidServerResponse, ...options });
     const { translated: invalidLatitude } = useTranslation({ text: source.validation.invalidLatitude, ...options });
     const { translated: invalidLongitude } = useTranslation({ text: source.validation.invalidLongitude, ...options });
     const { translated: requiredName } = useTranslation({ text: source.validation.requiredName, ...options });
     const { translated: invalidCoordinates } = useTranslation({ text: source.validation.invalidCoordinates, ...options });
-    const { translated: deleteConfirm } = useTranslation({ text: source.validation.deleteConfirm, ...options });
+    const { translated: potentialDuplicateConfirm } = useTranslation({ text: source.validation.potentialDuplicateConfirm, ...options });
+    const { translated: archiveConfirm } = useTranslation({ text: source.validation.archiveConfirm, ...options });
+    const { translated: archiveReasonPrompt } = useTranslation({ text: source.validation.archiveReasonPrompt, ...options });
+    const { translated: archiveReasonRequired } = useTranslation({ text: source.validation.archiveReasonRequired, ...options });
     const { translated: restrictedAccess } = useTranslation({ text: source.validation.restrictedAccess, ...options });
     const { translated: editTitle } = useTranslation({ text: source.form.editTitle, ...options });
     const { translated: createTitle } = useTranslation({ text: source.form.createTitle, ...options });
     const { translated: firstNamePlaceholder } = useTranslation({ text: source.form.firstNamePlaceholder, ...options });
     const { translated: lastNamePlaceholder } = useTranslation({ text: source.form.lastNamePlaceholder, ...options });
     const { translated: ramqPlaceholder } = useTranslation({ text: source.form.ramqPlaceholder, ...options });
+    const { translated: countryLabel } = useTranslation({ text: source.form.countryLabel, ...options });
+    const { translated: healthInsuranceJurisdictionLabel } = useTranslation({ text: source.form.healthInsuranceJurisdictionLabel, ...options });
     const { translated: phonePlaceholder } = useTranslation({ text: source.form.phonePlaceholder, ...options });
     const { translated: emailPlaceholder } = useTranslation({ text: source.form.emailPlaceholder, ...options });
     const { translated: addressPlaceholder } = useTranslation({ text: source.form.addressPlaceholder, ...options });
@@ -55,10 +63,10 @@ function usePatientsPageLabels(targetLang: string) {
     const { translated: cancel } = useTranslation({ text: source.form.cancel, ...options });
     const { translated: statusCreating } = useTranslation({ text: source.status.creating, ...options });
     const { translated: statusUpdating } = useTranslation({ text: source.status.updating, ...options });
-    const { translated: statusDeleting } = useTranslation({ text: source.status.deleting, ...options });
+    const { translated: statusArchiving } = useTranslation({ text: source.status.archiving, ...options });
     const { translated: statusCreated } = useTranslation({ text: source.status.created, ...options });
     const { translated: statusUpdated } = useTranslation({ text: source.status.updated, ...options });
-    const { translated: statusDeleted } = useTranslation({ text: source.status.deleted, ...options });
+    const { translated: statusArchived } = useTranslation({ text: source.status.archived, ...options });
     const { translated: statusFailed } = useTranslation({ text: source.status.failed, ...options });
     const { translated: searchTitle } = useTranslation({ text: source.search.title, ...options });
     const { translated: filterLastNamePlaceholder } = useTranslation({ text: source.search.lastNamePlaceholder, ...options });
@@ -76,7 +84,9 @@ function usePatientsPageLabels(targetLang: string) {
     const { translated: tableLoading } = useTranslation({ text: source.table.loading, ...options });
     const { translated: createAppointment } = useTranslation({ text: source.table.createAppointment, ...options });
     const { translated: edit } = useTranslation({ text: source.table.edit, ...options });
-    const { translated: deleteLabel } = useTranslation({ text: source.table.delete, ...options });
+    const { translated: archiveLabel } = useTranslation({ text: source.table.archive, ...options });
+    const { translated: archivedLabel } = useTranslation({ text: source.table.archived, ...options });
+    const { translated: archivedAt } = useTranslation({ text: source.table.archivedAt, ...options });
     const { translated: previous } = useTranslation({ text: source.pagination.previous, ...options });
     const { translated: next } = useTranslation({ text: source.pagination.next, ...options });
     const { translated: pagePrefix } = useTranslation({ text: source.pagination.pagePrefix, ...options });
@@ -86,18 +96,26 @@ function usePatientsPageLabels(targetLang: string) {
         title,
         createTab,
         searchTab,
+        archivedTab,
         invalidServerResponse,
         invalidLatitude,
         invalidLongitude,
         requiredName,
         invalidCoordinates,
-        deleteConfirm,
+        potentialDuplicateConfirm,
+        archiveConfirm,
+        archiveReasonPrompt,
+        archiveReasonRequired,
         restrictedAccess,
         editTitle,
         createTitle,
         firstNamePlaceholder,
         lastNamePlaceholder,
         ramqPlaceholder,
+        countryLabel,
+        countryOptions: source.form.countryOptions,
+        healthInsuranceJurisdictionLabel,
+        healthInsuranceJurisdictionOptions: source.form.healthInsuranceJurisdictionOptions,
         phonePlaceholder,
         emailPlaceholder,
         addressPlaceholder,
@@ -113,10 +131,10 @@ function usePatientsPageLabels(targetLang: string) {
         cancel,
         statusCreating,
         statusUpdating,
-        statusDeleting,
+        statusArchiving,
         statusCreated,
         statusUpdated,
-        statusDeleted,
+        statusArchived,
         statusFailed,
         searchTitle,
         filterLastNamePlaceholder,
@@ -134,7 +152,9 @@ function usePatientsPageLabels(targetLang: string) {
         tableLoading,
         createAppointment,
         edit,
-        deleteLabel,
+        archiveLabel,
+        archivedLabel,
+        archivedAt,
         previous,
         next,
         pagePrefix,
@@ -216,6 +236,8 @@ export function PatientsPage() {
         nom: "",
         prenom: "",
         num_assurance_maladie: "",
+        country: "CA" as PatientCountry,
+        healthInsuranceJurisdiction: "UNKNOWN" as HealthInsuranceJurisdiction,
         addresse: "",
         telephone: "",
         courriel: "",
@@ -224,11 +246,11 @@ export function PatientsPage() {
         long: "",
         texto: false,
     });
-    const [viewMode, setViewMode] = useState<"create" | "list">("list");
+    const [viewMode, setViewMode] = useState<"create" | "list" | "archived">("list");
     useEffect(() => {
         loadPatients();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filters, page]);
+    }, [filters, page, viewMode]);
 
     async function loadPatients() {
         setLoading(true);
@@ -248,6 +270,8 @@ export function PatientsPage() {
             addresse: addresseFilter,
             sortBy: filters.sortBy,
             sortDir: filters.sortDir,
+            archiveStatus:
+                viewMode === "archived" ? ("archived" as const) : ("active" as const),
         };
 
         const shouldUsePhoneOnly =
@@ -309,6 +333,8 @@ export function PatientsPage() {
             nom: "",
             prenom: "",
             num_assurance_maladie: "",
+            country: "CA" as PatientCountry,
+            healthInsuranceJurisdiction: "UNKNOWN" as HealthInsuranceJurisdiction,
             addresse: "",
             telephone: "",
             courriel: "",
@@ -325,6 +351,8 @@ export function PatientsPage() {
             prenom: values.prenom.trim(),
             texto: values.texto,
             language: values.language,
+            country: values.country,
+            healthInsuranceJurisdiction: values.healthInsuranceJurisdiction,
         };
 
         if (values.num_assurance_maladie.trim()) {
@@ -444,7 +472,16 @@ export function PatientsPage() {
                 setFormSaving(false);
                 return;
             }
-            const response = await createPatient(payload);
+            let response = await createPatient(payload);
+            if (
+                "error" in response &&
+                response.error.code === "POTENTIAL_DUPLICATE" &&
+                window.confirm(ui.potentialDuplicateConfirm)
+            ) {
+                response = await createPatient(payload, {
+                    confirmPotentialDuplicate: true,
+                });
+            }
             if ("error" in response) {
                 setError(response.error);
                 setSaveFeedback({
@@ -477,6 +514,9 @@ export function PatientsPage() {
                 nom: patient.nom ?? "",
                 prenom: patient.prenom ?? "",
                 num_assurance_maladie: patient.num_assurance_maladie ?? "",
+                country: patient.country ?? "CA",
+                healthInsuranceJurisdiction:
+                    patient.healthInsuranceJurisdiction ?? "UNKNOWN",
                 addresse: patient.addresse ?? "",
                 telephone: patient.telephone ?? "",
                 courriel: patient.courriel ?? "",
@@ -490,21 +530,30 @@ export function PatientsPage() {
             });
     }
 
-    async function handleDelete(id: string) {
+    async function handleArchive(id: string) {
         const confirmed = window.confirm(
-            ui.deleteConfirm
+            ui.archiveConfirm
         );
         if (!confirmed) return;
+
+        const reason = window.prompt(ui.archiveReasonPrompt)?.trim();
+        if (!reason) {
+            setSaveFeedback({
+                type: "error",
+                message: ui.archiveReasonRequired,
+            });
+            return;
+        }
 
         setBusyIds((p) => ({ ...p, [id]: true }));
         setError(null);
         setLastWriteVerification(null);
         setSaveFeedback({
             type: "info",
-            message: ui.statusDeleting,
+            message: ui.statusArchiving,
         });
 
-        const response = await deletePatient(id);
+        const response = await archivePatient(id, reason);
         if ("error" in response) {
             setError(response.error);
             setSaveFeedback({
@@ -521,7 +570,7 @@ export function PatientsPage() {
         setSaveFeedback({
             type: "success",
             message: formatWriteVerificationMessage(
-                ui.statusDeleted,
+                ui.statusArchived,
                 writeVerification
             ),
         });
@@ -586,6 +635,20 @@ export function PatientsPage() {
                 >
                     {ui.searchTab}
                 </button>
+                <button
+                    type="button"
+                    className={`px-4 py-2 rounded border font-semibold transition ${
+                        viewMode === "archived"
+                            ? "bg-primary text-white border-primary"
+                            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                    }`}
+                    onClick={() => {
+                        setPage(1);
+                        setViewMode("archived");
+                    }}
+                >
+                    {ui.archivedTab}
+                </button>
             </div>
 
             {visibleErrorMessage && (
@@ -627,6 +690,21 @@ export function PatientsPage() {
                                 }))
                             }
                         />
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span>{ui.countryLabel}</span>
+                            <select
+                                className="border rounded p-2"
+                                value={form.country}
+                                onChange={(e) =>
+                                    setForm((p) => ({
+                                        ...p,
+                                        country: e.target.value as PatientCountry,
+                                    }))
+                                }
+                            >
+                                <option value="CA">{ui.countryOptions.CA}</option>
+                            </select>
+                        </label>
                         <label className="flex flex-col gap-1 text-sm">
                             <span>{ui.languageLabel}</span>
                             <select
@@ -672,6 +750,26 @@ export function PatientsPage() {
                                 }))
                             }
                         />
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span>{ui.healthInsuranceJurisdictionLabel}</span>
+                            <select
+                                className="border rounded p-2"
+                                value={form.healthInsuranceJurisdiction}
+                                onChange={(e) =>
+                                    setForm((p) => ({
+                                        ...p,
+                                        healthInsuranceJurisdiction:
+                                            e.target.value as HealthInsuranceJurisdiction,
+                                    }))
+                                }
+                            >
+                                {Object.entries(ui.healthInsuranceJurisdictionOptions).map(
+                                    ([code, label]) => (
+                                        <option key={code} value={code}>{label}</option>
+                                    )
+                                )}
+                            </select>
+                        </label>
                         <input
                             className="border rounded p-2"
                             placeholder={ui.phonePlaceholder}
@@ -771,7 +869,7 @@ export function PatientsPage() {
                 </div>
             )}
 
-            {viewMode === "list" && (
+            {(viewMode === "list" || viewMode === "archived") && (
                 <>
                     <div className="border rounded p-4 space-y-3">
                         <div className="text-sm font-medium">
@@ -934,6 +1032,15 @@ export function PatientsPage() {
                                                 {p.num_assurance_maladie}
                                             </td>
                                             <td className="p-2 flex gap-2">
+                                                {viewMode === "archived" ? (
+                                                    <span className="text-sm text-amber-800">
+                                                        {ui.archivedLabel}
+                                                        {p.archivedAt
+                                                            ? ` - ${ui.archivedAt} ${new Date(p.archivedAt).toLocaleString()}`
+                                                            : ""}
+                                                    </span>
+                                                ) : (
+                                                    <>
                                                 <Link
                                                     className="px-2 py-1 border rounded"
                                                     to={`/appointments?ramq=${encodeURIComponent(
@@ -957,16 +1064,18 @@ export function PatientsPage() {
                                                     {labels.patientClinicalNotes.open}
                                                 </button>
                                                 <button
-                                                    className="px-2 py-1 border rounded text-red-600"
+                                                    className="px-2 py-1 border rounded text-amber-700"
                                                     disabled={
                                                         busyIds[p._id]
                                                     }
                                                     onClick={() =>
-                                                        handleDelete(p._id)
+                                                        handleArchive(p._id)
                                                     }
                                                 >
-                                                    {ui.deleteLabel}
+                                                    {ui.archiveLabel}
                                                 </button>
+                                                    </>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}

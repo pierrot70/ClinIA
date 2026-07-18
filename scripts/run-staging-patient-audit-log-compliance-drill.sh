@@ -290,20 +290,22 @@ update_audited_patient() {
   report_ok "updating audited patient"
 }
 
-delete_audited_patient() {
+archive_audited_patient() {
   local response="/tmp/clinia-staging-patient-audit-delete.json"
 
   curl -sS -X DELETE "$BASE_URL/api/patients/$PATIENT_ID" \
     -H "$(auth_header)" \
+    -H "Content-Type: application/json" \
+    --data '{"reason":"Nettoyage du drill staging"}' \
     > "$response"
 
   if [[ "$(jq -r '.data._id // empty' "$response")" != "$PATIENT_ID" ]]; then
     jq . "$response" || cat "$response"
-    report_failed "deleting audited patient"
-    fail "audited_patient_delete_failed"
+    report_failed "archiving audited patient"
+    fail "audited_patient_archive_failed"
   fi
 
-  report_ok "deleting audited patient"
+  report_ok "archiving audited patient"
 }
 
 verify_audit_actions() {
@@ -318,7 +320,7 @@ verify_audit_actions() {
 
   if ! grep -q 'PATIENT_CREATE' <<<"$actions" ||
      ! grep -q 'PATIENT_UPDATE' <<<"$actions" ||
-     ! grep -q 'PATIENT_DELETE' <<<"$actions"; then
+     ! grep -q 'PATIENT_ARCHIVE' <<<"$actions"; then
     jq . "$response" || cat "$response"
     report_failed "verifying patient audit actions"
     fail "patient_audit_actions_missing actions=$actions"
@@ -408,7 +410,7 @@ printf 'Patient audit log documents before drill: %s\n' "$AUDIT_COUNT_BEFORE"
 
 create_audited_patient
 update_audited_patient
-delete_audited_patient
+archive_audited_patient
 verify_audit_actions
 verify_no_sensitive_values_in_audit_logs
 verify_cleanup

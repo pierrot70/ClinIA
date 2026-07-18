@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import { RAMQ_REGEX } from "../utils/validators.js";
 
 /* ------------------------------------------------------------------ */
 /* Appointment Schema                                                  */
@@ -22,13 +21,19 @@ const AppointmentSchema = new mongoose.Schema(
             index: true,
         },
 
-        /** Numéro RAMQ (dérivé du patient) */
+        /** Numéro d'assurance maladie (facultatif, dérivé du patient) */
         patientInsuranceNumber: {
             type: String,
-            required: true,
             index: true,
             trim: true,
-            match: RAMQ_REGEX,
+            default: undefined,
+        },
+
+        /** Province ou territoire émetteur au moment du rendez-vous */
+        patientInsuranceJurisdiction: {
+            type: String,
+            default: undefined,
+            trim: true,
         },
 
         /** Spécialiste médical */

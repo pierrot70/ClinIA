@@ -19,15 +19,37 @@ export type PatientLanguage =
     | "zh"
     | "he";
 
+export type HealthInsuranceJurisdiction =
+    | "AB"
+    | "BC"
+    | "MB"
+    | "NB"
+    | "NL"
+    | "NS"
+    | "NT"
+    | "NU"
+    | "ON"
+    | "PE"
+    | "QC"
+    | "SK"
+    | "YT"
+    | "UNKNOWN";
+
+export type PatientCountry = "CA";
+
 export interface Patient {
     _id: string;
     nom: string;
     prenom: string;
     num_assurance_maladie: string;
+    country?: PatientCountry;
+    healthInsuranceJurisdiction?: HealthInsuranceJurisdiction;
     addresse?: string;
     telephone?: string;
     courriel?: string;
     created_by_reference?: string;
+    archivedAt?: string | null;
+    archivedByUserId?: string | null;
     texto?: boolean;
     language?: PatientLanguage | "sp";
     lat?: number;
@@ -100,6 +122,8 @@ export interface PatientPayload {
     nom: string;
     prenom: string;
     num_assurance_maladie?: string;
+    country?: PatientCountry;
+    healthInsuranceJurisdiction?: HealthInsuranceJurisdiction;
     addresse?: string;
     telephone?: string;
     courriel?: string;
@@ -131,7 +155,11 @@ export interface PatientPayload {
 
 export interface PatientAuditLog {
     id: string;
-    action: "PATIENT_CREATE" | "PATIENT_UPDATE" | "PATIENT_DELETE";
+    action:
+        | "PATIENT_CREATE"
+        | "PATIENT_UPDATE"
+        | "PATIENT_ARCHIVE"
+        | "PATIENT_DELETE";
     outcome: "SUCCESS" | "FAILED";
     actorUserId: string | null;
     actorUsernameMasked: string;
@@ -199,6 +227,7 @@ export async function fetchPatientsPaginated(
         addresse?: string;
         sortBy?: string;
         sortDir?: "asc" | "desc";
+        archiveStatus?: "active" | "archived";
     }
 ): Promise<ApiResponse<PaginatedPatients>> {
     const query = new URLSearchParams();
@@ -223,6 +252,9 @@ export async function fetchPatientsPaginated(
     }
     if (params.sortDir) {
         query.set("sortDir", params.sortDir);
+    }
+    if (params.archiveStatus) {
+        query.set("archiveStatus", params.archiveStatus);
     }
 
     return withSecurityIncidentGuard(
@@ -284,14 +316,20 @@ export async function restorePatientClinicalNoteVersion(
 /* ------------------------------------------------------------------ */
 
 export async function createPatient(
-    payload: PatientPayload
+    payload: PatientPayload,
+    { confirmPotentialDuplicate = false } = {}
 ): Promise<ApiResponse<Patient>> {
     return withSecurityIncidentGuard(
         (async () => {
             try {
                 const response = await authFetch(`/api/patients`, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(confirmPotentialDuplicate
+                            ? { "X-Confirm-Potential-Duplicate": "true" }
+                            : {}),
+                    },
                     body: JSON.stringify(payload),
                 });
                 return (await safeJson(response)) as ApiResponse<Patient>;
@@ -339,24 +377,29 @@ export async function updatePatient(
 }
 
 /* ------------------------------------------------------------------ */
-/* DELETE patient                                                      */
+/* Archive patient                                                     */
 /* ------------------------------------------------------------------ */
 
-export async function deletePatient(
-    id: string
+export async function archivePatient(
+    id: string,
+    reason: string
 ): Promise<ApiResponse<Patient>> {
     return withSecurityIncidentGuard(
         (async () => {
             try {
                 const response = await authFetch(`/api/patients/${id}`, {
                     method: "DELETE",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ reason }),
                 });
                 return (await safeJson(response)) as ApiResponse<Patient>;
             } catch {
                 return {
                     error: {
                         code: "INTERNAL_ERROR",
-                        message: "Impossible de supprimer le patient.",
+                        message: "Impossible d'archiver le patient.",
                         retryable: true,
                     },
                 };
@@ -372,7 +415,12 @@ export async function deletePatient(
 export async function fetchPatientAuditLogs(params: {
     page?: number;
     limit?: number;
-    action?: "PATIENT_CREATE" | "PATIENT_UPDATE" | "PATIENT_DELETE" | "";
+    action?:
+        | "PATIENT_CREATE"
+        | "PATIENT_UPDATE"
+        | "PATIENT_ARCHIVE"
+        | "PATIENT_DELETE"
+        | "";
     patientId?: string;
     actorUserId?: string;
     startDate?: string;

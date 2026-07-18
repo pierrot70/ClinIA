@@ -3,18 +3,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const patientFind = vi.fn();
 const patientCountDocuments = vi.fn();
 const patientFindOne = vi.fn();
+const patientExists = vi.fn();
+const patientSave = vi.fn();
 const auditCountDocuments = vi.fn();
 const auditFind = vi.fn();
 
+const PatientModel = vi.fn();
+PatientModel.find = patientFind;
+PatientModel.countDocuments = patientCountDocuments;
+PatientModel.findOne = patientFindOne;
+PatientModel.exists = patientExists;
+PatientModel.findOneAndUpdate = vi.fn();
+PatientModel.findOneAndDelete = vi.fn();
+PatientModel.create = vi.fn();
+
 vi.mock("../../models/Patient.js", () => ({
-    Patient: {
-        find: patientFind,
-        countDocuments: patientCountDocuments,
-        findOne: patientFindOne,
-        findOneAndUpdate: vi.fn(),
-        findOneAndDelete: vi.fn(),
-        create: vi.fn(),
-    },
+    Patient: PatientModel,
 }));
 
 vi.mock("../../models/PatientAuditLog.js", () => ({
@@ -25,6 +29,8 @@ vi.mock("../../models/PatientAuditLog.js", () => ({
 }));
 
 const {
+    createPatient,
+    archivePatient,
     listPatients,
     listPatientAuditLogs,
     listPatientSecureRequestDocuments,
@@ -32,9 +38,108 @@ const {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    PatientModel.mockImplementation((patient) => ({
+        ...patient,
+        save: patientSave,
+    }));
 });
 
 describe("patients service audit logs", () => {
+    it("requires explicit confirmation before creating a same-name patient without insurance number", async () => {
+        patientExists.mockResolvedValue({ _id: "existing-patient" });
+
+        await expect(
+            createPatient(
+                { nom: "Spenard", prenom: "Mickey" },
+                { userId: "507f1f77bcf86cd799439011", role: "MEDECIN" }
+            )
+        ).rejects.toMatchObject({ code: "POTENTIAL_DUPLICATE" });
+
+        expect(patientExists).toHaveBeenCalledWith({
+            ownerUserId: "507f1f77bcf86cd799439011",
+            archivedAt: null,
+            nomSearch: "spenard",
+            prenomSearch: "mickey",
+        });
+        expect(patientSave).not.toHaveBeenCalled();
+    });
+
+    it("excludes archived patients from active searches", async () => {
+        patientCountDocuments.mockResolvedValue(0);
+        patientFind.mockReturnValue({
+            sort: vi.fn().mockReturnValue({
+                skip: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockReturnValue({
+                        lean: vi.fn().mockResolvedValue([]),
+                    }),
+                }),
+            }),
+        });
+
+        await listPatients(
+            {},
+            {},
+            { userId: "507f1f77bcf86cd799439011", role: "MEDECIN" }
+        );
+
+        expect(patientFind).toHaveBeenCalledWith({
+            ownerUserId: "507f1f77bcf86cd799439011",
+            archivedAt: null,
+        });
+    });
+
+    it("lists archived dossiers only when explicitly requested", async () => {
+        patientCountDocuments.mockResolvedValue(0);
+        patientFind.mockReturnValue({
+            sort: vi.fn().mockReturnValue({
+                skip: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockReturnValue({
+                        lean: vi.fn().mockResolvedValue([]),
+                    }),
+                }),
+            }),
+        });
+
+        await listPatients(
+            {},
+            { archiveStatus: "archived" },
+            { userId: "507f1f77bcf86cd799439011", role: "MEDECIN" }
+        );
+
+        expect(patientFind).toHaveBeenCalledWith({
+            ownerUserId: "507f1f77bcf86cd799439011",
+            archivedAt: { $ne: null },
+        });
+    });
+
+    it("archives a patient instead of deleting the dossier", async () => {
+        PatientModel.findOneAndUpdate.mockResolvedValue({ _id: "patient-archive" });
+
+        const archived = await archivePatient(
+            "507f1f77bcf86cd799439012",
+            "Doublon confirmé",
+            { userId: "507f1f77bcf86cd799439011", role: "MEDECIN" }
+        );
+
+        expect(archived).toEqual({ _id: "patient-archive" });
+        expect(PatientModel.findOneAndDelete).not.toHaveBeenCalled();
+        expect(PatientModel.findOneAndUpdate).toHaveBeenCalledWith(
+            {
+                _id: "507f1f77bcf86cd799439012",
+                ownerUserId: "507f1f77bcf86cd799439011",
+                archivedAt: null,
+            },
+            {
+                $set: expect.objectContaining({
+                    archivedByUserId: "507f1f77bcf86cd799439011",
+                    archiveReason: "Doublon confirmé",
+                    archivedAt: expect.any(Date),
+                }),
+            },
+            expect.objectContaining({ new: true, runValidators: true })
+        );
+    });
+
     it("searches a clinician's patients by first and last name without regex injection", async () => {
         patientCountDocuments.mockResolvedValue(1);
         patientFind.mockReturnValue({
@@ -55,12 +160,109 @@ describe("patients service audit logs", () => {
 
         expect(patientFind).toHaveBeenCalledWith({
             ownerUserId: "507f1f77bcf86cd799439011",
+            archivedAt: null,
             $and: [
-                { $or: [{ nom: /Pierre/i }, { prenom: /Pierre/i }] },
-                { $or: [{ nom: /Lasante/i }, { prenom: /Lasante/i }] },
+                {
+                    $or: [
+                        { nomSearch: /^pierre/ },
+                        { prenomSearch: /^pierre/ },
+                    ],
+                },
+                {
+                    $or: [
+                        { nomSearch: /^lasante/ },
+                        { prenomSearch: /^lasante/ },
+                    ],
+                },
             ],
         });
         expect(result.data).toHaveLength(1);
+    });
+
+    it("escapes every direct patient search filter before using it as a Mongo regex", async () => {
+        patientCountDocuments.mockResolvedValue(0);
+        patientFind.mockReturnValue({
+            sort: vi.fn().mockReturnValue({
+                skip: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockReturnValue({
+                        lean: vi.fn().mockResolvedValue([]),
+                    }),
+                }),
+            }),
+        });
+
+        await listPatients(
+            {
+                nom: ".*(Pierre)+",
+                prenom: "[Anne]",
+                num_assurance_maladie: "RAMQ(123)+",
+                telephone: "+1(514).*",
+                addresse: "123 rue [Test]",
+            },
+            {},
+            { userId: "507f1f77bcf86cd799439011", role: "MEDECIN" }
+        );
+
+        expect(patientFind).toHaveBeenCalledWith({
+            ownerUserId: "507f1f77bcf86cd799439011",
+            archivedAt: null,
+            nomSearch: { $regex: /^\.\*\(pierre\)\+/ },
+            prenomSearch: { $regex: /^\[anne\]/ },
+            healthInsuranceNumberSearch: { $regex: /^RAMQ123/ },
+            telephoneSearch: { $regex: /^1514/ },
+            addresseSearch: { $regex: /^123 rue \[test\]/ },
+        });
+    });
+
+    it("limits the general search to four escaped terms", async () => {
+        patientCountDocuments.mockResolvedValue(0);
+        patientFind.mockReturnValue({
+            sort: vi.fn().mockReturnValue({
+                skip: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockReturnValue({
+                        lean: vi.fn().mockResolvedValue([]),
+                    }),
+                }),
+            }),
+        });
+
+        await listPatients(
+            { q: "un deux trois quatre cinq six" },
+            {},
+            { userId: "507f1f77bcf86cd799439011", role: "MEDECIN" }
+        );
+
+        const query = patientFind.mock.calls[0][0];
+        expect(query.$and).toHaveLength(4);
+        expect(query.$and.map((condition) => condition.$or[0].nomSearch.source)).toEqual([
+            "^un",
+            "^deux",
+            "^trois",
+            "^quatre",
+        ]);
+    });
+
+    it("limits direct patient search patterns to 80 characters", async () => {
+        patientCountDocuments.mockResolvedValue(0);
+        patientFind.mockReturnValue({
+            sort: vi.fn().mockReturnValue({
+                skip: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockReturnValue({
+                        lean: vi.fn().mockResolvedValue([]),
+                    }),
+                }),
+            }),
+        });
+
+        await listPatients(
+            { nom: "a".repeat(120) },
+            {},
+            { userId: "507f1f77bcf86cd799439011", role: "MEDECIN" }
+        );
+
+        expect(
+            patientFind.mock.calls[0][0].nomSearch.$regex.source
+        ).toHaveLength(81);
     });
 
     it("lists patient audit logs with pagination for admins", async () => {

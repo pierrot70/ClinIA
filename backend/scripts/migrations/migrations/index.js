@@ -6,9 +6,12 @@ import { migration as expandPatientLanguageOptions }
     from "./20260712-expand-patient-language-options.js";
 import { migration as sanitizeAuditRequestPaths }
     from "./20260718-sanitize-audit-request-paths.js";
+import { migration as addPatientSearchIndexes }
+    from "./20260718-add-patient-search-indexes.js";
 export const migrations = [
     registerMigrationFramework,
     addPatientLanguageDefault,
     expandPatientLanguageOptions,
     sanitizeAuditRequestPaths,
+    addPatientSearchIndexes,
 ];

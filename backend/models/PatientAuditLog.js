@@ -7,6 +7,7 @@ const PatientAuditLogSchema = new mongoose.Schema(
             enum: [
                 "PATIENT_CREATE",
                 "PATIENT_UPDATE",
+                "PATIENT_ARCHIVE",
                 "PATIENT_DELETE",
             ],
             required: true,

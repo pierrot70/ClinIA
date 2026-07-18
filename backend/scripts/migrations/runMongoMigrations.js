@@ -150,22 +150,30 @@ async function run() {
     try {
         for (const { migration, checksum } of pending) {
             const startedAt = Date.now();
+            const registryEntry = {
+                id: migration.id,
+                checksum,
+                description: migration.description,
+                reversible: migration.reversible,
+                appliedAt: new Date(),
+                durationMs: 0,
+                runner: "clinia-mongo-migrations-v1",
+            };
+
+            if (migration.transactional === false) {
+                await migration.up({ db, session: null });
+                registryEntry.durationMs = Date.now() - startedAt;
+                await registry.insertOne(registryEntry);
+                console.log(`APPLIED id=${migration.id}`);
+                continue;
+            }
+
             const session = await mongoose.startSession();
             try {
                 await session.withTransaction(async () => {
                     await migration.up({ db, session });
-                    await registry.insertOne(
-                        {
-                            id: migration.id,
-                            checksum,
-                            description: migration.description,
-                            reversible: migration.reversible,
-                            appliedAt: new Date(),
-                            durationMs: Date.now() - startedAt,
-                            runner: "clinia-mongo-migrations-v1",
-                        },
-                        { session }
-                    );
+                    registryEntry.durationMs = Date.now() - startedAt;
+                    await registry.insertOne(registryEntry, { session });
                 }, { writeConcern: WRITE_CONCERN });
             } finally {
                 await session.endSession();

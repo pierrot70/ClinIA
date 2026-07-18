@@ -9,6 +9,8 @@ export type ApiErrorCode =
     | "AI_DEGRADED"           // IA OK mais fallback/mock utilisé
     | "PERSISTENCE_FAILED"    // Mongo indisponible
     | "INVALID_INPUT"         // Payload invalide
+    | "POTENTIAL_DUPLICATE"   // Homonyme detecte avant creation patient
+    | "PATIENT_ARCHIVED"      // Dossier retiré des opérations actives
     | "SECURITY_INCIDENT_BLOCKING" // Acknowledgment explicite obligatoire
     | "TOKEN_REVOKED"         // Session invalidée par le backend
     | "ACCOUNT_TEMPORARILY_RESTRICTED" // Restriction temporaire sur routes sensibles
