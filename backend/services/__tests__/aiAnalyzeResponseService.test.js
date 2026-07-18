@@ -129,6 +129,14 @@ describe("aiAnalyzeResponseService", () => {
                 },
             },
         });
-        expect(logger.log).toHaveBeenCalled();
+        expect(logger.log).toHaveBeenCalledWith(
+            "AI_RESPONSE_READY",
+            expect.objectContaining({
+                model: "gpt-4.1-mini",
+                responseBytes: expect.any(Number),
+                writeVerificationRecorded: true,
+            })
+        );
+        expect(JSON.stringify(logger.log.mock.calls)).not.toContain("Migraine");
     });
 });

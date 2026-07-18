@@ -125,11 +125,11 @@ export async function executeOpenAIAnalyze({
         const completion = await openai.chat.completions.create(request);
         const rawContent = completion?.choices?.[0]?.message?.content || "";
 
-        logger.log(
-            "=== RAW OpenAI RESPONSE ===\n",
-            rawContent,
-            "\n==========================="
-        );
+        logger.log("OPENAI_RESPONSE_RECEIVED", {
+            model,
+            upstreamRequestId: completion?.id || null,
+            responseBytes: Buffer.byteLength(rawContent, "utf8"),
+        });
 
         const postCloudScan = detectNonSecureContent(rawContent);
         if (postCloudScan.hasMatches) {
@@ -169,7 +169,6 @@ export async function executeOpenAIAnalyze({
             });
             logger.error("❌ OpenAI returned an unusable clinical payload", {
                 model,
-                diagnosis,
                 rawContentLength: rawContent.length,
             });
 

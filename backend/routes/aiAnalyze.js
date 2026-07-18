@@ -17,6 +17,7 @@ import { createWriteVerificationContext } from "../audit/writeVerification.js";
 import { resolveAnalyzeExecutionMode } from "../services/aiAnalyzeAccessService.js";
 import { requireRole } from "../middleware/requireRole.js";
 import { getRequestContext } from "../app/requestContext.js";
+import { getSafeErrorMetadata, getSafeRequestPath } from "../utils/requestLogSafety.js";
 
 export function createAiAnalyzeRouter(deps) {
     const {
@@ -149,7 +150,7 @@ export function createAiAnalyzeRouter(deps) {
                     instanceId: requestContext.instanceId,
                     verificationId: writeVerification.verificationId,
                     clientMutationId: writeVerification.clientMutationId,
-                    requestPath: req.originalUrl || req.path || null,
+                    requestPath: getSafeRequestPath(req),
                 };
                 let cloudSafePatient = buildCloudSafePatientPayload(patient);
                 let neutralizationMeta = null;
@@ -375,7 +376,10 @@ export function createAiAnalyzeRouter(deps) {
 
                 return res.json(finalResult.responsePayload);
             } catch (err) {
-                console.error("🔥 FATAL /api/ai/analyze ERROR", err);
+                console.error("AI_ANALYZE_FAILED", {
+                    ...getSafeErrorMetadata(err),
+                    requestId: getRequestContext(req).requestId,
+                });
                 return res.status(500).json({
                     error: {
                         code: "INTERNAL_ERROR",

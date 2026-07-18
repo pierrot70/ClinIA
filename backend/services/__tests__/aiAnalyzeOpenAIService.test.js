@@ -76,6 +76,7 @@ describe("aiAnalyzeOpenAIService", () => {
             },
         };
 
+        const logger = { log: vi.fn(), error: vi.fn() };
         const result = await executeOpenAIAnalyze({
             openai,
             model: "gpt-4.1-mini",
@@ -102,7 +103,7 @@ describe("aiAnalyzeOpenAIService", () => {
             recordOpenAISuccess,
             recordOpenAIFailure: vi.fn(),
             res,
-            logger: { log: vi.fn(), error: vi.fn() },
+            logger,
         });
 
         expect(result).toEqual({
@@ -115,6 +116,15 @@ describe("aiAnalyzeOpenAIService", () => {
             upstreamRequestId: "upstream-1",
         });
         expect(recordOpenAISuccess).toHaveBeenCalledTimes(1);
+        expect(logger.log).toHaveBeenCalledWith(
+            "OPENAI_RESPONSE_RECEIVED",
+            expect.objectContaining({
+                model: "gpt-4.1-mini",
+                upstreamRequestId: "upstream-1",
+                responseBytes: expect.any(Number),
+            })
+        );
+        expect(JSON.stringify(logger.log.mock.calls)).not.toContain("Migraine");
     });
 
     it("adds type 2 diabetes comparison guardrails to the OpenAI prompt", async () => {

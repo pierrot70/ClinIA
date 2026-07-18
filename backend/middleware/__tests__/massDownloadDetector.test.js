@@ -110,7 +110,7 @@ describe("massDownloadDetector", () => {
             expect.objectContaining({
                 type: "MASS_DOWNLOAD_ATTEMPT",
                 phase: "post_cloud",
-                requestPath: "/api/patients?page=5&limit=50",
+                requestPath: "/api/patients",
                 context: expect.objectContaining({
                     detectorKey: "patients_list",
                     userId: "user-2",

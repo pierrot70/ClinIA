@@ -26,6 +26,7 @@ import {
     buildWriteVerificationMeta,
     createWriteVerificationContext,
 } from "../audit/writeVerification.js";
+import { getSafeRequestPath } from "../utils/requestLogSafety.js";
 
 const router = express.Router();
 
@@ -49,7 +50,7 @@ async function recordPatientMutationAudit(req, {
 }) {
     const requestContext = getRequestContext(req);
     const ip = getRequestIp(req);
-    const requestPath = req.originalUrl || req.path || null;
+    const requestPath = getSafeRequestPath(req);
     const { verificationId, clientMutationId } =
         createWriteVerificationContext(req);
 
@@ -168,7 +169,7 @@ async function buildClinicalNoteTransactionAudit(req, {
         ip: getRequestIp(req),
         requestId: requestContext.requestId,
         instanceId: requestContext.instanceId,
-        requestPath: req.originalUrl || req.path || null,
+        requestPath: getSafeRequestPath(req),
         changedFields,
         context,
         replicaSet: await getReplicaSetStatus(),

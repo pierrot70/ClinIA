@@ -151,11 +151,12 @@ export async function buildPersistedRealAnalyzeResponse({
         },
     };
 
-    logger.log(
-        "=== RESPONSE TO FRONTEND ===\n",
-        JSON.stringify(responsePayload, null, 2),
-        "\n============================"
-    );
+    logger.log("AI_RESPONSE_READY", {
+        source: "real",
+        model,
+        responseBytes: Buffer.byteLength(JSON.stringify(responsePayload), "utf8"),
+        writeVerificationRecorded: Boolean(persist.writeAuditRecorded),
+    });
 
     return { ok: true, responsePayload };
 }

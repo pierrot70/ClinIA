@@ -3,6 +3,7 @@ import cors from "cors";
 
 import { createCorsOriginDelegate } from "../security/originProtection.js";
 import { createRequestContextMiddleware, getRequestContext } from "./requestContext.js";
+import { getSafeRequestPath } from "../utils/requestLogSafety.js";
 
 export function createSecurityHeadersMiddleware() {
     return (req, res, next) => {
@@ -25,30 +26,10 @@ export function createSecurityHeadersMiddleware() {
                 forwardedProto.toLowerCase().includes("https"));
 
         const requestContext = getRequestContext(req);
-        console.log("[HTTPS DEBUG]", {
-            NODE_ENV: process.env.NODE_ENV,
-            isProd,
-            isSecure,
-            hostHeader,
-            hostname,
-            isLocalHostRequest,
-            forwardedProto,
-            url: req.url,
-            method: req.method,
-            ...requestContext,
-        });
-
         if (isProd && !isSecure && !isLocalHostRequest) {
             console.warn("[HTTPS BLOCKED]", {
-                NODE_ENV: process.env.NODE_ENV,
-                isProd,
-                isSecure,
-                hostHeader,
-                hostname,
-                isLocalHostRequest,
-                forwardedProto,
-                url: req.url,
                 method: req.method,
+                path: getSafeRequestPath(req, "/"),
                 ...requestContext,
             });
             return res.status(400).json({

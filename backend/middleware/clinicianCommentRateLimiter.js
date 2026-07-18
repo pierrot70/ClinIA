@@ -1,4 +1,5 @@
 import { RateLimitWindow } from "../models/RateLimitWindow.js";
+import { getSafeRequestPath } from "../utils/requestLogSafety.js";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_COMMENTS_PER_WINDOW = 5;
@@ -73,7 +74,7 @@ export function createClinicianCommentRateLimiter({
                 actorKey,
                 requestCount: bucket.requestCount,
                 windowStartedAt: windowStartedAt.toISOString(),
-                path: req.originalUrl || req.url || "/api/clinician-comments",
+                path: getSafeRequestPath(req, "/api/clinician-comments"),
             });
 
             return buildLimitedResponse(res, windowStartedAt, nowMs);

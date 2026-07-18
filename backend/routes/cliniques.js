@@ -14,6 +14,7 @@ import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js"
 import { getRequestContext } from "../app/requestContext.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 import { getReplicaSetStatus } from "../services/dbStatus.js";
+import { getSafeRequestPath } from "../utils/requestLogSafety.js";
 
 const router = express.Router();
 
@@ -46,7 +47,7 @@ async function recordCliniqueWriteAudit(req, {
         instanceId: requestContext.instanceId,
         resourceId: cliniqueId ? String(cliniqueId) : null,
         changedFields,
-        requestPath: req.originalUrl || req.path || null,
+        requestPath: getSafeRequestPath(req),
         writeConcern: CLINICAL_WRITE_CONCERN,
         replicaSet: await getReplicaSetStatus(),
     });

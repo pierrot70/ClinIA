@@ -1,4 +1,5 @@
 import { detectNonSecureContent, buildBlockingIncidentResponse } from "../utils/securityIncident.js";
+import { getSafeRequestPath } from "../utils/requestLogSafety.js";
 
 function shouldEnforceCloudSafety(req) {
     return Boolean(req?.cliniaCloudSafety?.enforce === true);
@@ -6,7 +7,7 @@ function shouldEnforceCloudSafety(req) {
 
 function buildIncidentContext(req) {
     return {
-        route: req.originalUrl,
+        route: getSafeRequestPath(req, "/"),
         method: req.method,
         ...(req?.cliniaCloudSafety?.context || {}),
     };

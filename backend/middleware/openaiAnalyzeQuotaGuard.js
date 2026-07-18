@@ -1,4 +1,5 @@
 import { RateLimitWindow } from "../models/RateLimitWindow.js";
+import { getSafeRequestPath } from "../utils/requestLogSafety.js";
 
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 5;
@@ -90,7 +91,7 @@ export function createOpenAIAnalyzeQuotaGuard({
                 key,
                 requestCount: bucket.requestCount,
                 windowStartedAt: windowStartedAt.toISOString(),
-                path: req.originalUrl || req.url || "/api/ai/analyze",
+                path: getSafeRequestPath(req, "/api/ai/analyze"),
             });
 
             return buildRateLimitedResponse(res, retryAfterSeconds);

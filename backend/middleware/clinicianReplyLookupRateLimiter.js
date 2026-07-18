@@ -1,4 +1,5 @@
 import { RateLimitWindow } from "../models/RateLimitWindow.js";
+import { getSafeRequestPath } from "../utils/requestLogSafety.js";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOOKUPS_PER_WINDOW = 10;
@@ -59,10 +60,10 @@ export function createClinicianReplyLookupRateLimiter({
                 actorKey,
                 requestCount: bucket.requestCount,
                 windowStartedAt: windowStartedAt.toISOString(),
-                path:
-                    req.originalUrl ||
-                    req.url ||
-                    "/api/clinician-comments/lookup-replies",
+                path: getSafeRequestPath(
+                    req,
+                    "/api/clinician-comments/lookup-replies"
+                ),
             });
 
             return res.status(429).json({

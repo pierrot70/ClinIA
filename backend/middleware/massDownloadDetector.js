@@ -3,6 +3,7 @@ import {
     handleMassDownloadSignal,
 } from "../services/securityIncidents.js";
 import { MassDownloadWindow } from "../models/MassDownloadWindow.js";
+import { getSafeErrorMetadata, getSafeRequestPath } from "../utils/requestLogSafety.js";
 
 const DEFAULT_WINDOW_MS = 2 * 60 * 1000;
 const DEFAULT_INCIDENT_COOLDOWN_MS = 10 * 60 * 1000;
@@ -111,7 +112,7 @@ export function createMassDownloadDetector({
                     type: "MASS_DOWNLOAD_ATTEMPT",
                     phase: "post_cloud",
                     reason: "Comportement de consultation ou d'export volumetrique detecte.",
-                    requestPath: req.originalUrl || req.path || req.url || "/",
+                    requestPath: getSafeRequestPath(req, "/"),
                     context: {
                         detectorKey,
                         userId: req.auth?.userId ?? null,
@@ -126,7 +127,7 @@ export function createMassDownloadDetector({
                         ...buildContext(req),
                     },
                 }).catch((err) => {
-                    console.error("❌ MASS_DOWNLOAD_INCIDENT_CREATE_FAILED", err);
+                    console.error("MASS_DOWNLOAD_INCIDENT_CREATE_FAILED", getSafeErrorMetadata(err));
                 });
             } else {
                 await handleMassDownloadSignal({
@@ -134,7 +135,7 @@ export function createMassDownloadDetector({
                     detectedAt: new Date(now),
                     additionalSignals: 1,
                 }).catch((err) => {
-                    console.error("❌ MASS_DOWNLOAD_ESCALATION_SIGNAL_FAILED", err);
+                    console.error("MASS_DOWNLOAD_ESCALATION_SIGNAL_FAILED", getSafeErrorMetadata(err));
                 });
             }
         }
