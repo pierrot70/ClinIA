@@ -26,6 +26,16 @@ const labels = {
         acknowledged: "Acknowledge",
         acknowledging: "Acknowledgement...",
         acknowledge: "Acknowledge",
+        explain: "Explanation",
+        hideExplanation: "Hide",
+        explanationTitle: "Understand this incident",
+        explanationWhatHappened: "Detected:",
+        explanationWhatWasBlocked: "Blocked:",
+        explanationNextStep: "Next step:",
+        explanationAcknowledgement: "Acknowledgement does not restore content.",
+        nonSecurePreCloudWhatHappened: "A patient identifier was detected.",
+        nonSecurePreCloudWhatWasBlocked: "The cloud request was blocked.",
+        nonSecurePreCloudNextStep: "Remove identifying details.",
         pagePrefix: "Page",
         pageSeparator: "/",
         resultSuffix: "resultats",
@@ -65,5 +75,52 @@ describe("SecurityIncidentsModal", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Rafraichir" }));
         expect(onRefresh).toHaveBeenCalledTimes(1);
+    });
+
+    it("explains a pre-cloud PHI incident without displaying its detected value", () => {
+        render(
+            <SecurityIncidentsModal
+                isOpen
+                items={[
+                    {
+                        id: "incident-1",
+                        type: "NON_SECURE_CONTENT",
+                        phase: "pre_cloud",
+                        reason: "Identifier detected.",
+                        requestPath: "/api/ai/analyze",
+                        transport: "openai_chat_completions",
+                        matches: [],
+                        context: {},
+                        detectedAt: "2026-07-18T12:00:00.000Z",
+                        acknowledged: false,
+                        acknowledgmentAction: "",
+                        acknowledgedAt: null,
+                        acknowledgmentContext: {},
+                        createdAt: "2026-07-18T12:00:00.000Z",
+                        updatedAt: "2026-07-18T12:00:00.000Z",
+                    },
+                ]}
+                loading={false}
+                error={null}
+                ackingId=""
+                acknowledgedFilter="false"
+                typeFilter=""
+                pagination={{ page: 1, limit: 10, total: 1, totalPages: 1 }}
+                headerLabels={labels}
+                onClose={() => {}}
+                onRefresh={() => {}}
+                onAcknowledgedFilterChange={() => {}}
+                onTypeFilterChange={() => {}}
+                onAcknowledge={() => {}}
+                onLoadPage={() => {}}
+            />
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "Explanation" }));
+
+        expect(screen.getByText("Understand this incident")).toBeInTheDocument();
+        expect(screen.getByText("A patient identifier was detected.")).toBeInTheDocument();
+        expect(screen.getByText("The cloud request was blocked.")).toBeInTheDocument();
+        expect(screen.getByText("Remove identifying details.")).toBeInTheDocument();
     });
 });

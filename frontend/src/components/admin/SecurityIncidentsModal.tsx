@@ -1,4 +1,5 @@
 import React from "react";
+import { CircleHelp } from "lucide-react";
 
 import type { SecurityIncidentEntry, SecurityIncidentPagination } from "../../services/securityIncidentApi";
 
@@ -27,6 +28,16 @@ type HeaderLabels = {
         acknowledged: string;
         acknowledging: string;
         acknowledge: string;
+        explain: string;
+        hideExplanation: string;
+        explanationTitle: string;
+        explanationWhatHappened: string;
+        explanationWhatWasBlocked: string;
+        explanationNextStep: string;
+        explanationAcknowledgement: string;
+        nonSecurePreCloudWhatHappened: string;
+        nonSecurePreCloudWhatWasBlocked: string;
+        nonSecurePreCloudNextStep: string;
         pagePrefix: string;
         pageSeparator: string;
         resultSuffix: string;
@@ -72,11 +83,29 @@ export function SecurityIncidentsModal({
     onAcknowledge,
     onLoadPage,
 }: SecurityIncidentsModalProps) {
+    const [explainedIncidentId, setExplainedIncidentId] = React.useState("");
+
     if (!isOpen) {
         return null;
     }
 
     const labels = headerLabels.securityIncidentsModal;
+
+    function getExplanation(item: SecurityIncidentEntry) {
+        if (item.type === "NON_SECURE_CONTENT" && item.phase === "pre_cloud") {
+            return {
+                whatHappened: labels.nonSecurePreCloudWhatHappened,
+                whatWasBlocked: labels.nonSecurePreCloudWhatWasBlocked,
+                nextStep: labels.nonSecurePreCloudNextStep,
+            };
+        }
+
+        return {
+            whatHappened: labels.explanationWhatHappened,
+            whatWasBlocked: labels.explanationWhatWasBlocked,
+            nextStep: labels.explanationNextStep,
+        };
+    }
 
     return (
         <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/40 px-4 py-4 sm:py-6">
@@ -156,6 +185,8 @@ export function SecurityIncidentsModal({
                                     </thead>
                                     <tbody>
                                         {items.map((item) => {
+                                            const explanation = getExplanation(item);
+                                            const isExplanationVisible = explainedIncidentId === item.id;
                                             const impactedAccount =
                                                 typeof item.context?.username === "string" && item.context.username.trim()
                                                     ? item.context.username.trim()
@@ -172,7 +203,8 @@ export function SecurityIncidentsModal({
                                                 .join(" | ");
 
                                             return (
-                                                <tr key={item.id} className="border-t border-gray-100 align-top">
+                                                <React.Fragment key={item.id}>
+                                                <tr className="border-t border-gray-100 align-top">
                                                     <td className="px-3 py-2 text-gray-600">
                                                         {new Date(item.detectedAt || item.createdAt || "").toLocaleString()}
                                                         {item.acknowledgedAt ? (
@@ -201,22 +233,69 @@ export function SecurityIncidentsModal({
                                                         {contextSummary || "—"}
                                                     </td>
                                                     <td className="px-3 py-2">
-                                                        {item.acknowledged ? (
-                                                            <span className="inline-flex rounded bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-                                                                {labels.acknowledged}
-                                                            </span>
-                                                        ) : (
+                                                        <div className="flex flex-wrap gap-2">
                                                             <button
                                                                 type="button"
-                                                                onClick={() => onAcknowledge(item.id)}
-                                                                disabled={ackingId === item.id}
-                                                                className="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                                onClick={() => setExplainedIncidentId(
+                                                                    isExplanationVisible ? "" : item.id
+                                                                )}
+                                                                className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
                                                             >
-                                                                {ackingId === item.id ? labels.acknowledging : labels.acknowledge}
+                                                                <CircleHelp size={14} aria-hidden="true" />
+                                                                {isExplanationVisible
+                                                                    ? labels.hideExplanation
+                                                                    : labels.explain}
                                                             </button>
-                                                        )}
+                                                            {item.acknowledged ? (
+                                                                <span className="inline-flex rounded bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                                                                    {labels.acknowledged}
+                                                                </span>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => onAcknowledge(item.id)}
+                                                                    disabled={ackingId === item.id}
+                                                                    className="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                                >
+                                                                    {ackingId === item.id ? labels.acknowledging : labels.acknowledge}
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                 </tr>
+                                                {isExplanationVisible ? (
+                                                    <tr className="border-t border-slate-100 bg-slate-50">
+                                                        <td className="px-3 py-3" colSpan={6}>
+                                                            <div className="max-w-4xl text-sm text-slate-700">
+                                                                <h3 className="font-semibold text-slate-900">
+                                                                    {labels.explanationTitle}
+                                                                </h3>
+                                                                <p className="mt-2">
+                                                                    <span className="font-medium text-slate-900">
+                                                                        {labels.explanationWhatHappened}
+                                                                    </span>{" "}
+                                                                    {explanation.whatHappened}
+                                                                </p>
+                                                                <p className="mt-1">
+                                                                    <span className="font-medium text-slate-900">
+                                                                        {labels.explanationWhatWasBlocked}
+                                                                    </span>{" "}
+                                                                    {explanation.whatWasBlocked}
+                                                                </p>
+                                                                <p className="mt-1">
+                                                                    <span className="font-medium text-slate-900">
+                                                                        {labels.explanationNextStep}
+                                                                    </span>{" "}
+                                                                    {explanation.nextStep}
+                                                                </p>
+                                                                <p className="mt-2 text-xs text-slate-600">
+                                                                    {labels.explanationAcknowledgement}
+                                                                </p>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ) : null}
+                                                </React.Fragment>
                                             );
                                         })}
                                     </tbody>

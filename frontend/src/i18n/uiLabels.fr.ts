@@ -321,6 +321,20 @@ export const UI_LABELS_FR = {
             acknowledging: "Acquittement...",
             acknowledged: "Déjà acquitté",
             acknowledgedAtPrefix: "Acquitté le:",
+            explain: "Explication",
+            hideExplanation: "Masquer",
+            explanationTitle: "Comprendre cet incident",
+            explanationWhatHappened: "Ce qui a été détecté:",
+            explanationWhatWasBlocked: "Ce qui a été bloqué:",
+            explanationNextStep: "Que faire:",
+            explanationAcknowledgement:
+                "L'acquittement confirme que l'incident a été examiné; il ne transmet ni ne rétablit le contenu détecté.",
+            nonSecurePreCloudWhatHappened:
+                "ClinIA a détecté un identifiant possible, par exemple un nom, un courriel, un téléphone, une adresse ou un numéro d'assurance maladie, dans les données d'analyse.",
+            nonSecurePreCloudWhatWasBlocked:
+                "L'analyse a été arrêtée avant toute transmission vers OpenAI. Le contenu détecté n'a pas été envoyé au service cloud.",
+            nonSecurePreCloudNextStep:
+                "Retirez les éléments identifiants du motif, du diagnostic et des champs cliniques, puis relancez l'analyse avec des renseignements cliniques minimisés.",
             pagePrefix: "Page",
             pageSeparator: "/",
             resultSuffix: "résultats",
