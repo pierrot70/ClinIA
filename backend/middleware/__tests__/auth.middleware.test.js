@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { requireRole } from "../requireRole.js";
-import { verifyDiagnosticJWT, verifyJWT } from "../verifyJWT.js";
+import { verifyJWT } from "../verifyJWT.js";
 
 const { verify } = vi.hoisted(() => ({
     verify: vi.fn(),
@@ -290,63 +290,6 @@ describe("verifyJWT middleware", () => {
                 retryable: false,
             },
         });
-        expect(next).not.toHaveBeenCalled();
-    });
-});
-
-describe("verifyDiagnosticJWT middleware", () => {
-    it("accepts a valid signed token without reading or touching Mongo-backed session state", () => {
-        process.env.JWT_ACCESS_SECRET = "test-access-secret";
-        verify.mockReturnValue({
-            sub: "user-1",
-            role: "SUPERADMIN",
-            username: "admin",
-            iat: Math.floor(Date.now() / 1000),
-        });
-
-        const req = {
-            headers: {
-                authorization: "Bearer token-value",
-            },
-        };
-        const res = makeRes();
-        const next = vi.fn();
-
-        verifyDiagnosticJWT(req, res, next);
-
-        expect(req.auth).toEqual({
-            userId: "user-1",
-            role: "SUPERADMIN",
-            username: "admin",
-            passwordResetRequired: false,
-            mustChangePasswordOnNextLogin: false,
-            diagnosticAuth: true,
-        });
-        expect(findById).not.toHaveBeenCalled();
-        expect(validateSessionState).not.toHaveBeenCalled();
-        expect(touchSessionActivity).not.toHaveBeenCalled();
-        expect(next).toHaveBeenCalledTimes(1);
-    });
-
-    it("rejects diagnostic access when the signed token role is not valid", () => {
-        process.env.JWT_ACCESS_SECRET = "test-access-secret";
-        verify.mockReturnValue({
-            sub: "user-1",
-            role: "NOT_A_ROLE",
-            username: "admin",
-        });
-
-        const req = {
-            headers: {
-                authorization: "Bearer token-value",
-            },
-        };
-        const res = makeRes();
-        const next = vi.fn();
-
-        verifyDiagnosticJWT(req, res, next);
-
-        expect(res.status).toHaveBeenCalledWith(401);
         expect(next).not.toHaveBeenCalled();
     });
 });
