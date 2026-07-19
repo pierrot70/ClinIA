@@ -31,6 +31,7 @@ vi.mock("../../models/PatientAuditLog.js", () => ({
 const {
     createPatient,
     archivePatient,
+    restorePatient,
     listPatients,
     listPatientAuditLogs,
     listPatientSecureRequestDocuments,
@@ -135,6 +136,34 @@ describe("patients service audit logs", () => {
                     archiveReason: "Doublon confirmé",
                     archivedAt: expect.any(Date),
                 }),
+            },
+            expect.objectContaining({ new: true, runValidators: true })
+        );
+    });
+
+    it("restores an archived patient without deleting clinical data", async () => {
+        PatientModel.findOneAndUpdate.mockResolvedValue({ _id: "patient-restored" });
+
+        const restored = await restorePatient(
+            "507f1f77bcf86cd799439012",
+            "Demande administrative",
+            { userId: "507f1f77bcf86cd799439011", role: "MEDECIN" }
+        );
+
+        expect(restored).toEqual({ _id: "patient-restored" });
+        expect(PatientModel.findOneAndDelete).not.toHaveBeenCalled();
+        expect(PatientModel.findOneAndUpdate).toHaveBeenCalledWith(
+            {
+                _id: "507f1f77bcf86cd799439012",
+                ownerUserId: "507f1f77bcf86cd799439011",
+                archivedAt: { $ne: null },
+            },
+            {
+                $set: {
+                    archivedAt: null,
+                    archivedByUserId: null,
+                    archiveReason: "",
+                },
             },
             expect.objectContaining({ new: true, runValidators: true })
         );

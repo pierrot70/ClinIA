@@ -6,21 +6,25 @@ const {
     getPatientById,
     updatePatient,
     archivePatient,
+    restorePatient,
 } = vi.hoisted(() => ({
     createPatient: vi.fn(),
     listPatientAuditLogs: vi.fn(),
     getPatientById: vi.fn(),
     updatePatient: vi.fn(),
     archivePatient: vi.fn(),
+    restorePatient: vi.fn(),
 }));
 
 const {
     toCreatePatientDTO,
     toArchivePatientDTO,
+    toRestorePatientDTO,
     toUpdatePatientDTO,
 } = vi.hoisted(() => ({
     toCreatePatientDTO: vi.fn(),
     toArchivePatientDTO: vi.fn(),
+    toRestorePatientDTO: vi.fn(),
     toUpdatePatientDTO: vi.fn(),
 }));
 
@@ -43,11 +47,13 @@ vi.mock("../../services/patients.js", () => ({
     getPatientById,
     updatePatient,
     archivePatient,
+    restorePatient,
 }));
 
 vi.mock("../../dto/patient.dto.js", () => ({
     toCreatePatientDTO,
     toArchivePatientDTO,
+    toRestorePatientDTO,
     toUpdatePatientDTO,
 }));
 
@@ -590,5 +596,48 @@ describe("patients routes audit", () => {
 
         expect(res.status).toHaveBeenCalledWith(403);
         expect(next).not.toHaveBeenCalled();
+        });
     });
-});
+
+    it("records a restore audit without retaining its reason", async () => {
+        const handler = getRouteHandler("post", "/:id/restore");
+
+        toRestorePatientDTO.mockReturnValue({ reason: "Demande administrative" });
+        restorePatient.mockResolvedValue({ _id: "patient-4" });
+
+        const req = {
+            params: { id: "patient-4" },
+            headers: {},
+            auth: {
+                userId: "user-4",
+                username: "super.admin",
+                role: "SUPERADMIN",
+            },
+            ip: "127.0.0.1",
+            originalUrl: "/api/patients/patient-4/restore",
+            requestContext: {
+                requestId: "request-restore",
+                instanceId: "instance-d",
+            },
+        };
+        const res = makeRes();
+
+        await handler(req, res);
+
+        expect(restorePatient).toHaveBeenCalledWith(
+            "patient-4",
+            "Demande administrative",
+            req.auth
+        );
+        expect(recordPatientAuditEvent).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: "PATIENT_RESTORE",
+                patientId: "patient-4",
+                changedFields: ["archivedAt", "archivedByUserId", "archiveReason"],
+                context: null,
+            })
+        );
+        expect(JSON.stringify(recordPatientAuditEvent.mock.calls)).not.toContain(
+            "Demande administrative"
+        );
+    });

@@ -12,10 +12,12 @@ import {
     updatePatientWithClinicalNoteHistory,
     restorePatientClinicalNoteVersion,
     archivePatient,
+    restorePatient,
 } from "../services/patients.js";
 import {
     toCreatePatientDTO,
     toArchivePatientDTO,
+    toRestorePatientDTO,
     toUpdatePatientDTO,
 } from "../dto/patient.dto.js";
 import { recordPatientAuditEvent } from "../audit/patientAudit.js";
@@ -796,6 +798,58 @@ router.delete(
                     code: "PERSISTENCE_FAILED",
                     message:
                         "Impossible d'archiver le patient.",
+                    retryable: true,
+                },
+            });
+        }
+    }
+);
+
+/* ------------------------------------------------------------------ */
+/* POST /api/patients/:id/restore - controlled reactivation            */
+/* ------------------------------------------------------------------ */
+
+router.post(
+    "/:id/restore",
+    requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+    async (req, res) => {
+        try {
+            const { reason } = toRestorePatientDTO(req.body);
+            const restored = await restorePatient(req.params.id, reason, req.auth);
+
+            const writeVerification = await recordPatientMutationAudit(req, {
+                action: "PATIENT_RESTORE",
+                operation: "UPDATE",
+                patientId: restored?._id ?? req.params.id,
+                changedFields: ["archivedAt", "archivedByUserId", "archiveReason"],
+            });
+
+            return res.status(200).json({
+                data: restored,
+                meta: {
+                    source: "real",
+                    model: "mongo",
+                    writeVerification,
+                },
+            });
+        } catch (err) {
+            if (["INVALID_ID", "INVALID_INPUT"].includes(err.code)) {
+                return res.status(400).json({
+                    error: { code: err.code, message: err.message, retryable: false },
+                });
+            }
+
+            if (err.code === "NOT_FOUND") {
+                return res.status(404).json({
+                    error: { code: err.code, message: err.message, retryable: false },
+                });
+            }
+
+            console.error("❌ Patient restore error:", err);
+            return res.status(500).json({
+                error: {
+                    code: "PERSISTENCE_FAILED",
+                    message: "Impossible de réactiver le patient.",
                     retryable: true,
                 },
             });

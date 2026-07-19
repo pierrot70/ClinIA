@@ -240,3 +240,23 @@ export function toArchivePatientDTO(body = {}) {
 
     return { reason };
 }
+
+export function toRestorePatientDTO(body = {}) {
+    const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+
+    if (!reason) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Une raison de réactivation est requise.",
+        };
+    }
+
+    if (reason.length > 500) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "La raison de réactivation ne peut pas dépasser 500 caractères.",
+        };
+    }
+
+    return { reason };
+}

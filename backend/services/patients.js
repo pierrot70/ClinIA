@@ -840,3 +840,48 @@ export async function archivePatient(id, reason, authUser) {
 
     return archived;
 }
+
+export async function restorePatient(id, reason, authUser) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw {
+            code: "INVALID_ID",
+            message: "Identifiant patient invalide.",
+        };
+    }
+
+    if (typeof reason !== "string" || !reason.trim() || reason.trim().length > 500) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Une raison de réactivation valide est requise.",
+        };
+    }
+
+    const restored = await Patient.findOneAndUpdate(
+        {
+            _id: id,
+            ...buildOwnerScope(authUser),
+            archivedAt: { $ne: null },
+        },
+        {
+            $set: {
+                archivedAt: null,
+                archivedByUserId: null,
+                archiveReason: "",
+            },
+        },
+        {
+            new: true,
+            runValidators: true,
+            ...CLINICAL_QUERY_WRITE_OPTIONS,
+        }
+    );
+
+    if (!restored) {
+        throw {
+            code: "NOT_FOUND",
+            message: "Patient archivé introuvable.",
+        };
+    }
+
+    return restored;
+}

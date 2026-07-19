@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { toArchivePatientDTO, toCreatePatientDTO } from "../patient.dto.js";
+import {
+    toArchivePatientDTO,
+    toCreatePatientDTO,
+    toRestorePatientDTO,
+} from "../patient.dto.js";
 
 describe("patient DTO", () => {
     it("accepts a patient without a health insurance number", () => {
@@ -40,6 +44,13 @@ describe("patient DTO", () => {
         expect(() => toArchivePatientDTO({})).toThrow();
         expect(toArchivePatientDTO({ reason: "Doublon confirmé" })).toEqual({
             reason: "Doublon confirmé",
+        });
+    });
+
+    it("requires a bounded restore reason", () => {
+        expect(() => toRestorePatientDTO({})).toThrow();
+        expect(toRestorePatientDTO({ reason: "Demande administrative" })).toEqual({
+            reason: "Demande administrative",
         });
     });
 });

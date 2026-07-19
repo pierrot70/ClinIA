@@ -408,6 +408,32 @@ export async function archivePatient(
     );
 }
 
+export async function restorePatient(
+    id: string,
+    reason: string
+): Promise<ApiResponse<Patient>> {
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await authFetch(`/api/patients/${id}/restore`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ reason }),
+                });
+                return (await safeJson(response)) as ApiResponse<Patient>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de réactiver le patient.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
+}
+
 /* ------------------------------------------------------------------ */
 /* GET patient audit logs                                              */
 /* ------------------------------------------------------------------ */

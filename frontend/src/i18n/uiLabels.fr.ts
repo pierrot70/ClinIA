@@ -1004,6 +1004,11 @@ export const UI_LABELS_FR = {
             archiveReasonPrompt:
                 "Indiquez la raison de l'archivage (obligatoire, sans renseignements cliniques).",
             archiveReasonRequired: "Une raison d'archivage est requise.",
+            restoreConfirm:
+                "Réactiver ce dossier patient? Il réapparaîtra dans les recherches actives.",
+            restoreReasonPrompt:
+                "Indiquez la raison de la réactivation (obligatoire, sans renseignements cliniques).",
+            restoreReasonRequired: "Une raison de réactivation est requise.",
             restrictedAccess:
                 "Acces temporairement restreint: ClinIA a bloque cette zone sensible apres une activite inhabituelle detectee sur ce compte. Reessayez plus tard ou contactez un SUPERADMIN.",
         },
@@ -1062,9 +1067,11 @@ export const UI_LABELS_FR = {
             creating: "Sauvegarde du patient en cours...",
             updating: "Sauvegarde des modifications en cours...",
             archiving: "Archivage du patient en cours...",
+            restoring: "Réactivation du patient en cours...",
             created: "Patient sauvegardé avec succès.",
             updated: "Modifications du patient sauvegardées avec succès.",
             archived: "Patient archivé avec succès.",
+            restored: "Patient réactivé avec succès.",
             failed:
                 "La sauvegarde n'a pas pu être confirmée. Vérifiez la connexion et réessayez.",
         },
@@ -1088,6 +1095,7 @@ export const UI_LABELS_FR = {
             createAppointment: "Créer rendez-vous",
             edit: "Éditer",
             archive: "Archiver",
+            restore: "Réactiver",
             archived: "Dossier archivé",
             archivedAt: "Archivé le",
         },

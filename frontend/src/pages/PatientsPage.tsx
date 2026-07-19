@@ -6,6 +6,7 @@ import { useTranslation } from "../hooks/useTranslation";
 import {
     createPatient,
     archivePatient,
+    restorePatient,
     fetchPatientsPaginated,
     updatePatient,
     type Patient,
@@ -41,6 +42,9 @@ function usePatientsPageLabels(targetLang: string) {
     const { translated: archiveConfirm } = useTranslation({ text: source.validation.archiveConfirm, ...options });
     const { translated: archiveReasonPrompt } = useTranslation({ text: source.validation.archiveReasonPrompt, ...options });
     const { translated: archiveReasonRequired } = useTranslation({ text: source.validation.archiveReasonRequired, ...options });
+    const { translated: restoreConfirm } = useTranslation({ text: source.validation.restoreConfirm, ...options });
+    const { translated: restoreReasonPrompt } = useTranslation({ text: source.validation.restoreReasonPrompt, ...options });
+    const { translated: restoreReasonRequired } = useTranslation({ text: source.validation.restoreReasonRequired, ...options });
     const { translated: restrictedAccess } = useTranslation({ text: source.validation.restrictedAccess, ...options });
     const { translated: editTitle } = useTranslation({ text: source.form.editTitle, ...options });
     const { translated: createTitle } = useTranslation({ text: source.form.createTitle, ...options });
@@ -64,9 +68,11 @@ function usePatientsPageLabels(targetLang: string) {
     const { translated: statusCreating } = useTranslation({ text: source.status.creating, ...options });
     const { translated: statusUpdating } = useTranslation({ text: source.status.updating, ...options });
     const { translated: statusArchiving } = useTranslation({ text: source.status.archiving, ...options });
+    const { translated: statusRestoring } = useTranslation({ text: source.status.restoring, ...options });
     const { translated: statusCreated } = useTranslation({ text: source.status.created, ...options });
     const { translated: statusUpdated } = useTranslation({ text: source.status.updated, ...options });
     const { translated: statusArchived } = useTranslation({ text: source.status.archived, ...options });
+    const { translated: statusRestored } = useTranslation({ text: source.status.restored, ...options });
     const { translated: statusFailed } = useTranslation({ text: source.status.failed, ...options });
     const { translated: searchTitle } = useTranslation({ text: source.search.title, ...options });
     const { translated: filterLastNamePlaceholder } = useTranslation({ text: source.search.lastNamePlaceholder, ...options });
@@ -85,6 +91,7 @@ function usePatientsPageLabels(targetLang: string) {
     const { translated: createAppointment } = useTranslation({ text: source.table.createAppointment, ...options });
     const { translated: edit } = useTranslation({ text: source.table.edit, ...options });
     const { translated: archiveLabel } = useTranslation({ text: source.table.archive, ...options });
+    const { translated: restoreLabel } = useTranslation({ text: source.table.restore, ...options });
     const { translated: archivedLabel } = useTranslation({ text: source.table.archived, ...options });
     const { translated: archivedAt } = useTranslation({ text: source.table.archivedAt, ...options });
     const { translated: previous } = useTranslation({ text: source.pagination.previous, ...options });
@@ -106,6 +113,9 @@ function usePatientsPageLabels(targetLang: string) {
         archiveConfirm,
         archiveReasonPrompt,
         archiveReasonRequired,
+        restoreConfirm,
+        restoreReasonPrompt,
+        restoreReasonRequired,
         restrictedAccess,
         editTitle,
         createTitle,
@@ -132,9 +142,11 @@ function usePatientsPageLabels(targetLang: string) {
         statusCreating,
         statusUpdating,
         statusArchiving,
+        statusRestoring,
         statusCreated,
         statusUpdated,
         statusArchived,
+        statusRestored,
         statusFailed,
         searchTitle,
         filterLastNamePlaceholder,
@@ -153,6 +165,7 @@ function usePatientsPageLabels(targetLang: string) {
         createAppointment,
         edit,
         archiveLabel,
+        restoreLabel,
         archivedLabel,
         archivedAt,
         previous,
@@ -571,6 +584,47 @@ export function PatientsPage() {
             type: "success",
             message: formatWriteVerificationMessage(
                 ui.statusArchived,
+                writeVerification
+            ),
+        });
+        setLastWriteVerification(writeVerification);
+    }
+
+    async function handleRestore(id: string) {
+        if (!window.confirm(ui.restoreConfirm)) return;
+
+        const reason = window.prompt(ui.restoreReasonPrompt)?.trim();
+        if (!reason) {
+            setSaveFeedback({
+                type: "error",
+                message: ui.restoreReasonRequired,
+            });
+            return;
+        }
+
+        setBusyIds((p) => ({ ...p, [id]: true }));
+        setError(null);
+        setLastWriteVerification(null);
+        setSaveFeedback({ type: "info", message: ui.statusRestoring });
+
+        const response = await restorePatient(id, reason);
+        if ("error" in response) {
+            setError(response.error);
+            setSaveFeedback({
+                type: "error",
+                message: response.error.message || ui.statusFailed,
+            });
+            setBusyIds((p) => ({ ...p, [id]: false }));
+            return;
+        }
+
+        setBusyIds((p) => ({ ...p, [id]: false }));
+        await loadPatients();
+        const writeVerification = response.meta.writeVerification ?? null;
+        setSaveFeedback({
+            type: "success",
+            message: formatWriteVerificationMessage(
+                ui.statusRestored,
                 writeVerification
             ),
         });
@@ -1033,12 +1087,21 @@ export function PatientsPage() {
                                             </td>
                                             <td className="p-2 flex gap-2">
                                                 {viewMode === "archived" ? (
-                                                    <span className="text-sm text-amber-800">
-                                                        {ui.archivedLabel}
-                                                        {p.archivedAt
-                                                            ? ` - ${ui.archivedAt} ${new Date(p.archivedAt).toLocaleString()}`
-                                                            : ""}
-                                                    </span>
+                                                    <>
+                                                        <span className="text-sm text-amber-800">
+                                                            {ui.archivedLabel}
+                                                            {p.archivedAt
+                                                                ? ` - ${ui.archivedAt} ${new Date(p.archivedAt).toLocaleString()}`
+                                                                : ""}
+                                                        </span>
+                                                        <button
+                                                            className="px-2 py-1 border rounded text-emerald-700"
+                                                            disabled={busyIds[p._id]}
+                                                            onClick={() => handleRestore(p._id)}
+                                                        >
+                                                            {ui.restoreLabel}
+                                                        </button>
+                                                    </>
                                                 ) : (
                                                     <>
                                                 <Link
