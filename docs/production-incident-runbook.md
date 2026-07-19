@@ -12,6 +12,8 @@ User -> Cloudflare -> DigitalOcean Load Balancer -> clinia-coolify -> Coolify/Tr
 - DigitalOcean Load Balancer IP: `146.190.189.77`
 - Direct droplet rollback IP: `138.197.142.207`
 - Health endpoint: `https://clinique-ai.ca/api/health/ready`
+- The frontend is reachable only through Coolify/Traefik. Do not publish a
+  direct host port such as `8082:80`.
 
 ## First 2 minutes
 
@@ -1355,6 +1357,23 @@ curl -k -i --connect-timeout 5 \
 ```
 
 3. Confirm DigitalOcean firewall allows inbound `80` and `443`.
+
+## Direct HTTP port check
+
+After every frontend deployment or networking change, confirm that no direct
+frontend HTTP port bypasses Traefik and TLS:
+
+```bash
+if ss -ltn '( sport = :8082 )' | grep -q ':8082'; then
+  echo "FAIL: direct frontend port 8082 is still listening"
+  exit 1
+fi
+
+echo "OK: direct frontend port 8082 is closed"
+```
+
+The expected public paths are exclusively `https://clinique-ai.ca/` and
+`https://clinique-ai.ca/api/...` through the load balancer and Traefik.
 
 ## Cloudflare rollback
 

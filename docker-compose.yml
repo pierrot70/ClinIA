@@ -106,8 +106,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     restart: always
-    ports:
-      - "8082:80" # debug direct (http://clinique-ai.ca:8082)
+    expose:
+      - "80"
     labels:
       - "traefik.enable=true"
 
