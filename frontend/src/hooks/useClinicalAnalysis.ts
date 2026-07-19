@@ -7,11 +7,13 @@ export function useClinicalAnalysis() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [errorFields, setErrorFields] = useState<string[]>([]);
 
   const analyze = useCallback(async (payload: ClinicalPayload) => {
     setLoading(true);
     setError(null);
     setErrorCode(null);
+    setErrorFields([]);
     setResult(null);
     try {
       const res = await authFetch("/api/ai/analyze", {
@@ -23,12 +25,20 @@ export function useClinicalAnalysis() {
       if (json?.error) {
         setError(json.error.message || "Erreur lors de l’analyse.");
         setErrorCode(json.error.code || null);
+        setErrorFields(
+          Array.isArray(json.error.fields)
+            ? json.error.fields.filter((field: unknown): field is string =>
+                typeof field === "string"
+              )
+            : []
+        );
         setResult(null);
       } else {
         setResult(json?.data ?? json);
       }
     } catch (e) {
       setError("Erreur réseau ou serveur.");
+      setErrorFields([]);
       setResult(null);
     } finally {
       setLoading(false);
@@ -39,8 +49,17 @@ export function useClinicalAnalysis() {
     setResult(null);
     setError(null);
     setErrorCode(null);
+    setErrorFields([]);
     setLoading(false);
   }, []);
 
-  return { result, loading, error, errorCode, analyze, resetAnalysis };
+  return {
+    result,
+    loading,
+    error,
+    errorCode,
+    errorFields,
+    analyze,
+    resetAnalysis,
+  };
 }

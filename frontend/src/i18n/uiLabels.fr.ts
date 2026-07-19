@@ -518,6 +518,21 @@ export const UI_LABELS_FR = {
             subtitle:
                 "Recherche clinique plus rapide. Alternatives comparables. References consultables.",
         },
+        cloudContentGuard: {
+            title: "Analyse interrompue avant transmission",
+            description:
+                "Certains champs contiennent du texte libre qui ne peut pas etre transmis a OpenAI. Aucune de ces valeurs n'a ete envoyee au service cloud.",
+            fieldsLabel: "Champs a corriger :",
+            fieldLabels: {
+                diagnosis: "Diagnostic ou motif clinique principal",
+                symptoms: "Symptomes principaux",
+                medical_history: "Antecedents medicaux",
+                current_medications: "Medicaments actuels",
+                diabetes_context: "Contexte du diabete",
+                patient: "Parametres cliniques du patient",
+            },
+            action: "Corriger les parametres",
+        },
         form: {
             openAiModelLabel: "Modèle OpenAI",
             simulationMode: "Mode simulation",
@@ -979,6 +994,7 @@ export const UI_LABELS_FR = {
         empty: "Aucun patient correspondant.",
         selected: "Patient sélectionné",
         structuredOnly: "Les paramètres structurés sont préremplis. Les notes cliniques libres ne sont jamais envoyées automatiquement à l'IA.",
+        unsafeProfileNotSaved: "Les paramètres contiennent du texte clinique non approuvé. Ils n'ont pas été sauvegardés; corrigez les champs indiqués avant de réessayer.",
         clear: "Revenir à la saisie manuelle",
     },
     // AppointmentsPage.tsx - page /appointments, création de rendez-vous.

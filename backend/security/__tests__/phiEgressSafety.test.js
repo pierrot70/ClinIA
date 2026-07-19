@@ -10,7 +10,10 @@ vi.mock("../../services/translationService.js", () => ({
 
 import translationRouter from "../../routes/translation.js";
 import { executeOpenAIAnalyze } from "../../services/aiAnalyzeOpenAIService.js";
-import { buildCloudSafePatientPayload } from "../../utils/requestSafety.js";
+import {
+    assessCloudClinicalPayload,
+    buildCloudSafePatientPayload,
+} from "../../utils/requestSafety.js";
 
 const PHI_CANARY = "PHI-CANARY-7F3A9C";
 
@@ -126,5 +129,59 @@ describe("PHI egress safety", () => {
         expect(res.status).toHaveBeenCalledWith(400);
         expect(getCachedTranslation).not.toHaveBeenCalled();
         expectNoPhiCanary(getCachedTranslation.mock.calls);
+    });
+
+    it("rejects an unlabeled patient name before building the OpenAI payload", () => {
+        const assessment = assessCloudClinicalPayload({
+            diagnosis: "Migraine chez Pierre Lasante",
+            symptoms: ["Douleur severe pour Pierre Lasante"],
+            medical_history: [],
+            current_medications: [],
+        });
+
+        expect(assessment.approved).toBe(false);
+        expect(assessment.rejectedFields).toEqual(["diagnosis", "symptoms"]);
+        expect(JSON.stringify(assessment.cloudPayload)).not.toContain("Pierre Lasante");
+    });
+
+    it("does not call OpenAI when a future caller passes unlabeled free text", async () => {
+        const create = vi.fn();
+        const res = makeResponseDouble();
+
+        const result = await executeOpenAIAnalyze({
+            openai: { chat: { completions: { create } } },
+            model: "gpt-4.1-mini",
+            diagnosis: "Migraine chez Pierre Lasante",
+            patient: {
+                symptoms: ["Douleur severe pour Pierre Lasante"],
+                medical_history: [],
+                current_medications: [],
+            },
+            symptoms: ["Douleur severe pour Pierre Lasante"],
+            reqAuth: { userId: "user-safe-1", username: "doctor", role: "MEDECIN" },
+            req: { ip: "127.0.0.1", headers: {} },
+            fingerprint: "fingerprint-rejected-1",
+            forceRealSafe: false,
+            neutralizationMeta: null,
+            supportsJsonResponseFormat: vi.fn(() => true),
+            recordOpenAIRequestAuditEvent: vi.fn(),
+            finalizeOpenAIRequestAuditEvent: vi.fn(),
+            getRequestIp: vi.fn(() => "127.0.0.1"),
+            makeSourceHash: vi.fn(() => "hash-safe-1"),
+            detectNonSecureContent: vi.fn(() => ({ hasMatches: false })),
+            respondWithSecurityIncident: vi.fn(),
+            safeParseMedicalAI: vi.fn(),
+            normalizeClinicalAnalysis: vi.fn(),
+            isPlaceholderClinicalAnalysis: vi.fn(),
+            recordOpenAISuccess: vi.fn(),
+            recordOpenAIFailure: vi.fn(),
+            res,
+            logger: { log: vi.fn(), error: vi.fn() },
+        });
+
+        expect(result.ok).toBe(false);
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(create).not.toHaveBeenCalled();
+        expect(JSON.stringify(res.json.mock.calls)).not.toContain("Pierre Lasante");
     });
 });

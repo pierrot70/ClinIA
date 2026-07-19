@@ -1,7 +1,79 @@
 const MAX_STRING_LENGTH = 2000;
-const MAX_CLOUD_LIST_ITEMS = 8;
-const MAX_CLOUD_ITEM_LENGTH = 120;
-const MAX_CLOUD_TEXT_LENGTH = 160;
+const APPROVED_AGE_BANDS = new Set([
+    "<18",
+    "18-19",
+    "20-29",
+    "30-39",
+    "40-49",
+    "50-59",
+    "60-69",
+    "70-79",
+    "80-89",
+    "90+",
+]);
+const APPROVED_WEIGHT_BANDS = new Set([
+    "<60kg",
+    "60-79kg",
+    "80-99kg",
+    "100kg+",
+]);
+
+const APPROVED_CLOUD_CLINICAL_TERMS = {
+    diagnosis: [
+        ["Migraine", ["migraine"]],
+        ["Arterial hypertension", ["hypertension", "hypertension arterielle", "suspected hypertension", "suspicion d hypertension"]],
+        ["Gastric cancer", ["gastric cancer", "cancer de l estomac", "cancer gastrique"]],
+        ["Infectious mononucleosis", ["infectious mononucleosis", "mononucleose", "mononucleose infectieuse"]],
+        ["Cataract", ["cataract", "cataracte"]],
+        ["Major depressive disorder", ["major depressive disorder", "trouble depressif majeur"]],
+        ["Type 2 diabetes", ["type 2 diabetes", "diabetes type 2", "diabete type 2", "diabete de type 2"]],
+    ],
+    symptoms: [
+        ["Headache", ["headache", "cephalee"]],
+        ["Elevated blood pressure", ["elevated blood pressure", "pression arterielle elevee"]],
+        ["Epigastric pain", ["epigastric pain", "douleur epigastrique"]],
+        ["Weight loss", ["weight loss", "perte de poids"]],
+        ["Nausea", ["nausea", "nausees"]],
+        ["Severe fatigue", ["severe fatigue", "fatigue intense"]],
+        ["Fatigue", ["fatigue"]],
+        ["Fever", ["fever", "fievre"]],
+        ["Cervical lymphadenopathy", ["cervical lymphadenopathy", "adenopathies cervicales"]],
+        ["Progressive blurred vision", ["progressive blurred vision", "vision floue progressive"]],
+        ["Glare", ["glare", "eblouissements"]],
+        ["Reduced visual acuity", ["reduced visual acuity", "baisse de l acuite visuelle"]],
+        ["Depressed mood", ["depressed mood", "humeur depressive"]],
+        ["Insomnia", ["insomnia", "insomnie"]],
+        ["Loss of interest", ["loss of interest", "perte d interet"]],
+        ["Polydipsia", ["polydipsia", "polydipsie"]],
+        ["Polyuria", ["polyuria", "polyurie"]],
+        ["Persistent hyperglycemia", ["persistent hyperglycemia", "hyperglycemie persistante"]],
+        ["Progressive weight gain", ["progressive weight gain", "prise de poids progressive"]],
+    ],
+    medical_history: [
+        ["Asthma", ["asthma", "asthme"]],
+        ["Hypertension", ["hypertension", "hypertension arterielle"]],
+        ["Dyslipidemia", ["dyslipidemia", "dyslipidemie"]],
+        ["Chronic kidney disease", ["chronic kidney disease", "insuffisance renale chronique"]],
+        ["Anemia", ["anemia", "anemie"]],
+        ["Type 2 diabetes", ["type 2 diabetes", "diabete de type 2"]],
+        ["Generalized anxiety", ["generalized anxiety", "anxiete generalisee"]],
+        ["Atherosclerotic cardiovascular disease", ["atherosclerotic cardiovascular disease", "maladie cardiovasculaire aterosclerotique"]],
+    ],
+    current_medications: [
+        ["None", ["none", "aucune", "aucun"]],
+        ["Metformin", ["metformin", "metformine"]],
+        ["Empagliflozin", ["empagliflozin", "empagliflozine"]],
+        ["Pantoprazole", ["pantoprazole"]],
+    ],
+};
+
+const APPROVED_DIABETES_CONTEXT = {
+    cardiovascular_risk: ["low", "moderate", "high", "modere a eleve", "eleve"],
+    renal_function: ["preserved", "mild impairment", "preservee ou legerement reduite", "legere atteinte"],
+    fragility: ["low", "moderate", "high", "faible"],
+    tolerance: ["good", "bonne", "bonne tolerance a la metformine", "bonne tolerance a la combinaison actuelle"],
+    glycemic_goals: ["hba1c < 7 %", "hba1c < 7 % si securitaire et realiste"],
+};
 
 const PROMPT_INJECTION_PATTERNS = [
     /ignore\s+(all\s+)?previous\s+instructions?/i,
@@ -33,6 +105,65 @@ function sanitizeString(value) {
         .replace(/javascript:/gi, "")
         .replace(/on[a-z]+\s*=\s*["'][^"']*["']/gi, "")
         .trim();
+}
+
+function normalizeClinicalCatalogValue(value) {
+    return String(value ?? "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9%<]+/g, " ")
+        .trim()
+        .replace(/\s+/g, " ");
+}
+
+function buildClinicalCatalog(entries) {
+    const catalog = new Map();
+    for (const [canonicalValue, aliases] of entries) {
+        for (const alias of aliases) {
+            catalog.set(normalizeClinicalCatalogValue(alias), canonicalValue);
+        }
+    }
+    return catalog;
+}
+
+const CLINICAL_CATALOGS = Object.fromEntries(
+    Object.entries(APPROVED_CLOUD_CLINICAL_TERMS).map(([field, entries]) => [
+        field,
+        buildClinicalCatalog(entries),
+    ])
+);
+
+function getApprovedClinicalValue(field, value) {
+    if (typeof value !== "string") {
+        return "";
+    }
+    return CLINICAL_CATALOGS[field]?.get(normalizeClinicalCatalogValue(value)) ?? "";
+}
+
+function buildApprovedClinicalList(field, values, maxItems) {
+    if (!Array.isArray(values)) {
+        return { approved: [], rejectedCount: 0 };
+    }
+
+    const approved = [];
+    let rejectedCount = 0;
+    for (const value of values.slice(0, maxItems)) {
+        const mapped = getApprovedClinicalValue(field, value);
+        if (mapped) {
+            if (!approved.includes(mapped)) approved.push(mapped);
+        } else if (String(value ?? "").trim()) {
+            rejectedCount += 1;
+        }
+    }
+    return { approved, rejectedCount };
+}
+
+function getApprovedContextValue(field, value) {
+    const normalized = normalizeClinicalCatalogValue(value);
+    return APPROVED_DIABETES_CONTEXT[field]?.includes(normalized)
+        ? normalized
+        : "";
 }
 
 function sanitizeNode(node) {
@@ -90,25 +221,6 @@ export function sanitizeRequestPayload(payload) {
     return sanitizeNode(payload);
 }
 
-function clampCloudString(value, maxLength = MAX_CLOUD_TEXT_LENGTH) {
-    if (typeof value !== "string") {
-        return "";
-    }
-
-    return sanitizeString(value).slice(0, maxLength).trim();
-}
-
-function compactStringList(values, maxItems = MAX_CLOUD_LIST_ITEMS) {
-    if (!Array.isArray(values)) {
-        return [];
-    }
-
-    return values
-        .map((value) => clampCloudString(String(value ?? ""), MAX_CLOUD_ITEM_LENGTH))
-        .filter(Boolean)
-        .slice(0, maxItems);
-}
-
 function toAgeBand(age) {
     const numericAge = Number(age);
     if (!Number.isFinite(numericAge) || numericAge <= 0) {
@@ -154,13 +266,29 @@ export function buildCloudSafePatientPayload(payload = {}) {
     }
 
     const safePayload = {};
-    const diagnosis = clampCloudString(payload.diagnosis);
-    const sex = clampCloudString(payload.sex, 32);
-    const ageBand = toAgeBand(payload.age);
-    const weightBand = toWeightBand(payload.weight);
-    const symptoms = compactStringList(payload.symptoms, 6);
-    const medicalHistory = compactStringList(payload.medical_history, 6);
-    const currentMedications = compactStringList(payload.current_medications, 6);
+    const diagnosis = getApprovedClinicalValue("diagnosis", payload.diagnosis);
+    const sex = ["male", "female", "other"].includes(payload.sex)
+        ? payload.sex
+        : "";
+    const ageBand =
+        toAgeBand(payload.age) ||
+        (APPROVED_AGE_BANDS.has(payload.age_band) ? payload.age_band : null);
+    const weightBand =
+        toWeightBand(payload.weight) ||
+        (APPROVED_WEIGHT_BANDS.has(payload.weight_band)
+            ? payload.weight_band
+            : null);
+    const symptoms = buildApprovedClinicalList("symptoms", payload.symptoms, 6).approved;
+    const medicalHistory = buildApprovedClinicalList(
+        "medical_history",
+        payload.medical_history,
+        6
+    ).approved;
+    const currentMedications = buildApprovedClinicalList(
+        "current_medications",
+        payload.current_medications,
+        6
+    ).approved;
 
     if (diagnosis) {
         safePayload.diagnosis = diagnosis;
@@ -189,14 +317,20 @@ export function buildCloudSafePatientPayload(payload = {}) {
     const diabetesContext = payload.diabetes_context;
     if (diabetesContext && typeof diabetesContext === "object" && !Array.isArray(diabetesContext)) {
         const safeContext = {};
-        const cardiovascularRisk = clampCloudString(
-            diabetesContext.cardiovascular_risk,
-            80
+        const cardiovascularRisk = getApprovedContextValue(
+            "cardiovascular_risk",
+            diabetesContext.cardiovascular_risk
         );
-        const renalFunction = clampCloudString(diabetesContext.renal_function, 80);
-        const fragility = clampCloudString(diabetesContext.fragility, 80);
-        const tolerance = clampCloudString(diabetesContext.tolerance, 80);
-        const glycemicGoals = clampCloudString(diabetesContext.glycemic_goals, 120);
+        const renalFunction = getApprovedContextValue(
+            "renal_function",
+            diabetesContext.renal_function
+        );
+        const fragility = getApprovedContextValue("fragility", diabetesContext.fragility);
+        const tolerance = getApprovedContextValue("tolerance", diabetesContext.tolerance);
+        const glycemicGoals = getApprovedContextValue(
+            "glycemic_goals",
+            diabetesContext.glycemic_goals
+        );
 
         if (cardiovascularRisk) {
             safeContext.cardiovascular_risk = cardiovascularRisk;
@@ -228,6 +362,52 @@ export function buildCloudSafePatientPayload(payload = {}) {
     }
 
     return safePayload;
+}
+
+export function assessCloudClinicalPayload(payload = {}) {
+    const rejectedFields = [];
+    const diagnosisInput = String(payload?.diagnosis ?? "").trim();
+    const diagnosis = getApprovedClinicalValue("diagnosis", diagnosisInput);
+    if (diagnosisInput && !diagnosis) {
+        rejectedFields.push("diagnosis");
+    }
+
+    for (const [field, maxItems] of [
+        ["symptoms", 6],
+        ["medical_history", 6],
+        ["current_medications", 6],
+    ]) {
+        const assessment = buildApprovedClinicalList(field, payload?.[field], maxItems);
+        if (
+            assessment.rejectedCount > 0 ||
+            (Array.isArray(payload?.[field]) && payload[field].length > maxItems)
+        ) {
+            rejectedFields.push(field);
+        }
+    }
+
+    const diabetesContext = payload?.diabetes_context;
+    if (diabetesContext && typeof diabetesContext === "object" && !Array.isArray(diabetesContext)) {
+        for (const field of Object.keys(APPROVED_DIABETES_CONTEXT)) {
+            const value = diabetesContext[field];
+            if (String(value ?? "").trim() && !getApprovedContextValue(field, value)) {
+                rejectedFields.push(`diabetes_context.${field}`);
+            }
+        }
+    }
+
+    const cloudPayload = buildCloudSafePatientPayload(payload);
+    const hasPrimaryClinicalConcept = Boolean(
+        cloudPayload.diagnosis || cloudPayload.symptoms?.length
+    );
+
+    return {
+        approved: rejectedFields.length === 0 && hasPrimaryClinicalConcept,
+        rejectedFields: Array.from(new Set(rejectedFields)),
+        cloudPayload,
+        primaryConcern:
+            cloudPayload.diagnosis || cloudPayload.symptoms?.[0] || "",
+    };
 }
 
 export function detectPromptInjection(payload) {

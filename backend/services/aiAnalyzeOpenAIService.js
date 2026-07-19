@@ -1,3 +1,5 @@
+import { assessCloudClinicalPayload } from "../utils/requestSafety.js";
+
 function buildType2DiabetesContextPrompt(patient = {}) {
     const context = patient?.diabetes_context;
     if (!context || typeof context !== "object") {
@@ -51,6 +53,30 @@ export async function executeOpenAIAnalyze({
     res,
     logger = console,
 }) {
+    const cloudAssessment = assessCloudClinicalPayload({
+        ...patient,
+        diagnosis,
+        symptoms,
+    });
+    if (!cloudAssessment.approved) {
+        return {
+            ok: false,
+            response: res.status(400).json({
+                error: {
+                    code: "UNAPPROVED_CLOUD_CLINICAL_CONTENT",
+                    message:
+                        "L'analyse OpenAI exige des concepts cliniques approuves. Le texte libre demeure dans ClinIA et n'a pas ete transmis.",
+                    retryable: false,
+                    fields: cloudAssessment.rejectedFields,
+                },
+            }),
+        };
+    }
+
+    diagnosis = cloudAssessment.primaryConcern;
+    symptoms = cloudAssessment.cloudPayload.symptoms ?? [];
+    patient = cloudAssessment.cloudPayload;
+
     const diagnosisLower = String(diagnosis || "").toLowerCase();
     const isType2DiabetesCase =
         diagnosisLower.includes("diab") ||
@@ -106,7 +132,7 @@ export async function executeOpenAIAnalyze({
             requestContext: {
                 fingerprint,
                 diagnosisHash: makeSourceHash({ diagnosis }),
-                cloudPayloadProfile: "MINIMIZED_V1",
+                cloudPayloadProfile: "CONTROLLED_CLINICAL_V2",
                 symptomCount: Array.isArray(symptoms) ? symptoms.length : 0,
                 medicalHistoryCount: Array.isArray(patient.medical_history)
                     ? patient.medical_history.length

@@ -79,6 +79,37 @@ describe("ClinicalForm", () => {
         expect(screen.queryByRole("button", { name: "Analyser" })).not.toBeInTheDocument();
     });
 
+    it("restores rejected analysis values for correction without selecting the case again", () => {
+        render(
+            <ClinicalForm
+                onSubmit={() => {}}
+                loading={false}
+                restoreInitialDataForCorrection
+                highlightFields={["diagnosis", "symptoms"]}
+                initialData={{
+                    age: 55,
+                    sex: "male",
+                    diagnosis: "Valeur a corriger",
+                    symptoms: ["Symptome a corriger"],
+                    medical_history: ["Hypertension arterielle"],
+                    current_medications: ["Metformine"],
+                }}
+            />
+        );
+
+        expect(screen.getByLabelText("Diagnostic / motif clinique principal")).toHaveValue(
+            "Valeur a corriger"
+        );
+        expect(screen.getByLabelText("Symptomes principaux")).toHaveValue(
+            "Symptome a corriger"
+        );
+        expect(screen.getByLabelText("Antecedents medicaux")).toHaveValue(
+            "Hypertension arterielle"
+        );
+        expect(screen.getByLabelText("Medication actuelle")).toHaveValue("Metformine");
+        expect(screen.getByRole("button", { name: "Analyser" })).toBeInTheDocument();
+    });
+
     it("defaults the country from the browser locale and submits the selected ethnicity", async () => {
         const onSubmit = vi.fn();
 

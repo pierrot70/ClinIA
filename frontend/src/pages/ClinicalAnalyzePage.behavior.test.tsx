@@ -14,6 +14,7 @@ vi.mock("../components/clinical/ClinicalForm", () => ({
 
         return (
             <div>
+                <input id="clinical-diagnosis" aria-label="clinical-diagnosis" />
                 <button
                     type="button"
                     onClick={() =>
@@ -197,6 +198,67 @@ describe("ClinicalAnalyzePage", () => {
             forceReal: false,
             openaiModel: "gpt-4.1-mini",
         });
+    });
+
+    it("returns to the form and focuses the first rejected cloud-bound field", async () => {
+        const resetAnalysis = vi.fn();
+        authUser = { role: "MEDECIN" };
+        configureClinicalAnalysisSlots(
+            {
+                result: null,
+                loading: false,
+                error: "Le texte libre demeure dans ClinIA.",
+                errorCode: "UNAPPROVED_CLOUD_CLINICAL_CONTENT",
+                errorFields: ["diagnosis", "symptoms"],
+                analyze: vi.fn(),
+                resetAnalysis,
+            },
+            {
+                result: null,
+                loading: false,
+                error: null,
+                errorCode: null,
+                errorFields: [],
+                analyze: vi.fn(),
+                resetAnalysis: vi.fn(),
+            },
+            {
+                result: null,
+                loading: false,
+                error: null,
+                errorCode: null,
+                errorFields: [],
+                analyze: vi.fn(),
+                resetAnalysis: vi.fn(),
+            }
+        );
+
+        render(
+            <MemoryRouter>
+                <ClinicalAnalyzePage />
+            </MemoryRouter>
+        );
+
+        expect(
+            screen.getByRole("alert", {
+                name: "Analyse interrompue avant transmission",
+            })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                /Diagnostic ou motif clinique principal, Symptomes principaux/
+            )
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/contenu libre confidentiel/i)).not.toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole("button", { name: "Corriger les parametres" })
+        );
+        expect(resetAnalysis).toHaveBeenCalledTimes(1);
+        await act(async () => {
+            await new Promise((resolve) => window.setTimeout(resolve, 0));
+        });
+        expect(screen.getByLabelText("clinical-diagnosis")).toHaveFocus();
     });
 
     it("shows model and simulation controls to administrators", () => {

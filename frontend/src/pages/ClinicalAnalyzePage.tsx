@@ -47,6 +47,7 @@ export function ClinicalAnalyzePage() {
     const targetLang = i18n.locale;
     const clinicalResultStrings = getClinicalResultStrings(targetLang);
     const clinicalIntroLabels = labels.clinicalDemo.intro;
+    const cloudContentGuardLabels = labels.clinicalDemo.cloudContentGuard;
     const [openaiModel, setOpenaiModel] = useState<OpenAIModel>(DEFAULT_OPENAI_MODEL);
     const effectiveOpenaiModel = canConfigureAi ? openaiModel : DEFAULT_OPENAI_MODEL;
     const isProd = !!import.meta.env.PROD;
@@ -58,6 +59,7 @@ export function ClinicalAnalyzePage() {
         loading,
         error,
         errorCode,
+        errorFields,
         analyze,
         resetAnalysis,
     } = useClinicalAnalysis();
@@ -125,6 +127,11 @@ export function ClinicalAnalyzePage() {
     useEffect(() => {
         localStorage.removeItem("clinia_last_clinical_payload");
     }, []);
+    useEffect(() => {
+        if (errorCode === "UNAPPROVED_CLOUD_CLINICAL_CONTENT") {
+            setActiveTab("patient");
+        }
+    }, [errorCode]);
     useEffect(() => {
         try {
             const raw = window.localStorage.getItem(COMMENT_TRACKING_STORAGE_KEY);
@@ -390,6 +397,30 @@ export function ClinicalAnalyzePage() {
         setServiceMode(null);
         setComparisonPayloads(null);
         setActiveTab("patient");
+    }
+
+    function handleCorrectRejectedFields() {
+        const fieldElementIds: Record<string, string> = {
+            diagnosis: "clinical-diagnosis",
+            symptoms: "clinical-symptoms",
+            medical_history: "clinical-medical-history",
+            current_medications: "clinical-current-medications",
+        };
+        const firstFieldId = errorFields
+            .map((field) => fieldElementIds[field])
+            .find(Boolean);
+
+        resetAnalysis();
+
+        if (!firstFieldId) {
+            return;
+        }
+
+        window.setTimeout(() => {
+            const field = document.getElementById(firstFieldId);
+            field?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+            field?.focus();
+        }, 0);
     }
 
     async function handleLookupReplies(event: React.FormEvent) {
@@ -914,13 +945,67 @@ export function ClinicalAnalyzePage() {
 
             {/* 👨‍⚕️ Formulaire */}
             {activeTab === "patient" && !result && (
-                <ClinicalForm
-                    key={targetLang + openaiModel}
-                    onSubmit={handleSubmit}
-                    onCompareSubmit={handleCompareSubmit}
-                    loading={loading}
-                    compareLoading={comparisonLoading}
-                />
+                <div className="space-y-4">
+                    {errorCode === "UNAPPROVED_CLOUD_CLINICAL_CONTENT" ? (
+                        <section
+                            className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950"
+                            role="alert"
+                            aria-labelledby="cloud-content-guard-title"
+                        >
+                            <h2
+                                id="cloud-content-guard-title"
+                                className="text-base font-semibold"
+                            >
+                                {cloudContentGuardLabels.title}
+                            </h2>
+                            <p className="mt-2 text-sm leading-6">
+                                {cloudContentGuardLabels.description}
+                            </p>
+                            {errorFields.length > 0 ? (
+                                <div className="mt-3 text-sm">
+                                    <span className="font-semibold">
+                                        {cloudContentGuardLabels.fieldsLabel}
+                                    </span>{" "}
+                                    {errorFields
+                                        .map(
+                                            (field) =>
+                                                cloudContentGuardLabels.fieldLabels[
+                                                    field as keyof typeof cloudContentGuardLabels.fieldLabels
+                                                ] || field
+                                        )
+                                        .join(", ")}
+                                </div>
+                            ) : null}
+                            <button
+                                type="button"
+                                className="mt-4 rounded border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100"
+                                onClick={handleCorrectRejectedFields}
+                            >
+                                {cloudContentGuardLabels.action}
+                            </button>
+                        </section>
+                    ) : null}
+                    <ClinicalForm
+                        key={targetLang + openaiModel}
+                        onSubmit={handleSubmit}
+                        onCompareSubmit={handleCompareSubmit}
+                        loading={loading}
+                        compareLoading={comparisonLoading}
+                        highlightFields={
+                            errorCode === "UNAPPROVED_CLOUD_CLINICAL_CONTENT"
+                                ? errorFields
+                                : []
+                        }
+                        initialData={
+                            errorCode === "UNAPPROVED_CLOUD_CLINICAL_CONTENT"
+                                ? lastPayload || undefined
+                                : undefined
+                        }
+                        restoreInitialDataForCorrection={
+                            errorCode === "UNAPPROVED_CLOUD_CLINICAL_CONTENT"
+                        }
+                    />
+                </div>
             )}
 
             {/* 📊 Résultat enrichi partagé */}

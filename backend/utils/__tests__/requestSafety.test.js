@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    assessCloudClinicalPayload,
     buildCloudSafePatientPayload,
     detectPromptInjection,
     sanitizeRequestPayload,
@@ -79,18 +80,18 @@ describe("requestSafety", () => {
         const minimized = buildCloudSafePatientPayload(payload);
 
         expect(minimized).toEqual({
-            diagnosis: "Diabete de type 2",
+            diagnosis: "Type 2 diabetes",
             sex: "male",
             age_band: "50-59",
-            symptoms: ["fatigue", "polydipsie"],
-            medical_history: ["Hypertension", "Dyslipidemie"],
-            current_medications: ["Metformine", "Empagliflozine"],
+            symptoms: ["Fatigue", "Polydipsia"],
+            medical_history: ["Hypertension", "Dyslipidemia"],
+            current_medications: ["Metformin", "Empagliflozin"],
             diabetes_context: {
                 cardiovascular_risk: "eleve",
                 renal_function: "legere atteinte",
                 fragility: "faible",
                 tolerance: "bonne",
-                glycemic_goals: "HbA1c < 7 %",
+                glycemic_goals: "hba1c < 7 %",
             },
             weight_band: "80-99kg",
         });
@@ -99,5 +100,39 @@ describe("requestSafety", () => {
         expect(minimized.height).toBeUndefined();
         expect(minimized.blood_pressure).toBeUndefined();
         expect(minimized.forceReal).toBeUndefined();
+    });
+
+    it("rejects unlabeled patient names instead of forwarding free text", () => {
+        const assessment = assessCloudClinicalPayload({
+            age: 55,
+            sex: "male",
+            diagnosis: "Migraine chez Pierre Lasante",
+            symptoms: ["Douleur severe pour Pierre Lasante"],
+        });
+
+        expect(assessment.approved).toBe(false);
+        expect(assessment.rejectedFields).toEqual(["diagnosis", "symptoms"]);
+        expect(JSON.stringify(assessment.cloudPayload)).not.toContain("Pierre Lasante");
+        expect(assessment.primaryConcern).toBe("");
+    });
+
+    it("maps approved clinical aliases to server-owned canonical values", () => {
+        const assessment = assessCloudClinicalPayload({
+            age: 55,
+            sex: "male",
+            diagnosis: "Diabete de type 2",
+            symptoms: ["Polydipsie", "Fatigue"],
+            medical_history: ["Dyslipidemie"],
+            current_medications: ["Metformine"],
+        });
+
+        expect(assessment.approved).toBe(true);
+        expect(assessment.primaryConcern).toBe("Type 2 diabetes");
+        expect(assessment.cloudPayload).toMatchObject({
+            diagnosis: "Type 2 diabetes",
+            symptoms: ["Polydipsia", "Fatigue"],
+            medical_history: ["Dyslipidemia"],
+            current_medications: ["Metformin"],
+        });
     });
 });

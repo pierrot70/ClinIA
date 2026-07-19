@@ -30,6 +30,7 @@ import {
     createWriteVerificationContext,
 } from "../audit/writeVerification.js";
 import { getSafeRequestPath } from "../utils/requestLogSafety.js";
+import { assessCloudClinicalPayload } from "../utils/requestSafety.js";
 
 const router = express.Router();
 
@@ -251,6 +252,31 @@ function sendPatientConflict(res, err) {
     });
 }
 
+function rejectUnsafeClinicalAnalysisProfile(res, dto) {
+    const clinicalParameters =
+        dto?.secure_request_profile?.clinicalAnalysisParameters;
+
+    if (!clinicalParameters) {
+        return false;
+    }
+
+    const assessment = assessCloudClinicalPayload(clinicalParameters);
+    if (assessment.rejectedFields.length === 0) {
+        return false;
+    }
+
+    res.status(400).json({
+        error: {
+            code: "UNAPPROVED_CLINICAL_PROFILE_CONTENT",
+            message:
+                "Les paramètres cliniques contiennent du texte libre non approuvé. Ils n'ont pas été sauvegardés.",
+            retryable: false,
+            fields: assessment.rejectedFields,
+        },
+    });
+    return true;
+}
+
 /* ------------------------------------------------------------------ */
 /* POST /api/patients                                                  */
 /* ------------------------------------------------------------------ */
@@ -267,6 +293,10 @@ router.post("/", async (req, res) => {
                 retryable: false,
             },
         });
+    }
+
+    if (rejectUnsafeClinicalAnalysisProfile(res, dto)) {
+        return;
     }
 
     try {
@@ -629,6 +659,10 @@ router.patch("/:id", async (req, res) => {
                 retryable: false,
             },
         });
+    }
+
+    if (rejectUnsafeClinicalAnalysisProfile(res, dto)) {
+        return;
     }
 
     try {

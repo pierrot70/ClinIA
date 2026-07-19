@@ -28,6 +28,7 @@ import {
     recordOpenAIFailure,
 } from "./utils/openaiCircuitBreaker.js";
 import {
+    assessCloudClinicalPayload,
     buildCloudSafePatientPayload,
     detectPromptInjection,
     sanitizeRequestPayload,
@@ -132,6 +133,7 @@ const respondWithSecurityIncident = createRespondWithSecurityIncident({
 
 const aiAnalyzeRouter = createAiAnalyzeRouter({
     openai,
+    assessCloudClinicalPayload,
     buildCloudSafePatientPayload,
     sanitizeRequestPayload,
     detectPromptInjection,

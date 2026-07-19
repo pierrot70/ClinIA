@@ -555,6 +555,7 @@ export function ClinicalForm({
                                  warningMessage,
                                  highlightFields = [],
                                  initialData,
+                                 restoreInitialDataForCorrection = false,
                              }: {
     onSubmit: (payload: ClinicalPayload) => void | Promise<void>;
     onCompareSubmit?: (
@@ -566,6 +567,7 @@ export function ClinicalForm({
     warningMessage?: string;
     highlightFields?: string[];
     initialData?: ClinicalPayload | null;
+    restoreInitialDataForCorrection?: boolean;
 }) {
     const { isAuthenticated } = useAuth();
     const [form, setForm] = useState<ClinicalPayload>(
@@ -582,6 +584,9 @@ export function ClinicalForm({
         ClinicalField | ""
     >("");
     const [selectedExampleCase, setSelectedExampleCase] = useState("");
+    const [hasRestoredClinicalData, setHasRestoredClinicalData] = useState(
+        restoreInitialDataForCorrection && Boolean(initialData)
+    );
     const [isDiabetesModalOpen, setIsDiabetesModalOpen] = useState(false);
     const [browserCountryCode, setBrowserCountryCode] = useState("");
     const [jsonImportValue, setJsonImportValue] = useState("");
@@ -631,8 +636,11 @@ export function ClinicalForm({
         if (initialData) {
             applyFormData(initialData);
             setSelectedExampleCase("");
+            if (restoreInitialDataForCorrection) {
+                setHasRestoredClinicalData(true);
+            }
         }
-    }, [initialData]);
+    }, [initialData, restoreInitialDataForCorrection]);
 
     useEffect(() => {
         let active = true;
@@ -714,6 +722,7 @@ export function ClinicalForm({
         applyFormData(EMPTY_FORM);
         setSelectedClinicalField("");
         setSelectedExampleCase("");
+        setHasRestoredClinicalData(false);
         setIsDiabetesModalOpen(false);
     }
 
@@ -724,6 +733,7 @@ export function ClinicalForm({
         setPatientMatches([]);
         setSelectedClinicalField("");
         setSelectedExampleCase("");
+        setHasRestoredClinicalData(false);
         setIsDiabetesModalOpen(false);
         applyFormData(buildPayloadFromPatientProfile(patient, browserCountryCode));
     }
@@ -760,7 +770,11 @@ export function ClinicalForm({
         setSavingPatientParameters(false);
 
         if ("error" in response) {
-            setPatientSaveError(response.error.message);
+            setPatientSaveError(
+                response.error.code === "UNAPPROVED_CLINICAL_PROFILE_CONTENT"
+                    ? patientSelectionLabels.unsafeProfileNotSaved
+                    : response.error.message
+            );
             return false;
         }
 
@@ -780,6 +794,7 @@ export function ClinicalForm({
     function handleClinicalFieldChange(field: ClinicalField | "") {
         setSelectedClinicalField(field);
         setSelectedExampleCase("");
+        setHasRestoredClinicalData(false);
         applyFormData(EMPTY_FORM);
         setIsDiabetesModalOpen(false);
     }
@@ -1105,7 +1120,8 @@ export function ClinicalForm({
     const countryOptions = buildCountryOptions(targetLang);
     const detectedCountryLabel = getCountryLabel(browserCountryCode, targetLang);
     const hasSelectedExampleCase = Boolean(selectedExampleCase);
-    const canAnalyze = hasSelectedExampleCase || Boolean(selectedPatient);
+    const canAnalyze =
+        hasSelectedExampleCase || Boolean(selectedPatient) || hasRestoredClinicalData;
     const patientSelectionLabels = labels.clinicalPatientSelection;
     const { translated: manualPatientEntryLabel } = useTranslation({
         text: patientSelectionLabels.manual,

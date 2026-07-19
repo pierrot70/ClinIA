@@ -239,6 +239,49 @@ describe("patients routes audit", () => {
         expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
     });
 
+    it("rejects unsafe clinical analysis parameters before creating a patient", async () => {
+        const handler = getRouteHandler("post", "/");
+        const dto = {
+            nom: "Lasante",
+            prenom: "Pierre",
+            secure_request_profile: {
+                clinicalAnalysisParameters: {
+                    diagnosis: "Migraine chez Pierre Lasante",
+                    symptoms: ["Douleur severe pour Pierre Lasante"],
+                },
+            },
+        };
+
+        toCreatePatientDTO.mockReturnValue(dto);
+
+        const req = {
+            body: dto,
+            headers: {},
+            auth: {
+                userId: "user-1",
+                username: "doctor.one",
+                role: "MEDECIN",
+            },
+        };
+        const res = makeRes();
+
+        await handler(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "UNAPPROVED_CLINICAL_PROFILE_CONTENT",
+                message:
+                    "Les paramètres cliniques contiennent du texte libre non approuvé. Ils n'ont pas été sauvegardés.",
+                retryable: false,
+                fields: ["diagnosis", "symptoms"],
+            },
+        });
+        expect(createPatient).not.toHaveBeenCalled();
+        expect(recordPatientAuditEvent).not.toHaveBeenCalled();
+        expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
+    });
+
     it("requires an explicit confirmation when a patient may be an accidental duplicate", async () => {
         const handler = getRouteHandler("post", "/");
         const dto = { nom: "Spenard", prenom: "Mickey" };
@@ -313,6 +356,89 @@ describe("patients routes audit", () => {
         });
         expect(recordPatientAuditEvent).not.toHaveBeenCalled();
         expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
+    });
+
+    it("rejects unsafe clinical analysis parameters before updating Mongo", async () => {
+        const handler = getRouteHandler("patch", "/:id");
+        const dto = {
+            secure_request_profile: {
+                clinicalAnalysisParameters: {
+                    diagnosis: "Migraine chez Pierre Lasante",
+                    symptoms: ["Douleur severe pour Pierre Lasante"],
+                },
+            },
+        };
+
+        toUpdatePatientDTO.mockReturnValue(dto);
+
+        const req = {
+            body: dto,
+            params: { id: "patient-2" },
+            headers: {},
+            auth: {
+                userId: "user-2",
+                username: "doctor.one",
+                role: "MEDECIN",
+            },
+        };
+        const res = makeRes();
+
+        await handler(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "UNAPPROVED_CLINICAL_PROFILE_CONTENT",
+                message:
+                    "Les paramètres cliniques contiennent du texte libre non approuvé. Ils n'ont pas été sauvegardés.",
+                retryable: false,
+                fields: ["diagnosis", "symptoms"],
+            },
+        });
+        expect(getPatientById).not.toHaveBeenCalled();
+        expect(updatePatient).not.toHaveBeenCalled();
+        expect(recordPatientAuditEvent).not.toHaveBeenCalled();
+        expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
+    });
+
+    it("accepts approved clinical analysis parameters on patient update", async () => {
+        const handler = getRouteHandler("patch", "/:id");
+        const dto = {
+            secure_request_profile: {
+                clinicalAnalysisParameters: {
+                    diagnosis: "Migraine",
+                    symptoms: ["Headache"],
+                },
+            },
+        };
+
+        toUpdatePatientDTO.mockReturnValue(dto);
+        getPatientById.mockResolvedValue({
+            _id: "patient-2",
+            secure_request_profile: null,
+        });
+        updatePatient.mockResolvedValue({ _id: "patient-2", ...dto });
+
+        const req = {
+            body: dto,
+            params: { id: "patient-2" },
+            headers: {},
+            auth: {
+                userId: "user-2",
+                username: "doctor.one",
+                role: "MEDECIN",
+            },
+            requestContext: {
+                requestId: "request-approved-profile",
+                instanceId: "instance-b",
+            },
+        };
+        const res = makeRes();
+
+        await handler(req, res);
+
+        expect(updatePatient).toHaveBeenCalledWith("patient-2", dto, req.auth);
+        expect(res.status).toHaveBeenCalledWith(200);
     });
 
     it("records changed fields on patient update", async () => {

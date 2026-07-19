@@ -22,6 +22,7 @@ import { getSafeErrorMetadata, getSafeRequestPath } from "../utils/requestLogSaf
 export function createAiAnalyzeRouter(deps) {
     const {
         openai,
+        assessCloudClinicalPayload,
         buildCloudSafePatientPayload,
         sanitizeRequestPayload,
         detectPromptInjection,
@@ -222,6 +223,21 @@ export function createAiAnalyzeRouter(deps) {
                     cloudSafePatient = buildCloudSafePatientPayload(patient);
                 }
 
+                const cloudAssessment = assessCloudClinicalPayload(patient);
+                cloudSafePatient = cloudAssessment.cloudPayload;
+
+                if (!cloudAssessment.approved) {
+                    return res.status(400).json({
+                        error: {
+                            code: "UNAPPROVED_CLOUD_CLINICAL_CONTENT",
+                            message:
+                                "L'analyse OpenAI exige des concepts cliniques approuves. Le texte libre demeure dans ClinIA et n'a pas ete transmis.",
+                            retryable: false,
+                            fields: cloudAssessment.rejectedFields,
+                        },
+                    });
+                }
+
                 const cachedDiagnosis = await findPersistedDiagnosisByFingerprint(
                     fingerprint
                 );
@@ -327,9 +343,9 @@ export function createAiAnalyzeRouter(deps) {
                 const openAIResult = await executeOpenAIAnalyze({
                     openai,
                     model,
-                    diagnosis,
+                    diagnosis: cloudAssessment.primaryConcern,
                     patient: cloudSafePatient,
-                    symptoms,
+                    symptoms: cloudSafePatient.symptoms ?? [],
                     reqAuth: req.auth,
                     req,
                     fingerprint,

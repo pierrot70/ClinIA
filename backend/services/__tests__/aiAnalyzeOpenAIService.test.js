@@ -243,11 +243,11 @@ describe("aiAnalyzeOpenAIService", () => {
         expect(request.messages[1].content).toContain("Additional type 2 diabetes clinical context:");
         expect(request.messages[1].content).toContain("- weight_band: 80-99kg");
         expect(request.messages[1].content).toContain("- age_band: 50-59");
-        expect(request.messages[1].content).toContain("- cardiovascular_risk: Modere a eleve");
-        expect(request.messages[1].content).toContain("- renal_function: Preservee ou legerement reduite");
-        expect(request.messages[1].content).toContain("- fragility: Faible");
-        expect(request.messages[1].content).toContain("- tolerance: Bonne tolerance a la metformine");
-        expect(request.messages[1].content).toContain("- glycemic_goals: HbA1c < 7 % si securitaire et realiste");
+        expect(request.messages[1].content).toContain("- cardiovascular_risk: modere a eleve");
+        expect(request.messages[1].content).toContain("- renal_function: preservee ou legerement reduite");
+        expect(request.messages[1].content).toContain("- fragility: faible");
+        expect(request.messages[1].content).toContain("- tolerance: bonne tolerance a la metformine");
+        expect(request.messages[1].content).toContain("- glycemic_goals: hba1c < 7 % si securitaire et realiste");
     });
 
     it("keeps exact age and non-essential demographics out of the OpenAI prompt", async () => {
