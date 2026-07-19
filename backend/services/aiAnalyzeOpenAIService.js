@@ -67,6 +67,7 @@ export async function executeOpenAIAnalyze({
                     message:
                         "L'analyse OpenAI exige des concepts cliniques approuves. Le texte libre demeure dans ClinIA et n'a pas ete transmis.",
                     retryable: false,
+                    stage: "openai_preflight",
                     fields: cloudAssessment.rejectedFields,
                 },
             }),

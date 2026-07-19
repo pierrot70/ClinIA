@@ -135,4 +135,15 @@ describe("requestSafety", () => {
             current_medications: ["Metformin"],
         });
     });
+
+    it("ignores invisible Unicode formatting characters in approved concepts", () => {
+        const assessment = assessCloudClinicalPayload({
+            diagnosis: "Hyperten\u200Bsion art\u00e9rielle",
+            symptoms: ["C\u00e9phal\u00e9e"],
+        });
+
+        expect(assessment.approved).toBe(true);
+        expect(assessment.primaryConcern).toBe("Arterial hypertension");
+        expect(assessment.cloudPayload.symptoms).toEqual(["Headache"]);
+    });
 });

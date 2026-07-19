@@ -233,6 +233,7 @@ export function createAiAnalyzeRouter(deps) {
                             message:
                                 "L'analyse OpenAI exige des concepts cliniques approuves. Le texte libre demeure dans ClinIA et n'a pas ete transmis.",
                             retryable: false,
+                            stage: "route_preflight",
                             fields: cloudAssessment.rejectedFields,
                         },
                     });
