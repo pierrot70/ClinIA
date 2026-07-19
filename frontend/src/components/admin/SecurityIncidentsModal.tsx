@@ -30,6 +30,38 @@ type HeaderLabels = {
         acknowledge: string;
         explain: string;
         hideExplanation: string;
+        summarize: string;
+        hideSummary: string;
+        summaryTitle: string;
+        summaryEvent: string;
+        summaryProtection: string;
+        summaryImpact: string;
+        summaryRecommendedAction: string;
+        summaryPrivacy: string;
+        nonSecurePreCloudSummaryEvent: string;
+        nonSecurePreCloudSummaryProtection: string;
+        nonSecurePreCloudSummaryImpact: string;
+        cspViolationSummaryEvent: string;
+        cspViolationSummaryProtection: string;
+        cspViolationSummaryImpact: string;
+        massDownloadSummaryEvent: string;
+        massDownloadSummaryProtection: string;
+        massDownloadSummaryImpact: string;
+        genericSummaryEvent: string;
+        genericSummaryProtection: string;
+        genericSummaryImpact: string;
+        globalSummaryNoIncidents: string;
+        globalSummaryCount: string;
+        globalSummaryUnacknowledged: string;
+        globalSummaryAllAcknowledged: string;
+        globalSummaryPreCloud: string;
+        globalSummaryCsp: string;
+        globalSummaryMassDownload: string;
+        globalSummaryOther: string;
+        globalSummaryPriorityPreCloud: string;
+        globalSummaryPriorityMassDownload: string;
+        globalSummaryPriorityCsp: string;
+        globalSummaryPriorityGeneric: string;
         explanationTitle: string;
         explanationWhatHappened: string;
         explanationWhatWasBlocked: string;
@@ -87,6 +119,7 @@ export function SecurityIncidentsModal({
     onLoadPage,
 }: SecurityIncidentsModalProps) {
     const [explainedIncidentId, setExplainedIncidentId] = React.useState("");
+    const [isSummaryVisible, setIsSummaryVisible] = React.useState(false);
 
     if (!isOpen) {
         return null;
@@ -118,6 +151,49 @@ export function SecurityIncidentsModal({
         };
     }
 
+    function getGlobalSummary() {
+        const counts = items.reduce<Record<string, number>>((summary, item) => {
+            const key = item.type === "NON_SECURE_CONTENT" && item.phase === "pre_cloud"
+                ? "preCloud"
+                : item.type === "CSP_VIOLATION"
+                    ? "csp"
+                    : item.type === "MASS_DOWNLOAD_ATTEMPT"
+                        ? "massDownload"
+                        : "other";
+            summary[key] = (summary[key] || 0) + 1;
+            return summary;
+        }, {});
+        const unacknowledged = items.filter((item) => !item.acknowledged);
+        const categories = [
+            counts.preCloud ? `${counts.preCloud} ${labels.globalSummaryPreCloud}` : "",
+            counts.massDownload ? `${counts.massDownload} ${labels.globalSummaryMassDownload}` : "",
+            counts.csp ? `${counts.csp} ${labels.globalSummaryCsp}` : "",
+            counts.other ? `${counts.other} ${labels.globalSummaryOther}` : "",
+        ].filter(Boolean);
+
+        let priority = labels.globalSummaryPriorityGeneric;
+        if (unacknowledged.some((item) => item.type === "NON_SECURE_CONTENT" && item.phase === "pre_cloud")) {
+            priority = labels.globalSummaryPriorityPreCloud;
+        } else if (unacknowledged.some((item) => item.type === "MASS_DOWNLOAD_ATTEMPT")) {
+            priority = labels.globalSummaryPriorityMassDownload;
+        } else if (unacknowledged.some((item) => item.type === "CSP_VIOLATION")) {
+            priority = labels.globalSummaryPriorityCsp;
+        }
+
+        return {
+            event: items.length
+                ? `${items.length} ${labels.globalSummaryCount}; ${unacknowledged.length} ${labels.globalSummaryUnacknowledged}.`
+                : labels.globalSummaryNoIncidents,
+            protection: categories.length ? categories.join("; ") : labels.globalSummaryNoIncidents,
+            impact: unacknowledged.length
+                ? `${unacknowledged.length} ${labels.globalSummaryUnacknowledged}.`
+                : labels.globalSummaryAllAcknowledged,
+            nextStep: priority,
+        };
+    }
+
+    const globalSummary = getGlobalSummary();
+
     return (
         <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/40 px-4 py-4 sm:py-6">
             <div className="mx-auto flex min-h-full w-full max-w-6xl items-start sm:items-center">
@@ -128,6 +204,13 @@ export function SecurityIncidentsModal({
                             <p className="mt-1 text-sm text-gray-600">{labels.description}</p>
                         </div>
                         <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setIsSummaryVisible((visible) => !visible)}
+                                className="rounded border border-indigo-300 px-3 py-1 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
+                            >
+                                {isSummaryVisible ? labels.hideSummary : labels.summarize}
+                            </button>
                             <button
                                 type="button"
                                 onClick={onRefresh}
@@ -144,6 +227,17 @@ export function SecurityIncidentsModal({
                             </button>
                         </div>
                     </div>
+
+                    {isSummaryVisible ? (
+                        <section className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50/50 p-4 text-sm text-slate-700">
+                            <h3 className="font-semibold text-slate-900">{labels.summaryTitle}</h3>
+                            <p className="mt-2"><span className="font-medium text-slate-900">{labels.summaryEvent}</span> {globalSummary.event}</p>
+                            <p className="mt-1"><span className="font-medium text-slate-900">{labels.summaryProtection}</span> {globalSummary.protection}</p>
+                            <p className="mt-1"><span className="font-medium text-slate-900">{labels.summaryImpact}</span> {globalSummary.impact}</p>
+                            <p className="mt-1"><span className="font-medium text-slate-900">{labels.summaryRecommendedAction}</span> {globalSummary.nextStep}</p>
+                            <p className="mt-2 text-xs text-slate-600">{labels.summaryPrivacy}</p>
+                        </section>
+                    ) : null}
 
                     <div className="mb-4 grid gap-3 sm:grid-cols-2">
                         <label className="text-sm text-gray-700">

@@ -323,6 +323,55 @@ export const UI_LABELS_FR = {
             acknowledgedAtPrefix: "Acquitté le:",
             explain: "Explication",
             hideExplanation: "Masquer",
+            summarize: "Analyser les incidents affichés",
+            hideSummary: "Masquer l'analyse",
+            summaryTitle: "Analyse locale des incidents affichés",
+            summaryEvent: "Constat:",
+            summaryProtection: "Protections observées:",
+            summaryImpact: "Priorité:",
+            summaryRecommendedAction: "Action recommandée:",
+            summaryPrivacy:
+                "Ce résumé est généré localement à partir des métadonnées minimisées de l'incident. Aucun contenu clinique n'est consulté ni transmis.",
+            nonSecurePreCloudSummaryEvent:
+                "Une donnée potentiellement identifiante a été détectée dans une demande d'analyse clinique.",
+            nonSecurePreCloudSummaryProtection:
+                "La demande a été bloquée avant tout envoi vers OpenAI.",
+            nonSecurePreCloudSummaryImpact:
+                "Aucun contenu détecté n'a été transmis au service cloud.",
+            cspViolationSummaryEvent:
+                "Le navigateur a signalé qu'une ressource ne respectait pas la politique CSP de ClinIA.",
+            cspViolationSummaryProtection:
+                "Le navigateur a bloqué cette ressource avant son chargement ou son exécution.",
+            cspViolationSummaryImpact:
+                "Aucune URL complète ni donnée clinique n'est conservée dans cet incident.",
+            massDownloadSummaryEvent:
+                "Un volume inhabituel de consultation ou d'exportation a été détecté.",
+            massDownloadSummaryProtection:
+                "Les protections de compte applicables ont été déclenchées selon le seuil atteint.",
+            massDownloadSummaryImpact:
+                "L'incident doit être examiné; il ne confirme pas à lui seul une divulgation de données.",
+            genericSummaryEvent:
+                "Un comportement de sécurité nécessitant une vérification a été détecté.",
+            genericSummaryProtection:
+                "ClinIA a appliqué la protection associée à ce type d'incident.",
+            genericSummaryImpact:
+                "Examinez l'événement avant de conclure à un impact sur les données.",
+            globalSummaryNoIncidents: "Aucun incident ne correspond aux filtres actuels.",
+            globalSummaryCount: "incident(s) affiché(s)",
+            globalSummaryUnacknowledged: "non acquitté(s)",
+            globalSummaryAllAcknowledged: "Tous les incidents affichés ont été acquittés.",
+            globalSummaryPreCloud: "contenu potentiellement identifiant bloqué avant transmission cloud",
+            globalSummaryCsp: "ressource bloquée par la politique CSP du navigateur",
+            globalSummaryMassDownload: "volume inhabituel de consultation ou d'exportation détecté",
+            globalSummaryOther: "autre événement de sécurité à examiner",
+            globalSummaryPriorityPreCloud:
+                "Traitez d'abord les incidents de contenu non sécurisé non acquittés: ils concernent une tentative d'analyse qui a été bloquée avant le cloud.",
+            globalSummaryPriorityMassDownload:
+                "Vérifiez d'abord les incidents de consultation ou d'exportation inhabituelle et l'état du compte concerné.",
+            globalSummaryPriorityCsp:
+                "Vérifiez les incidents CSP non acquittés seulement si une fonction attendue de ClinIA semble affectée.",
+            globalSummaryPriorityGeneric:
+                "Examinez d'abord les incidents non acquittés les plus récents, puis utilisez Explication pour le détail par incident.",
             explanationTitle: "Comprendre cet incident",
             explanationWhatHappened: "Ce qui a été détecté:",
             explanationWhatWasBlocked: "Ce qui a été bloqué:",
