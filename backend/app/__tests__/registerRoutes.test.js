@@ -15,4 +15,17 @@ describe("registerRoutes", () => {
         expect(dbStatusRegistration).toBeDefined();
         expect(dbStatusRegistration[1]).toBe(verifyJWT);
     });
+
+    it("registers the CSP reporting endpoint before protected incident routes", () => {
+        const app = { use: vi.fn() };
+
+        registerRoutes(app, {});
+
+        const reportRegistration = app.use.mock.calls.find(
+            ([path]) => path === "/api/security/csp-reports"
+        );
+
+        expect(reportRegistration).toBeDefined();
+        expect(reportRegistration).not.toContain(verifyJWT);
+    });
 });

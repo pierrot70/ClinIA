@@ -335,6 +335,12 @@ export const UI_LABELS_FR = {
                 "L'analyse a été arrêtée avant toute transmission vers OpenAI. Le contenu détecté n'a pas été envoyé au service cloud.",
             nonSecurePreCloudNextStep:
                 "Retirez les éléments identifiants du motif, du diagnostic et des champs cliniques, puis relancez l'analyse avec des renseignements cliniques minimisés.",
+            cspViolationWhatHappened:
+                "Le navigateur a refusé de charger ou d'exécuter une ressource qui ne respecte pas la politique de sécurité de ClinIA.",
+            cspViolationWhatWasBlocked:
+                "La ressource a été bloquée dans le navigateur. Aucun contenu clinique ni URL complète n'est conservé dans cet incident.",
+            cspViolationNextStep:
+                "Vérifiez la directive et la catégorie de ressource indiquées. Si une fonction ClinIA attendue est touchée, transmettez ces deux informations à l'équipe technique.",
             pagePrefix: "Page",
             pageSeparator: "/",
             resultSuffix: "résultats",

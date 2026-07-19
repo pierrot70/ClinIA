@@ -75,6 +75,7 @@ services:
       OPENAI_API_KEY: "${OPENAI_API_KEY}"
       OPENAI_MODEL: gpt-4.1-mini
       CLINIA_MOCK_AI: "false"
+      CLINIA_TRUST_PROXY_CIDRS: "loopback,linklocal,uniquelocal"
       MONGO_BACKUP_DIR: /var/backups/clinia/mongo
       MONGO_BACKUP_KEEP_DIR: /var/backups/clinia/mongo-keep
       MONGO_BACKUP_RETENTION_DAYS: "7"

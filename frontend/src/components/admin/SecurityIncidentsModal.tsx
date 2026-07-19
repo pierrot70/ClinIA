@@ -38,6 +38,9 @@ type HeaderLabels = {
         nonSecurePreCloudWhatHappened: string;
         nonSecurePreCloudWhatWasBlocked: string;
         nonSecurePreCloudNextStep: string;
+        cspViolationWhatHappened: string;
+        cspViolationWhatWasBlocked: string;
+        cspViolationNextStep: string;
         pagePrefix: string;
         pageSeparator: string;
         resultSuffix: string;
@@ -100,6 +103,14 @@ export function SecurityIncidentsModal({
             };
         }
 
+        if (item.type === "CSP_VIOLATION") {
+            return {
+                whatHappened: labels.cspViolationWhatHappened,
+                whatWasBlocked: labels.cspViolationWhatWasBlocked,
+                nextStep: labels.cspViolationNextStep,
+            };
+        }
+
         return {
             whatHappened: labels.explanationWhatHappened,
             whatWasBlocked: labels.explanationWhatWasBlocked,
@@ -157,6 +168,7 @@ export function SecurityIncidentsModal({
                                 <option value="">{labels.all}</option>
                                 <option value="MASS_DOWNLOAD_ATTEMPT">MASS_DOWNLOAD_ATTEMPT</option>
                                 <option value="NON_SECURE_CONTENT">NON_SECURE_CONTENT</option>
+                                <option value="CSP_VIOLATION">CSP_VIOLATION</option>
                             </select>
                         </label>
                     </div>
@@ -198,6 +210,8 @@ export function SecurityIncidentsModal({
                                                 item.context?.userId ? `user=${String(item.context.userId)}` : "",
                                                 item.context?.ip ? `ip=${String(item.context.ip)}` : "",
                                                 item.context?.totalCost ? `volume=${String(item.context.totalCost)}` : "",
+                                                item.context?.directive ? `directive=${String(item.context.directive)}` : "",
+                                                item.context?.resource ? `resource=${String(item.context.resource)}` : "",
                                             ]
                                                 .filter(Boolean)
                                                 .join(" | ");

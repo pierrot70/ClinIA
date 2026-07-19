@@ -30,12 +30,8 @@ export function parseCookies(cookieHeader) {
 }
 
 export function getIsSecureRequest(req) {
-    const forwardedProto = req.headers["x-forwarded-proto"];
-    return (
-        req.secure ||
-        (typeof forwardedProto === "string" &&
-            forwardedProto.toLowerCase().includes("https"))
-    );
+    // req.secure honors X-Forwarded-Proto only for trusted proxies.
+    return req.secure === true;
 }
 
 export function getRefreshCookieOptions(req) {

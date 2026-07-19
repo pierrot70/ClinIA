@@ -5,25 +5,51 @@ import { createCorsOriginDelegate } from "../security/originProtection.js";
 import { createRequestContextMiddleware, getRequestContext } from "./requestContext.js";
 import { getSafeRequestPath } from "../utils/requestLogSafety.js";
 
+const DEFAULT_TRUSTED_PROXY_CIDRS = ["loopback", "linklocal", "uniquelocal"];
+const CONTENT_SECURITY_POLICY = [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "report-uri /api/security/csp-reports",
+    "upgrade-insecure-requests",
+].join("; ");
+
+export function getTrustedProxyCidrs(env = process.env) {
+    const configuredCidrs = String(env.CLINIA_TRUST_PROXY_CIDRS || "")
+        .split(",")
+        .map((cidr) => cidr.trim())
+        .filter(Boolean);
+
+    return configuredCidrs.length > 0
+        ? configuredCidrs
+        : DEFAULT_TRUSTED_PROXY_CIDRS;
+}
+
 export function createSecurityHeadersMiddleware() {
     return (req, res, next) => {
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("X-Frame-Options", "DENY");
         res.setHeader("Referrer-Policy", "no-referrer");
         res.setHeader("Permissions-Policy", "geolocation=(), microphone=()");
+        res.setHeader("Content-Security-Policy", CONTENT_SECURITY_POLICY);
 
         const isProd = process.env.NODE_ENV === "production";
-        const forwardedProto = req.headers["x-forwarded-proto"];
         const hostHeader = String(req.headers.host || "").toLowerCase();
         const hostname = hostHeader.split(":")[0];
         const isLocalHostRequest =
             hostname === "localhost" ||
             hostname === "127.0.0.1" ||
             hostname === "::1";
-        const isSecure =
-            req.secure ||
-            (typeof forwardedProto === "string" &&
-                forwardedProto.toLowerCase().includes("https"));
+        // Express only sets req.secure from X-Forwarded-Proto when the remote
+        // peer matches the explicit trust proxy configuration below.
+        const isSecure = req.secure === true;
 
         const requestContext = getRequestContext(req);
         if (isProd && !isSecure && !isLocalHostRequest) {
@@ -53,7 +79,7 @@ export function createSecurityHeadersMiddleware() {
 }
 
 export function configureCoreMiddleware(app) {
-    app.set("trust proxy", 1);
+    app.set("trust proxy", getTrustedProxyCidrs());
     app.use(createRequestContextMiddleware());
     app.use(
         cors({

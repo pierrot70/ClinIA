@@ -3,6 +3,7 @@ import patientsRouter from "../routes/patients.js";
 import cliniquesRouter from "../routes/cliniques.js";
 import specialistsRouter from "../routes/specialists.js";
 import securityIncidentsRouter from "../routes/securityIncidents.js";
+import cspReportsRouter from "../routes/cspReports.js";
 import openaiLogsRouter from "../routes/openaiLogs.js";
 import clinicianCommentsRouter from "../routes/clinicianComments.js";
 import authRouter from "../routes/auth.js";
@@ -44,6 +45,10 @@ export function registerRoutes(app, deps) {
     } = deps;
 
     app.use("/api/health", healthRouter);
+
+    // CSP reports are browser telemetry, not user API requests. The route
+    // only accepts minimized reports and applies its own IP-based limit.
+    app.use("/api/security/csp-reports", cspReportsRouter);
 
     app.use("/api/ai", aiAnalyzeRouter || createAiAnalyzeRouter({}));
 
