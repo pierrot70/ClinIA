@@ -121,6 +121,10 @@ function normalizeClinicalCatalogValue(value) {
 function buildClinicalCatalog(entries) {
     const catalog = new Map();
     for (const [canonicalValue, aliases] of entries) {
+        catalog.set(
+            normalizeClinicalCatalogValue(canonicalValue),
+            canonicalValue
+        );
         for (const alias of aliases) {
             catalog.set(normalizeClinicalCatalogValue(alias), canonicalValue);
         }

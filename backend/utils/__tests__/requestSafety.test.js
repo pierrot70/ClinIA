@@ -136,6 +136,25 @@ describe("requestSafety", () => {
         });
     });
 
+    it("accepts its own canonical payload on a second safety pass", () => {
+        const firstAssessment = assessCloudClinicalPayload({
+            diagnosis: "Hypertension arterielle",
+            symptoms: ["Cephalee", "Pression arterielle elevee"],
+            medical_history: ["Dyslipidemie"],
+            current_medications: ["Aucune"],
+        });
+        const secondAssessment = assessCloudClinicalPayload(
+            firstAssessment.cloudPayload
+        );
+
+        expect(firstAssessment.approved).toBe(true);
+        expect(secondAssessment.approved).toBe(true);
+        expect(secondAssessment.rejectedFields).toEqual([]);
+        expect(secondAssessment.cloudPayload).toEqual(
+            firstAssessment.cloudPayload
+        );
+    });
+
     it("ignores invisible Unicode formatting characters in approved concepts", () => {
         const assessment = assessCloudClinicalPayload({
             diagnosis: "Hyperten\u200Bsion art\u00e9rielle",
