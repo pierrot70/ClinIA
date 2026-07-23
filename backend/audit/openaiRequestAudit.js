@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { OpenAIRequestAuditLog } from "../models/OpenAIRequestAuditLog.js";
+import { minimizeOpenAIRequestContext } from "./auditDataMinimization.js";
 
 function redactUsername(username) {
     if (!username || typeof username !== "string") {
@@ -7,34 +8,6 @@ function redactUsername(username) {
     }
 
     return username.trim().toLowerCase().slice(0, 2) + "***";
-}
-
-function normalizeRequestContext(context) {
-    if (!context || typeof context !== "object") {
-        return {};
-    }
-
-    return Object.fromEntries(
-        Object.entries(context).filter(([, value]) => {
-            if (value == null) {
-                return false;
-            }
-
-            if (typeof value === "string") {
-                return value.trim().length > 0;
-            }
-
-            if (typeof value === "number" || typeof value === "boolean") {
-                return true;
-            }
-
-            if (Array.isArray(value)) {
-                return value.length > 0;
-            }
-
-            return false;
-        })
-    );
 }
 
 export async function recordOpenAIRequestAuditEvent({
@@ -68,7 +41,7 @@ export async function recordOpenAIRequestAuditEvent({
             model,
             payloadHash,
             payloadSizeBytes,
-            requestContext: normalizeRequestContext(requestContext),
+            requestContext: minimizeOpenAIRequestContext(requestContext),
             acknowledgmentIncidentId:
                 acknowledgmentIncidentId &&
                 mongoose.Types.ObjectId.isValid(acknowledgmentIncidentId)

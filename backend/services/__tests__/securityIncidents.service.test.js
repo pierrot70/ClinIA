@@ -148,7 +148,7 @@ describe("security incidents service", () => {
         expect(save).toHaveBeenCalledTimes(1);
     });
 
-    it("records explicit acknowledgment with timestamp and context", async () => {
+    it("records only safe acknowledgment metadata", async () => {
         const save = vi.fn().mockResolvedValue(undefined);
         const incident = {
             _id: "507f1f77bcf86cd799439011",
@@ -160,13 +160,13 @@ describe("security incidents service", () => {
         const result = await acknowledgeSecurityIncident({
             incidentId: "507f1f77bcf86cd799439011",
             action: "J'ai lu et compris",
-            context: { userId: "doctor-1" },
+            context: { route: "/clinical", userId: "doctor-1" },
         });
 
         expect(result.acknowledged).toBe(true);
         expect(result.acknowledgmentAction).toBe("J'ai lu et compris");
         expect(result.acknowledgedAt).toBeInstanceOf(Date);
-        expect(result.acknowledgmentContext).toEqual({ userId: "doctor-1" });
+        expect(result.acknowledgmentContext).toEqual({ route: "/clinical" });
         expect(save).toHaveBeenCalledTimes(1);
     });
 

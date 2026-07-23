@@ -74,44 +74,36 @@ function normalizeKey(input) {
         .replace(/[^a-z0-9]/g, "");
 }
 
-function maskValue(value) {
-    const text = String(value || "").trim();
-    if (!text) return "";
-    if (text.length <= 4) return "****";
-    return `${text.slice(0, 2)}***${text.slice(-2)}`;
-}
-
-function pushMatch(matches, type, path, value) {
+function pushMatch(matches, type, path) {
     matches.push({
         type,
         path,
-        sample: maskValue(value),
     });
 }
 
 function scanString(value, path, matches) {
     if (EMAIL_REGEX.test(value)) {
-        pushMatch(matches, "email", path, value.match(EMAIL_REGEX)?.[0] || value);
+        pushMatch(matches, "email", path);
     }
 
     if (PHONE_REGEX.test(value)) {
-        pushMatch(matches, "phone", path, value.match(PHONE_REGEX)?.[0] || value);
+        pushMatch(matches, "phone", path);
     }
 
     if (RAMQ_REGEX.test(value)) {
-        pushMatch(matches, "ramq", path, value.match(RAMQ_REGEX)?.[0] || value);
+        pushMatch(matches, "ramq", path);
     }
 
     if (DOB_REGEX.test(value)) {
-        pushMatch(matches, "dob", path, value.match(DOB_REGEX)?.[0] || value);
+        pushMatch(matches, "dob", path);
     }
 
     if (ADDRESS_REGEX.test(value)) {
-        pushMatch(matches, "address", path, value.match(ADDRESS_REGEX)?.[0] || value);
+        pushMatch(matches, "address", path);
     }
 
     if (NAME_LABEL_REGEX.test(value)) {
-        pushMatch(matches, "name", path, value.match(NAME_LABEL_REGEX)?.[0] || value);
+        pushMatch(matches, "name", path);
     }
 }
 
@@ -142,27 +134,27 @@ function scanNode(node, path, matches) {
 
         if (typeof value === "string" && value.trim()) {
             if (NAME_KEYS.has(normalizedKey)) {
-                pushMatch(matches, "name", nodePath, value);
+                pushMatch(matches, "name", nodePath);
             }
 
             if (ADDRESS_KEYS.has(normalizedKey)) {
-                pushMatch(matches, "address", nodePath, value);
+                pushMatch(matches, "address", nodePath);
             }
 
             if (DOB_KEYS.has(normalizedKey) || DOB_REGEX.test(value)) {
-                pushMatch(matches, "dob", nodePath, value);
+                pushMatch(matches, "dob", nodePath);
             }
 
             if (PHONE_KEYS.has(normalizedKey) || PHONE_REGEX.test(value)) {
-                pushMatch(matches, "phone", nodePath, value);
+                pushMatch(matches, "phone", nodePath);
             }
 
             if (EMAIL_KEYS.has(normalizedKey) || EMAIL_REGEX.test(value)) {
-                pushMatch(matches, "email", nodePath, value);
+                pushMatch(matches, "email", nodePath);
             }
 
             if (RAMQ_KEYS.has(normalizedKey) || RAMQ_REGEX.test(value)) {
-                pushMatch(matches, "ramq", nodePath, value);
+                pushMatch(matches, "ramq", nodePath);
             }
         }
 
@@ -177,7 +169,7 @@ export function detectNonSecureContent(payload) {
     const uniqueMatches = [];
     const seen = new Set();
     for (const match of matches) {
-        const key = `${match.type}|${match.path}|${match.sample}`;
+        const key = `${match.type}|${match.path}`;
         if (seen.has(key)) continue;
         seen.add(key);
         uniqueMatches.push(match);

@@ -42,12 +42,12 @@ function formatAuditContext(log: PatientAuditLog) {
 
     const parts = [];
 
-    if (secureRequest.clinicalScope) {
-        parts.push(`Specialite: ${secureRequest.clinicalScope}`);
+    if (secureRequest.clinicalScopeProvided) {
+        parts.push("Portee clinique enregistree");
     }
 
-    if (secureRequest.objective) {
-        parts.push(`Objectif: ${secureRequest.objective}`);
+    if (secureRequest.objectiveProvided) {
+        parts.push("Objectif enregistre");
     }
 
     if ((secureRequest.selectedDocumentCount || 0) > 0) {

@@ -7,6 +7,8 @@ const patientExists = vi.fn();
 const patientSave = vi.fn();
 const auditCountDocuments = vi.fn();
 const auditFind = vi.fn();
+const secureRequestSnapshotFind = vi.fn();
+const secureRequestSnapshotFindOneAndUpdate = vi.fn();
 
 const PatientModel = vi.fn();
 PatientModel.find = patientFind;
@@ -25,6 +27,13 @@ vi.mock("../../models/PatientAuditLog.js", () => ({
     PatientAuditLog: {
         countDocuments: auditCountDocuments,
         find: auditFind,
+    },
+}));
+
+vi.mock("../../models/PatientSecureRequestSnapshot.js", () => ({
+    PatientSecureRequestSnapshot: {
+        find: secureRequestSnapshotFind,
+        findOneAndUpdate: secureRequestSnapshotFindOneAndUpdate,
     },
 }));
 
@@ -367,58 +376,22 @@ describe("patients service audit logs", () => {
                 nom: "Pierrot",
             }),
         });
-        auditFind.mockReturnValue({
+        secureRequestSnapshotFind.mockReturnValue({
             sort: vi.fn().mockReturnValue({
                 lean: vi.fn().mockResolvedValue([
                     {
-                        _id: "audit-oncology-new",
-                        action: "PATIENT_UPDATE",
-                        changedFields: ["secure_request_profile"],
-                        timestamp: new Date("2026-04-05T10:30:00.000Z"),
-                        context: {
-                            secureRequest: {
-                                clinicalScope: "Oncology",
-                                objective: "Therapeutic adjustment",
-                                selectedDocumentIds: ["doc-1"],
-                            },
-                        },
+                        _id: "snapshot-oncology",
+                        clinicalScope: "Oncology",
+                        objective: "Therapeutic adjustment",
+                        selectedDocumentIds: ["doc-1"],
+                        updatedAt: new Date("2026-04-05T10:30:00.000Z"),
                     },
                     {
-                        _id: "audit-oncology-old",
-                        action: "PATIENT_UPDATE",
-                        changedFields: ["secure_request_profile"],
-                        timestamp: new Date("2026-04-05T09:00:00.000Z"),
-                        context: {
-                            secureRequest: {
-                                clinicalScope: "Oncology",
-                                objective: "Earlier request",
-                                selectedDocumentIds: [],
-                            },
-                        },
-                    },
-                    {
-                        _id: "audit-general",
-                        action: "PATIENT_UPDATE",
-                        changedFields: ["secure_request_profile"],
-                        timestamp: new Date("2026-04-05T08:00:00.000Z"),
-                        context: {
-                            secureRequest: {
-                                clinicalScope: "General medicine",
-                                objective: "Initial therapy",
-                                selectedDocumentIds: ["doc-2", "doc-3"],
-                            },
-                        },
-                    },
-                    {
-                        _id: "audit-empty-scope",
-                        action: "PATIENT_UPDATE",
-                        changedFields: ["secure_request_profile"],
-                        timestamp: new Date("2026-04-05T07:00:00.000Z"),
-                        context: {
-                            secureRequest: {
-                                clinicalScope: "",
-                            },
-                        },
+                        _id: "snapshot-general",
+                        clinicalScope: "General medicine",
+                        objective: "Initial therapy",
+                        selectedDocumentIds: ["doc-2", "doc-3"],
+                        updatedAt: new Date("2026-04-05T08:00:00.000Z"),
                     },
                 ]),
             }),
@@ -436,28 +409,26 @@ describe("patients service audit logs", () => {
             _id: "507f1f77bcf86cd799439012",
             ownerUserId: "507f1f77bcf86cd799439099",
         });
-        expect(auditFind).toHaveBeenCalledWith({
+        expect(secureRequestSnapshotFind).toHaveBeenCalledWith({
             patientId: "507f1f77bcf86cd799439012",
-            action: "PATIENT_UPDATE",
-            changedFields: "secure_request_profile",
         });
         expect(result).toEqual([
             {
-                id: "secure-request-log:audit-oncology-new",
+                id: "secure-request-snapshot:snapshot-oncology",
                 title: "Oncology",
                 type: "Derniere requete securisee",
                 uploadedAt: new Date("2026-04-05T10:30:00.000Z"),
-                sourceAuditLogId: "audit-oncology-new",
+                sourceAuditLogId: null,
                 clinicalScope: "Oncology",
                 objective: "Therapeutic adjustment",
                 selectedDocumentIds: ["doc-1"],
             },
             {
-                id: "secure-request-log:audit-general",
+                id: "secure-request-snapshot:snapshot-general",
                 title: "General medicine",
                 type: "Derniere requete securisee",
                 uploadedAt: new Date("2026-04-05T08:00:00.000Z"),
-                sourceAuditLogId: "audit-general",
+                sourceAuditLogId: null,
                 clinicalScope: "General medicine",
                 objective: "Initial therapy",
                 selectedDocumentIds: ["doc-2", "doc-3"],

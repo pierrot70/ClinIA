@@ -89,7 +89,7 @@ export interface PatientSecureRequestDocument {
     title: string;
     type: string;
     uploadedAt?: string;
-    sourceAuditLogId: string;
+    sourceAuditLogId: string | null;
     clinicalScope: string;
     objective?: string;
     selectedDocumentIds: string[];
@@ -170,9 +170,8 @@ export interface PatientAuditLog {
     requestPath: string | null;
     context: {
         secureRequest?: {
-            objective?: string;
-            clinicalScope?: string;
-            selectedDocumentIds?: string[];
+            objectiveProvided?: boolean;
+            clinicalScopeProvided?: boolean;
             selectedDocumentCount?: number;
         };
     } | null;

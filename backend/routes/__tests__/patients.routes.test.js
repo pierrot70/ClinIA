@@ -500,9 +500,9 @@ describe("patients routes audit", () => {
             requestPath: "/api/patients/patient-2",
             context: {
                 secureRequest: {
-                    objective: "Traitement initial",
-                    clinicalScope: "Oncologie",
-                    selectedDocumentIds: ["doc-1", "doc-2"],
+                    objectiveProvided: true,
+                    clinicalScopeProvided: true,
+                    selectedDocumentCount: 2,
                 },
             },
         });

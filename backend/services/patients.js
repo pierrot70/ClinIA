@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { Patient } from "../models/Patient.js";
 import { PatientClinicalNoteVersion } from "../models/PatientClinicalNoteVersion.js";
 import { PatientAuditLog } from "../models/PatientAuditLog.js";
+import { PatientSecureRequestSnapshot } from "../models/PatientSecureRequestSnapshot.js";
 import { recordPatientAuditEvent } from "../audit/patientAudit.js";
 import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
 import { buildOwnerScope } from "../auth/resourceAccess.js";
@@ -62,6 +63,41 @@ function clinicalNotesFrom(patient) {
     return typeof patient?.secure_request_profile?.clinicalNotes === "string"
         ? patient.secure_request_profile.clinicalNotes
         : "";
+}
+
+function secureRequestSnapshotPayload(patientId, profile = {}) {
+    const clinicalScope = typeof profile.clinicalScope === "string"
+        ? profile.clinicalScope.trim().slice(0, 160)
+        : "";
+    if (!clinicalScope) return null;
+
+    const selectedDocumentIds = Array.isArray(profile.selected_document_ids)
+        ? Array.from(new Set(profile.selected_document_ids
+            .filter((value) => typeof value === "string")
+            .map((value) => value.trim())
+            .filter(Boolean)))
+        : [];
+
+    return {
+        patientId,
+        clinicalScope,
+        clinicalScopeKey: clinicalScope.toLocaleLowerCase(),
+        objective: typeof profile.objective === "string"
+            ? profile.objective.trim().slice(0, 500)
+            : "",
+        selectedDocumentIds,
+        source: "patient_profile",
+    };
+}
+
+async function savePatientSecureRequestSnapshot(patientId, profile, { session = null } = {}) {
+    const snapshot = secureRequestSnapshotPayload(patientId, profile);
+    if (!snapshot) return null;
+    return PatientSecureRequestSnapshot.findOneAndUpdate(
+        { patientId: snapshot.patientId, clinicalScopeKey: snapshot.clinicalScopeKey },
+        { $set: snapshot },
+        { upsert: true, new: true, ...(session ? { session } : {}) }
+    );
 }
 
 function hashClinicalNote(note) {
@@ -125,7 +161,14 @@ export async function createPatient(
         ownerUserId: authUser.userId,
     });
 
-    return patient.save(CLINICAL_WRITE_CONCERN);
+    const savedPatient = await patient.save(CLINICAL_WRITE_CONCERN);
+    if (Object.hasOwn(dto, "secure_request_profile")) {
+        await savePatientSecureRequestSnapshot(
+            savedPatient._id,
+            dto.secure_request_profile
+        );
+    }
+    return savedPatient;
 }
 
 export async function listPatients(filters = {}, opts = {}, authUser) {
@@ -370,57 +413,21 @@ export async function listPatientSecureRequestDocuments(patientId, authUser) {
         };
     }
 
-    const logs = await PatientAuditLog.find({
-        patientId,
-        action: "PATIENT_UPDATE",
-        changedFields: "secure_request_profile",
-    })
-        .sort({ timestamp: -1 })
+    const snapshots = await PatientSecureRequestSnapshot.find({ patientId })
+        .sort({ updatedAt: -1 })
         .lean();
-
-    const latestBySpecialty = new Map();
-
-    for (const log of logs) {
-        const secureRequest =
-            log?.context && typeof log.context === "object"
-                ? log.context.secureRequest
-                : null;
-
-        const clinicalScope =
-            typeof secureRequest?.clinicalScope === "string"
-                ? secureRequest.clinicalScope.trim()
-                : "";
-
-        if (!clinicalScope) {
-            continue;
-        }
-
-        const specialtyKey = clinicalScope.toLowerCase();
-
-        if (latestBySpecialty.has(specialtyKey)) {
-            continue;
-        }
-
-        latestBySpecialty.set(specialtyKey, {
-            id: `secure-request-log:${String(log._id)}`,
-            title: clinicalScope,
+    return snapshots.map((snapshot) => ({
+            id: `secure-request-snapshot:${String(snapshot._id)}`,
+            title: snapshot.clinicalScope,
             type: "Derniere requete securisee",
-            uploadedAt: log.timestamp,
-            sourceAuditLogId: String(log._id),
-            clinicalScope,
-            objective:
-                typeof secureRequest?.objective === "string"
-                    ? secureRequest.objective.trim()
-                    : "",
-            selectedDocumentIds: Array.isArray(secureRequest?.selectedDocumentIds)
-                ? secureRequest.selectedDocumentIds.filter(
-                    (entry) => typeof entry === "string" && entry.trim()
-                )
+            uploadedAt: snapshot.updatedAt || snapshot.createdAt,
+            sourceAuditLogId: null,
+            clinicalScope: snapshot.clinicalScope,
+            objective: snapshot.objective || "",
+            selectedDocumentIds: Array.isArray(snapshot.selectedDocumentIds)
+                ? snapshot.selectedDocumentIds
                 : [],
-        });
-    }
-
-    return Array.from(latestBySpecialty.values());
+        }));
 }
 
 export async function getPatientById(id, authUser) {
@@ -519,6 +526,13 @@ export async function updatePatient(id, updates, authUser) {
             code: "NOT_FOUND",
             message: "Patient introuvable.",
         };
+    }
+
+    if (Object.hasOwn(preparedUpdates, "secure_request_profile")) {
+        await savePatientSecureRequestSnapshot(
+            patient._id,
+            preparedUpdates.secure_request_profile
+        );
     }
 
     return patient;
@@ -709,6 +723,14 @@ export async function updatePatientWithClinicalNoteHistory(
                 );
                 if (!patient) {
                     throw { code: "NOT_FOUND", message: "Patient introuvable." };
+                }
+
+                if (Object.hasOwn(preparedUpdates, "secure_request_profile")) {
+                    await savePatientSecureRequestSnapshot(
+                        patient._id,
+                        preparedUpdates.secure_request_profile,
+                        { session }
+                    );
                 }
 
                 nextVersion += 1;

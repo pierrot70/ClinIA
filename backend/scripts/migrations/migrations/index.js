@@ -8,10 +8,13 @@ import { migration as sanitizeAuditRequestPaths }
     from "./20260718-sanitize-audit-request-paths.js";
 import { migration as addPatientSearchIndexes }
     from "./20260718-add-patient-search-indexes.js";
+import { migration as minimizeClinicalAuditContent }
+    from "./20260723-minimize-clinical-audit-content.js";
 export const migrations = [
     registerMigrationFramework,
     addPatientLanguageDefault,
     expandPatientLanguageOptions,
     sanitizeAuditRequestPaths,
     addPatientSearchIndexes,
+    minimizeClinicalAuditContent,
 ];

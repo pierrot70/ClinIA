@@ -1,4 +1,5 @@
 import { PatientAuditLog } from "../models/PatientAuditLog.js";
+import { minimizePatientAuditContext } from "./auditDataMinimization.js";
 
 function redactUsername(username) {
     if (!username || typeof username !== "string") {
@@ -21,57 +22,6 @@ function normalizeChangedFields(changedFields = []) {
                 .filter(Boolean)
         )
     );
-}
-
-function normalizeAuditContext(context) {
-    if (!context || typeof context !== "object") {
-        return null;
-    }
-
-    const secureRequest =
-        context.secureRequest && typeof context.secureRequest === "object"
-            ? context.secureRequest
-            : null;
-
-    if (!secureRequest) {
-        return null;
-    }
-
-    const selectedDocumentIds = Array.isArray(secureRequest.selectedDocumentIds)
-        ? Array.from(
-            new Set(
-                secureRequest.selectedDocumentIds
-                    .map((entry) =>
-                        typeof entry === "string" ? entry.trim() : ""
-                    )
-                    .filter(Boolean)
-            )
-        )
-        : [];
-
-    const normalized = {
-        secureRequest: {
-            objective:
-                typeof secureRequest.objective === "string"
-                    ? secureRequest.objective.trim()
-                    : "",
-            clinicalScope:
-                typeof secureRequest.clinicalScope === "string"
-                    ? secureRequest.clinicalScope.trim()
-                    : "",
-            selectedDocumentIds,
-            selectedDocumentCount: selectedDocumentIds.length,
-        },
-    };
-
-    const hasUsefulContext = Object.values(normalized.secureRequest).some(
-        (value) =>
-            (typeof value === "string" && value.length > 0) ||
-            (Array.isArray(value) && value.length > 0) ||
-            (typeof value === "number" && value > 0)
-    );
-
-    return hasUsefulContext ? normalized : null;
 }
 
 export async function recordPatientAuditEvent({
@@ -99,7 +49,7 @@ export async function recordPatientAuditEvent({
             patientId,
             changedFields: normalizeChangedFields(changedFields),
             requestPath,
-            context: normalizeAuditContext(context),
+            context: minimizePatientAuditContext(context),
             timestamp: new Date(),
         };
 

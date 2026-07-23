@@ -1,6 +1,11 @@
 import mongoose from "mongoose";
 import { SecurityIncident } from "../models/SecurityIncident.js";
 import { AdminUser } from "../models/AdminUser.js";
+import {
+    minimizeAcknowledgmentContext,
+    minimizeSecurityIncidentContext,
+    minimizeSecurityIncidentMatches,
+} from "../audit/auditDataMinimization.js";
 
 const REQUIRED_ACK_ACTION = "J'ai lu et compris";
 const MASS_DOWNLOAD_ESCALATION_WINDOW_MS = 15 * 60 * 1000;
@@ -50,6 +55,8 @@ export async function createSecurityIncident(payload) {
     const incidentPayload = {
         type: "NON_SECURE_CONTENT",
         ...payload,
+        matches: minimizeSecurityIncidentMatches(payload?.matches),
+        context: minimizeSecurityIncidentContext(payload?.type, payload?.context),
         detectedAt: payload?.detectedAt || new Date(),
     };
 
@@ -220,7 +227,7 @@ export async function acknowledgeSecurityIncident({
     incident.acknowledged = true;
     incident.acknowledgmentAction = action;
     incident.acknowledgedAt = new Date();
-    incident.acknowledgmentContext = context;
+    incident.acknowledgmentContext = minimizeAcknowledgmentContext(context);
 
     await incident.save();
     return incident;

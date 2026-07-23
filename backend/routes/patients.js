@@ -31,6 +31,7 @@ import {
 } from "../audit/writeVerification.js";
 import { getSafeRequestPath } from "../utils/requestLogSafety.js";
 import { assessCloudClinicalPayload } from "../utils/requestSafety.js";
+import { minimizePatientAuditContext } from "../audit/auditDataMinimization.js";
 
 const router = express.Router();
 
@@ -187,7 +188,7 @@ function buildPatientAuditContext(dto) {
         return null;
     }
 
-    return {
+    return minimizePatientAuditContext({
         secureRequest: {
             objective: secureRequestProfile.objective ?? "",
             clinicalScope: secureRequestProfile.clinicalScope ?? "",
@@ -197,7 +198,7 @@ function buildPatientAuditContext(dto) {
                 ? secureRequestProfile.selected_document_ids
                 : [],
         },
-    };
+    });
 }
 
 function normalizeComparableValue(value) {
@@ -705,16 +706,14 @@ router.patch("/:id", async (req, res) => {
             changedFields: noteVersion
                 ? changedFields.map((field) => field === "secure_request_profile" ? "secure_request_profile.clinicalNotes" : field)
                 : changedFields,
-            context: {
-                ...buildPatientAuditContext(dto),
+            context: minimizePatientAuditContext({
+                ...(buildPatientAuditContext(dto) || {}),
                 ...(noteVersion ? {
                     clinicalNoteVersion: {
-                        version: noteVersion.version,
                         changeType: noteVersion.changeType,
-                        versionId: String(noteVersion._id),
                     },
                 } : {}),
-            },
+            }),
             clinicalNoteVersion: noteVersion,
         });
 
