@@ -5,6 +5,7 @@ const {
     listPatientAuditLogs,
     getPatientById,
     updatePatient,
+    updatePatientWithClinicalNoteHistory,
     archivePatient,
     restorePatient,
 } = vi.hoisted(() => ({
@@ -12,6 +13,7 @@ const {
     listPatientAuditLogs: vi.fn(),
     getPatientById: vi.fn(),
     updatePatient: vi.fn(),
+    updatePatientWithClinicalNoteHistory: vi.fn(),
     archivePatient: vi.fn(),
     restorePatient: vi.fn(),
 }));
@@ -46,6 +48,7 @@ vi.mock("../../services/patients.js", () => ({
     listPatientAuditLogs,
     getPatientById,
     updatePatient,
+    updatePatientWithClinicalNoteHistory,
     archivePatient,
     restorePatient,
 }));
@@ -358,7 +361,7 @@ describe("patients routes audit", () => {
         expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
     });
 
-    it("rejects unsafe clinical analysis parameters before updating Mongo", async () => {
+    it("rejects changed unsafe clinical analysis parameters before updating Mongo", async () => {
         const handler = getRouteHandler("patch", "/:id");
         const dto = {
             secure_request_profile: {
@@ -370,6 +373,10 @@ describe("patients routes audit", () => {
         };
 
         toUpdatePatientDTO.mockReturnValue(dto);
+        getPatientById.mockResolvedValue({
+            _id: "patient-2",
+            secure_request_profile: null,
+        });
 
         const req = {
             body: dto,
@@ -395,10 +402,56 @@ describe("patients routes audit", () => {
                 fields: ["diagnosis", "symptoms"],
             },
         });
-        expect(getPatientById).not.toHaveBeenCalled();
+        expect(getPatientById).toHaveBeenCalledWith("patient-2", req.auth);
         expect(updatePatient).not.toHaveBeenCalled();
         expect(recordPatientAuditEvent).not.toHaveBeenCalled();
         expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
+    });
+
+    it("allows a clinical note update when unchanged legacy parameters are unsafe", async () => {
+        const handler = getRouteHandler("patch", "/:id");
+        const clinicalAnalysisParameters = {
+            diagnosis: "Migraine chez Pierre Lasante",
+            symptoms: ["Douleur severe pour Pierre Lasante"],
+        };
+        const dto = {
+            secure_request_profile: {
+                clinicalAnalysisParameters,
+                clinicalNotes: "Note clinique versionnee.",
+            },
+        };
+
+        toUpdatePatientDTO.mockReturnValue(dto);
+        getPatientById.mockResolvedValue({
+            _id: "patient-2",
+            secure_request_profile: {
+                clinicalAnalysisParameters,
+                clinicalNotes: "Ancienne note.",
+            },
+        });
+        updatePatientWithClinicalNoteHistory.mockResolvedValue({
+            patient: { _id: "patient-2", ...dto },
+            noteVersion: { changeType: "UPDATE" },
+            writeVerification: { verificationId: "WRV-TEST" },
+        });
+
+        const req = {
+            body: dto,
+            params: { id: "patient-2" },
+            headers: {},
+            auth: { userId: "user-2", username: "doctor.one", role: "MEDECIN" },
+        };
+        const res = makeRes();
+
+        await handler(req, res);
+
+        expect(updatePatientWithClinicalNoteHistory).toHaveBeenCalledWith(
+            "patient-2",
+            dto,
+            req.auth,
+            expect.any(Object)
+        );
+        expect(res.status).toHaveBeenCalledWith(200);
     });
 
     it("accepts approved clinical analysis parameters on patient update", async () => {

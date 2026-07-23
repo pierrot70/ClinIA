@@ -253,11 +253,60 @@ function sendPatientConflict(res, err) {
     });
 }
 
-function rejectUnsafeClinicalAnalysisProfile(res, dto) {
+function clinicalParametersFingerprint(parameters) {
+    if (!parameters || typeof parameters !== "object") {
+        return "";
+    }
+
+    const asString = (value) =>
+        typeof value === "string" ? value.trim() : "";
+    const asNumber = (value) =>
+        Number.isFinite(value) ? Number(value) : null;
+    const asList = (value) =>
+        Array.isArray(value)
+            ? value.filter((entry) => typeof entry === "string").map((entry) => entry.trim())
+            : [];
+
+    return JSON.stringify({
+        age: asNumber(parameters.age),
+        sex: asString(parameters.sex),
+        country: asString(parameters.country),
+        ethnicity: asString(parameters.ethnicity),
+        diagnosis: asString(parameters.diagnosis),
+        weight: asNumber(parameters.weight),
+        height: asNumber(parameters.height),
+        blood_pressure: {
+            systolic: asNumber(parameters.blood_pressure?.systolic),
+            diastolic: asNumber(parameters.blood_pressure?.diastolic),
+        },
+        symptoms: asList(parameters.symptoms),
+        medical_history: asList(parameters.medical_history),
+        current_medications: asList(parameters.current_medications),
+        diabetes_context: {
+            cardiovascular_risk: asString(parameters.diabetes_context?.cardiovascular_risk),
+            renal_function: asString(parameters.diabetes_context?.renal_function),
+            fragility: asString(parameters.diabetes_context?.fragility),
+            tolerance: asString(parameters.diabetes_context?.tolerance),
+            glycemic_goals: asString(parameters.diabetes_context?.glycemic_goals),
+        },
+    });
+}
+
+function rejectUnsafeClinicalAnalysisProfile(res, dto, existingPatient = null) {
     const clinicalParameters =
         dto?.secure_request_profile?.clinicalAnalysisParameters;
 
     if (!clinicalParameters) {
+        return false;
+    }
+
+    const existingParameters =
+        existingPatient?.secure_request_profile?.clinicalAnalysisParameters;
+    if (
+        existingPatient &&
+        clinicalParametersFingerprint(clinicalParameters) ===
+            clinicalParametersFingerprint(existingParameters)
+    ) {
         return false;
     }
 
@@ -662,12 +711,11 @@ router.patch("/:id", async (req, res) => {
         });
     }
 
-    if (rejectUnsafeClinicalAnalysisProfile(res, dto)) {
-        return;
-    }
-
     try {
         const beforePatient = await getPatientById(req.params.id, req.auth);
+        if (rejectUnsafeClinicalAnalysisProfile(res, dto, beforePatient)) {
+            return;
+        }
         const clinicalNotesChanged =
             dto.secure_request_profile !== undefined &&
             (beforePatient.secure_request_profile?.clinicalNotes || "") !==
