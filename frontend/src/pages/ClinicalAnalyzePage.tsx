@@ -31,6 +31,7 @@ import type {
 import { useAuth } from "../hooks/useAuth";
 import { isAdminRole } from "../auth/roles";
 import { copyToClipboard } from "../utils/copyToClipboard";
+import { clearLegacyClinicalBrowserStorage } from "../utils/clinicalBrowserStorage";
 
 type OpenAIModel = "gpt-4.1-mini" | "gpt-4-0613";
 const DEFAULT_OPENAI_MODEL: OpenAIModel = "gpt-4.1-mini";
@@ -120,12 +121,8 @@ export function ClinicalAnalyzePage() {
         translationKey: "clinicalDemo.intro.subtitle",
     });
 
-    /* ------------------------------------------------------------------ */
-    /* Nettoyage cache à l’entrée (1 seule fois)                          */
-    /* ------------------------------------------------------------------ */
-
     useEffect(() => {
-        localStorage.removeItem("clinia_last_clinical_payload");
+        clearLegacyClinicalBrowserStorage();
     }, []);
     useEffect(() => {
         if (errorCode === "UNAPPROVED_CLOUD_CLINICAL_CONTENT") {

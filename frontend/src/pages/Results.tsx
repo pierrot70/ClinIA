@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useClinicalAnalysis } from "../hooks/useClinicalAnalysis";
-import { useLocation, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
+import { useClinicalAnalysisNavigation } from "../contexts/ClinicalAnalysisNavigationContext";
 import {
     acknowledgeSecurityIncident,
     REQUIRED_ACK_ACTION,
@@ -15,19 +16,11 @@ import ClinicalDemoResult from "../components/ClinicalDemoResult";
 
 import { getClinicalDemoScenario } from "../data/clinicalDemoScenarios";
 
-const useQuery = () => new URLSearchParams(useLocation().search);
-const RESULTS_PAYLOAD_STORAGE_KEY = "clinia_results_payload";
-
-type ResultsLocationState = {
-    patientDisplayName?: string;
-    analysisPayload?: ClinicalPayload;
-};
-
-function buildFallbackPayload(q: string): ClinicalPayload {
+function buildFallbackPayload(): ClinicalPayload {
     return {
         age: 55,
         sex: "male",
-        symptoms: [q],
+        symptoms: ["Hypertension essentielle"],
         medical_history: [],
         current_medications: [],
     };
@@ -36,44 +29,24 @@ function buildFallbackPayload(q: string): ClinicalPayload {
 const Results: React.FC = () => {
     const { locale } = useHomeI18n();
     const isProd = !!import.meta.env.PROD;
-    const location = useLocation();
-    const query = useQuery();
-    const q = query.get("q") || "Hypertension essentielle";
-    const locationState = location.state as ResultsLocationState | null;
-    const patientDisplayName =
-        locationState?.patientDisplayName?.trim() ||
-        undefined;
+    const { pendingClinicalAnalysis, clearPendingClinicalAnalysis } =
+        useClinicalAnalysisNavigation();
+    const [navigationAnalysis] = useState(() => pendingClinicalAnalysis);
+    const patientDisplayName = navigationAnalysis?.patientDisplayName?.trim() || undefined;
     const baseAnalysisPayload = useMemo(() => {
-        if (locationState?.analysisPayload) {
+        if (navigationAnalysis?.payload) {
             return {
-                ...locationState.analysisPayload,
+                ...navigationAnalysis.payload,
                 symptoms:
-                    Array.isArray(locationState.analysisPayload.symptoms) &&
-                    locationState.analysisPayload.symptoms.length > 0
-                        ? locationState.analysisPayload.symptoms
-                        : [q],
+                    Array.isArray(navigationAnalysis.payload.symptoms) &&
+                    navigationAnalysis.payload.symptoms.length > 0
+                        ? navigationAnalysis.payload.symptoms
+                        : ["Hypertension essentielle"],
             } satisfies ClinicalPayload;
         }
 
-        if (typeof window !== "undefined") {
-            try {
-                const raw = window.sessionStorage.getItem(
-                    RESULTS_PAYLOAD_STORAGE_KEY
-                );
-                if (raw) {
-                    const parsed = JSON.parse(raw) as {
-                        q?: string;
-                        payload?: ClinicalPayload;
-                    };
-                    if (parsed.q === q && parsed.payload) {
-                        return parsed.payload;
-                    }
-                }
-            } catch (error) {}
-        }
-
-        return buildFallbackPayload(q);
-    }, [locationState, q]);
+        return buildFallbackPayload();
+    }, [navigationAnalysis]);
 
     const { result: analysis, loading: loadingAI, error: errorMessage, analyze } = useClinicalAnalysis();
 
@@ -117,6 +90,10 @@ const Results: React.FC = () => {
     const AI_ENDPOINT = "/api/ai/analyze";
 
     // fetchAI remplacé par useClinicalAnalysis
+
+    useEffect(() => {
+        clearPendingClinicalAnalysis();
+    }, [clearPendingClinicalAnalysis]);
 
     useEffect(() => {
         if (isProd) {
@@ -170,7 +147,6 @@ const Results: React.FC = () => {
             context: {
                 route: "/results",
                 flow: "quick_search",
-                query: q,
             },
         });
 
@@ -205,11 +181,10 @@ const Results: React.FC = () => {
 
             {/* HEADER */}
             <header className="space-y-2">
-                <p className="text-xs text-gray-500 uppercase tracking-wide">
-                    {locale === "en" ? "Search Term" : "Terme recherché"}
-                </p>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <h1 className="text-2xl font-semibold text-gray-900">{q}</h1>
+                    <h1 className="text-2xl font-semibold text-gray-900">
+                        {locale === "en" ? "Clinical analysis" : "Analyse clinique"}
+                    </h1>
                     {!isProd && (
                         <div className="flex items-center gap-2">
                             <button

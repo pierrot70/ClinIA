@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import Results from "./Results";
 import type { ClinicalPayload } from "../types/clinical";
+import { ClinicalAnalysisNavigationProvider } from "../contexts/ClinicalAnalysisNavigationContext";
 
 const analyzeMock = vi.fn();
 
@@ -43,26 +44,21 @@ vi.mock("../services/securityIncidentApi", () => ({
 }));
 
 function renderResults(options: {
-  q: string;
-  state?: {
+  pendingClinicalAnalysis?: {
     patientDisplayName?: string;
-    analysisPayload?: ClinicalPayload;
+    payload: ClinicalPayload;
   };
 }) {
   return render(
-    <MemoryRouter
-      initialEntries={[
-        {
-          pathname: "/results",
-          search: `?q=${encodeURIComponent(options.q)}`,
-          state: options.state,
-        } as never,
-      ]}
+    <ClinicalAnalysisNavigationProvider
+      initialPendingClinicalAnalysis={options.pendingClinicalAnalysis}
     >
-      <Routes>
-        <Route path="/results" element={<Results />} />
-      </Routes>
-    </MemoryRouter>
+      <MemoryRouter initialEntries={["/results"]}>
+        <Routes>
+          <Route path="/results" element={<Results />} />
+        </Routes>
+      </MemoryRouter>
+    </ClinicalAnalysisNavigationProvider>
   );
 }
 
@@ -73,12 +69,11 @@ describe("Results payload forwarding", () => {
     window.localStorage.clear();
   });
 
-  it("uses the analysis payload from navigation state instead of hardcoded defaults", async () => {
+  it("uses the in-memory navigation payload instead of hardcoded defaults", async () => {
     renderResults({
-      q: "Main symptom: Hypertension | Age: 70",
-      state: {
+      pendingClinicalAnalysis: {
         patientDisplayName: "Jean Tremblay",
-        analysisPayload: {
+        payload: {
           age: 70,
           sex: "male",
           symptoms: ["Main symptom: Hypertension | Age: 70"],
@@ -100,11 +95,10 @@ describe("Results payload forwarding", () => {
     });
   });
 
-  it("uses the persisted session payload when the page reloads without navigation state", async () => {
+  it("does not restore a persisted clinical payload after a reload", async () => {
     window.sessionStorage.setItem(
       "clinia_results_payload",
       JSON.stringify({
-        q: "Main symptom: Hypertension | Age: 70",
         payload: {
           age: 70,
           sex: "male",
@@ -115,19 +109,19 @@ describe("Results payload forwarding", () => {
       })
     );
 
-    renderResults({
-      q: "Main symptom: Hypertension | Age: 70",
-    });
+    renderResults({});
 
     await waitFor(() => {
       expect(analyzeMock).toHaveBeenCalledWith({
-        age: 70,
+        age: 55,
         sex: "male",
-        symptoms: ["Main symptom: Hypertension | Age: 70"],
+        symptoms: ["Hypertension essentielle"],
         medical_history: [],
-        current_medications: ["Amlodipine"],
+        current_medications: [],
         forceReal: false,
       });
     });
+
+    expect(window.sessionStorage.getItem("clinia_results_payload")).toBeNull();
   });
 });

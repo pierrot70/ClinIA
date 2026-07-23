@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
+import { useClinicalAnalysisNavigation } from "../contexts/ClinicalAnalysisNavigationContext";
 import {
   createPatient,
   fetchPatientSecureRequestDocuments,
@@ -15,7 +16,6 @@ import type { ClinicalPayload, Sex } from "../types/clinical";
 
 const CREATE_PATIENT_OPTION = "__create_patient__";
 const UNDEFINED_FIELD_DISPLAY = "undefined";
-const RESULTS_PAYLOAD_STORAGE_KEY = "clinia_results_payload";
 
 function splitPatientName(fullName: string) {
   const parts = fullName
@@ -190,6 +190,7 @@ const SearchBar: React.FC = () => {
     useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { setPendingClinicalAnalysis } = useClinicalAnalysisNavigation();
   const lastInsertRef = useRef<{ text: string; at: number } | null>(null);
 
   const selectedPatient =
@@ -315,19 +316,6 @@ const SearchBar: React.FC = () => {
       current_medications: splitListField(currentMedications),
     };
 
-    try {
-      window.sessionStorage.setItem(
-        RESULTS_PAYLOAD_STORAGE_KEY,
-        JSON.stringify({
-          q,
-          payload: analysisPayload,
-          patientDisplayName: selectedPatient
-            ? `${selectedPatient.prenom} ${selectedPatient.nom}`.trim()
-            : undefined,
-        })
-      );
-    } catch (error) {}
-
     if (selectedPatientId && selectedPatientId !== CREATE_PATIENT_OPTION && selectedPatient) {
       const saveResponse = await updatePatient(selectedPatientId, {
         nom: selectedPatient?.nom || "",
@@ -367,14 +355,13 @@ const SearchBar: React.FC = () => {
       );
     }
 
-    navigate(`/results?q=${encodeURIComponent(q)}`, {
-      state: {
-        patientDisplayName: selectedPatient
-          ? `${selectedPatient.prenom} ${selectedPatient.nom}`.trim()
-          : undefined,
-        analysisPayload,
-      },
+    setPendingClinicalAnalysis({
+      payload: analysisPayload,
+      patientDisplayName: selectedPatient
+        ? `${selectedPatient.prenom} ${selectedPatient.nom}`.trim()
+        : undefined,
     });
+    navigate("/results");
   }, [
     ageGroup,
     cancerType,
@@ -388,6 +375,7 @@ const SearchBar: React.FC = () => {
     age,
     privacyAttestation,
     redFlagStatus,
+    setPendingClinicalAnalysis,
     selectedPatient?.nom,
     selectedPatient?.prenom,
     selectedPatientId,

@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import SearchBar from "../components/SearchBar";
 import Results from "./Results";
+import { ClinicalAnalysisNavigationProvider } from "../contexts/ClinicalAnalysisNavigationContext";
 
 const { analyzeMock, fetchPatientsPaginatedMock } = vi.hoisted(() => ({
   analyzeMock: vi.fn(),
@@ -91,12 +92,14 @@ describe("Search to Results integration", () => {
     const user = userEvent.setup();
 
     render(
-      <MemoryRouter initialEntries={["/"]}>
-        <Routes>
-          <Route path="/" element={<SearchBar />} />
-          <Route path="/results" element={<Results />} />
-        </Routes>
-      </MemoryRouter>
+      <ClinicalAnalysisNavigationProvider>
+        <MemoryRouter initialEntries={["/"]}>
+          <Routes>
+            <Route path="/" element={<SearchBar />} />
+            <Route path="/results" element={<Results />} />
+          </Routes>
+        </MemoryRouter>
+      </ClinicalAnalysisNavigationProvider>
     );
 
     await waitFor(() => {
@@ -134,5 +137,6 @@ describe("Search to Results integration", () => {
     const latestPayload = analyzeMock.mock.calls.at(-1)?.[0];
     expect(latestPayload?.symptoms).toHaveLength(1);
     expect(latestPayload?.symptoms?.[0]).toContain("Age: 70");
+    expect(window.sessionStorage.getItem("clinia_results_payload")).toBeNull();
   });
 });

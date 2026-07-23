@@ -7,7 +7,8 @@ headline() {
   echo "=================================================="
 }
 
-EARLY_MODE="${MODE:-${1:-}}"
+# Staging is the default local stack. An explicit MODE or first argument wins.
+EARLY_MODE="${MODE:-${1:-STAGING}}"
 
 if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
   set -euo pipefail

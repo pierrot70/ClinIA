@@ -17,7 +17,6 @@ import type {
     Sex,
 } from "../../types/clinical";
 
-const CACHE_KEY = "clinia_last_clinical_payload";
 const COUNTRY_CODES = [
     "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT",
     "AU", "AW", "AX", "AZ", "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI",
@@ -435,26 +434,6 @@ function getCountryLabel(code: string, targetLang: string) {
     return displayNames?.of(code) ?? code;
 }
 
-// --------------------
-// Cache helpers
-// --------------------
-function loadCachedForm(): ClinicalPayload | null {
-    try {
-        const raw = localStorage.getItem(CACHE_KEY);
-        return raw ? JSON.parse(raw) : null;
-    } catch {
-        return null;
-    }
-}
-
-function saveCachedForm(data: ClinicalPayload) {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
-}
-
-function clearCachedForm() {
-    localStorage.removeItem(CACHE_KEY);
-}
-
 type ComparisonCaseEditorState = {
     age: string;
     sex: Sex;
@@ -571,7 +550,7 @@ export function ClinicalForm({
 }) {
     const { isAuthenticated } = useAuth();
     const [form, setForm] = useState<ClinicalPayload>(
-        initialData ?? loadCachedForm() ?? EMPTY_FORM
+        initialData ?? EMPTY_FORM
     );
     const [inputMode, setInputMode] = useState<"manual" | "patient">("manual");
     const [patientSearch, setPatientSearch] = useState("");
@@ -621,12 +600,12 @@ export function ClinicalForm({
         glycemic_goals: DEFAULT_DIABETES_CONTEXT.glycemic_goals ?? "",
     });
     const [listInputs, setListInputs] = useState(() => ({
-        symptoms: formatList((initialData ?? loadCachedForm() ?? EMPTY_FORM).symptoms),
+        symptoms: formatList((initialData ?? EMPTY_FORM).symptoms),
         medical_history: formatList(
-            (initialData ?? loadCachedForm() ?? EMPTY_FORM).medical_history
+            (initialData ?? EMPTY_FORM).medical_history
         ),
         current_medications: formatList(
-            (initialData ?? loadCachedForm() ?? EMPTY_FORM).current_medications
+            (initialData ?? EMPTY_FORM).current_medications
         ),
     }));
     const debouncedPatientSearch = useDebounce(patientSearch, 250);
@@ -678,11 +657,6 @@ export function ClinicalForm({
         };
     }, [debouncedPatientSearch, inputMode, isAuthenticated, selectedPatient]);
 
-    // 💾 Cache local automatique
-    useEffect(() => {
-        saveCachedForm(form);
-    }, [form]);
-
     function update<K extends keyof ClinicalPayload>(key: K, value: any) {
         setForm((prev) => ({ ...prev, [key]: value }));
     }
@@ -718,7 +692,6 @@ export function ClinicalForm({
     const isHighlighted = (field: string) => highlightFields.includes(field);
 
     function resetPatient() {
-        clearCachedForm();
         applyFormData(EMPTY_FORM);
         setSelectedClinicalField("");
         setSelectedExampleCase("");
