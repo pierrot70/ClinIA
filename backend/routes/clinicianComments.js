@@ -21,17 +21,12 @@ import {
     createWriteVerificationContext,
 } from "../audit/writeVerification.js";
 import { getSafeRequestPath, logSafeError } from "../utils/requestLogSafety.js";
+import { getTrustedRequestIp } from "../utils/requestIp.js";
 
 const router = express.Router();
 
 function getRequestIp(req) {
-    const forwardedFor = req.headers?.["x-forwarded-for"];
-
-    if (typeof forwardedFor === "string" && forwardedFor.trim()) {
-        return forwardedFor.split(",")[0].trim();
-    }
-
-    return req.ip || null;
+    return getTrustedRequestIp(req);
 }
 
 async function recordClinicianCommentWriteAudit(req, {

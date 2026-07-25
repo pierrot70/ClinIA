@@ -46,6 +46,7 @@ import {
     recordOpenAIRequestAuditEvent,
 } from "./audit/openaiRequestAudit.js";
 import { configureCoreMiddleware } from "./app/configureCoreMiddleware.js";
+import { getTrustedRequestIp } from "./utils/requestIp.js";
 import { registerErrorHandlers } from "./app/registerErrorHandlers.js";
 import { registerRoutes } from "./app/registerRoutes.js";
 import { createStartServer } from "./app/startServer.js";
@@ -99,13 +100,7 @@ function makeSourceHash(sourceStrings) {
 }
 
 function getRequestIp(req) {
-    const forwardedFor = req.headers?.["x-forwarded-for"];
-
-    if (typeof forwardedFor === "string" && forwardedFor.trim()) {
-        return forwardedFor.split(",")[0].trim();
-    }
-
-    return req.ip || null;
+    return getTrustedRequestIp(req);
 }
 
 const JSON_MODELS = new Set([

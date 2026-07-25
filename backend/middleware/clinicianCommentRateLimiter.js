@@ -1,5 +1,6 @@
 import { RateLimitWindow } from "../models/RateLimitWindow.js";
 import { logSafeError } from "../utils/requestLogSafety.js";
+import { getTrustedRequestIp } from "../utils/requestIp.js";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_COMMENTS_PER_WINDOW = 5;
@@ -10,15 +11,7 @@ function getRateLimitKey(req) {
         return `user:${req.auth.userId}`;
     }
 
-    const cloudflareIp = req.headers?.["cf-connecting-ip"];
-    const clientIp =
-        (typeof cloudflareIp === "string" && cloudflareIp.trim()) ||
-        req.ip ||
-        req.socket?.remoteAddress ||
-        req.connection?.remoteAddress ||
-        "unknown";
-
-    return `ip:${clientIp}`;
+    return `ip:${getTrustedRequestIp(req)}`;
 }
 
 function buildLimitedResponse(res, windowStartedAt, nowMs) {

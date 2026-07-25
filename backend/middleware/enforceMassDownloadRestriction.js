@@ -1,15 +1,6 @@
 import { recordAuthAuditEvent } from "../audit/authAudit.js";
 import { AdminUser } from "../models/AdminUser.js";
-
-function getRequestIp(req) {
-    const forwardedFor = req.headers?.["x-forwarded-for"];
-
-    if (typeof forwardedFor === "string" && forwardedFor.trim()) {
-        return forwardedFor.split(",")[0].trim();
-    }
-
-    return req.ip || req.socket?.remoteAddress || "unknown";
-}
+import { getTrustedRequestIp } from "../utils/requestIp.js";
 
 export function enforceMassDownloadRestriction() {
     return async function massDownloadRestrictionMiddleware(req, res, next) {
@@ -41,7 +32,7 @@ export function enforceMassDownloadRestriction() {
             userId: String(user._id),
             username: user.username,
             role: user.role,
-            ip: getRequestIp(req),
+            ip: getTrustedRequestIp(req),
             reason: "MASS_DOWNLOAD_RESTRICTION_ACTIVE",
         });
 

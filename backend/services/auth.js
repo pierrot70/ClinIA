@@ -30,6 +30,7 @@ import {
     resetUserPassword as resetUserPasswordService,
 } from "./auth/passwordAdminService.js";
 import { assertSuperAdmin, createAuthError } from "./auth/shared.js";
+import { getTrustedRequestIp } from "../utils/requestIp.js";
 
 export { listAuthLogGraphs, listAuthLogs };
 
@@ -88,11 +89,7 @@ function makeTemporaryPassword() {
 }
 
 function getRequestIp(req) {
-    const forwardedFor = req.headers["x-forwarded-for"];
-    if (typeof forwardedFor === "string" && forwardedFor.trim()) {
-        return forwardedFor.split(",")[0].trim();
-    }
-    return req.ip || req.socket?.remoteAddress || "unknown";
+    return getTrustedRequestIp(req);
 }
 
 function isSessionIdleExpired(user, now = Date.now()) {

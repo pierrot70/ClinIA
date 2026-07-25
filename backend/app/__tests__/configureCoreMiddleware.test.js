@@ -151,7 +151,7 @@ describe("createSecurityHeadersMiddleware", () => {
 
         expect(app.set).toHaveBeenCalledWith(
             "trust proxy",
-            expect.arrayContaining(["loopback", "linklocal", "uniquelocal"])
+            ["loopback"]
         );
     });
 });

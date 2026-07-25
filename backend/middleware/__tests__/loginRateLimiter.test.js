@@ -128,7 +128,7 @@ describe("loginRateLimiter middleware", () => {
         expect(nextB).toHaveBeenCalledTimes(1);
     });
 
-    it("uses Cloudflare's stable IP across rotating forwarded proxy IPs", async () => {
+    it("cannot bypass the login limit by rotating client-controlled forwarding headers", async () => {
         const limiter = createLoginRateLimiter({
             RateLimitWindowModel: createModel(),
             now: () => 1_000,
@@ -142,10 +142,10 @@ describe("loginRateLimiter middleware", () => {
             await limiter(
                 {
                     headers: {
-                        "cf-connecting-ip": "203.0.113.60",
-                        "x-forwarded-for": `172.16.0.${i + 1}`,
+                        "cf-connecting-ip": `203.0.113.${i + 1}`,
+                        "x-forwarded-for": `198.51.100.${i + 1}`,
                     },
-                    ip: `10.0.0.${i + 1}`,
+                    ip: "203.0.113.60",
                 },
                 res,
                 next
@@ -277,7 +277,7 @@ describe("refreshRateLimiter middleware", () => {
         expect(nextB).toHaveBeenCalledTimes(1);
     });
 
-    it("uses Cloudflare's stable IP across rotating forwarded proxy IPs", async () => {
+    it("cannot bypass the refresh limit by rotating client-controlled forwarding headers", async () => {
         const limiter = createRefreshRateLimiter({
             RateLimitWindowModel: createModel(),
             now: () => 1_000,
@@ -291,10 +291,10 @@ describe("refreshRateLimiter middleware", () => {
             await limiter(
                 {
                     headers: {
-                        "cf-connecting-ip": "203.0.113.61",
-                        "x-forwarded-for": `172.16.1.${i + 1}`,
+                        "cf-connecting-ip": `203.0.113.${i + 1}`,
+                        "x-forwarded-for": `198.51.100.${i + 1}`,
                     },
-                    ip: `10.0.1.${i + 1}`,
+                    ip: "203.0.113.61",
                 },
                 res,
                 next

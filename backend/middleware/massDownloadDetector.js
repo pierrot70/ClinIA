@@ -4,22 +4,13 @@ import {
 } from "../services/securityIncidents.js";
 import { MassDownloadWindow } from "../models/MassDownloadWindow.js";
 import { getSafeRequestPath, logSafeError } from "../utils/requestLogSafety.js";
+import { getTrustedRequestIp } from "../utils/requestIp.js";
 
 const DEFAULT_WINDOW_MS = 2 * 60 * 1000;
 const DEFAULT_INCIDENT_COOLDOWN_MS = 10 * 60 * 1000;
 
-function getRequestIp(req) {
-    const forwardedFor = req.headers?.["x-forwarded-for"];
-
-    if (typeof forwardedFor === "string" && forwardedFor.trim()) {
-        return forwardedFor.split(",")[0].trim();
-    }
-
-    return req.ip || "unknown";
-}
-
 function buildActorKey(req, detectorKey) {
-    const ip = getRequestIp(req);
+    const ip = getTrustedRequestIp(req);
     const userId = req.auth?.userId;
 
     if (userId) {
@@ -63,7 +54,7 @@ export function createMassDownloadDetector({
         const now = Date.now();
 
         const actorKey = buildActorKey(req, detectorKey);
-        const ip = getRequestIp(req);
+        const ip = getTrustedRequestIp(req);
         const eventCost = Math.max(0, Number(computeCost(req)) || 0);
         const windowStartedAt = getWindowStartedAt(now, windowMs);
         const expiresAt = new Date(windowStartedAt.getTime() + windowMs + incidentCooldownMs);

@@ -1,18 +1,9 @@
 import { RateLimitWindow } from "../models/RateLimitWindow.js";
+import { getTrustedRequestIp } from "../utils/requestIp.js";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_REPORTS_PER_WINDOW = 30;
 const LIMITER_KEY = "csp_report";
-
-function getClientIp(req) {
-    const cloudflareIp = req.headers?.["cf-connecting-ip"];
-    return (
-        (typeof cloudflareIp === "string" && cloudflareIp.trim()) ||
-        req.ip ||
-        req.socket?.remoteAddress ||
-        "unknown"
-    );
-}
 
 export function createCspReportRateLimiter({
     RateLimitWindowModel = RateLimitWindow,
@@ -22,7 +13,7 @@ export function createCspReportRateLimiter({
         const nowMs = now();
         const windowStartedAt = new Date(Math.floor(nowMs / WINDOW_MS) * WINDOW_MS);
         const expiresAt = new Date(windowStartedAt.getTime() + WINDOW_MS * 2);
-        const actorKey = `ip:${getClientIp(req)}`;
+        const actorKey = `ip:${getTrustedRequestIp(req)}`;
 
         try {
             const bucket = await RateLimitWindowModel.findOneAndUpdate(

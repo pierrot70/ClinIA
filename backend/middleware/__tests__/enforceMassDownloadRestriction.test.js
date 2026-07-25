@@ -117,7 +117,7 @@ describe("enforceMassDownloadRestriction middleware", () => {
             userId: "user-1",
             username: "doctor.one",
             role: "MEDECIN",
-            ip: "203.0.113.5",
+            ip: "127.0.0.1",
             reason: "MASS_DOWNLOAD_RESTRICTION_ACTIVE",
         });
         expect(res.status).toHaveBeenCalledWith(423);

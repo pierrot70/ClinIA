@@ -49,7 +49,7 @@ describe("password recovery rate limiters", () => {
         const limiter = createLimiter({ model });
         const req = {
             headers: { "cf-connecting-ip": "203.0.113.40" },
-            ip: "172.16.0.2",
+            ip: "203.0.113.40",
         };
         const next = vi.fn();
 

@@ -51,6 +51,7 @@ import {
     passwordRecoveryVerifyRateLimiter,
 } from "../middleware/passwordRecoveryRateLimiter.js";
 import { logSafeError } from "../utils/requestLogSafety.js";
+import { getTrustedRequestIp } from "../utils/requestIp.js";
 
 const router = express.Router();
 const enforceSensitiveAuthOrigin = enforceTrustedOrigin();
@@ -293,11 +294,7 @@ router.post("/password-recovery/complete", passwordRecoveryVerifyRateLimiter, as
             email: req.body?.email,
             recoveryGrant: req.body?.recoveryGrant,
             newPassword: req.body?.newPassword,
-            ip:
-                req.headers?.["cf-connecting-ip"] ||
-                req.ip ||
-                req.socket?.remoteAddress ||
-                null,
+            ip: getTrustedRequestIp(req),
         });
 
         return res.status(200).json({

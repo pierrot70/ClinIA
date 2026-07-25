@@ -5,7 +5,9 @@ import { createCorsOriginDelegate } from "../security/originProtection.js";
 import { createRequestContextMiddleware, getRequestContext } from "./requestContext.js";
 import { logSafeError } from "../utils/requestLogSafety.js";
 
-const DEFAULT_TRUSTED_PROXY_CIDRS = ["loopback", "linklocal", "uniquelocal"];
+// A backend reachable directly must not trust forwarding headers. Production
+// deployments can opt into their exact reverse-proxy CIDR through the env var.
+const DEFAULT_TRUSTED_PROXY_CIDRS = ["loopback"];
 const CONTENT_SECURITY_POLICY = [
     "default-src 'self'",
     "base-uri 'self'",

@@ -1,20 +1,10 @@
 import { RateLimitWindow } from "../models/RateLimitWindow.js";
 import { logSafeError } from "../utils/requestLogSafety.js";
+import { getTrustedRequestIp } from "../utils/requestIp.js";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOOKUPS_PER_WINDOW = 10;
 const LIMITER_KEY = "clinician_reply_lookup";
-
-function getClientIp(req) {
-    const cloudflareIp = req.headers?.["cf-connecting-ip"];
-    return (
-        (typeof cloudflareIp === "string" && cloudflareIp.trim()) ||
-        req.ip ||
-        req.socket?.remoteAddress ||
-        req.connection?.remoteAddress ||
-        "unknown"
-    );
-}
 
 export function createClinicianReplyLookupRateLimiter({
     RateLimitWindowModel = RateLimitWindow,
@@ -22,7 +12,7 @@ export function createClinicianReplyLookupRateLimiter({
 } = {}) {
     return async function clinicianReplyLookupRateLimiter(req, res, next) {
         const nowMs = now();
-        const actorKey = `ip:${getClientIp(req)}`;
+        const actorKey = `ip:${getTrustedRequestIp(req)}`;
         const windowStartedAt = new Date(
             Math.floor(nowMs / WINDOW_MS) * WINDOW_MS
         );

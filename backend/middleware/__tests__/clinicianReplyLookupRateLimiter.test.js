@@ -36,7 +36,7 @@ describe("clinicianReplyLookupRateLimiter", () => {
         const req = {
             headers: { "cf-connecting-ip": "203.0.113.30" },
             originalUrl: "/api/clinician-comments/lookup-replies",
-            ip: "172.16.0.2",
+            ip: "203.0.113.30",
         };
         const next = vi.fn();
 
@@ -78,7 +78,7 @@ describe("clinicianReplyLookupRateLimiter", () => {
         );
     });
 
-    it("uses Cloudflare's client IP across rotating proxy IPs", async () => {
+    it("cannot bypass lookups by rotating client-controlled forwarding headers", async () => {
         const limiter = createClinicianReplyLookupRateLimiter({
             RateLimitWindowModel: createModel(),
             now: () => 2_000,
@@ -91,8 +91,11 @@ describe("clinicianReplyLookupRateLimiter", () => {
             responses.push(res);
             await limiter(
                 {
-                    headers: { "cf-connecting-ip": "203.0.113.31" },
-                    ip: `172.16.0.${i + 1}`,
+                    headers: {
+                        "cf-connecting-ip": `203.0.113.${i + 1}`,
+                        "x-forwarded-for": `198.51.100.${i + 1}`,
+                    },
+                    ip: "203.0.113.31",
                 },
                 res,
                 next

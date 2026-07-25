@@ -1,20 +1,10 @@
 import { RateLimitWindow } from "../models/RateLimitWindow.js";
 import { logSafeError } from "../utils/requestLogSafety.js";
+import { getTrustedRequestIp } from "../utils/requestIp.js";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 5;
 const MAX_VERIFICATIONS_PER_WINDOW = 15;
-
-function getClientIp(req) {
-    const cloudflareIp = req.headers?.["cf-connecting-ip"];
-    return (
-        (typeof cloudflareIp === "string" && cloudflareIp.trim()) ||
-        req.ip ||
-        req.socket?.remoteAddress ||
-        req.connection?.remoteAddress ||
-        "unknown"
-    );
-}
 
 export function createPasswordRecoveryRateLimiter({
     limiterKey,
@@ -26,7 +16,7 @@ export function createPasswordRecoveryRateLimiter({
 }) {
     return async function passwordRecoveryRateLimiter(req, res, next) {
         const nowMs = now();
-        const actorKey = `ip:${getClientIp(req)}`;
+        const actorKey = `ip:${getTrustedRequestIp(req)}`;
         const windowStartedAt = new Date(
             Math.floor(nowMs / WINDOW_MS) * WINDOW_MS
         );

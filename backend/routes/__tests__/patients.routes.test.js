@@ -544,7 +544,7 @@ describe("patients routes audit", () => {
             actorUserId: "user-2",
             actorUsername: "doctor.one",
             actorRole: "MEDECIN",
-            ip: "203.0.113.9",
+            ip: "10.0.0.10",
             patientId: "patient-2",
             changedFields: [
                 "prenom",
@@ -568,7 +568,7 @@ describe("patients routes audit", () => {
             actorUserId: "user-2",
             actorUsername: "doctor.one",
             actorRole: "MEDECIN",
-            ip: "203.0.113.9",
+            ip: "10.0.0.10",
             requestId: "request-update",
             instanceId: "instance-b",
             resourceId: "patient-2",

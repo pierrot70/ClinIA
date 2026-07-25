@@ -183,7 +183,7 @@ describe("clinician comments routes write verification", () => {
                 outcome: "SUCCESS",
                 verificationId: expect.stringMatching(/^WRV-[A-Z0-9]+-[A-F0-9]{12}$/),
                 clientMutationId: "clinician-comment-reply-client-1",
-                ip: "203.0.113.15",
+                ip: "10.0.0.10",
                 resourceId: "comment-2",
                 changedFields: ["replies"],
             })

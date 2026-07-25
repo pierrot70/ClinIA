@@ -6,23 +6,10 @@ import {
 } from "../auth/constants.js";
 import { RateLimitWindow } from "../models/RateLimitWindow.js";
 import { logSafeError } from "../utils/requestLogSafety.js";
+import { getTrustedRequestIp } from "../utils/requestIp.js";
 
 const LOGIN_LIMITER_KEY = "auth_login";
 const REFRESH_LIMITER_KEY = "auth_refresh";
-
-function getClientIp(req) {
-    const cloudflareIp = req.headers["cf-connecting-ip"];
-    if (typeof cloudflareIp === "string" && cloudflareIp.trim()) {
-        return cloudflareIp.trim();
-    }
-
-    const forwardedFor = req.headers["x-forwarded-for"];
-    if (typeof forwardedFor === "string" && forwardedFor.trim()) {
-        return forwardedFor.split(",")[0].trim();
-    }
-
-    return req.ip || req.socket?.remoteAddress || "unknown";
-}
 
 export function createLoginRateLimiter({
     RateLimitWindowModel = RateLimitWindow,
@@ -30,7 +17,7 @@ export function createLoginRateLimiter({
 } = {}) {
     return async function loginRateLimiter(req, res, next) {
         const nowMs = now();
-        const actorKey = `ip:${getClientIp(req)}`;
+        const actorKey = `ip:${getTrustedRequestIp(req)}`;
         const windowStartedAt = new Date(
             Math.floor(nowMs / LOGIN_RATE_LIMIT_WINDOW_MS) *
                 LOGIN_RATE_LIMIT_WINDOW_MS
@@ -103,7 +90,7 @@ export function createRefreshRateLimiter({
 } = {}) {
     return async function refreshRateLimiter(req, res, next) {
         const nowMs = now();
-        const actorKey = `ip:${getClientIp(req)}`;
+        const actorKey = `ip:${getTrustedRequestIp(req)}`;
         const windowStartedAt = new Date(
             Math.floor(nowMs / REFRESH_RATE_LIMIT_WINDOW_MS) *
                 REFRESH_RATE_LIMIT_WINDOW_MS

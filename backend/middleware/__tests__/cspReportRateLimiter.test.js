@@ -28,7 +28,10 @@ describe("CSP report rate limiter", () => {
             now: () => 1_000,
         });
         const next = vi.fn();
-        const request = { headers: { "cf-connecting-ip": "203.0.113.91" } };
+        const request = {
+            headers: { "cf-connecting-ip": "198.51.100.91" },
+            ip: "203.0.113.91",
+        };
 
         for (let index = 0; index < 30; index += 1) {
             await limiter(request, createRes(), next);

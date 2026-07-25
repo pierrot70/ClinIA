@@ -1,5 +1,6 @@
 import { RateLimitWindow } from "../models/RateLimitWindow.js";
 import { logSafeError } from "../utils/requestLogSafety.js";
+import { getTrustedRequestIp } from "../utils/requestIp.js";
 
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 5;
@@ -14,13 +15,7 @@ function getQuotaKey(req) {
         return `user:${req.auth.userId}`;
     }
 
-    const forwardedFor = req.headers?.["x-forwarded-for"];
-    const ip =
-        typeof forwardedFor === "string" && forwardedFor.trim()
-            ? forwardedFor.split(",")[0].trim()
-            : req.ip || req.connection?.remoteAddress || "unknown";
-
-    return `ip:${ip}`;
+    return `ip:${getTrustedRequestIp(req)}`;
 }
 
 function buildRateLimitedResponse(res, retryAfterSeconds) {

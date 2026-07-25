@@ -1,21 +1,14 @@
 // middleware/clinicalDemoRateLimiter.js
 // Limite à 1 requête/seconde par IP sur /api/ai/analyze pour les accès non authentifiés (ex: clinical-demo)
 
+import { getTrustedRequestIp } from "../utils/requestIp.js";
+
 const buckets = new Map();
 const WINDOW_MS = 1000; // 1 seconde
 const MAX_ATTEMPTS = 1;
 
-function getClientIp(req) {
-  return (
-    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-    req.connection?.remoteAddress ||
-    req.ip ||
-    "unknown"
-  );
-}
-
 export function clinicalDemoRateLimiter(req, res, next) {
-  const key = getClientIp(req);
+  const key = getTrustedRequestIp(req);
   const now = Date.now();
   const bucket = buckets.get(key);
 

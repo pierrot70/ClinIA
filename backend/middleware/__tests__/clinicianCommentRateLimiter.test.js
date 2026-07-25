@@ -123,7 +123,7 @@ describe("clinicianCommentRateLimiter", () => {
         expect(next).toHaveBeenCalledTimes(6);
     });
 
-    it("uses Cloudflare's stable client IP instead of rotating proxy IPs", async () => {
+    it("cannot bypass anonymous comments by rotating forwarding headers", async () => {
         const limiter = createClinicianCommentRateLimiter({
             RateLimitWindowModel: createModel(),
             now: () => 25_000,
@@ -136,8 +136,11 @@ describe("clinicianCommentRateLimiter", () => {
             responses.push(res);
             await limiter(
                 {
-                    headers: { "cf-connecting-ip": "203.0.113.20" },
-                    ip: `172.16.0.${i + 1}`,
+                    headers: {
+                        "cf-connecting-ip": `203.0.113.${i + 1}`,
+                        "x-forwarded-for": `198.51.100.${i + 1}`,
+                    },
+                    ip: "203.0.113.20",
                 },
                 res,
                 next

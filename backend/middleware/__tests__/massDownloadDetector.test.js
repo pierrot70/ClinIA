@@ -41,7 +41,7 @@ describe("massDownloadDetector", () => {
             originalUrl: "/api/patients?page=1&limit=50",
             query: { page: "1", limit: "50" },
             headers: {},
-            ip: "127.0.0.1",
+            ip: "203.0.113.10",
             auth: {
                 userId: "user-1",
                 username: "admin@example.com",
@@ -79,7 +79,7 @@ describe("massDownloadDetector", () => {
             originalUrl: "/api/patients?page=5&limit=50",
             query: { page: "5", limit: "50" },
             headers: { "x-forwarded-for": "203.0.113.10, 10.0.0.1" },
-            ip: "127.0.0.1",
+            ip: "203.0.113.10",
             auth: {
                 userId: "user-2",
                 username: "superadmin@example.com",

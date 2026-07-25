@@ -207,7 +207,7 @@ describe("appointments routes write verification", () => {
                 outcome: "SUCCESS",
                 verificationId: expect.stringMatching(/^WRV-[A-Z0-9]+-[A-F0-9]{12}$/),
                 clientMutationId: "appointment-status-client-1",
-                ip: "203.0.113.15",
+                ip: "10.0.0.10",
                 resourceId: "appointment-2",
                 changedFields: ["status"],
             })
