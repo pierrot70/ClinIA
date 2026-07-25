@@ -532,6 +532,22 @@ export const UI_LABELS_FR = {
                 patient: "Parametres cliniques du patient",
             },
             action: "Corriger les parametres",
+            neutralizationReview: {
+                title: "Verification avant transmission",
+                description:
+                    "ClinIA retirera les elements identifies avant toute transmission a OpenAI. Verifiez les valeurs corrigees puis confirmez la poursuite.",
+                original: "Valeur originale",
+                corrected: "Valeur corrigee",
+                empty: "Aucun element conserve",
+                continue: "Continuer avec les parametres corriges",
+                cancel: "Annuler",
+                fields: {
+                    diagnosis: "Diagnostic ou motif clinique principal",
+                    symptoms: "Symptomes principaux",
+                    medical_history: "Antecedents medicaux",
+                    current_medications: "Medicaments actuels",
+                },
+            },
         },
         form: {
             openAiModelLabel: "Modèle OpenAI",

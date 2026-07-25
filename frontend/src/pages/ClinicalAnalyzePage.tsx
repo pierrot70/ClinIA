@@ -9,12 +9,12 @@ import { ClinicalForm } from "../components/clinical/ClinicalForm";
 import ClinicalDemoResult from "../components/ClinicalDemoResult";
 import ClinicalRelevanceByAgeChart from "../components/ClinicalRelevanceByAgeChart";
 import { useClinicalAnalysis } from "../hooks/useClinicalAnalysis";
-import { useSecurityIncident } from "../contexts/SecurityIncidentContext";
 import {
     acknowledgeSecurityIncident,
     REQUIRED_ACK_ACTION,
 } from "../services/securityIncidentApi";
 import { SecurityBlockingAlert } from "../components/system/SecurityBlockingAlert";
+import { SecurityNeutralizationReview } from "../components/system/SecurityNeutralizationReview";
 
 import { useTranslation } from "../hooks/useTranslation";
 import { getClinicalDemoScenario } from "../data/clinicalDemoScenarios";
@@ -86,6 +86,12 @@ export function ClinicalAnalyzePage() {
         useState(false);
     const [blockingActionableMessage, setBlockingActionableMessage] =
         useState<string | null>(null);
+    const [pendingNeutralizationReview, setPendingNeutralizationReview] = useState<{
+        payload: ClinicalPayload;
+        preview: NonNullable<
+            SecurityIncidentBlockingData["incident"]["sanitizationPreview"]
+        >;
+    } | null>(null);
     const [serviceMode, setServiceMode] =
         useState<"real" | "mock" | "degraded" | null>(null);
     const [reverifyLoading, setReverifyLoading] = useState(false);
@@ -238,10 +244,58 @@ export function ClinicalAnalyzePage() {
 
         setBlockingIncident(null);
         setApiError(null);
+        const acknowledgedPayload = lastPayload
+            ? {
+                  ...lastPayload,
+                  incidentAckId: blockingIncident.incident.id,
+              }
+            : null;
+        const sanitizationPreview = blockingIncident.incident.sanitizationPreview;
+
+        if (!acknowledgedPayload) {
+            setBlockingActionableMessage(
+                "Confirmation enregistree. Relancez l'analyse pour continuer."
+            );
+            setAcknowledgingIncident(false);
+            return;
+        }
+
+        if (sanitizationPreview && Object.keys(sanitizationPreview).length > 0) {
+            setPendingNeutralizationReview({
+                payload: acknowledgedPayload,
+                preview: sanitizationPreview,
+            });
+            setBlockingActionableMessage(null);
+            setAcknowledgingIncident(false);
+            return;
+        }
+
+        setLastPayload(acknowledgedPayload);
         setBlockingActionableMessage(
-            "Confirmation enregistree. Vous pouvez maintenant corriger le contenu et relancer l'analyse."
+            "Confirmation enregistree. Analyse relancee avec le meme contenu."
         );
+        const replayBlockingIncident = await analyze(acknowledgedPayload);
+        if (replayBlockingIncident) {
+            setBlockingIncident(replayBlockingIncident);
+        }
         setAcknowledgingIncident(false);
+    }
+
+    async function continueWithNeutralizedPayload() {
+        if (!pendingNeutralizationReview) {
+            return;
+        }
+
+        const { payload } = pendingNeutralizationReview;
+        setPendingNeutralizationReview(null);
+        setLastPayload(payload);
+        setBlockingActionableMessage(
+            "Analyse relancee avec les parametres corriges."
+        );
+        const replayBlockingIncident = await analyze(payload);
+        if (replayBlockingIncident) {
+            setBlockingIncident(replayBlockingIncident);
+        }
     }
 
     /* ------------------------------------------------------------------ */
@@ -261,7 +315,10 @@ export function ClinicalAnalyzePage() {
         };
         setLastPayload(safePayload);
         setActiveTab("clinical");
-        await analyze(safePayload);
+        const nextBlockingIncident = await analyze(safePayload);
+        if (nextBlockingIncident) {
+            setBlockingIncident(nextBlockingIncident);
+        }
     }
 
     async function handleCompareSubmit(
@@ -726,6 +783,15 @@ export function ClinicalAnalyzePage() {
                     actionableMessage={blockingActionableMessage}
                     acknowledging={acknowledgingIncident}
                     onAcknowledge={handleAcknowledgeBlockingIncident}
+                />
+            )}
+            {pendingNeutralizationReview && (
+                <SecurityNeutralizationReview
+                    originalPayload={pendingNeutralizationReview.payload}
+                    preview={pendingNeutralizationReview.preview}
+                    labels={cloudContentGuardLabels.neutralizationReview}
+                    onContinue={() => void continueWithNeutralizedPayload()}
+                    onCancel={() => setPendingNeutralizationReview(null)}
                 />
             )}
 

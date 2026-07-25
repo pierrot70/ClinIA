@@ -37,6 +37,7 @@ describe("aiAnalyzePreCloudService", () => {
         expect(respondWithSecurityIncident).toHaveBeenCalledWith(
             expect.objectContaining({
                 auditEvent: expect.objectContaining({ payloadHash: "hash-123" }),
+                sanitizationPreview: null,
             })
         );
         expect(detectNonSecureContent).toHaveBeenCalledTimes(1);
@@ -131,6 +132,44 @@ describe("aiAnalyzePreCloudService", () => {
         expect(getAcknowledgedSecurityIncident).toHaveBeenCalledWith(
             "incident-123",
             "different-payload-hash"
+        );
+    });
+
+    it("returns a safe correction preview without echoing the original identifier", async () => {
+        const respondWithSecurityIncident = vi.fn().mockResolvedValue({ blocked: true });
+
+        await resolvePreCloudSecurityState({
+            patient: {
+                diagnosis: "Hypertension arterielle",
+                symptoms: ["Cephalee", "canary@invalid.test"],
+            },
+            incidentAckId: null,
+            model: "gpt-4.1-mini",
+            reqAuth: null,
+            req: { ip: "127.0.0.1", headers: {} },
+            fingerprint: "fp-1",
+            diagnosis: "Hypertension arterielle",
+            symptoms: ["Cephalee", "canary@invalid.test"],
+            detectNonSecureContent: vi.fn(() => ({ hasMatches: true, matches: [{ type: "email" }] })),
+            getAcknowledgedSecurityIncident: vi.fn(),
+            respondWithSecurityIncident,
+            getRequestIp: vi.fn(() => "127.0.0.1"),
+            makeSourceHash: vi.fn(() => "hash-123"),
+            sanitizeNonSecureContent: vi.fn(() => ({
+                diagnosis: "Hypertension arterielle",
+                symptoms: ["Cephalee"],
+            })),
+            res: {},
+            forceRealSafe: false,
+        });
+
+        expect(respondWithSecurityIncident).toHaveBeenCalledWith(
+            expect.objectContaining({
+                sanitizationPreview: { symptoms: ["Cephalee"] },
+            })
+        );
+        expect(JSON.stringify(respondWithSecurityIncident.mock.calls)).not.toContain(
+            "canary@invalid.test"
         );
     });
 });

@@ -81,6 +81,49 @@ describe('useClinicalAnalysis', () => {
     expect(JSON.stringify(result.current.errorFields)).not.toContain('confidentiel');
   });
 
+  it('returns a blocking security incident to the calling page without storing clinical content', async () => {
+    const blocking = {
+      required: true,
+      incident: {
+        id: 'incident-123',
+        type: 'NON_SECURE_CONTENT',
+        reason: 'Potential identifier detected.',
+        phase: 'pre_cloud',
+        timestamp: '2026-07-25T10:00:00.000Z',
+        context: {},
+        matches: [],
+      },
+      acknowledgment: {
+        requiredAction: "J'ai lu et compris",
+        method: 'POST' as const,
+        endpoint: '/api/security/incidents/acknowledge',
+      },
+      userMessage: 'Analyse bloquee.',
+    };
+    mockAuthFetch.mockResolvedValueOnce({
+      json: async () => ({
+        error: { code: 'SECURITY_INCIDENT_BLOCKING', message: 'Analyse bloquee.' },
+        blocking,
+      }),
+    });
+    const { result } = renderHook(() => useClinicalAnalysis());
+
+    let returnedBlocking = null;
+    await act(async () => {
+      returnedBlocking = await result.current.analyze({
+        age: 55,
+        sex: 'male',
+        diagnosis: 'test clinique',
+        symptoms: [],
+        medical_history: [],
+        current_medications: [],
+      });
+    });
+
+    expect(returnedBlocking).toEqual(blocking);
+    expect(JSON.stringify(result.current.errorFields)).not.toContain('test clinique');
+  });
+
   it('should set error on network error', async () => {
     mockAuthFetch.mockRejectedValueOnce(new Error('Network error'));
     const { result } = renderHook(() => useClinicalAnalysis());

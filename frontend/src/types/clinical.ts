@@ -51,6 +51,8 @@ export interface ClinicalPayload {
     forceReal?: boolean;
     openaiModel?: string;
     reverifyRequested?: boolean;
+    // Ephemeral control value used only after an explicit security acknowledgement.
+    incidentAckId?: string;
 }
 
 /* ------------------------------------------------------------------ */

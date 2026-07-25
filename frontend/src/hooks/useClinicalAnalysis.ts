@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import type { ClinicalPayload, ClinicalAnalysis } from "../types/clinical";
+import type { SecurityIncidentBlockingData } from "../types/api";
 import { authFetch } from "../services/authService";
 
 export function useClinicalAnalysis() {
@@ -9,7 +10,9 @@ export function useClinicalAnalysis() {
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [errorFields, setErrorFields] = useState<string[]>([]);
 
-  const analyze = useCallback(async (payload: ClinicalPayload) => {
+  const analyze = useCallback(async (
+    payload: ClinicalPayload
+  ): Promise<SecurityIncidentBlockingData | null> => {
     setLoading(true);
     setError(null);
     setErrorCode(null);
@@ -33,13 +36,16 @@ export function useClinicalAnalysis() {
             : []
         );
         setResult(null);
+        return json?.blocking ?? null;
       } else {
         setResult(json?.data ?? json);
+        return null;
       }
     } catch (e) {
       setError("Erreur réseau ou serveur.");
       setErrorFields([]);
       setResult(null);
+      return null;
     } finally {
       setLoading(false);
     }

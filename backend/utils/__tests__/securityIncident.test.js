@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
     buildBlockingIncidentResponse,
     detectNonSecureContent,
+    sanitizeNonSecureContent,
 } from "../securityIncident.js";
 
 describe("security incident detection", () => {
@@ -56,5 +57,30 @@ describe("security incident detection", () => {
             "/api/security/incidents/acknowledge"
         );
         expect(response.blocking.incident.id).toBe("507f1f77bcf86cd799439011");
+    });
+
+    it("includes only a safe correction preview when one is supplied", () => {
+        const response = buildBlockingIncidentResponse(
+            { _id: "507f1f77bcf86cd799439011" },
+            { sanitizationPreview: { symptoms: ["Cephalee"] } }
+        );
+
+        expect(response.blocking.incident.sanitizationPreview).toEqual({
+            symptoms: ["Cephalee"],
+        });
+    });
+
+    it("removes identifier-bearing list items while keeping approved clinical entries", () => {
+        const sanitized = sanitizeNonSecureContent({
+            patient_name: "Canary Patient",
+            symptoms: ["Cephalee", "canary@invalid.test"],
+            medical_history: ["Dyslipidemie"],
+        });
+
+        expect(sanitized).toEqual({
+            patient_name: "[REDACTED_NAME]",
+            symptoms: ["Cephalee"],
+            medical_history: ["Dyslipidemie"],
+        });
     });
 });

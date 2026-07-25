@@ -46,6 +46,12 @@ export interface SecurityIncidentBlockingData {
         timestamp: string;
         context: Record<string, unknown>;
         matches: Array<Record<string, unknown>>;
+        sanitizationPreview?: {
+            diagnosis?: string;
+            symptoms?: string[];
+            medical_history?: string[];
+            current_medications?: string[];
+        };
     };
     acknowledgment: {
         requiredAction: string;

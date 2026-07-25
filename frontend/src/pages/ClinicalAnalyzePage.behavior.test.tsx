@@ -7,6 +7,9 @@ const clinicalFormSpy = vi.fn();
 const hookSlots: any[] = [];
 let useClinicalAnalysisCallIndex = 0;
 let authUser: any = null;
+const { acknowledgeSecurityIncidentMock } = vi.hoisted(() => ({
+    acknowledgeSecurityIncidentMock: vi.fn(),
+}));
 
 vi.mock("../components/clinical/ClinicalForm", () => ({
     ClinicalForm: (props: any) => {
@@ -100,12 +103,16 @@ vi.mock("../contexts/HomeI18nContext", () => ({
 }));
 
 vi.mock("../services/securityIncidentApi", () => ({
-    acknowledgeSecurityIncident: vi.fn(),
+    acknowledgeSecurityIncident: acknowledgeSecurityIncidentMock,
     REQUIRED_ACK_ACTION: "J'ai lu et compris",
 }));
 
 vi.mock("../components/system/SecurityBlockingAlert", () => ({
-    SecurityBlockingAlert: () => null,
+    SecurityBlockingAlert: ({ onAcknowledge }: { onAcknowledge: () => void }) => (
+        <button type="button" onClick={onAcknowledge}>
+            acknowledge-blocking-incident
+        </button>
+    ),
 }));
 
 vi.mock("../components/ClinicalRelevanceByAgeChart", () => ({
@@ -198,6 +205,104 @@ describe("ClinicalAnalyzePage", () => {
             forceReal: false,
             openaiModel: "gpt-4.1-mini",
         });
+    });
+
+    it("replays the same clinical payload with the acknowledged incident ID", async () => {
+        const blockingIncident = {
+            required: true,
+            incident: {
+                id: "incident-123",
+                type: "NON_SECURE_CONTENT",
+                reason: "Potential identifier detected.",
+                phase: "pre_cloud",
+                timestamp: "2026-07-25T10:00:00.000Z",
+                context: {},
+                matches: [],
+                sanitizationPreview: {
+                    symptoms: ["Cephalee"],
+                },
+            },
+            acknowledgment: {
+                requiredAction: "J'ai lu et compris",
+                method: "POST" as const,
+                endpoint: "/api/security/incidents/acknowledge",
+            },
+            userMessage: "Analyse bloquee.",
+        };
+        const replayAnalyze = vi
+            .fn()
+            .mockResolvedValueOnce(blockingIncident)
+            .mockResolvedValueOnce(null);
+        acknowledgeSecurityIncidentMock.mockReset();
+        acknowledgeSecurityIncidentMock.mockResolvedValue({
+            data: { incidentId: "incident-123", acknowledged: true },
+        });
+        authUser = { role: "MEDECIN" };
+        configureClinicalAnalysisSlots(
+            {
+                result: null,
+                loading: false,
+                error: null,
+                errorCode: null,
+                errorFields: [],
+                analyze: replayAnalyze,
+                resetAnalysis: vi.fn(),
+            },
+            {
+                result: null,
+                loading: false,
+                error: null,
+                errorCode: null,
+                errorFields: [],
+                analyze: vi.fn(),
+                resetAnalysis: vi.fn(),
+            },
+            {
+                result: null,
+                loading: false,
+                error: null,
+                errorCode: null,
+                errorFields: [],
+                analyze: vi.fn(),
+                resetAnalysis: vi.fn(),
+            }
+        );
+
+        render(
+            <MemoryRouter>
+                <ClinicalAnalyzePage />
+            </MemoryRouter>
+        );
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "submit-clinical-form" }));
+        });
+        await act(async () => {
+            fireEvent.click(
+                screen.getByRole("button", { name: "acknowledge-blocking-incident" })
+            );
+        });
+
+        expect(acknowledgeSecurityIncidentMock).toHaveBeenCalledWith(
+            expect.objectContaining({ incidentId: "incident-123" })
+        );
+        expect(replayAnalyze).toHaveBeenCalledTimes(1);
+
+        expect(screen.getByText("Verification avant transmission")).toBeInTheDocument();
+        expect(screen.getByText("Valeur originale:")).toBeInTheDocument();
+        expect(screen.getByText("Valeur corrigee:")).toBeInTheDocument();
+
+        await act(async () => {
+            fireEvent.click(
+                screen.getByRole("button", {
+                    name: "Continuer avec les parametres corriges",
+                })
+            );
+        });
+        expect(replayAnalyze).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({ incidentAckId: "incident-123" })
+        );
     });
 
     it("returns to the form and focuses the first rejected cloud-bound field", async () => {

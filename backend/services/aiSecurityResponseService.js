@@ -17,6 +17,7 @@ export function createRespondWithSecurityIncident(deps) {
         matches,
         context = {},
         auditEvent = null,
+        sanitizationPreview = null,
     }) {
         try {
             const incident = await createSecurityIncident({
@@ -71,7 +72,9 @@ export function createRespondWithSecurityIncident(deps) {
                 });
             }
 
-            return res.status(422).json(buildBlockingIncidentResponse(incident));
+            return res
+                .status(422)
+                .json(buildBlockingIncidentResponse(incident, { sanitizationPreview }));
         } catch (err) {
             logSafeError("SECURITY_INCIDENT_PERSIST_FAILED", err, {
                 logger,

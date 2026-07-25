@@ -181,7 +181,9 @@ export function detectNonSecureContent(payload) {
     };
 }
 
-export function buildBlockingIncidentResponse(incident) {
+export function buildBlockingIncidentResponse(incident, options = {}) {
+    const sanitizationPreview = options?.sanitizationPreview;
+
     return {
         error: {
             code: "SECURITY_INCIDENT_BLOCKING",
@@ -205,6 +207,9 @@ export function buildBlockingIncidentResponse(incident) {
                 matches: Array.isArray(incident?.matches)
                     ? incident.matches
                     : [],
+                ...(sanitizationPreview && typeof sanitizationPreview === "object"
+                    ? { sanitizationPreview }
+                    : {}),
             },
             acknowledgment: {
                 requiredAction: "J'ai lu et compris",
@@ -223,6 +228,11 @@ function sanitizeString(value) {
         sanitized = sanitized.replace(entry.regex, entry.replacement);
     }
     return sanitized;
+}
+
+function containsSensitiveContent(value) {
+    const text = String(value ?? "");
+    return SENSITIVE_REPLACEMENTS.some(({ regex }) => regex.test(text));
 }
 
 function sanitizeNode(node, keyName = "") {
@@ -252,7 +262,12 @@ function sanitizeNode(node, keyName = "") {
     }
 
     if (Array.isArray(node)) {
-        return node.map((item) => sanitizeNode(item, keyName));
+        return node
+            .filter(
+                (item) =>
+                    typeof item !== "string" || !containsSensitiveContent(item)
+            )
+            .map((item) => sanitizeNode(item, keyName));
     }
 
     if (typeof node === "object") {

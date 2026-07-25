@@ -14,6 +14,27 @@ function buildClinicalPayloadBinding(patient) {
     return clinicalPayload;
 }
 
+const CLINICAL_PREVIEW_FIELDS = [
+    "diagnosis",
+    "symptoms",
+    "medical_history",
+    "current_medications",
+];
+
+function buildSanitizationPreview(patient, sanitizedPatient) {
+    const preview = {};
+
+    for (const field of CLINICAL_PREVIEW_FIELDS) {
+        if (!(field in patient) || !(field in sanitizedPatient)) continue;
+
+        if (JSON.stringify(patient[field]) !== JSON.stringify(sanitizedPatient[field])) {
+            preview[field] = sanitizedPatient[field];
+        }
+    }
+
+    return Object.keys(preview).length > 0 ? preview : null;
+}
+
 export async function resolvePreCloudSecurityState({
     patient,
     incidentAckId,
@@ -44,6 +65,11 @@ export async function resolvePreCloudSecurityState({
     const ackedIncident = incidentAckId
         ? await getAcknowledgedSecurityIncident(incidentAckId, payloadHash)
         : null;
+    const sanitizedPatient = sanitizeNonSecureContent(patient) ?? {};
+    const sanitizationPreview = buildSanitizationPreview(
+        patient,
+        sanitizedPatient
+    );
 
     if (!ackedIncident) {
         return {
@@ -59,6 +85,7 @@ export async function resolvePreCloudSecurityState({
                     model,
                     direction: "request",
                 },
+                sanitizationPreview,
                 auditEvent: {
                     actorUserId: reqAuth?.userId ?? null,
                     actorUsername: reqAuth?.username ?? null,
@@ -91,8 +118,6 @@ export async function resolvePreCloudSecurityState({
             }),
         };
     }
-
-    const sanitizedPatient = sanitizeNonSecureContent(patient);
 
     return {
         blocked: false,
