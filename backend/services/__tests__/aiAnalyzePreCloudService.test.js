@@ -34,6 +34,11 @@ describe("aiAnalyzePreCloudService", () => {
 
         expect(result.blocked).toBe(true);
         expect(respondWithSecurityIncident).toHaveBeenCalledTimes(1);
+        expect(respondWithSecurityIncident).toHaveBeenCalledWith(
+            expect.objectContaining({
+                auditEvent: expect.objectContaining({ payloadHash: "hash-123" }),
+            })
+        );
         expect(detectNonSecureContent).toHaveBeenCalledTimes(1);
     });
 
@@ -49,9 +54,17 @@ describe("aiAnalyzePreCloudService", () => {
             medical_history: ["sanitized"],
             current_medications: [],
         }));
+        const makeSourceHash = vi.fn(() => "hash-123");
 
         const result = await resolvePreCloudSecurityState({
-            patient: { medical_history: ["raw"], current_medications: [] },
+            patient: {
+                medical_history: ["raw"],
+                current_medications: [],
+                incidentAckId: "incident-123",
+                forceReal: true,
+                openaiModel: "gpt-4.1-mini",
+                reverifyRequested: true,
+            },
             incidentAckId: "incident-123",
             model: "gpt-4.1-mini",
             reqAuth: null,
@@ -63,7 +76,7 @@ describe("aiAnalyzePreCloudService", () => {
             getAcknowledgedSecurityIncident,
             respondWithSecurityIncident: vi.fn(),
             getRequestIp: vi.fn(() => "127.0.0.1"),
-            makeSourceHash: vi.fn(() => "hash-123"),
+            makeSourceHash,
             sanitizeNonSecureContent,
             res: {},
             forceRealSafe: false,
@@ -81,5 +94,43 @@ describe("aiAnalyzePreCloudService", () => {
             message:
                 "Requete contenant des donnees sensibles neutralisee apres acknowledgment explicite du clinicien.",
         });
+        expect(getAcknowledgedSecurityIncident).toHaveBeenCalledWith(
+            "incident-123",
+            "hash-123"
+        );
+        expect(makeSourceHash).toHaveBeenCalledWith({
+            medical_history: ["raw"],
+            current_medications: [],
+        });
+    });
+
+    it("blocks a replay when the acknowledged incident belongs to another payload", async () => {
+        const respondWithSecurityIncident = vi.fn().mockResolvedValue({ blocked: true });
+        const getAcknowledgedSecurityIncident = vi.fn().mockResolvedValue(null);
+
+        const result = await resolvePreCloudSecurityState({
+            patient: { diagnosis: "different raw value" },
+            incidentAckId: "incident-123",
+            model: "gpt-4.1-mini",
+            reqAuth: null,
+            req: { ip: "127.0.0.1", headers: {} },
+            fingerprint: "fp-1",
+            diagnosis: "Migraine",
+            symptoms: [],
+            detectNonSecureContent: vi.fn(() => ({ hasMatches: true, matches: [{ type: "NAME" }] })),
+            getAcknowledgedSecurityIncident,
+            respondWithSecurityIncident,
+            getRequestIp: vi.fn(() => "127.0.0.1"),
+            makeSourceHash: vi.fn(() => "different-payload-hash"),
+            sanitizeNonSecureContent: vi.fn(),
+            res: {},
+            forceRealSafe: false,
+        });
+
+        expect(result.blocked).toBe(true);
+        expect(getAcknowledgedSecurityIncident).toHaveBeenCalledWith(
+            "incident-123",
+            "different-payload-hash"
+        );
     });
 });

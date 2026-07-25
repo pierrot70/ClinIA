@@ -32,6 +32,13 @@ const SecurityIncidentSchema = new mongoose.Schema(
             type: Object,
             default: {},
         },
+        // SHA-256 fingerprint only. The clinical payload itself is never stored here.
+        payloadHash: {
+            type: String,
+            default: null,
+            index: true,
+            immutable: true,
+        },
         detectedAt: {
             type: Date,
             required: true,

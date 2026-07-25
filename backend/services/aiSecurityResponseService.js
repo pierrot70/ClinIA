@@ -25,6 +25,9 @@ export function createRespondWithSecurityIncident(deps) {
                 requestPath,
                 matches,
                 context,
+                ...(auditEvent?.payloadHash
+                    ? { payloadHash: auditEvent.payloadHash }
+                    : {}),
                 transport: "openai_chat_completions",
             });
 

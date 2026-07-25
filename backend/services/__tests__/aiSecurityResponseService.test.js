@@ -42,6 +42,7 @@ describe("aiSecurityResponseService", () => {
                 actorRole: "SUPERADMIN",
                 ip: "127.0.0.1",
                 model: "gpt-4.1-mini",
+                payloadHash: "payload-hash-123",
                 payloadSizeBytes: 42,
                 requestContext: { fingerprint: "fp-1" },
             },
@@ -53,6 +54,7 @@ describe("aiSecurityResponseService", () => {
             requestPath: "/api/ai/analyze",
             matches: [{ type: "EMAIL" }, { type: "EMAIL" }, { type: "PHONE" }],
             context: { model: "gpt-4.1-mini" },
+            payloadHash: "payload-hash-123",
             transport: "openai_chat_completions",
         });
         expect(recordOpenAIRequestAuditEvent).toHaveBeenCalledWith(

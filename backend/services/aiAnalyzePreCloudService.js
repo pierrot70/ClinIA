@@ -1,3 +1,19 @@
+function buildClinicalPayloadBinding(patient) {
+    if (!patient || typeof patient !== "object" || Array.isArray(patient)) {
+        return {};
+    }
+
+    const clinicalPayload = { ...patient };
+
+    // These fields control the request lifecycle; they are not clinical content.
+    delete clinicalPayload.incidentAckId;
+    delete clinicalPayload.forceReal;
+    delete clinicalPayload.openaiModel;
+    delete clinicalPayload.reverifyRequested;
+
+    return clinicalPayload;
+}
+
 export async function resolvePreCloudSecurityState({
     patient,
     incidentAckId,
@@ -24,8 +40,9 @@ export async function resolvePreCloudSecurityState({
         };
     }
 
+    const payloadHash = makeSourceHash(buildClinicalPayloadBinding(patient));
     const ackedIncident = incidentAckId
-        ? await getAcknowledgedSecurityIncident(incidentAckId)
+        ? await getAcknowledgedSecurityIncident(incidentAckId, payloadHash)
         : null;
 
     if (!ackedIncident) {
@@ -48,7 +65,7 @@ export async function resolvePreCloudSecurityState({
                     actorRole: reqAuth?.role ?? null,
                     ip: getRequestIp(req),
                     model,
-                    payloadHash: makeSourceHash(patient),
+                    payloadHash,
                     payloadSizeBytes: Buffer.byteLength(
                         JSON.stringify(patient),
                         "utf8"

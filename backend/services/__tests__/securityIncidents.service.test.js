@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const create = vi.fn();
 const findById = vi.fn();
+const findOneAndUpdate = vi.fn();
+const findOneLean = vi.fn();
+const findOne = vi.fn(() => ({ lean: findOneLean }));
 const countDocuments = vi.fn();
 const lean = vi.fn();
 const limit = vi.fn(() => ({ lean }));
@@ -16,6 +19,8 @@ vi.mock("../../models/SecurityIncident.js", () => ({
         countDocuments,
         find,
         findById,
+        findOne,
+        findOneAndUpdate,
     },
 }));
 
@@ -28,12 +33,14 @@ vi.mock("../../models/AdminUser.js", () => ({
 const {
     acknowledgeSecurityIncident,
     createSecurityIncident,
+    getAcknowledgedSecurityIncident,
     handleMassDownloadSignal,
     listSecurityIncidents,
 } = await import("../securityIncidents.js");
 
 beforeEach(() => {
     vi.clearAllMocks();
+    findOne.mockReturnValue({ lean: findOneLean });
 });
 
 describe("security incidents service", () => {
@@ -148,14 +155,15 @@ describe("security incidents service", () => {
         expect(save).toHaveBeenCalledTimes(1);
     });
 
-    it("records only safe acknowledgment metadata", async () => {
-        const save = vi.fn().mockResolvedValue(undefined);
+    it("records only safe acknowledgment metadata once through an atomic update", async () => {
         const incident = {
             _id: "507f1f77bcf86cd799439011",
-            acknowledged: false,
-            save,
+            acknowledged: true,
+            acknowledgmentAction: "J'ai lu et compris",
+            acknowledgedAt: new Date("2026-07-25T12:00:00.000Z"),
+            acknowledgmentContext: { route: "/clinical" },
         };
-        findById.mockResolvedValue(incident);
+        findOneAndUpdate.mockResolvedValue(incident);
 
         const result = await acknowledgeSecurityIncident({
             incidentId: "507f1f77bcf86cd799439011",
@@ -167,7 +175,35 @@ describe("security incidents service", () => {
         expect(result.acknowledgmentAction).toBe("J'ai lu et compris");
         expect(result.acknowledgedAt).toBeInstanceOf(Date);
         expect(result.acknowledgmentContext).toEqual({ route: "/clinical" });
-        expect(save).toHaveBeenCalledTimes(1);
+        expect(findOneAndUpdate).toHaveBeenCalledWith(
+            {
+                _id: "507f1f77bcf86cd799439011",
+                acknowledged: { $ne: true },
+            },
+            expect.objectContaining({
+                $set: expect.objectContaining({
+                    acknowledgmentAction: "J'ai lu et compris",
+                    acknowledgmentContext: { route: "/clinical" },
+                }),
+            }),
+            { new: true }
+        );
+    });
+
+    it("does not reuse an acknowledged incident for a different payload hash", async () => {
+        findOneLean.mockResolvedValue(null);
+
+        const result = await getAcknowledgedSecurityIncident(
+            "507f1f77bcf86cd799439011",
+            "payload-hash-b"
+        );
+
+        expect(result).toBeNull();
+        expect(findOne).toHaveBeenCalledWith({
+            _id: "507f1f77bcf86cd799439011",
+            acknowledged: true,
+            payloadHash: "payload-hash-b",
+        });
     });
 
     it("rejects any acknowledgment action that does not match required phrase", async () => {

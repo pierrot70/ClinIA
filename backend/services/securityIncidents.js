@@ -15,6 +15,12 @@ function createSecurityIncidentError(code, message) {
     return { code, message };
 }
 
+function normalizePayloadHash(value) {
+    if (typeof value !== "string") return null;
+    const normalized = value.trim().toLowerCase();
+    return normalized && normalized.length <= 128 ? normalized : null;
+}
+
 function assertSecurityIncidentAccess(authUser) {
     if (!authUser?.role || !["ADMIN", "SUPERADMIN"].includes(authUser.role)) {
         throw createSecurityIncidentError(
@@ -57,6 +63,7 @@ export async function createSecurityIncident(payload) {
         ...payload,
         matches: minimizeSecurityIncidentMatches(payload?.matches),
         context: minimizeSecurityIncidentContext(payload?.type, payload?.context),
+        payloadHash: normalizePayloadHash(payload?.payloadHash),
         detectedAt: payload?.detectedAt || new Date(),
     };
 
@@ -212,38 +219,47 @@ export async function acknowledgeSecurityIncident({
         };
     }
 
-    const incident = await SecurityIncident.findById(incidentId);
-    if (!incident) {
+    const acknowledgedAt = new Date();
+    const acknowledgmentContext = minimizeAcknowledgmentContext(context);
+    const newlyAcknowledged = await SecurityIncident.findOneAndUpdate(
+        { _id: incidentId, acknowledged: { $ne: true } },
+        {
+            $set: {
+                acknowledged: true,
+                acknowledgmentAction: action,
+                acknowledgedAt,
+                acknowledgmentContext,
+            },
+        },
+        { new: true }
+    );
+
+    if (newlyAcknowledged) {
+        return newlyAcknowledged;
+    }
+
+    const existingIncident = await SecurityIncident.findById(incidentId);
+    if (!existingIncident) {
         throw {
             code: "INCIDENT_NOT_FOUND",
             message: "Incident introuvable.",
         };
     }
 
-    if (incident.acknowledged) {
-        return incident;
-    }
-
-    incident.acknowledged = true;
-    incident.acknowledgmentAction = action;
-    incident.acknowledgedAt = new Date();
-    incident.acknowledgmentContext = minimizeAcknowledgmentContext(context);
-
-    await incident.save();
-    return incident;
+    return existingIncident;
 }
 
-export async function getAcknowledgedSecurityIncident(incidentId) {
-    if (!mongoose.Types.ObjectId.isValid(incidentId)) {
+export async function getAcknowledgedSecurityIncident(incidentId, payloadHash) {
+    const normalizedPayloadHash = normalizePayloadHash(payloadHash);
+    if (!mongoose.Types.ObjectId.isValid(incidentId) || !normalizedPayloadHash) {
         return null;
     }
 
-    const incident = await SecurityIncident.findById(incidentId).lean();
-    if (!incident || !incident.acknowledged) {
-        return null;
-    }
-
-    return incident;
+    return SecurityIncident.findOne({
+        _id: incidentId,
+        acknowledged: true,
+        payloadHash: normalizedPayloadHash,
+    }).lean();
 }
 
 export { REQUIRED_ACK_ACTION };
