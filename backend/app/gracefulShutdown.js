@@ -1,3 +1,5 @@
+import { logSafeError } from "../utils/requestLogSafety.js";
+
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 10_000;
 
 export function registerGracefulShutdown({
@@ -17,7 +19,10 @@ export function registerGracefulShutdown({
             logger.log(`[shutdown] MongoDB disconnected after ${signal}`);
         } catch (err) {
             exitCode = 1;
-            logger.error("[shutdown] MongoDB disconnect failed:", err?.message);
+            logSafeError("SHUTDOWN_MONGO_DISCONNECT_FAILED", err, {
+                logger,
+                component: "shutdown",
+            });
         } finally {
             clearTimeoutFn(timeout);
             processRef.exit(exitCode);
@@ -33,16 +38,21 @@ export function registerGracefulShutdown({
         logger.log(`[shutdown] ${signal} received; draining HTTP connections`);
 
         const timeout = setTimeoutFn(() => {
-            logger.error(
-                `[shutdown] Graceful shutdown exceeded ${timeoutMs}ms`
-            );
+            logSafeError("SHUTDOWN_TIMEOUT", null, {
+                logger,
+                component: "shutdown",
+                status: 503,
+            });
             processRef.exit(1);
         }, timeoutMs);
         timeout?.unref?.();
 
         server.close((err) => {
             if (err) {
-                logger.error("[shutdown] HTTP server close failed:", err.message);
+                logSafeError("SHUTDOWN_HTTP_CLOSE_FAILED", err, {
+                    logger,
+                    component: "shutdown",
+                });
                 finishShutdown({ signal, timeout, exitCode: 1 });
                 return;
             }
@@ -56,11 +66,17 @@ export function registerGracefulShutdown({
     processRef.once("SIGTERM", () => shutdown("SIGTERM"));
     processRef.once("SIGINT", () => shutdown("SIGINT"));
     processRef.once("uncaughtException", (err) => {
-        logger.error("[fatal] uncaughtException:", err);
+        logSafeError("UNCAUGHT_EXCEPTION", err, {
+            logger,
+            component: "shutdown",
+        });
         shutdown("uncaughtException", 1);
     });
     processRef.once("unhandledRejection", (reason) => {
-        logger.error("[fatal] unhandledRejection:", reason);
+        logSafeError("UNHANDLED_REJECTION", reason, {
+            logger,
+            component: "shutdown",
+        });
         shutdown("unhandledRejection", 1);
     });
 

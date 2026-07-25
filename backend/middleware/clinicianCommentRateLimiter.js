@@ -1,5 +1,5 @@
 import { RateLimitWindow } from "../models/RateLimitWindow.js";
-import { getSafeRequestPath } from "../utils/requestLogSafety.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_COMMENTS_PER_WINDOW = 5;
@@ -70,19 +70,14 @@ export function createClinicianCommentRateLimiter({
                 return next();
             }
 
-            console.warn("CLINICIAN_COMMENTS_RATE_LIMITED", {
-                actorKey,
-                requestCount: bucket.requestCount,
-                windowStartedAt: windowStartedAt.toISOString(),
-                path: getSafeRequestPath(req, "/api/clinician-comments"),
+            logSafeError("CLINICIAN_COMMENTS_RATE_LIMITED", null, {
+                component: "rate_limiter",
+                status: 429,
             });
 
             return buildLimitedResponse(res, windowStartedAt, nowMs);
         } catch (err) {
-            console.error(
-                "CLINICIAN_COMMENTS_RATE_LIMIT_CHECK_FAILED",
-                err?.message
-            );
+            logSafeError("CLINICIAN_COMMENTS_RATE_LIMIT_CHECK_FAILED", err);
             return res.status(503).json({
                 error: {
                     code: "CLINICIAN_COMMENTS_RATE_LIMIT_UNAVAILABLE",

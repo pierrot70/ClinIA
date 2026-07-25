@@ -68,10 +68,12 @@ describe("startServer", () => {
 
         expect(listen).not.toHaveBeenCalled();
         expect(initShutdownState).not.toHaveBeenCalled();
-        expect(logger.error).toHaveBeenCalledWith(
-            "❌ Mongo connection error (FAIL-FAST):",
-            "mongo down"
-        );
+        expect(logger.error).toHaveBeenCalledWith("CLINIA_SAFE_ERROR", {
+            event: "MONGO_CONNECTION_FAILED",
+            name: "Error",
+            code: null,
+            component: "mongo",
+        });
     });
 
     it("refuses a root Mongo account in production", async () => {
@@ -98,9 +100,11 @@ describe("startServer", () => {
 
         expect(connect).not.toHaveBeenCalled();
         expect(listen).not.toHaveBeenCalled();
-        expect(logger.error).toHaveBeenCalledWith(
-            "❌ Mongo connection error (FAIL-FAST):",
-            "Production MONGO_URI must use a dedicated non-root application user."
-        );
+        expect(logger.error).toHaveBeenCalledWith("CLINIA_SAFE_ERROR", {
+            event: "MONGO_CONNECTION_FAILED",
+            name: "Error",
+            code: null,
+            component: "mongo",
+        });
     });
 });

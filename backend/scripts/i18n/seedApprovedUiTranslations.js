@@ -112,7 +112,7 @@ async function run() {
     }
 }
 
-run().catch((error) => {
-    console.error(`ERROR ${error.message}`);
+run().catch(() => {
+    console.error("ERROR approved_ui_translation_seed_failed");
     process.exitCode = 1;
 });

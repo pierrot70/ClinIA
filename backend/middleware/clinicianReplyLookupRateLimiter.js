@@ -1,5 +1,5 @@
 import { RateLimitWindow } from "../models/RateLimitWindow.js";
-import { getSafeRequestPath } from "../utils/requestLogSafety.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOOKUPS_PER_WINDOW = 10;
@@ -56,14 +56,9 @@ export function createClinicianReplyLookupRateLimiter({
             );
             res.setHeader("Retry-After", String(retryAfterSeconds));
 
-            console.warn("CLINICIAN_REPLY_LOOKUP_RATE_LIMITED", {
-                actorKey,
-                requestCount: bucket.requestCount,
-                windowStartedAt: windowStartedAt.toISOString(),
-                path: getSafeRequestPath(
-                    req,
-                    "/api/clinician-comments/lookup-replies"
-                ),
+            logSafeError("CLINICIAN_REPLY_LOOKUP_RATE_LIMITED", null, {
+                component: "rate_limiter",
+                status: 429,
             });
 
             return res.status(429).json({
@@ -75,10 +70,7 @@ export function createClinicianReplyLookupRateLimiter({
                 },
             });
         } catch (err) {
-            console.error(
-                "CLINICIAN_REPLY_LOOKUP_RATE_LIMIT_CHECK_FAILED",
-                err?.message
-            );
+            logSafeError("CLINICIAN_REPLY_LOOKUP_RATE_LIMIT_CHECK_FAILED", err);
             return res.status(503).json({
                 error: {
                     code: "CLINICIAN_REPLY_LOOKUP_RATE_LIMIT_UNAVAILABLE",

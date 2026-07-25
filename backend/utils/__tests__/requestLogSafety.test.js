@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { getSafeRequestPath } from "../requestLogSafety.js";
+import { describe, expect, it, vi } from "vitest";
+import {
+    getSafeErrorMetadata,
+    getSafeRequestPath,
+    logSafeError,
+} from "../requestLogSafety.js";
 
 describe("getSafeRequestPath", () => {
     it("removes query strings and fragments", () => {
@@ -27,5 +31,42 @@ describe("getSafeRequestPath", () => {
                 originalUrl: "/api/appointments/slots?date=2026-07-18",
             })
         ).toBe("/api/appointments/slots");
+    });
+});
+
+describe("logSafeError", () => {
+    it("does not write error messages, stacks, URLs or arbitrary context", () => {
+        const logger = { error: vi.fn() };
+        const canary = "Pierre Lasante RAMQ1234567890 pierre@example.com";
+        const error = Object.assign(new Error(canary), {
+            code: "MONGO_WRITE_FAILED",
+            stack: `Error: ${canary} at https://example.invalid/patients/secret`,
+        });
+
+        logSafeError("PATIENT_UPDATE_FAILED", error, {
+            logger,
+            requestId: "550e8400-e29b-41d4-a716-446655440000",
+            operation: "update",
+            patientName: canary,
+        });
+
+        expect(logger.error).toHaveBeenCalledWith("CLINIA_SAFE_ERROR", {
+            event: "PATIENT_UPDATE_FAILED",
+            name: "Error",
+            code: "MONGO_WRITE_FAILED",
+            requestId: "550e8400-e29b-41d4-a716-446655440000",
+            operation: "update",
+        });
+        expect(JSON.stringify(logger.error.mock.calls)).not.toContain(canary);
+        expect(JSON.stringify(logger.error.mock.calls)).not.toContain("example.invalid");
+    });
+
+    it("drops untrusted error names and codes", () => {
+        expect(
+            getSafeErrorMetadata({
+                name: "Pierre Lasante",
+                code: "RAMQ1234567890",
+            })
+        ).toEqual({ name: "Error", code: null });
     });
 });

@@ -24,6 +24,7 @@ import {
     WriteVerificationReceipt,
 } from "../components/system/WriteVerificationReceipt";
 import { labels } from "../i18n/uiLabels";
+import { logSafeClientError } from "../utils/safeClientLog";
 
 /* ------------------------------------------------------------------ */
 /* Hook debounce                                                       */
@@ -253,7 +254,7 @@ export function AppointmentsListPage() {
         }
 
         if (!response.data || !response.data.meta) {
-            console.error("❌ Réponse invalide:", response);
+            logSafeClientError("APPOINTMENTS_RESPONSE_INVALID");
             setError({
                 code: "INTERNAL_ERROR",
                 message:

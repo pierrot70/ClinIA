@@ -45,7 +45,7 @@ async function run() {
 	await mongoose.disconnect();
 }
 
-run().catch((err) => {
-	console.error(err);
+run().catch(() => {
+	console.error("ERROR purge_bad_translations_failed");
 	process.exit(1);
 });

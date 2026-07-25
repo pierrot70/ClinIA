@@ -14,7 +14,7 @@ import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js"
 import { getRequestContext } from "../app/requestContext.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 import { getReplicaSetStatus } from "../services/dbStatus.js";
-import { getSafeRequestPath } from "../utils/requestLogSafety.js";
+import { getSafeRequestPath, logSafeError } from "../utils/requestLogSafety.js";
 
 const router = express.Router();
 
@@ -108,7 +108,7 @@ router.post("/", async (req, res) => {
             });
         }
 
-        console.error("❌ Specialist create error:", err);
+        logSafeError("SPECIALIST_CREATE_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -158,7 +158,7 @@ router.get("/", async (req, res) => {
             },
         });
     } catch (err) {
-        console.error("❌ Specialist list error:", err);
+        logSafeError("SPECIALIST_LIST_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -207,7 +207,7 @@ router.get("/:id", async (req, res) => {
             });
         }
 
-        console.error("❌ Specialist get error:", err);
+        logSafeError("SPECIALIST_GET_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -288,7 +288,7 @@ router.patch("/:id", async (req, res) => {
             });
         }
 
-        console.error("❌ Specialist update error:", err);
+        logSafeError("SPECIALIST_UPDATE_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -341,7 +341,7 @@ router.delete("/:id", async (req, res) => {
             });
         }
 
-        console.error("❌ Specialist delete error:", err);
+        logSafeError("SPECIALIST_DELETE_FAILED", err);
 
         return res.status(500).json({
             error: {

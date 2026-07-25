@@ -1,3 +1,5 @@
+import { logSafeError } from "../utils/requestLogSafety.js";
+
 function getMongoUsername(mongoUri) {
     const match = String(mongoUri || "").match(
         /^mongodb(?:\+srv)?:\/\/([^:@/]+)(?::[^@]*)?@/i
@@ -57,7 +59,10 @@ export function createStartServer(deps) {
                     await initShutdownState();
                     logger.log("✅ Maintenance state chargé depuis MongoDB");
                 } catch (err) {
-                    logger.warn("⚠️ initShutdownState failed", err?.message);
+                    logSafeError("APP_SHUTDOWN_STATE_INIT_FAILED", err, {
+                        logger,
+                        component: "mongo",
+                    });
                 }
 
                 const server = app.listen(port, () =>
@@ -75,7 +80,10 @@ export function createStartServer(deps) {
                 return server;
             })
             .catch((err) => {
-                logger.error("❌ Mongo connection error (FAIL-FAST):", err.message);
+                logSafeError("MONGO_CONNECTION_FAILED", err, {
+                    logger,
+                    component: "mongo",
+                });
             });
     };
 }

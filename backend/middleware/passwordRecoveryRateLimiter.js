@@ -1,4 +1,5 @@
 import { RateLimitWindow } from "../models/RateLimitWindow.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 5;
@@ -66,9 +67,8 @@ export function createPasswordRecoveryRateLimiter({
                 },
             });
         } catch (err) {
-            console.error("PASSWORD_RECOVERY_RATE_LIMIT_CHECK_FAILED", {
-                limiterKey,
-                message: err?.message,
+            logSafeError("PASSWORD_RECOVERY_RATE_LIMIT_CHECK_FAILED", err, {
+                component: "rate_limiter",
             });
             return res.status(503).json({
                 error: {

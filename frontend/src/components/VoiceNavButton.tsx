@@ -4,6 +4,7 @@ import { Loader2, Mic, MicOff } from "lucide-react";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { useTranslation } from "../hooks/useTranslation";
 import { labels } from "../i18n/uiLabels";
+import { logSafeClientError } from "../utils/safeClientLog";
 
 type NavCommand = {
     label: string;
@@ -1449,7 +1450,7 @@ const VoiceNavButton: React.FC = () => {
                 setStatus(`Erreur vocale: ${event.error}`);
             }
             if (isDev) {
-                console.error("[VoiceNav] recognition error", event.error);
+                logSafeClientError("VOICE_RECOGNITION_FAILED");
             }
             if (silenceTimerRef.current) {
                 window.clearTimeout(silenceTimerRef.current);
@@ -1585,7 +1586,7 @@ const VoiceNavButton: React.FC = () => {
             try {
                 recognition.start();
             } catch (error) {
-                console.error("[VoiceNav] start error", error);
+                logSafeClientError("VOICE_START_FAILED");
                 setStatus("Erreur de demarrage micro.");
                 setIsListening(false);
                 isListeningRef.current = false;
@@ -1625,7 +1626,7 @@ const VoiceNavButton: React.FC = () => {
             })
             .catch((error) => {
                 if (isDev) {
-                    console.error("[VoiceNav] getUserMedia error", error);
+                    logSafeClientError("VOICE_MEDIA_ACCESS_FAILED");
                 }
                 setStatus(
                     `Micro non accessible: ${error?.name || "inconnu"}.`
@@ -1742,7 +1743,7 @@ const VoiceNavButton: React.FC = () => {
             })
             .catch((error) => {
                 if (isDev) {
-                    console.error("[VoiceNav] mic test error", error);
+                    logSafeClientError("VOICE_MIC_TEST_FAILED");
                 }
                 setStatus(
                     `Test micro impossible: ${error?.name || "inconnu"}.`

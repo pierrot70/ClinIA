@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { OpenAIRequestAuditLog } from "../models/OpenAIRequestAuditLog.js";
 import { minimizeOpenAIRequestContext } from "./auditDataMinimization.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 function redactUsername(username) {
     if (!username || typeof username !== "string") {
@@ -54,7 +55,7 @@ export async function recordOpenAIRequestAuditEvent({
 
         return created;
     } catch (err) {
-        console.warn("⚠️ OpenAI request audit write failed", err?.message);
+        logSafeError("OPENAI_AUDIT_WRITE_FAILED", err);
         return null;
     }
 }
@@ -83,6 +84,6 @@ export async function finalizeOpenAIRequestAuditEvent(
             }
         );
     } catch (err) {
-        console.warn("⚠️ OpenAI request audit finalize failed", err?.message);
+        logSafeError("OPENAI_AUDIT_FINALIZE_FAILED", err);
     }
 }

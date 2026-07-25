@@ -18,7 +18,7 @@ import {
     buildWriteVerificationMeta,
     createWriteVerificationContext,
 } from "../audit/writeVerification.js";
-import { getSafeRequestPath } from "../utils/requestLogSafety.js";
+import { getSafeRequestPath, logSafeError } from "../utils/requestLogSafety.js";
 
 const router = express.Router();
 
@@ -97,7 +97,7 @@ router.get("/slots", async (req, res) => {
             });
         }
 
-        console.error("❌ Slot fetch error:", err);
+        logSafeError("APPOINTMENT_SLOT_LIST_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -182,7 +182,7 @@ router.post("/", async (req, res) => {
             });
         }
 
-        console.error("❌ Appointment create error:", err);
+        logSafeError("APPOINTMENT_CREATE_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -259,7 +259,7 @@ router.get("/", async (req, res) => {
             },
         });
     } catch (err) {
-        console.error("❌ Appointment list error:", err);
+        logSafeError("APPOINTMENT_LIST_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -308,7 +308,7 @@ router.get("/:id", async (req, res) => {
             });
         }
 
-        console.error("❌ Appointment get error:", err);
+        logSafeError("APPOINTMENT_GET_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -367,7 +367,7 @@ router.delete("/:id", async (req, res) => {
             });
         }
 
-        console.error("❌ Appointment cancel error:", err);
+        logSafeError("APPOINTMENT_CANCEL_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -442,10 +442,7 @@ router.patch("/:id/status", async (req, res) => {
             });
         }
 
-        console.error(
-            "❌ Appointment status update error:",
-            err
-        );
+        logSafeError("APPOINTMENT_STATUS_UPDATE_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -537,10 +534,7 @@ router.patch("/:id/schedule", async (req, res) => {
             });
         }
 
-        console.error(
-            "❌ Appointment schedule update error:",
-            err
-        );
+        logSafeError("APPOINTMENT_SCHEDULE_UPDATE_FAILED", err);
 
         return res.status(500).json({
             error: {

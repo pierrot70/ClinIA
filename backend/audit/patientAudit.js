@@ -1,5 +1,6 @@
 import { PatientAuditLog } from "../models/PatientAuditLog.js";
 import { minimizePatientAuditContext } from "./auditDataMinimization.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 function redactUsername(username) {
     if (!username || typeof username !== "string") {
@@ -64,7 +65,7 @@ export async function recordPatientAuditEvent({
             throw err;
         }
         // Never block patient flows due to audit persistence issues.
-        console.warn("⚠️ Patient audit write failed", err?.message);
+        logSafeError("PATIENT_AUDIT_WRITE_FAILED", err);
         return null;
     }
 }

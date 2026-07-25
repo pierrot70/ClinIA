@@ -1,4 +1,5 @@
 import { WriteOperationAuditLog } from "../models/WriteOperationAuditLog.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 function redactUsername(username) {
     if (!username || typeof username !== "string") {
@@ -164,7 +165,7 @@ export async function recordWriteOperationAuditEvent({
             throw err;
         }
         // Audit must never block clinical workflows.
-        console.warn("Write operation audit failed", err?.message);
+        logSafeError("WRITE_OPERATION_AUDIT_FAILED", err);
         return false;
     }
 }

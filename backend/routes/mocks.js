@@ -1,5 +1,6 @@
 import express from "express";
 import { getAllMocks, saveAllMocks } from "../utils/mockLoader.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 const router = express.Router();
 
@@ -7,7 +8,7 @@ router.get("/", (_req, res) => {
     try {
         return res.status(200).json(getAllMocks());
     } catch (err) {
-        console.error("❌ Mock Studio load error:", err);
+        logSafeError("MOCK_LOAD_FAILED", err);
         return res.status(500).json({
             error: {
                 code: "MOCK_LOAD_FAILED",
@@ -43,7 +44,7 @@ router.put("/", (req, res) => {
             });
         }
 
-        console.error("❌ Mock Studio save error:", err);
+        logSafeError("MOCK_SAVE_FAILED", err);
         return res.status(500).json({
             error: {
                 code: "MOCK_SAVE_FAILED",

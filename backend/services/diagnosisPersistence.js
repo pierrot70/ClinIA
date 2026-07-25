@@ -2,6 +2,7 @@ import { DiagnosisResult } from "../models/DiagnosisResult.js";
 import { CLINICAL_QUERY_WRITE_OPTIONS, CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
 import { getReplicaSetStatus } from "./dbStatus.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 async function recordDiagnosisWriteAudit({
     operation,
@@ -122,7 +123,10 @@ export async function persistOrReuseDiagnosis(payload, deps = {}) {
             }
         }
 
-        logger.error("❌ Mongo persist error:", err.message);
+        logSafeError("DIAGNOSIS_PERSIST_FAILED", err, {
+            logger,
+            component: "mongo",
+        });
         return {
             ok: false,
             error: {
@@ -141,7 +145,10 @@ export async function findPersistedDiagnosisByFingerprint(fingerprint, deps = {}
     try {
         return await DiagnosisResult.findOne({ fingerprint }).lean();
     } catch (err) {
-        logger.error("❌ Mongo lookup error:", err.message);
+        logSafeError("DIAGNOSIS_LOOKUP_FAILED", err, {
+            logger,
+            component: "mongo",
+        });
         return null;
     }
 }
@@ -170,7 +177,10 @@ export async function upgradePersistedDiagnosisOutput(
         }
         return true;
     } catch (err) {
-        logger.warn("⚠️ AI cache upgrade failed", err?.message);
+        logSafeError("DIAGNOSIS_CACHE_UPGRADE_FAILED", err, {
+            logger,
+            component: "mongo",
+        });
         return false;
     }
 }

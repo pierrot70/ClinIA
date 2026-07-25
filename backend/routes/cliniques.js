@@ -14,7 +14,7 @@ import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js"
 import { getRequestContext } from "../app/requestContext.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 import { getReplicaSetStatus } from "../services/dbStatus.js";
-import { getSafeRequestPath } from "../utils/requestLogSafety.js";
+import { getSafeRequestPath, logSafeError } from "../utils/requestLogSafety.js";
 
 const router = express.Router();
 
@@ -97,7 +97,7 @@ router.post("/", async (req, res) => {
             });
         }
 
-        console.error("❌ Clinique create error:", err);
+        logSafeError("CLINIQUE_CREATE_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -143,7 +143,7 @@ router.get("/", async (req, res) => {
             },
         });
     } catch (err) {
-        console.error("❌ Clinique list error:", err);
+        logSafeError("CLINIQUE_LIST_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -192,7 +192,7 @@ router.get("/:id", async (req, res) => {
             });
         }
 
-        console.error("❌ Clinique get error:", err);
+        logSafeError("CLINIQUE_GET_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -262,7 +262,7 @@ router.patch("/:id", async (req, res) => {
             });
         }
 
-        console.error("❌ Clinique update error:", err);
+        logSafeError("CLINIQUE_UPDATE_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -315,7 +315,7 @@ router.delete("/:id", async (req, res) => {
             });
         }
 
-        console.error("❌ Clinique delete error:", err);
+        logSafeError("CLINIQUE_DELETE_FAILED", err);
 
         return res.status(500).json({
             error: {

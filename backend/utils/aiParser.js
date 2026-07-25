@@ -1,3 +1,5 @@
+import { logSafeError } from "./requestLogSafety.js";
+
 export function safeParseMedicalAI(text) {
     try {
         const parsed = JSON.parse(text);
@@ -17,7 +19,9 @@ export function safeParseMedicalAI(text) {
             const parsed2 = JSON.parse(cleaned);
             return parsed2 && typeof parsed2 === "object" ? parsed2 : {};
         } catch (err2) {
-            console.error("Final JSON parse failed:", err2);
+            logSafeError("AI_RESPONSE_JSON_PARSE_FAILED", err2, {
+                component: "openai",
+            });
             // ✅ retourne un objet neutre (et le backend normalise)
             return {};
         }

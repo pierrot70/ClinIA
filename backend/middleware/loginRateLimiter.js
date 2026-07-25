@@ -5,6 +5,7 @@ import {
     REFRESH_RATE_LIMIT_WINDOW_MS,
 } from "../auth/constants.js";
 import { RateLimitWindow } from "../models/RateLimitWindow.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 const LOGIN_LIMITER_KEY = "auth_login";
 const REFRESH_LIMITER_KEY = "auth_refresh";
@@ -81,7 +82,7 @@ export function createLoginRateLimiter({
                 },
             });
         } catch (err) {
-            console.error("LOGIN_RATE_LIMIT_CHECK_FAILED", err?.message);
+            logSafeError("LOGIN_RATE_LIMIT_CHECK_FAILED", err);
             return res.status(503).json({
                 error: {
                     code: "LOGIN_RATE_LIMIT_UNAVAILABLE",
@@ -154,7 +155,7 @@ export function createRefreshRateLimiter({
                 },
             });
         } catch (err) {
-            console.error("REFRESH_RATE_LIMIT_CHECK_FAILED", err?.message);
+            logSafeError("REFRESH_RATE_LIMIT_CHECK_FAILED", err);
             return res.status(503).json({
                 error: {
                     code: "REFRESH_RATE_LIMIT_UNAVAILABLE",

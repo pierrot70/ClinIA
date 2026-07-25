@@ -3,7 +3,7 @@ import cors from "cors";
 
 import { createCorsOriginDelegate } from "../security/originProtection.js";
 import { createRequestContextMiddleware, getRequestContext } from "./requestContext.js";
-import { getSafeRequestPath } from "../utils/requestLogSafety.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 const DEFAULT_TRUSTED_PROXY_CIDRS = ["loopback", "linklocal", "uniquelocal"];
 const CONTENT_SECURITY_POLICY = [
@@ -53,10 +53,10 @@ export function createSecurityHeadersMiddleware() {
 
         const requestContext = getRequestContext(req);
         if (isProd && !isSecure && !isLocalHostRequest) {
-            console.warn("[HTTPS BLOCKED]", {
-                method: req.method,
-                path: getSafeRequestPath(req, "/"),
-                ...requestContext,
+            logSafeError("HTTPS_BLOCKED", null, {
+                requestId: requestContext.requestId,
+                component: "https",
+                status: 400,
             });
             return res.status(400).json({
                 error: {

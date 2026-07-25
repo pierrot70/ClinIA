@@ -2,6 +2,7 @@ import express from "express";
 import { requireRole } from "../middleware/requireRole.js";
 import { AUTH_ROLES } from "../auth/constants.js";
 import { exportOpenAILogsCsv, listOpenAILogs } from "../services/openaiLogs.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 const router = express.Router();
 
@@ -75,7 +76,7 @@ router.get(
                 });
             }
 
-            console.error("❌ OpenAI audit CSV export error:", err);
+            logSafeError("OPENAI_AUDIT_EXPORT_FAILED", err);
 
             return res.status(500).json({
                 error: {
@@ -126,7 +127,7 @@ router.get(
                 });
             }
 
-            console.error("❌ OpenAI audit log list error:", err);
+            logSafeError("OPENAI_AUDIT_LIST_FAILED", err);
 
             return res.status(500).json({
                 error: {

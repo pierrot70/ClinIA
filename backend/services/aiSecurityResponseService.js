@@ -1,3 +1,5 @@
+import { logSafeError } from "../utils/requestLogSafety.js";
+
 export function createRespondWithSecurityIncident(deps) {
     const {
         createSecurityIncident,
@@ -68,7 +70,10 @@ export function createRespondWithSecurityIncident(deps) {
 
             return res.status(422).json(buildBlockingIncidentResponse(incident));
         } catch (err) {
-            logger.error("❌ Security incident persistence error:", err);
+            logSafeError("SECURITY_INCIDENT_PERSIST_FAILED", err, {
+                logger,
+                component: "security_incident",
+            });
 
             return res.status(500).json({
                 error: {

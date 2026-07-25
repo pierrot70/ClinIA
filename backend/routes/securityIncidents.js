@@ -4,6 +4,7 @@ import {
     listSecurityIncidents,
     REQUIRED_ACK_ACTION,
 } from "../services/securityIncidents.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 const router = express.Router();
 
@@ -45,7 +46,7 @@ router.get("/", async (req, res) => {
             });
         }
 
-        console.error("❌ Security incident list error:", err);
+        logSafeError("SECURITY_INCIDENT_LIST_FAILED", err);
         return res.status(500).json({
             error: {
                 code: "INCIDENT_LIST_FAILED",
@@ -115,7 +116,7 @@ router.post("/acknowledge", async (req, res) => {
             });
         }
 
-        console.error("❌ Security incident acknowledgment error:", err);
+        logSafeError("SECURITY_INCIDENT_ACK_FAILED", err);
         return res.status(500).json({
             error: {
                 code: "INCIDENT_ACK_FAILED",

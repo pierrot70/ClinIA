@@ -188,8 +188,8 @@ async function run() {
 }
 
 run()
-    .catch((error) => {
-        console.error(`ERROR ${error?.message || "migration_failed"}`);
+    .catch(() => {
+        console.error("ERROR migration_failed");
         process.exitCode = 1;
     })
     .finally(async () => {

@@ -1,6 +1,7 @@
 import express from "express";
 import { getCachedTranslation } from "../services/translationService.js";
 import { APPROVED_UI_TRANSLATION_CATALOG } from "../scripts/i18n/approvedUiTranslationCatalog.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 const router = express.Router();
 
@@ -94,7 +95,7 @@ router.post("/", async (req, res) => {
         },
       });
     }
-    console.error("Translation error:", err);
+    logSafeError("TRANSLATION_FAILED", err);
     res.status(500).json({ error: "Translation failed" });
   }
 });

@@ -1,5 +1,6 @@
 import express from "express";
 import { getDbStatus, setBackupProtection } from "../services/dbStatus.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ router.get("/", async (_req, res) => {
             },
         });
     } catch (err) {
-        console.error("❌ DB status error:", err);
+        logSafeError("DB_STATUS_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -36,7 +37,7 @@ router.post("/backups/:fileName/protection", async (req, res) => {
 
         return res.status(200).json({ data });
     } catch (err) {
-        console.error("❌ DB backup protection error:", err);
+        logSafeError("DB_BACKUP_PROTECTION_FAILED", err);
 
         return res.status(400).json({
             error: {
@@ -57,7 +58,7 @@ router.delete("/backups/:fileName/protection", async (req, res) => {
 
         return res.status(200).json({ data });
     } catch (err) {
-        console.error("❌ DB backup protection removal error:", err);
+        logSafeError("DB_BACKUP_PROTECTION_REMOVAL_FAILED", err);
 
         return res.status(400).json({
             error: {

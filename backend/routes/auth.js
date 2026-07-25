@@ -50,6 +50,7 @@ import {
     passwordRecoveryRequestRateLimiter,
     passwordRecoveryVerifyRateLimiter,
 } from "../middleware/passwordRecoveryRateLimiter.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 const router = express.Router();
 const enforceSensitiveAuthOrigin = enforceTrustedOrigin();
@@ -150,7 +151,7 @@ router.post("/login", loginRateLimiter, async (req, res) => {
             });
         }
 
-        console.error("❌ Auth login error:", err?.code || err?.message);
+        logSafeError("AUTH_LOGIN_FAILED", err);
         return res.status(500).json({
             error: {
                 code: "AUTH_LOGIN_FAILED",
@@ -210,7 +211,7 @@ router.post("/register-self", loginRateLimiter, async (req, res) => {
             });
         }
 
-        console.error("❌ Auth self-register error:", err?.code || err?.message);
+        logSafeError("AUTH_SELF_REGISTER_FAILED", err);
         return res.status(500).json({
             error: {
                 code: "AUTH_REGISTER_SELF_FAILED",
@@ -239,10 +240,7 @@ router.post("/password-recovery/request", passwordRecoveryRequestRateLimiter, as
             },
         });
     } catch (err) {
-        console.error(
-            "Auth password recovery request error:",
-            err?.code || err?.message
-        );
+        logSafeError("PASSWORD_RECOVERY_REQUEST_FAILED", err);
         return res.status(500).json({
             error: {
                 code: "PASSWORD_RECOVERY_REQUEST_FAILED",
@@ -278,10 +276,7 @@ router.post("/password-recovery/verify", passwordRecoveryVerifyRateLimiter, asyn
             });
         }
 
-        console.error(
-            "Auth password recovery verify error:",
-            err?.code || err?.message
-        );
+        logSafeError("PASSWORD_RECOVERY_VERIFY_FAILED", err);
         return res.status(500).json({
             error: {
                 code: "PASSWORD_RECOVERY_VERIFY_FAILED",
@@ -323,10 +318,7 @@ router.post("/password-recovery/complete", passwordRecoveryVerifyRateLimiter, as
             });
         }
 
-        console.error(
-            "Auth password recovery complete error:",
-            err?.code || err?.message
-        );
+        logSafeError("PASSWORD_RECOVERY_COMPLETE_FAILED", err);
         return res.status(500).json({
             error: {
                 code: "PASSWORD_RECOVERY_COMPLETE_FAILED",
@@ -384,7 +376,7 @@ router.post("/refresh", enforceSensitiveAuthOrigin, refreshRateLimiter, async (r
             });
         }
 
-        console.error("❌ Auth refresh error:", err?.code || err?.message);
+        logSafeError("AUTH_REFRESH_FAILED", err);
         return res.status(500).json({
             error: {
                 code: "AUTH_REFRESH_FAILED",
@@ -417,7 +409,7 @@ router.post("/logout", enforceSensitiveAuthOrigin, verifyJWT, async (req, res) =
             },
         });
     } catch (err) {
-        console.error("❌ Auth logout error:", err?.code || err?.message);
+        logSafeError("AUTH_LOGOUT_FAILED", err);
         return res.status(500).json({
             error: {
                 code: "AUTH_LOGOUT_FAILED",
@@ -460,7 +452,7 @@ router.post("/reauth", enforceSensitiveAuthOrigin, verifyJWT, async (req, res) =
                         : 500;
 
         if (statusCode === 500) {
-            console.error("❌ Auth reauth error:", err?.code || err?.message);
+            logSafeError("AUTH_REAUTH_FAILED", err);
         }
 
         return res.status(statusCode).json({
@@ -597,7 +589,7 @@ router.post(
                 });
             }
 
-            console.error("❌ Auth register error:", err?.code || err?.message);
+            logSafeError("AUTH_REGISTER_FAILED", err);
             return res.status(500).json({
                 error: {
                     code: "AUTH_REGISTER_FAILED",
@@ -625,7 +617,7 @@ router.get(
                 },
             });
         } catch (err) {
-            console.error("❌ Auth active users list error:", err?.code || err?.message);
+            logSafeError("AUTH_ACTIVE_USERS_LIST_FAILED", err);
             return res.status(500).json({
                 error: {
                     code: "AUTH_ACTIVE_USERS_LIST_FAILED",
@@ -669,7 +661,7 @@ router.get(
                 });
             }
 
-            console.error("❌ Auth logs graph error:", err?.code || err?.message);
+            logSafeError("AUTH_LOG_GRAPH_FAILED", err);
             return res.status(500).json({
                 error: {
                     code: "AUTH_LOGS_GRAPH_FAILED",
@@ -733,7 +725,7 @@ router.get(
                 });
             }
 
-            console.error("❌ Auth logs list error:", err?.code || err?.message);
+            logSafeError("AUTH_LOG_LIST_FAILED", err);
             return res.status(500).json({
                 error: {
                     code: "AUTH_LOGS_LIST_FAILED",
@@ -777,7 +769,7 @@ router.get(
                 });
             }
 
-            console.error("❌ Auth users list error:", err?.code || err?.message);
+            logSafeError("AUTH_USERS_LIST_FAILED", err);
             return res.status(500).json({
                 error: {
                     code: "AUTH_USERS_LIST_FAILED",
@@ -851,7 +843,7 @@ router.patch(
                 });
             }
 
-            console.error("❌ Auth user update error:", err?.code || err?.message);
+            logSafeError("AUTH_USER_UPDATE_FAILED", err);
             return res.status(500).json({
                 error: {
                     code: "AUTH_USER_UPDATE_FAILED",
@@ -914,7 +906,7 @@ router.patch(
                 });
             }
 
-            console.error("❌ Auth user status error:", err?.code || err?.message);
+            logSafeError("AUTH_USER_STATUS_FAILED", err);
             return res.status(500).json({
                 error: {
                     code: "AUTH_USER_STATUS_FAILED",
@@ -967,7 +959,7 @@ router.post(
                 });
             }
 
-            console.error("❌ Auth reset password error:", err?.code || err?.message);
+            logSafeError("AUTH_PASSWORD_RESET_FAILED", err);
             return res.status(500).json({
                 error: {
                     code: "AUTH_USER_RESET_PASSWORD_FAILED",
@@ -1029,7 +1021,7 @@ router.delete(
                 });
             }
 
-            console.error("❌ Auth delete user error:", err?.code || err?.message);
+            logSafeError("AUTH_USER_DELETE_FAILED", err);
             return res.status(500).json({
                 error: {
                     code: "AUTH_USER_DELETE_FAILED",
@@ -1077,7 +1069,7 @@ router.post(
                 });
             }
 
-            console.error("❌ App shutdown scheduling error:", err?.code || err?.message);
+            logSafeError("APP_SHUTDOWN_SCHEDULE_FAILED", err);
             return res.status(500).json({
                 error: {
                     code: "APP_SHUTDOWN_SCHEDULE_FAILED",
@@ -1102,7 +1094,7 @@ router.post(
                 meta: { source: "real", model: "auth" },
             });
         } catch (err) {
-            console.error("❌ App shutdown clear error:", err?.message);
+            logSafeError("APP_SHUTDOWN_CLEAR_FAILED", err);
             return res.status(500).json({
                 error: {
                     code: "APP_SHUTDOWN_CLEAR_FAILED",

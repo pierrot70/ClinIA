@@ -1,4 +1,5 @@
 import { assessCloudClinicalPayload } from "../utils/requestSafety.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 function buildType2DiabetesContextPrompt(patient = {}) {
     const context = patient?.diabetes_context;
@@ -194,9 +195,9 @@ export async function executeOpenAIAnalyze({
                 upstreamRequestId: completion?.id || null,
                 errorCode: "OPENAI_INVALID_RESPONSE",
             });
-            logger.error("❌ OpenAI returned an unusable clinical payload", {
-                model,
-                rawContentLength: rawContent.length,
+            logSafeError("OPENAI_INVALID_RESPONSE", null, {
+                logger,
+                component: "openai",
             });
 
             return {
@@ -224,7 +225,10 @@ export async function executeOpenAIAnalyze({
             outcome: "FAILED",
             errorCode: "OPENAI_UPSTREAM_FAILED",
         });
-        logger.error("❌ OpenAI error:", err.message);
+        logSafeError("OPENAI_UPSTREAM_FAILED", err, {
+            logger,
+            component: "openai",
+        });
         recordOpenAIFailure();
 
         return {

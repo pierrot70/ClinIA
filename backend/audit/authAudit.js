@@ -1,4 +1,5 @@
 import { AuthAuditLog } from "../models/AuthAuditLog.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 function redactUsername(username) {
     if (!username || typeof username !== "string") {
@@ -40,6 +41,6 @@ export async function recordAuthAuditEvent({
         });
     } catch (err) {
         // Never block auth flows due to audit persistence issues.
-        console.warn("⚠️ Auth audit write failed", err?.message);
+        logSafeError("AUTH_AUDIT_WRITE_FAILED", err);
     }
 }

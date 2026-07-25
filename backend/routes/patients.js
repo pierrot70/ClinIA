@@ -29,7 +29,7 @@ import {
     buildWriteVerificationMeta,
     createWriteVerificationContext,
 } from "../audit/writeVerification.js";
-import { getSafeRequestPath } from "../utils/requestLogSafety.js";
+import { getSafeRequestPath, logSafeError } from "../utils/requestLogSafety.js";
 import { assessCloudClinicalPayload } from "../utils/requestSafety.js";
 import { minimizePatientAuditContext } from "../audit/auditDataMinimization.js";
 
@@ -397,7 +397,7 @@ router.post("/", async (req, res) => {
             });
         }
 
-        console.error("❌ Patient create error:", err);
+        logSafeError("PATIENT_CREATE_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -451,7 +451,7 @@ router.get("/", async (req, res) => {
             },
         });
     } catch (err) {
-        console.error("❌ Patient list error:", err);
+        logSafeError("PATIENT_LIST_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -512,7 +512,7 @@ router.get(
                 });
             }
 
-            console.error("❌ Patient audit list error:", err);
+            logSafeError("PATIENT_AUDIT_LIST_FAILED", err);
 
             return res.status(500).json({
                 error: {
@@ -575,7 +575,7 @@ router.get("/:id/secure-request-documents", async (req, res) => {
             });
         }
 
-        console.error("❌ Patient secure request documents error:", err);
+        logSafeError("PATIENT_SECURE_DOCUMENTS_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -601,7 +601,7 @@ router.get("/:id/clinical-note-versions", async (req, res) => {
                 error: { code: err.code, message: err.message, retryable: false },
             });
         }
-        console.error("Patient clinical note versions error:", err);
+        logSafeError("PATIENT_NOTE_VERSIONS_FAILED", err);
         return res.status(500).json({
             error: { code: "PERSISTENCE_FAILED", message: "Impossible de recuperer les versions de note.", retryable: true },
         });
@@ -637,7 +637,7 @@ router.post("/:id/clinical-note-versions/:versionId/restore", async (req, res) =
                 error: { code: err.code, message: err.message, retryable: false },
             });
         }
-        console.error("Patient clinical note restore error:", err);
+        logSafeError("PATIENT_NOTE_RESTORE_FAILED", err);
         return res.status(500).json({
             error: { code: "PERSISTENCE_FAILED", message: "Impossible de restaurer cette version de note.", retryable: true },
         });
@@ -680,7 +680,7 @@ router.get("/:id", async (req, res) => {
             });
         }
 
-        console.error("❌ Patient get error:", err);
+        logSafeError("PATIENT_GET_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -811,7 +811,7 @@ router.patch("/:id", async (req, res) => {
             return sendPatientConflict(res, err);
         }
 
-        console.error("❌ Patient update error:", err);
+        logSafeError("PATIENT_UPDATE_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -872,7 +872,7 @@ router.delete(
                 });
             }
 
-            console.error("❌ Patient archive error:", err);
+            logSafeError("PATIENT_ARCHIVE_FAILED", err);
 
             return res.status(500).json({
                 error: {
@@ -926,7 +926,7 @@ router.post(
                 });
             }
 
-            console.error("❌ Patient restore error:", err);
+            logSafeError("PATIENT_RESTORE_FAILED", err);
             return res.status(500).json({
                 error: {
                     code: "PERSISTENCE_FAILED",

@@ -107,7 +107,7 @@ async function run() {
     console.log("STAGING_REVERSIBLE_NUMERIC_MIGRATION_DRILL_PASSED");
 }
 
-run().catch((error) => {
-    console.error(`ERROR ${error?.message || "migration_drill_failed"}`);
+run().catch(() => {
+    console.error("ERROR migration_drill_failed");
     process.exitCode = 1;
 });

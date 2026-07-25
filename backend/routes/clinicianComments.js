@@ -20,7 +20,7 @@ import {
     buildWriteVerificationMeta,
     createWriteVerificationContext,
 } from "../audit/writeVerification.js";
-import { getSafeRequestPath } from "../utils/requestLogSafety.js";
+import { getSafeRequestPath, logSafeError } from "../utils/requestLogSafety.js";
 
 const router = express.Router();
 
@@ -109,7 +109,7 @@ router.get(
                 });
             }
 
-            console.error("❌ Clinician comments inbox error:", err);
+            logSafeError("CLINICIAN_COMMENTS_INBOX_FAILED", err);
             return res.status(500).json({
                 error: {
                     code: "PERSISTENCE_FAILED",
@@ -149,7 +149,7 @@ router.post(
                 });
             }
 
-            console.error("❌ Clinician comments inbox acknowledge error:", err);
+            logSafeError("CLINICIAN_COMMENTS_INBOX_ACK_FAILED", err);
             return res.status(500).json({
                 error: {
                     code: "PERSISTENCE_FAILED",
@@ -186,7 +186,7 @@ router.get("/lookup-replies", clinicianReplyLookupRateLimiter, async (req, res) 
             });
         }
 
-        console.error("❌ Clinician replies lookup error:", err);
+        logSafeError("CLINICIAN_REPLIES_LOOKUP_FAILED", err);
         return res.status(500).json({
             error: {
                 code: "PERSISTENCE_FAILED",
@@ -245,7 +245,7 @@ router.get(
             });
         }
 
-        console.error("❌ Clinician comments list error:", err);
+        logSafeError("CLINICIAN_COMMENTS_LIST_FAILED", err);
         return res.status(500).json({
             error: {
                 code: "PERSISTENCE_FAILED",
@@ -312,7 +312,7 @@ router.post("/", clinicianCommentRateLimiter, async (req, res) => {
             });
         }
 
-        console.error("❌ Clinician comment create error:", err);
+        logSafeError("CLINICIAN_COMMENT_CREATE_FAILED", err);
         return res.status(500).json({
             error: {
                 code: "PERSISTENCE_FAILED",
@@ -374,7 +374,7 @@ router.post(
                 });
             }
 
-            console.error("❌ Clinician comment reply error:", err);
+            logSafeError("CLINICIAN_COMMENT_REPLY_FAILED", err);
             return res.status(500).json({
                 error: {
                     code: "PERSISTENCE_FAILED",

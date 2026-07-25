@@ -2,6 +2,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 
 import { recordAuthAuditEvent } from "../audit/authAudit.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 import { AdminUser } from "../models/AdminUser.js";
 import {
     sendPasswordChangedConfirmation,
@@ -99,10 +100,9 @@ export async function requestPasswordRecoveryCode({ email, now = new Date() }) {
         user.passwordRecoveryCodeExpiresAt = null;
         user.passwordRecoveryCodeAttempts = 0;
         await user.save();
-        console.error(
-            "Password recovery email delivery failed:",
-            err?.code || err?.message
-        );
+        logSafeError("PASSWORD_RECOVERY_DELIVERY_FAILED", err, {
+            component: "email",
+        });
         return {
             accepted: true,
             deliveryFailed: true,
@@ -250,10 +250,9 @@ export async function completePasswordRecovery({
             email: normalizedEmail,
         });
     } catch (err) {
-        console.error(
-            "Password changed confirmation email failed:",
-            err?.code || err?.message
-        );
+        logSafeError("PASSWORD_CHANGE_CONFIRMATION_DELIVERY_FAILED", err, {
+            component: "email",
+        });
     }
 
     return { success: true };

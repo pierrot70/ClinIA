@@ -1,5 +1,5 @@
 import { RateLimitWindow } from "../models/RateLimitWindow.js";
-import { getSafeRequestPath } from "../utils/requestLogSafety.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 5;
@@ -87,16 +87,14 @@ export function createOpenAIAnalyzeQuotaGuard({
                 Math.ceil((windowStartedAt.getTime() + WINDOW_MS - nowMs) / 1000)
             );
 
-            console.warn("OPENAI_ANALYZE_RATE_LIMITED", {
-                key,
-                requestCount: bucket.requestCount,
-                windowStartedAt: windowStartedAt.toISOString(),
-                path: getSafeRequestPath(req, "/api/ai/analyze"),
+            logSafeError("OPENAI_ANALYZE_RATE_LIMITED", null, {
+                component: "rate_limiter",
+                status: 429,
             });
 
             return buildRateLimitedResponse(res, retryAfterSeconds);
         } catch (err) {
-            console.error("OPENAI_ANALYZE_QUOTA_CHECK_FAILED", err?.message);
+            logSafeError("OPENAI_ANALYZE_QUOTA_CHECK_FAILED", err);
             return res.status(503).json({
                 error: {
                     code: "OPENAI_ANALYZE_QUOTA_UNAVAILABLE",

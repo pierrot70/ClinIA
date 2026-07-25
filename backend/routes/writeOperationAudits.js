@@ -3,6 +3,7 @@ import {
     listMyWriteReceipts,
     listWriteOperationAudits,
 } from "../services/writeOperationAudits.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 const router = express.Router();
 
@@ -61,7 +62,7 @@ router.get("/", async (req, res) => {
             });
         }
 
-        console.error("Write operation audit list error:", err);
+        logSafeError("WRITE_AUDIT_LIST_FAILED", err);
 
         return res.status(500).json({
             error: {
@@ -97,7 +98,7 @@ router.get("/my-receipts", async (req, res) => {
             });
         }
 
-        console.error("My write receipts list error:", err);
+        logSafeError("WRITE_RECEIPTS_LIST_FAILED", err);
         return res.status(500).json({
             error: {
                 code: "PERSISTENCE_FAILED",

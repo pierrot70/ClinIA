@@ -129,8 +129,13 @@ describe("graceful shutdown", () => {
         });
 
         expect(harness.logger.error).toHaveBeenCalledWith(
-            "[fatal] uncaughtException:",
-            error
+            "CLINIA_SAFE_ERROR",
+            {
+                event: "UNCAUGHT_EXCEPTION",
+                name: "Error",
+                code: null,
+                component: "shutdown",
+            }
         );
         expect(harness.mongoose.disconnect).toHaveBeenCalledTimes(1);
     });
@@ -145,8 +150,13 @@ describe("graceful shutdown", () => {
         });
 
         expect(harness.logger.error).toHaveBeenCalledWith(
-            "[fatal] unhandledRejection:",
-            reason
+            "CLINIA_SAFE_ERROR",
+            {
+                event: "UNHANDLED_REJECTION",
+                name: "Error",
+                code: null,
+                component: "shutdown",
+            }
         );
         expect(harness.mongoose.disconnect).toHaveBeenCalledTimes(1);
     });

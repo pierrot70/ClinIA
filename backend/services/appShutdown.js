@@ -1,6 +1,7 @@
 import { AUTH_ROLES } from "../auth/constants.js";
 import { AdminUser } from "../models/AdminUser.js";
 import { AppSettings } from "../models/AppSettings.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
 
 const SETTINGS_KEY = "main";
 
@@ -57,7 +58,9 @@ export async function initShutdownState() {
             applyDocToState(doc);
         }
     } catch (err) {
-        console.error("[appShutdown] Failed to load state from DB:", err.message);
+        logSafeError("APP_SHUTDOWN_STATE_LOAD_FAILED", err, {
+            component: "mongo",
+        });
     }
 }
 

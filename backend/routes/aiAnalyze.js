@@ -17,7 +17,7 @@ import { createWriteVerificationContext } from "../audit/writeVerification.js";
 import { resolveAnalyzeExecutionMode } from "../services/aiAnalyzeAccessService.js";
 import { requireRole } from "../middleware/requireRole.js";
 import { getRequestContext } from "../app/requestContext.js";
-import { getSafeErrorMetadata, getSafeRequestPath } from "../utils/requestLogSafety.js";
+import { getSafeRequestPath, logSafeError } from "../utils/requestLogSafety.js";
 
 export function createAiAnalyzeRouter(deps) {
     const {
@@ -393,9 +393,9 @@ export function createAiAnalyzeRouter(deps) {
 
                 return res.json(finalResult.responsePayload);
             } catch (err) {
-                console.error("AI_ANALYZE_FAILED", {
-                    ...getSafeErrorMetadata(err),
+                logSafeError("AI_ANALYZE_FAILED", err, {
                     requestId: getRequestContext(req).requestId,
+                    component: "ai_analyze",
                 });
                 return res.status(500).json({
                     error: {
