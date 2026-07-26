@@ -561,10 +561,10 @@ function toClinicalNoteVersion({
     };
 }
 
-async function recordClinicalNoteMutationInTransaction({
+async function recordPatientMutationInTransaction({
     audit,
     patientId,
-    noteVersion,
+    noteVersion = null,
     session,
 }) {
     if (!audit) {
@@ -603,14 +603,16 @@ async function recordClinicalNoteMutationInTransaction({
         throwOnError: true,
     };
 
-    await recordWriteOperationAuditEvent({
-        ...common,
-        collectionName: "patientclinicalnoteversions",
-        operation: "CREATE",
-        outcome: "SUCCESS",
-        resourceId: String(noteVersion._id),
-        changedFields: ["version", "contentHash", "changeType"],
-    });
+    if (noteVersion) {
+        await recordWriteOperationAuditEvent({
+            ...common,
+            collectionName: "patientclinicalnoteversions",
+            operation: "CREATE",
+            outcome: "SUCCESS",
+            resourceId: String(noteVersion._id),
+            changedFields: ["version", "contentHash", "changeType"],
+        });
+    }
 
     await recordWriteOperationAuditEvent({
         ...common,
@@ -645,6 +647,161 @@ async function recordClinicalNoteMutationInTransaction({
         verificationId: audit.verificationId,
         clientMutationId: audit.clientMutationId,
     };
+}
+
+async function runPatientWriteTransaction(callback) {
+    const session = await mongoose.startSession();
+    try {
+        let result;
+        await session.withTransaction(async () => {
+            result = await callback(session);
+        }, { writeConcern: CLINICAL_WRITE_CONCERN });
+        return result;
+    } finally {
+        await session.endSession();
+    }
+}
+
+export async function createPatientWithWriteVerification(
+    dto,
+    authUser,
+    { allowPotentialDuplicate = false, audit = null } = {}
+) {
+    const ownerScope = buildOwnerScope(authUser);
+
+    if (!dto.nom || !dto.prenom) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Les champs 'nom' et 'prenom' sont requis.",
+        };
+    }
+
+    const hasHealthInsuranceNumber = Boolean(
+        normalizePatientIdentifierSearch(dto.num_assurance_maladie)
+    );
+    if (!hasHealthInsuranceNumber && !allowPotentialDuplicate) {
+        const keys = buildPatientSearchKeys(dto);
+        const potentialDuplicate = await Patient.exists({
+            ...ownerScope,
+            archivedAt: null,
+            nomSearch: keys.nomSearch,
+            prenomSearch: keys.prenomSearch,
+        });
+
+        if (potentialDuplicate) {
+            throw {
+                code: "POTENTIAL_DUPLICATE",
+                message:
+                    "Un patient avec le même nom et prénom existe déjà. Vérifiez-le avant de créer un nouveau dossier.",
+            };
+        }
+    }
+
+    return runPatientWriteTransaction(async (session) => {
+        const patient = new Patient({
+            ...dto,
+            healthInsuranceJurisdiction: normalizeHealthInsuranceJurisdiction(
+                dto.healthInsuranceJurisdiction,
+                dto.num_assurance_maladie
+            ),
+            ...buildPatientSearchKeys(dto),
+            ownerUserId: authUser.userId,
+        });
+        const savedPatient = await patient.save({
+            ...CLINICAL_WRITE_CONCERN,
+            session,
+        });
+
+        if (Object.hasOwn(dto, "secure_request_profile")) {
+            await savePatientSecureRequestSnapshot(
+                savedPatient._id,
+                dto.secure_request_profile,
+                { session }
+            );
+        }
+
+        const writeVerification = await recordPatientMutationInTransaction({
+            audit,
+            patientId: savedPatient._id,
+            session,
+        });
+
+        return { patient: savedPatient, writeVerification };
+    });
+}
+
+export async function updatePatientWithWriteVerification(
+    id,
+    updates,
+    authUser,
+    { audit = null } = {}
+) {
+    const { existing, ownerScope, updates: preparedUpdates } = await preparePatientUpdate(
+        id,
+        updates,
+        authUser
+    );
+    const updatesWithSearchKeys = {
+        ...preparedUpdates,
+        healthInsuranceJurisdiction: normalizeHealthInsuranceJurisdiction(
+            preparedUpdates.healthInsuranceJurisdiction ||
+                existing.healthInsuranceJurisdiction,
+            preparedUpdates.num_assurance_maladie ??
+                existing.num_assurance_maladie
+        ),
+        ...buildPatientSearchKeys({ ...existing, ...preparedUpdates }),
+    };
+
+    return runPatientWriteTransaction(async (session) => {
+        const patient = await Patient.findOneAndUpdate(
+            { _id: id, ...ownerScope },
+            { $set: updatesWithSearchKeys },
+            { new: true, runValidators: true, session }
+        );
+        if (!patient) {
+            throw { code: "NOT_FOUND", message: "Patient introuvable." };
+        }
+
+        if (Object.hasOwn(preparedUpdates, "secure_request_profile")) {
+            await savePatientSecureRequestSnapshot(
+                patient._id,
+                preparedUpdates.secure_request_profile,
+                { session }
+            );
+        }
+
+        const writeVerification = await recordPatientMutationInTransaction({
+            audit,
+            patientId: patient._id,
+            session,
+        });
+
+        return { patient, writeVerification };
+    });
+}
+
+async function updatePatientArchiveStateWithWriteVerification(
+    id,
+    authUser,
+    { query, update, notFoundMessage, audit }
+) {
+    return runPatientWriteTransaction(async (session) => {
+        const patient = await Patient.findOneAndUpdate(
+            { _id: id, ...buildOwnerScope(authUser), ...query },
+            { $set: update },
+            { new: true, runValidators: true, session }
+        );
+        if (!patient) {
+            throw { code: "NOT_FOUND", message: notFoundMessage };
+        }
+
+        const writeVerification = await recordPatientMutationInTransaction({
+            audit,
+            patientId: patient._id,
+            session,
+        });
+        return { patient, writeVerification };
+    });
 }
 
 export async function updatePatientWithClinicalNoteHistory(
@@ -747,7 +904,7 @@ export async function updatePatientWithClinicalNoteHistory(
                     { session }
                 );
                 noteVersion = created.toObject();
-                writeVerification = await recordClinicalNoteMutationInTransaction({
+                writeVerification = await recordPatientMutationInTransaction({
                     audit,
                     patientId: patient._id,
                     noteVersion,
@@ -863,6 +1020,38 @@ export async function archivePatient(id, reason, authUser) {
     return archived;
 }
 
+export async function archivePatientWithWriteVerification(
+    id,
+    reason,
+    authUser,
+    { audit = null } = {}
+) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw {
+            code: "INVALID_ID",
+            message: "Identifiant patient invalide.",
+        };
+    }
+
+    if (typeof reason !== "string" || !reason.trim() || reason.trim().length > 500) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Une raison d'archivage valide est requise.",
+        };
+    }
+
+    return updatePatientArchiveStateWithWriteVerification(id, authUser, {
+        query: { archivedAt: null },
+        update: {
+            archivedAt: new Date(),
+            archivedByUserId: authUser.userId,
+            archiveReason: reason.trim(),
+        },
+        notFoundMessage: "Patient introuvable.",
+        audit,
+    });
+}
+
 export async function restorePatient(id, reason, authUser) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
@@ -906,4 +1095,36 @@ export async function restorePatient(id, reason, authUser) {
     }
 
     return restored;
+}
+
+export async function restorePatientWithWriteVerification(
+    id,
+    reason,
+    authUser,
+    { audit = null } = {}
+) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw {
+            code: "INVALID_ID",
+            message: "Identifiant patient invalide.",
+        };
+    }
+
+    if (typeof reason !== "string" || !reason.trim() || reason.trim().length > 500) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Une raison de réactivation valide est requise.",
+        };
+    }
+
+    return updatePatientArchiveStateWithWriteVerification(id, authUser, {
+        query: { archivedAt: { $ne: null } },
+        update: {
+            archivedAt: null,
+            archivedByUserId: null,
+            archiveReason: "",
+        },
+        notFoundMessage: "Patient archivé introuvable.",
+        audit,
+    });
 }

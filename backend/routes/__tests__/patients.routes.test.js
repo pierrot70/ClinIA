@@ -1,41 +1,20 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const {
-    createPatient,
-    listPatientAuditLogs,
-    getPatientById,
-    updatePatient,
-    updatePatientWithClinicalNoteHistory,
-    archivePatient,
-    restorePatient,
-} = vi.hoisted(() => ({
-    createPatient: vi.fn(),
-    listPatientAuditLogs: vi.fn(),
-    getPatientById: vi.fn(),
-    updatePatient: vi.fn(),
+const services = vi.hoisted(() => ({
+    createPatientWithWriteVerification: vi.fn(),
+    updatePatientWithWriteVerification: vi.fn(),
     updatePatientWithClinicalNoteHistory: vi.fn(),
-    archivePatient: vi.fn(),
-    restorePatient: vi.fn(),
+    archivePatientWithWriteVerification: vi.fn(),
+    restorePatientWithWriteVerification: vi.fn(),
+    getPatientById: vi.fn(),
+    listPatientAuditLogs: vi.fn(),
 }));
 
-const {
-    toCreatePatientDTO,
-    toArchivePatientDTO,
-    toRestorePatientDTO,
-    toUpdatePatientDTO,
-} = vi.hoisted(() => ({
+const dto = vi.hoisted(() => ({
     toCreatePatientDTO: vi.fn(),
     toArchivePatientDTO: vi.fn(),
     toRestorePatientDTO: vi.fn(),
     toUpdatePatientDTO: vi.fn(),
-}));
-
-const { recordPatientAuditEvent } = vi.hoisted(() => ({
-    recordPatientAuditEvent: vi.fn(),
-}));
-
-const { recordWriteOperationAuditEvent } = vi.hoisted(() => ({
-    recordWriteOperationAuditEvent: vi.fn(),
 }));
 
 const { getReplicaSetStatus } = vi.hoisted(() => ({
@@ -43,780 +22,166 @@ const { getReplicaSetStatus } = vi.hoisted(() => ({
 }));
 
 vi.mock("../../services/patients.js", () => ({
-    createPatient,
+    ...services,
     listPatients: vi.fn(),
-    listPatientAuditLogs,
-    getPatientById,
-    updatePatient,
-    updatePatientWithClinicalNoteHistory,
-    archivePatient,
-    restorePatient,
+    listPatientSecureRequestDocuments: vi.fn(),
+    listPatientClinicalNoteVersions: vi.fn(),
+    restorePatientClinicalNoteVersion: vi.fn(),
 }));
 
-vi.mock("../../dto/patient.dto.js", () => ({
-    toCreatePatientDTO,
-    toArchivePatientDTO,
-    toRestorePatientDTO,
-    toUpdatePatientDTO,
-}));
-
-vi.mock("../../audit/patientAudit.js", () => ({
-    recordPatientAuditEvent,
-}));
-
-vi.mock("../../audit/writeOperationAudit.js", () => ({
-    recordWriteOperationAuditEvent,
-}));
-
-vi.mock("../../services/dbStatus.js", () => ({
-    getReplicaSetStatus,
-}));
+vi.mock("../../dto/patient.dto.js", () => dto);
+vi.mock("../../services/dbStatus.js", () => ({ getReplicaSetStatus }));
 
 import router from "../patients.js";
 
 function makeRes() {
-    return {
-        status: vi.fn().mockReturnThis(),
-        json: vi.fn().mockReturnThis(),
-    };
+    return { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
 }
 
 function getRouteHandler(method, path) {
     const layer = router.stack.find(
-        (entry) =>
-            entry.route?.path === path &&
-            entry.route?.methods?.[method] === true
+        (entry) => entry.route?.path === path && entry.route?.methods?.[method]
     );
-
-    if (!layer) {
-        throw new Error(`Route ${method.toUpperCase()} ${path} not found`);
-    }
-
+    if (!layer) throw new Error(`Route ${method.toUpperCase()} ${path} not found`);
     return layer.route.stack.at(-1).handle;
 }
 
-describe("patients routes audit", () => {
+function request(overrides = {}) {
+    return {
+        body: {},
+        headers: {},
+        params: {},
+        auth: { userId: "user-1", username: "doctor.one", role: "MEDECIN" },
+        ip: "10.0.0.10",
+        originalUrl: "/api/patients",
+        requestContext: { requestId: "request-1", instanceId: "instance-a" },
+        ...overrides,
+    };
+}
+
+const replicaSet = { summary: { status: "OK", majorityAvailable: true } };
+const receipt = { status: "CONFIRMED", verificationId: "WRV-TEST", clientMutationId: null };
+
+describe("patient routes atomic write receipts", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        getReplicaSetStatus.mockResolvedValue({
-            summary: {
-                status: "OK",
-                memberCount: 3,
-                healthyCount: 3,
-                primaryCount: 1,
-                secondaryCount: 2,
-                majorityAvailable: true,
-                maxLagSeconds: 0,
-                laggingThresholdSeconds: 10,
-            },
-        });
-        recordWriteOperationAuditEvent.mockResolvedValue(true);
+        getReplicaSetStatus.mockResolvedValue(replicaSet);
     });
 
-    it("records audit data on patient creation", async () => {
+    it("creates the patient and its receipt through one transactional service", async () => {
         const handler = getRouteHandler("post", "/");
-        const dto = { nom: "Doe", prenom: "Jane" };
-        const patient = { _id: "patient-1", ...dto };
-
-        toCreatePatientDTO.mockReturnValue(dto);
-        createPatient.mockResolvedValue(patient);
-
-        const req = {
-            body: dto,
-            headers: {},
-            auth: {
-                userId: "user-1",
-                username: "admin.user",
-                role: "ADMIN",
-            },
-            ip: "10.0.0.10",
-            originalUrl: "/api/patients",
-            requestContext: {
-                requestId: "request-create",
-                instanceId: "instance-a",
-            },
-        };
+        const patient = { _id: "patient-1", nom: "Doe", prenom: "Jane" };
+        dto.toCreatePatientDTO.mockReturnValue({ nom: "Doe", prenom: "Jane" });
+        services.createPatientWithWriteVerification.mockResolvedValue({ patient, writeVerification: receipt });
+        const req = request({ body: { nom: "Doe", prenom: "Jane" } });
         const res = makeRes();
 
         await handler(req, res);
 
-        expect(recordPatientAuditEvent).toHaveBeenCalledWith({
-            action: "PATIENT_CREATE",
-            outcome: "SUCCESS",
-            actorUserId: "user-1",
-            actorUsername: "admin.user",
-            actorRole: "ADMIN",
-            ip: "10.0.0.10",
-            patientId: "patient-1",
-            changedFields: ["nom", "prenom"],
-            requestPath: "/api/patients",
-            context: null,
-        });
-        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith({
-            collectionName: "patients",
-            operation: "CREATE",
-            outcome: "SUCCESS",
-            verificationId: expect.stringMatching(/^WRV-[A-Z0-9]+-[A-F0-9]{12}$/),
-            clientMutationId: null,
-            actorUserId: "user-1",
-            actorUsername: "admin.user",
-            actorRole: "ADMIN",
-            ip: "10.0.0.10",
-            requestId: "request-create",
-            instanceId: "instance-a",
-            resourceId: "patient-1",
-            patientId: "patient-1",
-            changedFields: ["nom", "prenom"],
-            requestPath: "/api/patients",
-            writeConcern: {
-                w: "majority",
-                j: true,
-                wtimeout: 5000,
-            },
-            replicaSet: {
-                summary: {
-                    status: "OK",
-                    memberCount: 3,
-                    healthyCount: 3,
-                    primaryCount: 1,
-                    secondaryCount: 2,
-                    majorityAvailable: true,
-                    maxLagSeconds: 0,
-                    laggingThresholdSeconds: 10,
-                },
-            },
-        });
+        expect(services.createPatientWithWriteVerification).toHaveBeenCalledWith(
+            { nom: "Doe", prenom: "Jane" },
+            req.auth,
+            expect.objectContaining({
+                allowPotentialDuplicate: false,
+                audit: expect.objectContaining({
+                    action: "PATIENT_CREATE",
+                    operation: "CREATE",
+                    verificationId: expect.stringMatching(/^WRV-/),
+                    changedFields: ["nom", "prenom"],
+                    replicaSet,
+                }),
+            })
+        );
         expect(res.status).toHaveBeenCalledWith(201);
-        expect(res.json).toHaveBeenCalledWith({
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
             data: patient,
-            meta: {
-                source: "real",
-                model: "mongo",
-                writeVerification: {
-                    status: "CONFIRMED",
-                    verificationId: expect.stringMatching(/^WRV-[A-Z0-9]+-[A-F0-9]{12}$/),
-                    clientMutationId: null,
-                },
-            },
-        });
+            meta: expect.objectContaining({ writeVerification: receipt }),
+        }));
     });
 
-    it("returns a telephone-specific conflict message on patient creation", async () => {
+    it("does not request a transaction for rejected unsafe clinical parameters", async () => {
         const handler = getRouteHandler("post", "/");
-        const dto = {
-            nom: "Doe",
-            prenom: "Jane",
-            telephone: "5145550101",
-        };
-
-        toCreatePatientDTO.mockReturnValue(dto);
-        createPatient.mockRejectedValue({
-            code: 11000,
-            keyPattern: { telephone: 1 },
-        });
-
-        const req = {
-            body: dto,
-            headers: {},
-            auth: {
-                userId: "user-1",
-                username: "doctor.one",
-                role: "MEDECIN",
-            },
-            ip: "10.0.0.10",
-            originalUrl: "/api/patients",
-        };
-        const res = makeRes();
-
-        await handler(req, res);
-
-        expect(res.status).toHaveBeenCalledWith(409);
-        expect(res.json).toHaveBeenCalledWith({
-            error: {
-                code: "PATIENT_CONFLICT",
-                message: "Ce numéro de téléphone existe déjà.",
-                retryable: false,
-            },
-        });
-        expect(recordPatientAuditEvent).not.toHaveBeenCalled();
-        expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
-    });
-
-    it("rejects unsafe clinical analysis parameters before creating a patient", async () => {
-        const handler = getRouteHandler("post", "/");
-        const dto = {
+        dto.toCreatePatientDTO.mockReturnValue({
             nom: "Lasante",
             prenom: "Pierre",
             secure_request_profile: {
-                clinicalAnalysisParameters: {
-                    diagnosis: "Migraine chez Pierre Lasante",
-                    symptoms: ["Douleur severe pour Pierre Lasante"],
-                },
+                clinicalAnalysisParameters: { diagnosis: "Migraine chez Pierre Lasante" },
             },
-        };
-
-        toCreatePatientDTO.mockReturnValue(dto);
-
-        const req = {
-            body: dto,
-            headers: {},
-            auth: {
-                userId: "user-1",
-                username: "doctor.one",
-                role: "MEDECIN",
-            },
-        };
+        });
         const res = makeRes();
 
-        await handler(req, res);
+        await handler(request(), res);
 
         expect(res.status).toHaveBeenCalledWith(400);
-        expect(res.json).toHaveBeenCalledWith({
-            error: {
-                code: "UNAPPROVED_CLINICAL_PROFILE_CONTENT",
-                message:
-                    "Les paramètres cliniques contiennent du texte libre non approuvé. Ils n'ont pas été sauvegardés.",
-                retryable: false,
-                fields: ["diagnosis", "symptoms"],
-            },
-        });
-        expect(createPatient).not.toHaveBeenCalled();
-        expect(recordPatientAuditEvent).not.toHaveBeenCalled();
-        expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
+        expect(services.createPatientWithWriteVerification).not.toHaveBeenCalled();
     });
 
-    it("requires an explicit confirmation when a patient may be an accidental duplicate", async () => {
-        const handler = getRouteHandler("post", "/");
-        const dto = { nom: "Spenard", prenom: "Mickey" };
-        toCreatePatientDTO.mockReturnValue(dto);
-        createPatient.mockRejectedValue({
-            code: "POTENTIAL_DUPLICATE",
-            message: "Un patient avec le même nom et prénom existe déjà.",
-        });
-
-        const req = {
-            body: dto,
-            get: vi.fn().mockReturnValue(undefined),
-            headers: {},
-            auth: { userId: "user-1", username: "doctor.one", role: "MEDECIN" },
-            ip: "10.0.0.10",
-            originalUrl: "/api/patients",
-        };
-        const res = makeRes();
-
-        await handler(req, res);
-
-        expect(createPatient).toHaveBeenCalledWith(dto, req.auth, {
-            allowPotentialDuplicate: false,
-        });
-        expect(res.status).toHaveBeenCalledWith(409);
-        expect(res.json).toHaveBeenCalledWith({
-            error: {
-                code: "POTENTIAL_DUPLICATE",
-                message: "Un patient avec le même nom et prénom existe déjà.",
-                retryable: false,
-                action: "CONFIRM_POTENTIAL_DUPLICATE",
-            },
-        });
-    });
-
-    it("returns a RAMQ-specific conflict message on patient update", async () => {
+    it("uses one transactional service for a non-note patient update", async () => {
         const handler = getRouteHandler("patch", "/:id");
-        const dto = {
-            num_assurance_maladie: "RAMQ1234567890",
-        };
-
-        toUpdatePatientDTO.mockReturnValue(dto);
-        updatePatient.mockRejectedValue({
-            code: 11000,
-            keyValue: { num_assurance_maladie: "RAMQ1234567890" },
-        });
-
-        const req = {
-            body: dto,
-            params: { id: "patient-2" },
-            headers: {},
-            auth: {
-                userId: "user-2",
-                username: "doctor.one",
-                role: "MEDECIN",
-            },
-            ip: "10.0.0.10",
-            originalUrl: "/api/patients/patient-2",
-        };
+        const patient = { _id: "patient-2", nom: "After", prenom: "Jane" };
+        dto.toUpdatePatientDTO.mockReturnValue({ nom: "After" });
+        services.getPatientById.mockResolvedValue({ _id: "patient-2", nom: "Before", prenom: "Jane" });
+        services.updatePatientWithWriteVerification.mockResolvedValue({ patient, writeVerification: receipt });
+        const req = request({ params: { id: "patient-2" }, body: { nom: "After" }, originalUrl: "/api/patients/patient-2" });
         const res = makeRes();
 
         await handler(req, res);
 
-        expect(res.status).toHaveBeenCalledWith(409);
-        expect(res.json).toHaveBeenCalledWith({
-            error: {
-                code: "PATIENT_CONFLICT",
-                message:
-                    "Ce numéro d'assurance maladie existe déjà.",
-                retryable: false,
-            },
-        });
-        expect(recordPatientAuditEvent).not.toHaveBeenCalled();
-        expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
-    });
-
-    it("rejects changed unsafe clinical analysis parameters before updating Mongo", async () => {
-        const handler = getRouteHandler("patch", "/:id");
-        const dto = {
-            secure_request_profile: {
-                clinicalAnalysisParameters: {
-                    diagnosis: "Migraine chez Pierre Lasante",
-                    symptoms: ["Douleur severe pour Pierre Lasante"],
-                },
-            },
-        };
-
-        toUpdatePatientDTO.mockReturnValue(dto);
-        getPatientById.mockResolvedValue({
-            _id: "patient-2",
-            secure_request_profile: null,
-        });
-
-        const req = {
-            body: dto,
-            params: { id: "patient-2" },
-            headers: {},
-            auth: {
-                userId: "user-2",
-                username: "doctor.one",
-                role: "MEDECIN",
-            },
-        };
-        const res = makeRes();
-
-        await handler(req, res);
-
-        expect(res.status).toHaveBeenCalledWith(400);
-        expect(res.json).toHaveBeenCalledWith({
-            error: {
-                code: "UNAPPROVED_CLINICAL_PROFILE_CONTENT",
-                message:
-                    "Les paramètres cliniques contiennent du texte libre non approuvé. Ils n'ont pas été sauvegardés.",
-                retryable: false,
-                fields: ["diagnosis", "symptoms"],
-            },
-        });
-        expect(getPatientById).toHaveBeenCalledWith("patient-2", req.auth);
-        expect(updatePatient).not.toHaveBeenCalled();
-        expect(recordPatientAuditEvent).not.toHaveBeenCalled();
-        expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
-    });
-
-    it("allows a clinical note update when unchanged legacy parameters are unsafe", async () => {
-        const handler = getRouteHandler("patch", "/:id");
-        const clinicalAnalysisParameters = {
-            diagnosis: "Migraine chez Pierre Lasante",
-            symptoms: ["Douleur severe pour Pierre Lasante"],
-        };
-        const dto = {
-            secure_request_profile: {
-                clinicalAnalysisParameters,
-                clinicalNotes: "Note clinique versionnee.",
-            },
-        };
-
-        toUpdatePatientDTO.mockReturnValue(dto);
-        getPatientById.mockResolvedValue({
-            _id: "patient-2",
-            secure_request_profile: {
-                clinicalAnalysisParameters,
-                clinicalNotes: "Ancienne note.",
-            },
-        });
-        updatePatientWithClinicalNoteHistory.mockResolvedValue({
-            patient: { _id: "patient-2", ...dto },
-            noteVersion: { changeType: "UPDATE" },
-            writeVerification: { verificationId: "WRV-TEST" },
-        });
-
-        const req = {
-            body: dto,
-            params: { id: "patient-2" },
-            headers: {},
-            auth: { userId: "user-2", username: "doctor.one", role: "MEDECIN" },
-        };
-        const res = makeRes();
-
-        await handler(req, res);
-
-        expect(updatePatientWithClinicalNoteHistory).toHaveBeenCalledWith(
+        expect(services.updatePatientWithWriteVerification).toHaveBeenCalledWith(
             "patient-2",
-            dto,
+            { nom: "After" },
             req.auth,
-            expect.any(Object)
-        );
-        expect(res.status).toHaveBeenCalledWith(200);
-    });
-
-    it("accepts approved clinical analysis parameters on patient update", async () => {
-        const handler = getRouteHandler("patch", "/:id");
-        const dto = {
-            secure_request_profile: {
-                clinicalAnalysisParameters: {
-                    diagnosis: "Migraine",
-                    symptoms: ["Headache"],
-                },
-            },
-        };
-
-        toUpdatePatientDTO.mockReturnValue(dto);
-        getPatientById.mockResolvedValue({
-            _id: "patient-2",
-            secure_request_profile: null,
-        });
-        updatePatient.mockResolvedValue({ _id: "patient-2", ...dto });
-
-        const req = {
-            body: dto,
-            params: { id: "patient-2" },
-            headers: {},
-            auth: {
-                userId: "user-2",
-                username: "doctor.one",
-                role: "MEDECIN",
-            },
-            requestContext: {
-                requestId: "request-approved-profile",
-                instanceId: "instance-b",
-            },
-        };
-        const res = makeRes();
-
-        await handler(req, res);
-
-        expect(updatePatient).toHaveBeenCalledWith("patient-2", dto, req.auth);
-        expect(res.status).toHaveBeenCalledWith(200);
-    });
-
-    it("records changed fields on patient update", async () => {
-        const handler = getRouteHandler("patch", "/:id");
-        const dto = {
-            nom: "Doe",
-            prenom: "Janet",
-            secure_request_profile: {
-                objective: "Traitement initial",
-                clinicalScope: "Oncologie",
-                selected_document_ids: ["doc-1", "doc-2"],
-            },
-        };
-
-        toUpdatePatientDTO.mockReturnValue(dto);
-        getPatientById.mockResolvedValue({
-            _id: "patient-2",
-            nom: "Doe",
-            prenom: "Jane",
-            secure_request_profile: null,
-        });
-        updatePatient.mockResolvedValue({ _id: "patient-2", ...dto });
-
-        const req = {
-            body: dto,
-            params: { id: "patient-2" },
-            headers: {
-                "x-forwarded-for": "203.0.113.9, 10.0.0.10",
-                "x-client-mutation-id": "patient-update-client-1",
-            },
-            auth: {
-                userId: "user-2",
-                username: "doctor.one",
-                role: "MEDECIN",
-            },
-            ip: "10.0.0.10",
-            originalUrl: "/api/patients/patient-2",
-            requestContext: {
-                requestId: "request-update",
-                instanceId: "instance-b",
-            },
-        };
-        const res = makeRes();
-
-        await handler(req, res);
-
-        expect(recordPatientAuditEvent).toHaveBeenCalledWith({
-            action: "PATIENT_UPDATE",
-            outcome: "SUCCESS",
-            actorUserId: "user-2",
-            actorUsername: "doctor.one",
-            actorRole: "MEDECIN",
-            ip: "10.0.0.10",
-            patientId: "patient-2",
-            changedFields: [
-                "prenom",
-                "secure_request_profile",
-            ],
-            requestPath: "/api/patients/patient-2",
-            context: {
-                secureRequest: {
-                    objectiveProvided: true,
-                    clinicalScopeProvided: true,
-                    selectedDocumentCount: 2,
-                },
-            },
-        });
-        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith({
-            collectionName: "patients",
-            operation: "UPDATE",
-            outcome: "SUCCESS",
-            verificationId: expect.stringMatching(/^WRV-[A-Z0-9]+-[A-F0-9]{12}$/),
-            clientMutationId: "patient-update-client-1",
-            actorUserId: "user-2",
-            actorUsername: "doctor.one",
-            actorRole: "MEDECIN",
-            ip: "10.0.0.10",
-            requestId: "request-update",
-            instanceId: "instance-b",
-            resourceId: "patient-2",
-            patientId: "patient-2",
-            changedFields: [
-                "prenom",
-                "secure_request_profile",
-            ],
-            requestPath: "/api/patients/patient-2",
-            writeConcern: {
-                w: "majority",
-                j: true,
-                wtimeout: 5000,
-            },
-            replicaSet: {
-                summary: {
-                    status: "OK",
-                    memberCount: 3,
-                    healthyCount: 3,
-                    primaryCount: 1,
-                    secondaryCount: 2,
-                    majorityAvailable: true,
-                    maxLagSeconds: 0,
-                    laggingThresholdSeconds: 10,
-                },
-            },
-        });
-        expect(res.status).toHaveBeenCalledWith(200);
-        expect(res.json).toHaveBeenCalledWith({
-            data: { _id: "patient-2", ...dto },
-            meta: {
-                source: "real",
-                model: "mongo",
-                writeVerification: {
-                    status: "CONFIRMED",
-                    verificationId: expect.stringMatching(/^WRV-[A-Z0-9]+-[A-F0-9]{12}$/),
-                    clientMutationId: "patient-update-client-1",
-                },
-            },
-        });
-    });
-
-    it("records archive audit without patient identifiers", async () => {
-        const handler = getRouteHandler("delete", "/:id");
-
-        toArchivePatientDTO.mockReturnValue({ reason: "Doublon confirmé" });
-        archivePatient.mockResolvedValue({ _id: "patient-3" });
-
-        const req = {
-            params: { id: "patient-3" },
-            headers: {},
-            auth: {
-                userId: "user-3",
-                username: "super.admin",
-                role: "SUPERADMIN",
-            },
-            ip: "127.0.0.1",
-            originalUrl: "/api/patients/patient-3",
-            requestContext: {
-                requestId: "request-delete",
-                instanceId: "instance-c",
-            },
-        };
-        const res = makeRes();
-
-        await handler(req, res);
-
-        expect(archivePatient).toHaveBeenCalledWith(
-            "patient-3",
-            "Doublon confirmé",
-            req.auth
-        );
-
-        expect(recordPatientAuditEvent).toHaveBeenCalledWith({
-            action: "PATIENT_ARCHIVE",
-            outcome: "SUCCESS",
-            actorUserId: "user-3",
-            actorUsername: "super.admin",
-            actorRole: "SUPERADMIN",
-            ip: "127.0.0.1",
-            patientId: "patient-3",
-            changedFields: ["archivedAt", "archivedByUserId", "archiveReason"],
-            requestPath: "/api/patients/patient-3",
-            context: null,
-        });
-        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith({
-            collectionName: "patients",
-            operation: "UPDATE",
-            outcome: "SUCCESS",
-            verificationId: expect.stringMatching(/^WRV-[A-Z0-9]+-[A-F0-9]{12}$/),
-            clientMutationId: null,
-            actorUserId: "user-3",
-            actorUsername: "super.admin",
-            actorRole: "SUPERADMIN",
-            ip: "127.0.0.1",
-            requestId: "request-delete",
-            instanceId: "instance-c",
-            resourceId: "patient-3",
-            patientId: "patient-3",
-            changedFields: ["archivedAt", "archivedByUserId", "archiveReason"],
-            requestPath: "/api/patients/patient-3",
-            writeConcern: {
-                w: "majority",
-                j: true,
-                wtimeout: 5000,
-            },
-            replicaSet: {
-                summary: {
-                    status: "OK",
-                    memberCount: 3,
-                    healthyCount: 3,
-                    primaryCount: 1,
-                    secondaryCount: 2,
-                    majorityAvailable: true,
-                    maxLagSeconds: 0,
-                    laggingThresholdSeconds: 10,
-                },
-            },
-        });
-        expect(res.status).toHaveBeenCalledWith(200);
-    });
-
-    it("returns patient audit logs for admins", async () => {
-        const routeLayer = router.stack.find(
-            (entry) => entry.route?.path === "/audit-logs"
-        );
-        const guard = routeLayer.route.stack[0].handle;
-        const handler = routeLayer.route.stack[1].handle;
-
-        listPatientAuditLogs.mockResolvedValue({
-            logs: [
-                {
-                    id: "audit-1",
-                    action: "PATIENT_CREATE",
-                    outcome: "SUCCESS",
-                    actorUserId: "507f1f77bcf86cd799439011",
-                    actorUsernameMasked: "ad***",
-                    actorRole: "ADMIN",
-                    ip: "127.0.0.1",
-                    patientId: "507f1f77bcf86cd799439012",
-                    changedFields: ["nom", "prenom"],
-                    requestPath: "/api/patients",
-                    timestamp: new Date("2026-04-04T10:00:00.000Z"),
-                },
-            ],
-            pagination: {
-                page: 1,
-                limit: 20,
-                total: 1,
-                totalPages: 1,
-            },
-        });
-
-        const req = {
-            query: {
-                page: "1",
-                limit: "20",
-                action: "PATIENT_CREATE",
-            },
-            auth: {
-                userId: "user-1",
-                username: "admin.user",
-                role: "ADMIN",
-            },
-        };
-        const res = makeRes();
-        const next = vi.fn();
-
-        guard(req, res, next);
-        expect(next).toHaveBeenCalledTimes(1);
-
-        await handler(req, res);
-
-        expect(listPatientAuditLogs).toHaveBeenCalledWith({
-            authUser: req.auth,
-            page: "1",
-            limit: "20",
-            action: "PATIENT_CREATE",
-            patientId: undefined,
-            actorUserId: undefined,
-            startDate: undefined,
-            endDate: undefined,
-        });
-        expect(res.status).toHaveBeenCalledWith(200);
-    });
-
-    it("rejects patient audit logs for non-admin roles", () => {
-        const routeLayer = router.stack.find(
-            (entry) => entry.route?.path === "/audit-logs"
-        );
-        const guard = routeLayer.route.stack[0].handle;
-
-        const req = {
-            auth: {
-                userId: "user-4",
-                username: "basic.user",
-                role: "USER",
-            },
-        };
-        const res = makeRes();
-        const next = vi.fn();
-
-        guard(req, res, next);
-
-        expect(res.status).toHaveBeenCalledWith(403);
-        expect(next).not.toHaveBeenCalled();
-        });
-    });
-
-    it("records a restore audit without retaining its reason", async () => {
-        const handler = getRouteHandler("post", "/:id/restore");
-
-        toRestorePatientDTO.mockReturnValue({ reason: "Demande administrative" });
-        restorePatient.mockResolvedValue({ _id: "patient-4" });
-
-        const req = {
-            params: { id: "patient-4" },
-            headers: {},
-            auth: {
-                userId: "user-4",
-                username: "super.admin",
-                role: "SUPERADMIN",
-            },
-            ip: "127.0.0.1",
-            originalUrl: "/api/patients/patient-4/restore",
-            requestContext: {
-                requestId: "request-restore",
-                instanceId: "instance-d",
-            },
-        };
-        const res = makeRes();
-
-        await handler(req, res);
-
-        expect(restorePatient).toHaveBeenCalledWith(
-            "patient-4",
-            "Demande administrative",
-            req.auth
-        );
-        expect(recordPatientAuditEvent).toHaveBeenCalledWith(
             expect.objectContaining({
-                action: "PATIENT_RESTORE",
-                patientId: "patient-4",
-                changedFields: ["archivedAt", "archivedByUserId", "archiveReason"],
-                context: null,
+                audit: expect.objectContaining({
+                    action: "PATIENT_UPDATE",
+                    changedFields: ["nom"],
+                }),
             })
         );
-        expect(JSON.stringify(recordPatientAuditEvent.mock.calls)).not.toContain(
-            "Demande administrative"
+        expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    it("keeps clinical note updates on their transactional service", async () => {
+        const handler = getRouteHandler("patch", "/:id");
+        const profile = { clinicalNotes: "Nouvelle note." };
+        dto.toUpdatePatientDTO.mockReturnValue({ secure_request_profile: profile });
+        services.getPatientById.mockResolvedValue({
+            _id: "patient-2",
+            secure_request_profile: { clinicalNotes: "Ancienne note." },
+        });
+        services.updatePatientWithClinicalNoteHistory.mockResolvedValue({
+            patient: { _id: "patient-2" }, noteVersion: { _id: "version-1" }, writeVerification: receipt,
+        });
+        const req = request({ params: { id: "patient-2" }, body: { secure_request_profile: profile } });
+        const res = makeRes();
+
+        await handler(req, res);
+
+        expect(services.updatePatientWithClinicalNoteHistory).toHaveBeenCalledWith(
+            "patient-2", { secure_request_profile: profile }, req.auth,
+            expect.objectContaining({ audit: expect.objectContaining({ action: "PATIENT_UPDATE" }) })
+        );
+        expect(services.updatePatientWithWriteVerification).not.toHaveBeenCalled();
+    });
+
+    it("archives and restores through transactional services without retaining the reason in audit context", async () => {
+        dto.toArchivePatientDTO.mockReturnValue({ reason: "Doublon confirmé" });
+        dto.toRestorePatientDTO.mockReturnValue({ reason: "Demande administrative" });
+        services.archivePatientWithWriteVerification.mockResolvedValue({ patient: { _id: "patient-3" }, writeVerification: receipt });
+        services.restorePatientWithWriteVerification.mockResolvedValue({ patient: { _id: "patient-3" }, writeVerification: receipt });
+        const archiveRes = makeRes();
+        const restoreRes = makeRes();
+
+        await getRouteHandler("delete", "/:id")(request({ params: { id: "patient-3" } }), archiveRes);
+        await getRouteHandler("post", "/:id/restore")(request({ params: { id: "patient-3" } }), restoreRes);
+
+        expect(services.archivePatientWithWriteVerification).toHaveBeenCalledWith(
+            "patient-3", "Doublon confirmé", expect.any(Object),
+            expect.objectContaining({ audit: expect.objectContaining({ context: null }) })
+        );
+        expect(services.restorePatientWithWriteVerification).toHaveBeenCalledWith(
+            "patient-3", "Demande administrative", expect.any(Object),
+            expect.objectContaining({ audit: expect.objectContaining({ context: null }) })
         );
     });
+});

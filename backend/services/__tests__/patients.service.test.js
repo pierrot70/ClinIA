@@ -9,6 +9,20 @@ const auditCountDocuments = vi.fn();
 const auditFind = vi.fn();
 const secureRequestSnapshotFind = vi.fn();
 const secureRequestSnapshotFindOneAndUpdate = vi.fn();
+const transactionSession = {
+    withTransaction: vi.fn(async (callback) => callback()),
+    endSession: vi.fn(),
+};
+const startSession = vi.fn(async () => transactionSession);
+const recordPatientAuditEvent = vi.fn();
+const recordWriteOperationAuditEvent = vi.fn();
+
+vi.mock("mongoose", () => ({
+    default: {
+        startSession,
+        Types: { ObjectId: { isValid: vi.fn(() => true) } },
+    },
+}));
 
 const PatientModel = vi.fn();
 PatientModel.find = patientFind;
@@ -21,6 +35,13 @@ PatientModel.create = vi.fn();
 
 vi.mock("../../models/Patient.js", () => ({
     Patient: PatientModel,
+}));
+
+vi.mock("../../models/PatientClinicalNoteVersion.js", () => ({
+    PatientClinicalNoteVersion: {
+        findOne: vi.fn(),
+        create: vi.fn(),
+    },
 }));
 
 vi.mock("../../models/PatientAuditLog.js", () => ({
@@ -37,8 +58,15 @@ vi.mock("../../models/PatientSecureRequestSnapshot.js", () => ({
     },
 }));
 
+vi.mock("../../audit/patientAudit.js", () => ({ recordPatientAuditEvent }));
+vi.mock("../../audit/writeOperationAudit.js", () => ({ recordWriteOperationAuditEvent }));
+
 const {
     createPatient,
+    createPatientWithWriteVerification,
+    updatePatientWithWriteVerification,
+    archivePatientWithWriteVerification,
+    restorePatientWithWriteVerification,
     archivePatient,
     restorePatient,
     listPatients,
@@ -48,13 +76,123 @@ const {
 
 beforeEach(() => {
     vi.clearAllMocks();
-    PatientModel.mockImplementation((patient) => ({
-        ...patient,
-        save: patientSave,
-    }));
+    PatientModel.mockImplementation(function PatientDocument(patient) {
+        return {
+            ...patient,
+            save: patientSave,
+        };
+    });
+    transactionSession.withTransaction.mockImplementation(async (callback) => callback());
+    transactionSession.endSession.mockResolvedValue();
+    recordPatientAuditEvent.mockResolvedValue({ _id: "patient-audit-1" });
+    recordWriteOperationAuditEvent.mockResolvedValue(true);
 });
 
 describe("patients service audit logs", () => {
+    it("commits a patient creation and all receipt audits in one Mongo transaction", async () => {
+        patientExists.mockResolvedValue(null);
+        patientSave.mockResolvedValue({ _id: "patient-atomic" });
+        const audit = {
+            action: "PATIENT_CREATE",
+            operation: "CREATE",
+            verificationId: "WRV-ATOMIC",
+            clientMutationId: "mutation-1",
+            actorUserId: "user-1",
+            actorUsername: "doctor.one",
+            actorRole: "MEDECIN",
+            ip: "10.0.0.1",
+            requestId: "request-1",
+            instanceId: "instance-1",
+            requestPath: "/api/patients",
+            changedFields: ["nom", "prenom"],
+            context: null,
+            replicaSet: { summary: { status: "OK" } },
+        };
+
+        const result = await createPatientWithWriteVerification(
+            { nom: "Doe", prenom: "Jane" },
+            { userId: "user-1", role: "MEDECIN" },
+            { audit }
+        );
+
+        expect(startSession).toHaveBeenCalledTimes(1);
+        expect(transactionSession.withTransaction).toHaveBeenCalledWith(
+            expect.any(Function),
+            expect.objectContaining({ writeConcern: expect.objectContaining({ w: "majority" }) })
+        );
+        expect(patientSave).toHaveBeenCalledWith(expect.objectContaining({ session: transactionSession }));
+        expect(recordPatientAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+            session: transactionSession,
+            throwOnError: true,
+            patientId: "patient-atomic",
+        }));
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledTimes(2);
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+            collectionName: "patients",
+            verificationId: "WRV-ATOMIC",
+            session: transactionSession,
+            throwOnError: true,
+        }));
+        expect(result).toEqual({
+            patient: { _id: "patient-atomic" },
+            writeVerification: {
+                status: "CONFIRMED",
+                verificationId: "WRV-ATOMIC",
+                clientMutationId: "mutation-1",
+            },
+        });
+    });
+
+    it("aborts a priority write when receipt persistence fails", async () => {
+        patientExists.mockResolvedValue(null);
+        patientSave.mockResolvedValue({ _id: "patient-atomic" });
+        recordWriteOperationAuditEvent.mockRejectedValueOnce(new Error("audit unavailable"));
+
+        await expect(createPatientWithWriteVerification(
+            { nom: "Doe", prenom: "Jane" },
+            { userId: "user-1", role: "MEDECIN" },
+            { audit: {
+                action: "PATIENT_CREATE", operation: "CREATE", verificationId: "WRV-ATOMIC",
+                clientMutationId: null, actorUserId: "user-1", actorUsername: "doctor.one",
+                actorRole: "MEDECIN", ip: null, requestId: "request-1", instanceId: "instance-1",
+                requestPath: "/api/patients", changedFields: ["nom"], context: null, replicaSet: null,
+            } }
+        )).rejects.toThrow("audit unavailable");
+
+        expect(transactionSession.endSession).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses the same transaction boundary for archive and restore receipts", async () => {
+        PatientModel.findOneAndUpdate
+            .mockResolvedValueOnce({ _id: "patient-archive" })
+            .mockResolvedValueOnce({ _id: "patient-restore" });
+        const audit = {
+            action: "PATIENT_ARCHIVE", operation: "UPDATE", verificationId: "WRV-ARCHIVE",
+            clientMutationId: null, actorUserId: "user-1", actorUsername: "doctor.one",
+            actorRole: "MEDECIN", ip: null, requestId: "request-1", instanceId: "instance-1",
+            requestPath: "/api/patients/:id", changedFields: ["archivedAt"], context: null, replicaSet: null,
+        };
+
+        await archivePatientWithWriteVerification(
+            "507f1f77bcf86cd799439012", "Doublon confirmé",
+            { userId: "user-1", role: "MEDECIN" }, { audit }
+        );
+        await restorePatientWithWriteVerification(
+            "507f1f77bcf86cd799439012", "Demande administrative",
+            { userId: "user-1", role: "MEDECIN" }, { audit: { ...audit, action: "PATIENT_RESTORE" } }
+        );
+
+        expect(PatientModel.findOneAndUpdate).toHaveBeenCalledWith(
+            expect.any(Object), expect.any(Object), expect.objectContaining({ session: transactionSession })
+        );
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+            collectionName: "patients",
+            session: transactionSession,
+            throwOnError: true,
+        }));
+        expect(transactionSession.withTransaction).toHaveBeenCalledTimes(2);
+    });
+
     it("requires explicit confirmation before creating a same-name patient without insurance number", async () => {
         patientExists.mockResolvedValue({ _id: "existing-patient" });
 

@@ -2,17 +2,17 @@ import express from "express";
 import { requireRole } from "../middleware/requireRole.js";
 import { AUTH_ROLES } from "../auth/constants.js";
 import {
-    createPatient,
+    createPatientWithWriteVerification,
     listPatients,
     listPatientAuditLogs,
     listPatientSecureRequestDocuments,
     listPatientClinicalNoteVersions,
     getPatientById,
-    updatePatient,
+    updatePatientWithWriteVerification,
     updatePatientWithClinicalNoteHistory,
     restorePatientClinicalNoteVersion,
-    archivePatient,
-    restorePatient,
+    archivePatientWithWriteVerification,
+    restorePatientWithWriteVerification,
 } from "../services/patients.js";
 import {
     toCreatePatientDTO,
@@ -20,13 +20,9 @@ import {
     toRestorePatientDTO,
     toUpdatePatientDTO,
 } from "../dto/patient.dto.js";
-import { recordPatientAuditEvent } from "../audit/patientAudit.js";
-import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
 import { getRequestContext } from "../app/requestContext.js";
-import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 import { getReplicaSetStatus } from "../services/dbStatus.js";
 import {
-    buildWriteVerificationMeta,
     createWriteVerificationContext,
 } from "../audit/writeVerification.js";
 import { getSafeRequestPath, logSafeError } from "../utils/requestLogSafety.js";
@@ -40,115 +36,7 @@ function getRequestIp(req) {
     return getTrustedRequestIp(req);
 }
 
-async function recordPatientMutationAudit(req, {
-    action,
-    operation,
-    patientId,
-    changedFields = [],
-    context = null,
-    clinicalNoteVersion = null,
-}) {
-    const requestContext = getRequestContext(req);
-    const ip = getRequestIp(req);
-    const requestPath = getSafeRequestPath(req);
-    const { verificationId, clientMutationId } =
-        createWriteVerificationContext(req);
-
-    const patientAuditLog = await recordPatientAuditEvent({
-        action,
-        outcome: "SUCCESS",
-        actorUserId: req.auth?.userId ?? null,
-        actorUsername: req.auth?.username ?? null,
-        actorRole: req.auth?.role ?? null,
-        ip,
-        patientId,
-        changedFields,
-        requestPath,
-        context,
-    });
-
-    const replicaSet = await getReplicaSetStatus();
-
-    if (clinicalNoteVersion) {
-        await recordWriteOperationAuditEvent({
-            collectionName: "patientclinicalnoteversions",
-            operation: "CREATE",
-            outcome: "SUCCESS",
-            verificationId,
-            clientMutationId,
-            actorUserId: req.auth?.userId ?? null,
-            actorUsername: req.auth?.username ?? null,
-            actorRole: req.auth?.role ?? null,
-            ip,
-            requestId: requestContext.requestId,
-            instanceId: requestContext.instanceId,
-            resourceId: String(clinicalNoteVersion._id),
-            patientId: patientId ? String(patientId) : null,
-            changedFields: ["version", "contentHash", "changeType"],
-            requestPath,
-            writeConcern: CLINICAL_WRITE_CONCERN,
-            replicaSet,
-        });
-    }
-
-    await recordWriteOperationAuditEvent({
-        collectionName: "patientauditlogs",
-        operation: "CREATE",
-        outcome: "SUCCESS",
-        verificationId,
-        clientMutationId,
-        actorUserId: req.auth?.userId ?? null,
-        actorUsername: req.auth?.username ?? null,
-        actorRole: req.auth?.role ?? null,
-        ip,
-        requestId: requestContext.requestId,
-        instanceId: requestContext.instanceId,
-        resourceId: patientAuditLog?._id ? String(patientAuditLog._id) : null,
-        patientId: patientId ? String(patientId) : null,
-        changedFields: [
-            "action",
-            "outcome",
-            "actorUserId",
-            "actorUsernameMasked",
-            "actorRole",
-            "patientId",
-            "changedFields",
-            "requestPath",
-            "context",
-        ],
-        requestPath,
-        writeConcern: CLINICAL_WRITE_CONCERN,
-        replicaSet,
-    });
-
-    const writeAuditRecorded = await recordWriteOperationAuditEvent({
-        collectionName: "patients",
-        operation,
-        outcome: "SUCCESS",
-        verificationId,
-        clientMutationId,
-        actorUserId: req.auth?.userId ?? null,
-        actorUsername: req.auth?.username ?? null,
-        actorRole: req.auth?.role ?? null,
-        ip,
-        requestId: requestContext.requestId,
-        instanceId: requestContext.instanceId,
-        resourceId: patientId ? String(patientId) : null,
-        patientId: patientId ? String(patientId) : null,
-        changedFields,
-        requestPath,
-        writeConcern: CLINICAL_WRITE_CONCERN,
-        replicaSet,
-    });
-
-    return buildWriteVerificationMeta({
-        writeAuditRecorded,
-        verificationId,
-        clientMutationId,
-    });
-}
-
-async function buildClinicalNoteTransactionAudit(req, {
+async function buildPatientWriteTransactionAudit(req, {
     action,
     operation,
     changedFields,
@@ -345,18 +233,19 @@ router.post("/", async (req, res) => {
     }
 
     try {
-        const patient = await createPatient(dto, req.auth, {
+        const transactionAudit = await buildPatientWriteTransactionAudit(req, {
+            action: "PATIENT_CREATE",
+            operation: "CREATE",
+            changedFields: Object.keys(dto),
+            context: buildPatientAuditContext(dto),
+        });
+        const { patient, writeVerification } =
+            await createPatientWithWriteVerification(dto, req.auth, {
             allowPotentialDuplicate:
                 (req.get?.("X-Confirm-Potential-Duplicate") ||
                     req.headers?.["x-confirm-potential-duplicate"]) === "true",
-        });
-
-        const writeVerification = await recordPatientMutationAudit(req, {
-            action: "PATIENT_CREATE",
-            operation: "CREATE",
-            patientId: patient?._id ?? null,
-            changedFields: Object.keys(dto),
-        });
+                audit: transactionAudit,
+            });
 
         return res.status(201).json({
             data: patient,
@@ -605,7 +494,7 @@ router.get("/:id/clinical-note-versions", async (req, res) => {
 
 router.post("/:id/clinical-note-versions/:versionId/restore", async (req, res) => {
     try {
-        const transactionAudit = await buildClinicalNoteTransactionAudit(req, {
+        const transactionAudit = await buildPatientWriteTransactionAudit(req, {
             action: "PATIENT_UPDATE",
             operation: "UPDATE",
             changedFields: ["secure_request_profile.clinicalNotes"],
@@ -720,45 +609,25 @@ router.patch("/:id", async (req, res) => {
                 ? "secure_request_profile.clinicalNotes"
                 : field
         );
-        const transactionAudit = clinicalNotesChanged
-            ? await buildClinicalNoteTransactionAudit(req, {
+        const changedFields = getActuallyChangedPatientFields(
+            beforePatient,
+            dto
+        );
+        const transactionAudit = await buildPatientWriteTransactionAudit(req, {
                 action: "PATIENT_UPDATE",
                 operation: "UPDATE",
-                changedFields: noteChangedFields,
+                changedFields: clinicalNotesChanged ? noteChangedFields : changedFields,
                 context: buildPatientAuditContext(dto),
-            })
-            : null;
+            });
         const result = clinicalNotesChanged
             ? await updatePatientWithClinicalNoteHistory(req.params.id, dto, req.auth, {
                 audit: transactionAudit,
             })
-            : { patient: await updatePatient(req.params.id, dto, req.auth), noteVersion: null };
-        const { patient, noteVersion } = result;
-        const changedFields = getActuallyChangedPatientFields(
-            beforePatient,
-            dto,
-            patient
-        );
-
-        const writeVerification = noteVersion
-            ? result.writeVerification
-            : await recordPatientMutationAudit(req, {
-            action: "PATIENT_UPDATE",
-            operation: "UPDATE",
-            patientId: patient?._id ?? req.params.id,
-            changedFields: noteVersion
-                ? changedFields.map((field) => field === "secure_request_profile" ? "secure_request_profile.clinicalNotes" : field)
-                : changedFields,
-            context: minimizePatientAuditContext({
-                ...(buildPatientAuditContext(dto) || {}),
-                ...(noteVersion ? {
-                    clinicalNoteVersion: {
-                        changeType: noteVersion.changeType,
-                    },
-                } : {}),
-            }),
-            clinicalNoteVersion: noteVersion,
-        });
+            : await updatePatientWithWriteVerification(req.params.id, dto, req.auth, {
+                audit: transactionAudit,
+            });
+        const { patient } = result;
+        const writeVerification = result.writeVerification;
 
         return res.status(200).json({
             data: patient,
@@ -829,14 +698,15 @@ router.delete(
     async (req, res) => {
         try {
             const { reason } = toArchivePatientDTO(req.body);
-            const archived = await archivePatient(req.params.id, reason, req.auth);
-
-            const writeVerification = await recordPatientMutationAudit(req, {
+            const transactionAudit = await buildPatientWriteTransactionAudit(req, {
                 action: "PATIENT_ARCHIVE",
                 operation: "UPDATE",
-                patientId: archived?._id ?? req.params.id,
                 changedFields: ["archivedAt", "archivedByUserId", "archiveReason"],
             });
+            const { patient: archived, writeVerification } =
+                await archivePatientWithWriteVerification(req.params.id, reason, req.auth, {
+                    audit: transactionAudit,
+                });
 
             return res.status(200).json({
                 data: archived,
@@ -891,14 +761,15 @@ router.post(
     async (req, res) => {
         try {
             const { reason } = toRestorePatientDTO(req.body);
-            const restored = await restorePatient(req.params.id, reason, req.auth);
-
-            const writeVerification = await recordPatientMutationAudit(req, {
+            const transactionAudit = await buildPatientWriteTransactionAudit(req, {
                 action: "PATIENT_RESTORE",
                 operation: "UPDATE",
-                patientId: restored?._id ?? req.params.id,
                 changedFields: ["archivedAt", "archivedByUserId", "archiveReason"],
             });
+            const { patient: restored, writeVerification } =
+                await restorePatientWithWriteVerification(req.params.id, reason, req.auth, {
+                    audit: transactionAudit,
+                });
 
             return res.status(200).json({
                 data: restored,
