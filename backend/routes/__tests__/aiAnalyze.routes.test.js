@@ -6,6 +6,7 @@ import {
     buildCloudSafePatientPayload,
     detectPromptInjection,
     sanitizeRequestPayload,
+    validateClinicalInputBounds,
 } from "../../utils/requestSafety.js";
 import { extractPrimaryClinicalConcern } from "../../utils/clinicalAnalysis.js";
 import { sanitizeNonSecureContent } from "../../utils/securityIncident.js";
@@ -31,6 +32,7 @@ function createRouterDependencies({ openai, persistOrReuseDiagnosis }) {
         assessCloudClinicalPayload,
         buildCloudSafePatientPayload,
         sanitizeRequestPayload,
+        validateClinicalInputBounds,
         detectPromptInjection,
         extractPrimaryClinicalConcern,
         detectNonSecureContent: vi.fn(() => ({ hasMatches: false, matches: [] })),
@@ -59,6 +61,35 @@ function createRouterDependencies({ openai, persistOrReuseDiagnosis }) {
 describe("POST /api/ai/analyze real simulated path", () => {
     afterEach(() => {
         vi.unstubAllEnvs();
+    });
+
+    it("rejects out-of-bounds clinical input before any cloud processing", async () => {
+        const persistOrReuseDiagnosis = vi.fn();
+        const router = createAiAnalyzeRouter(
+            createRouterDependencies({ openai: {}, persistOrReuseDiagnosis })
+        );
+        const res = createResponseDouble();
+
+        await getAnalyzeHandler(router)(
+            {
+                body: {
+                    diagnosis: "Migraine",
+                    symptoms: Array.from({ length: 7 }, () => "Cephalee"),
+                },
+                headers: {},
+                auth: null,
+            },
+            res
+        );
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+            error: expect.objectContaining({
+                code: "INVALID_CLINICAL_INPUT_BOUNDARY",
+                fields: ["symptoms"],
+            }),
+        });
+        expect(persistOrReuseDiagnosis).not.toHaveBeenCalled();
     });
 
     it("keeps approved French aliases approved through both cloud safety checks", async () => {

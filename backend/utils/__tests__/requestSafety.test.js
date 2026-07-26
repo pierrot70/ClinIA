@@ -5,9 +5,46 @@ import {
     buildCloudSafePatientPayload,
     detectPromptInjection,
     sanitizeRequestPayload,
+    validateClinicalInputBounds,
+    validateClinicalProfileBounds,
 } from "../requestSafety.js";
 
 describe("requestSafety", () => {
+    it("rejects oversized or implausible clinical inputs before cloud assessment", () => {
+        expect(
+            validateClinicalInputBounds({
+                diagnosis: "x".repeat(161),
+                age: 131,
+                symptoms: Array.from({ length: 7 }, () => "Cephalee"),
+                blood_pressure: { systolic: 301 },
+            })
+        ).toEqual({
+            valid: false,
+            invalidFields: ["diagnosis", "age", "symptoms", "blood_pressure.systolic"],
+        });
+    });
+
+    it("allows bounded local clinical notes but rejects an oversized profile", () => {
+        expect(
+            validateClinicalProfileBounds({
+                clinicalNotes: "Note clinique locale.",
+                clinicalAnalysisParameters: { diagnosis: "Migraine" },
+            })
+        ).toEqual({ valid: true, invalidFields: [] });
+
+        expect(
+            validateClinicalProfileBounds({
+                clinicalNotes: "x".repeat(10001),
+                clinicalAnalysisParameters: "not-an-object",
+            })
+        ).toEqual({
+            valid: false,
+            invalidFields: [
+                "secure_request_profile.clinicalNotes",
+                "secure_request_profile.clinicalAnalysisParameters",
+            ],
+        });
+    });
     it("removes dangerous object keys and script payloads", () => {
         const payload = {
             safe: "ok",

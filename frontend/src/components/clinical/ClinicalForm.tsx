@@ -1497,6 +1497,7 @@ export function ClinicalForm({
                     </p>
                     <textarea
                         id="clinical-json-import"
+                        maxLength={10000}
                         className="input min-h-36 w-full font-mono text-xs"
                         placeholder={jsonImportPlaceholderLabel}
                         value={jsonImportValue}
@@ -1636,6 +1637,8 @@ export function ClinicalForm({
                         <input
                             id="clinical-age"
                             type="number"
+                            min={0}
+                            max={130}
                             className="input w-full"
                             placeholder={reviewedStrings.agePlaceholder}
                             value={form.age ?? ""}
@@ -1740,6 +1743,7 @@ export function ClinicalForm({
                     <input
                         id="clinical-diagnosis"
                         className="input w-full"
+                        maxLength={160}
                         placeholder={reviewedStrings.diagnosisPlaceholder}
                         value={form.diagnosis ?? ""}
                         onChange={(e) => update("diagnosis", e.target.value)}
@@ -1759,6 +1763,9 @@ export function ClinicalForm({
                         <input
                             id="clinical-weight"
                             type="number"
+                            min={0.5}
+                            max={500}
+                            step="any"
                             className="input w-full"
                             placeholder={reviewedStrings.weightPlaceholder}
                             value={form.weight ?? ""}
@@ -1783,6 +1790,9 @@ export function ClinicalForm({
                         <input
                             id="clinical-height"
                             type="number"
+                            min={20}
+                            max={300}
+                            step="any"
                             className="input w-full"
                             placeholder={reviewedStrings.heightPlaceholder}
                             value={form.height ?? ""}
@@ -1808,6 +1818,7 @@ export function ClinicalForm({
                     <input
                         id="clinical-symptoms"
                         className="input w-full"
+                        maxLength={725}
                         placeholder={reviewedStrings.symptomsPlaceholder}
                         value={listInputs.symptoms}
                         onChange={(e) =>
@@ -1829,6 +1840,7 @@ export function ClinicalForm({
                     <input
                         id="clinical-medical-history"
                         className="input w-full"
+                        maxLength={725}
                         placeholder={reviewedStrings.medicalHistoryPlaceholder}
                         value={listInputs.medical_history}
                         onChange={(e) =>
@@ -1849,6 +1861,7 @@ export function ClinicalForm({
                     <input
                         id="clinical-current-medications"
                         className="input w-full"
+                        maxLength={725}
                         placeholder={reviewedStrings.medicationsPlaceholder}
                         value={listInputs.current_medications}
                         onChange={(e) =>

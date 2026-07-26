@@ -1,4 +1,20 @@
 const MAX_STRING_LENGTH = 2000;
+export const CLINICAL_INPUT_LIMITS = Object.freeze({
+    diagnosis: 160,
+    listItem: 120,
+    listItems: 6,
+    age: { min: 0, max: 130 },
+    weight: { min: 0.5, max: 500 },
+    height: { min: 20, max: 300 },
+    systolic: { min: 20, max: 300 },
+    diastolic: { min: 20, max: 200 },
+    diabetesContextValue: 120,
+    clinicalNotes: 10000,
+    profileText: 500,
+    profileMedications: 1000,
+    selectedDocumentIds: 20,
+    selectedDocumentId: 128,
+});
 const APPROVED_AGE_BANDS = new Set([
     "<18",
     "18-19",
@@ -224,6 +240,129 @@ function collectStrings(node, into) {
 
 export function sanitizeRequestPayload(payload) {
     return sanitizeNode(payload);
+}
+
+function isPlainObject(value) {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function addInvalidField(invalidFields, field) {
+    if (!invalidFields.includes(field)) invalidFields.push(field);
+}
+
+function validateOptionalString(value, field, maxLength, invalidFields) {
+    if (value === undefined || value === null || value === "") return;
+    if (typeof value !== "string" || value.length > maxLength) {
+        addInvalidField(invalidFields, field);
+    }
+}
+
+function validateOptionalNumber(value, field, bounds, invalidFields) {
+    if (value === undefined || value === null || value === "") return;
+    if (
+        typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        value < bounds.min ||
+        value > bounds.max
+    ) {
+        addInvalidField(invalidFields, field);
+    }
+}
+
+function validateClinicalList(value, field, invalidFields) {
+    if (value === undefined || value === null) return;
+    if (!Array.isArray(value) || value.length > CLINICAL_INPUT_LIMITS.listItems) {
+        addInvalidField(invalidFields, field);
+        return;
+    }
+    for (const entry of value) {
+        if (
+            typeof entry !== "string" ||
+            entry.trim().length === 0 ||
+            entry.length > CLINICAL_INPUT_LIMITS.listItem
+        ) {
+            addInvalidField(invalidFields, field);
+            return;
+        }
+    }
+}
+
+export function validateClinicalInputBounds(payload = {}) {
+    const invalidFields = [];
+    if (!isPlainObject(payload)) {
+        return { valid: false, invalidFields: ["payload"] };
+    }
+
+    validateOptionalString(payload.diagnosis, "diagnosis", CLINICAL_INPUT_LIMITS.diagnosis, invalidFields);
+    validateOptionalNumber(payload.age, "age", CLINICAL_INPUT_LIMITS.age, invalidFields);
+    validateOptionalNumber(payload.weight, "weight", CLINICAL_INPUT_LIMITS.weight, invalidFields);
+    validateOptionalNumber(payload.height, "height", CLINICAL_INPUT_LIMITS.height, invalidFields);
+    for (const field of ["symptoms", "medical_history", "current_medications"]) {
+        validateClinicalList(payload[field], field, invalidFields);
+    }
+
+    if (payload.blood_pressure !== undefined && payload.blood_pressure !== null) {
+        if (!isPlainObject(payload.blood_pressure)) {
+            addInvalidField(invalidFields, "blood_pressure");
+        } else {
+            validateOptionalNumber(payload.blood_pressure.systolic, "blood_pressure.systolic", CLINICAL_INPUT_LIMITS.systolic, invalidFields);
+            validateOptionalNumber(payload.blood_pressure.diastolic, "blood_pressure.diastolic", CLINICAL_INPUT_LIMITS.diastolic, invalidFields);
+        }
+    }
+
+    if (payload.diabetes_context !== undefined && payload.diabetes_context !== null) {
+        if (!isPlainObject(payload.diabetes_context)) {
+            addInvalidField(invalidFields, "diabetes_context");
+        } else {
+            for (const field of Object.keys(APPROVED_DIABETES_CONTEXT)) {
+                validateOptionalString(payload.diabetes_context[field], `diabetes_context.${field}`, CLINICAL_INPUT_LIMITS.diabetesContextValue, invalidFields);
+            }
+        }
+    }
+
+    return { valid: invalidFields.length === 0, invalidFields };
+}
+
+export function validateClinicalProfileBounds(profile) {
+    const invalidFields = [];
+    if (profile === undefined || profile === null) return { valid: true, invalidFields };
+    if (!isPlainObject(profile)) {
+        return { valid: false, invalidFields: ["secure_request_profile"] };
+    }
+
+    for (const field of ["objective", "sex", "age", "clinicalScope", "ageGroup", "symptomProfile", "cancerType", "duration", "severity", "redFlagStatus", "comorbidityContext"]) {
+        validateOptionalString(profile[field], `secure_request_profile.${field}`, CLINICAL_INPUT_LIMITS.profileText, invalidFields);
+    }
+    validateOptionalString(profile.current_medications, "secure_request_profile.current_medications", CLINICAL_INPUT_LIMITS.profileMedications, invalidFields);
+    validateOptionalString(profile.clinicalNotes, "secure_request_profile.clinicalNotes", CLINICAL_INPUT_LIMITS.clinicalNotes, invalidFields);
+
+    if (profile.selected_document_ids !== undefined && profile.selected_document_ids !== null) {
+        if (
+            !Array.isArray(profile.selected_document_ids) ||
+            profile.selected_document_ids.length > CLINICAL_INPUT_LIMITS.selectedDocumentIds ||
+            profile.selected_document_ids.some((value) => typeof value !== "string" || value.length === 0 || value.length > CLINICAL_INPUT_LIMITS.selectedDocumentId)
+        ) {
+            addInvalidField(invalidFields, "secure_request_profile.selected_document_ids");
+        }
+    }
+
+    if (
+        profile.clinicalAnalysisParameters !== undefined &&
+        profile.clinicalAnalysisParameters !== null
+    ) {
+        const parameterBounds = validateClinicalInputBounds(
+            profile.clinicalAnalysisParameters
+        );
+        for (const field of parameterBounds.invalidFields) {
+            addInvalidField(
+                invalidFields,
+                field === "payload"
+                    ? "secure_request_profile.clinicalAnalysisParameters"
+                    : `secure_request_profile.clinicalAnalysisParameters.${field}`
+            );
+        }
+    }
+    return { valid: invalidFields.length === 0, invalidFields };
 }
 
 function toAgeBand(age) {

@@ -116,6 +116,34 @@ describe("patient routes atomic write receipts", () => {
         expect(services.createPatientWithWriteVerification).not.toHaveBeenCalled();
     });
 
+    it("rejects an oversized clinical note before creating a patient", async () => {
+        const handler = getRouteHandler("post", "/");
+        const res = makeRes();
+
+        await handler(
+            request({
+                body: {
+                    nom: "Lasante",
+                    prenom: "Pierre",
+                    secure_request_profile: {
+                        clinicalNotes: "x".repeat(10001),
+                    },
+                },
+            }),
+            res
+        );
+
+        expect(dto.toCreatePatientDTO).not.toHaveBeenCalled();
+        expect(services.createPatientWithWriteVerification).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+            error: expect.objectContaining({
+                code: "INVALID_CLINICAL_INPUT_BOUNDARY",
+                fields: ["secure_request_profile.clinicalNotes"],
+            }),
+        });
+    });
+
     it("uses one transactional service for a non-note patient update", async () => {
         const handler = getRouteHandler("patch", "/:id");
         const patient = { _id: "patient-2", nom: "After", prenom: "Jane" };

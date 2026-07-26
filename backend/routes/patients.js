@@ -26,7 +26,10 @@ import {
     createWriteVerificationContext,
 } from "../audit/writeVerification.js";
 import { getSafeRequestPath, logSafeError } from "../utils/requestLogSafety.js";
-import { assessCloudClinicalPayload } from "../utils/requestSafety.js";
+import {
+    assessCloudClinicalPayload,
+    validateClinicalProfileBounds,
+} from "../utils/requestSafety.js";
 import { minimizePatientAuditContext } from "../audit/auditDataMinimization.js";
 import { getTrustedRequestIp } from "../utils/requestIp.js";
 
@@ -210,11 +213,29 @@ function rejectUnsafeClinicalAnalysisProfile(res, dto, existingPatient = null) {
     return true;
 }
 
+function rejectOutOfBoundsClinicalProfile(res, rawProfile) {
+    const boundaryCheck = validateClinicalProfileBounds(rawProfile);
+    if (boundaryCheck.valid) return false;
+
+    res.status(400).json({
+        error: {
+            code: "INVALID_CLINICAL_INPUT_BOUNDARY",
+            message: "Les paramètres cliniques dépassent les limites autorisées.",
+            retryable: false,
+            fields: boundaryCheck.invalidFields,
+        },
+    });
+    return true;
+}
+
 /* ------------------------------------------------------------------ */
 /* POST /api/patients                                                  */
 /* ------------------------------------------------------------------ */
 
 router.post("/", async (req, res) => {
+    if (rejectOutOfBoundsClinicalProfile(res, req.body?.secure_request_profile)) {
+        return;
+    }
     const dto = toCreatePatientDTO(req.body);
 
     if (!dto.nom || !dto.prenom) {
@@ -582,6 +603,9 @@ router.get("/:id", async (req, res) => {
 /* ------------------------------------------------------------------ */
 
 router.patch("/:id", async (req, res) => {
+    if (rejectOutOfBoundsClinicalProfile(res, req.body?.secure_request_profile)) {
+        return;
+    }
     const dto = toUpdatePatientDTO(req.body);
 
     if (Object.keys(dto).length === 0) {

@@ -25,6 +25,7 @@ export function createAiAnalyzeRouter(deps) {
         assessCloudClinicalPayload,
         buildCloudSafePatientPayload,
         sanitizeRequestPayload,
+        validateClinicalInputBounds,
         detectPromptInjection,
         extractPrimaryClinicalConcern,
         detectNonSecureContent,
@@ -79,6 +80,18 @@ export function createAiAnalyzeRouter(deps) {
         async (req, res) => {
             try {
                 const safeBody = sanitizeRequestPayload(req.body ?? {});
+                const boundaryCheck = validateClinicalInputBounds(safeBody);
+                if (!boundaryCheck.valid) {
+                    return res.status(400).json({
+                        error: {
+                            code: "INVALID_CLINICAL_INPUT_BOUNDARY",
+                            message:
+                                "Les paramètres cliniques dépassent les limites autorisées.",
+                            retryable: false,
+                            fields: boundaryCheck.invalidFields,
+                        },
+                    });
+                }
                 const promptInjectionScan = detectPromptInjection(safeBody);
                 if (promptInjectionScan.hasMatch) {
                     return res.status(400).json({
