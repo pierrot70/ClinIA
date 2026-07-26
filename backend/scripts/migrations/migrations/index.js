@@ -10,6 +10,8 @@ import { migration as addPatientSearchIndexes }
     from "./20260718-add-patient-search-indexes.js";
 import { migration as minimizeClinicalAuditContent }
     from "./20260723-minimize-clinical-audit-content.js";
+import { migration as addRefreshTokenFamilyIndexes }
+    from "./20260726-add-refresh-token-family-indexes.js";
 export const migrations = [
     registerMigrationFramework,
     addPatientLanguageDefault,
@@ -17,4 +19,5 @@ export const migrations = [
     sanitizeAuditRequestPaths,
     addPatientSearchIndexes,
     minimizeClinicalAuditContent,
+    addRefreshTokenFamilyIndexes,
 ];

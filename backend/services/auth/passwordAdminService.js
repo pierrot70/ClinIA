@@ -1,6 +1,7 @@
 import { recordAuthAuditEvent } from "../../audit/authAudit.js";
 import { AdminUser } from "../../models/AdminUser.js";
 import { assertSuperAdmin, createAuthError } from "./shared.js";
+import { revokeRefreshTokenFamiliesForUser } from "./refreshTokenFamilies.js";
 
 export async function resetUserPassword({
     userId,
@@ -46,6 +47,7 @@ export async function resetUserPassword({
     user.passwordResetRequired = false;
     user.mustChangePasswordOnNextLogin = shouldGenerateTemporaryPassword;
     deps.revokeAccessTokens(user);
+    await revokeRefreshTokenFamiliesForUser(user._id, "PASSWORD_RESET");
     await user.save();
 
     await recordAuthAuditEvent({
@@ -105,6 +107,7 @@ export async function completeForcedPasswordChange({
     user.passwordResetRequired = false;
     user.massDownloadRestrictedUntil = null;
     deps.revokeAccessTokens(user);
+    await revokeRefreshTokenFamiliesForUser(user._id, "FORCED_PASSWORD_CHANGE");
     await user.save();
 
     await recordAuthAuditEvent({

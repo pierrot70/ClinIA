@@ -6,6 +6,7 @@ import {
     minimizeSecurityIncidentContext,
     minimizeSecurityIncidentMatches,
 } from "../audit/auditDataMinimization.js";
+import { revokeRefreshTokenFamiliesForUser } from "./auth/refreshTokenFamilies.js";
 
 const REQUIRED_ACK_ACTION = "J'ai lu et compris";
 const MASS_DOWNLOAD_ESCALATION_WINDOW_MS = 15 * 60 * 1000;
@@ -133,6 +134,7 @@ export async function handleMassDownloadSignal({
         now.getTime() + MASS_DOWNLOAD_RESTRICTION_MS
     );
     user.passwordResetRequired = true;
+    await revokeRefreshTokenFamiliesForUser(user._id, "MASS_DOWNLOAD_RESTRICTION", now);
     await user.save();
     return true;
 }

@@ -344,6 +344,12 @@ export const UI_LABELS_FR = {
                 "Le navigateur a bloqué cette ressource avant son chargement ou son exécution.",
             cspViolationSummaryImpact:
                 "Aucune URL complète ni donnée clinique n'est conservée dans cet incident.",
+            refreshTokenReplaySummaryEvent:
+                "Un jeton de renouvellement déjà remplacé a été réutilisé.",
+            refreshTokenReplaySummaryProtection:
+                "La famille de session concernée a été invalidée et une reconnexion est requise.",
+            refreshTokenReplaySummaryImpact:
+                "L'incident peut signaler un jeton copié ou une session utilisée sur plusieurs appareils.",
             massDownloadSummaryEvent:
                 "Un volume inhabituel de consultation ou d'exportation a été détecté.",
             massDownloadSummaryProtection:
@@ -363,6 +369,7 @@ export const UI_LABELS_FR = {
             globalSummaryPreCloud: "contenu potentiellement identifiant bloqué avant transmission cloud",
             globalSummaryCsp: "ressource bloquée par la politique CSP du navigateur",
             globalSummaryMassDownload: "volume inhabituel de consultation ou d'exportation détecté",
+            globalSummaryRefreshTokenReplay: "réutilisation de jeton de renouvellement détectée",
             globalSummaryOther: "autre événement de sécurité à examiner",
             globalSummaryPriorityPreCloud:
                 "Traitez d'abord les incidents de contenu non sécurisé non acquittés: ils concernent une tentative d'analyse qui a été bloquée avant le cloud.",
@@ -370,6 +377,8 @@ export const UI_LABELS_FR = {
                 "Vérifiez d'abord les incidents de consultation ou d'exportation inhabituelle et l'état du compte concerné.",
             globalSummaryPriorityCsp:
                 "Vérifiez les incidents CSP non acquittés seulement si une fonction attendue de ClinIA semble affectée.",
+            globalSummaryPriorityRefreshTokenReplay:
+                "Vérifiez d'abord les réutilisations de jeton: la session concernée a été fermée par précaution. Si l'action n'était pas attendue, réinitialisez le mot de passe du compte.",
             globalSummaryPriorityGeneric:
                 "Examinez d'abord les incidents non acquittés les plus récents, puis utilisez Explication pour le détail par incident.",
             explanationTitle: "Comprendre cet incident",
@@ -390,6 +399,12 @@ export const UI_LABELS_FR = {
                 "La ressource a été bloquée dans le navigateur. Aucun contenu clinique ni URL complète n'est conservé dans cet incident.",
             cspViolationNextStep:
                 "Vérifiez la directive et la catégorie de ressource indiquées. Si une fonction ClinIA attendue est touchée, transmettez ces deux informations à l'équipe technique.",
+            refreshTokenReplayWhatHappened:
+                "Un jeton de renouvellement qui avait déjà servi à créer une nouvelle session a été présenté de nouveau.",
+            refreshTokenReplayWhatWasBlocked:
+                "ClinIA a invalidé la famille complète de jetons associée et a exigé une nouvelle connexion. Le jeton lui-même n'est jamais affiché ni conservé dans cet écran.",
+            refreshTokenReplayNextStep:
+                "Si cette reconnexion était attendue, reconnectez-vous simplement. Sinon, considérez la session comme compromise et réinitialisez le mot de passe du compte.",
             pagePrefix: "Page",
             pageSeparator: "/",
             resultSuffix: "résultats",

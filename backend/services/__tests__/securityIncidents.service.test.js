@@ -12,6 +12,7 @@ const skip = vi.fn(() => ({ limit }));
 const sort = vi.fn(() => ({ skip }));
 const find = vi.fn(() => ({ sort }));
 const findAdminUserById = vi.fn();
+const revokeRefreshTokenFamiliesForUser = vi.fn();
 
 vi.mock("../../models/SecurityIncident.js", () => ({
     SecurityIncident: {
@@ -30,6 +31,10 @@ vi.mock("../../models/AdminUser.js", () => ({
     },
 }));
 
+vi.mock("../auth/refreshTokenFamilies.js", () => ({
+    revokeRefreshTokenFamiliesForUser,
+}));
+
 const {
     acknowledgeSecurityIncident,
     createSecurityIncident,
@@ -40,6 +45,7 @@ const {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    revokeRefreshTokenFamiliesForUser.mockResolvedValue(undefined);
     findOne.mockReturnValue({ lean: findOneLean });
 });
 

@@ -42,6 +42,9 @@ const labels = {
         cspViolationSummaryEvent: "A browser resource violated CSP.",
         cspViolationSummaryProtection: "The browser blocked it.",
         cspViolationSummaryImpact: "No full URL was retained.",
+        refreshTokenReplaySummaryEvent: "A rotated refresh token was reused.",
+        refreshTokenReplaySummaryProtection: "The related session family was revoked.",
+        refreshTokenReplaySummaryImpact: "The session may have been copied.",
         massDownloadSummaryEvent: "An unusual volume was detected.",
         massDownloadSummaryProtection: "Account protections were applied.",
         massDownloadSummaryImpact: "This does not prove a disclosure.",
@@ -55,10 +58,12 @@ const labels = {
         globalSummaryPreCloud: "cloud request blocked before transmission",
         globalSummaryCsp: "browser CSP block",
         globalSummaryMassDownload: "unusual volume detected",
+        globalSummaryRefreshTokenReplay: "refresh token replay detected",
         globalSummaryOther: "other security event",
         globalSummaryPriorityPreCloud: "Prioritize pre-cloud incidents.",
         globalSummaryPriorityMassDownload: "Prioritize volume incidents.",
         globalSummaryPriorityCsp: "Prioritize CSP incidents if a feature is affected.",
+        globalSummaryPriorityRefreshTokenReplay: "Prioritize refresh token replay incidents.",
         globalSummaryPriorityGeneric: "Review recent unacknowledged incidents.",
         explanationTitle: "Understand this incident",
         explanationWhatHappened: "Detected:",
@@ -71,6 +76,9 @@ const labels = {
         cspViolationWhatHappened: "A browser resource was blocked.",
         cspViolationWhatWasBlocked: "The browser blocked it.",
         cspViolationNextStep: "Review the directive.",
+        refreshTokenReplayWhatHappened: "A rotated refresh token was reused.",
+        refreshTokenReplayWhatWasBlocked: "The related session family was revoked.",
+        refreshTokenReplayNextStep: "Sign in again and reset the password if unexpected.",
         pagePrefix: "Page",
         pageSeparator: "/",
         resultSuffix: "resultats",
@@ -204,5 +212,51 @@ describe("SecurityIncidentsModal", () => {
         expect(screen.getByText("1 displayed incident(s); 1 unacknowledged.")).toBeInTheDocument();
         expect(screen.getByText("Prioritize pre-cloud incidents.")).toBeInTheDocument();
         expect(screen.queryByText("MUST_NOT_RENDER")).not.toBeInTheDocument();
+    });
+
+    it("offers a dedicated explanation for refresh token replay", () => {
+        render(
+            <SecurityIncidentsModal
+                isOpen
+                items={[
+                    {
+                        id: "incident-refresh-replay",
+                        type: "REFRESH_TOKEN_REPLAY",
+                        phase: "auth",
+                        reason: "A replaced refresh token was reused.",
+                        requestPath: "/api/auth/refresh",
+                        transport: "internal_auth",
+                        matches: [],
+                        context: { userId: "507f1f77bcf86cd799439011" },
+                        detectedAt: "2026-07-26T12:00:00.000Z",
+                        acknowledged: false,
+                        acknowledgmentAction: "",
+                        acknowledgedAt: null,
+                        acknowledgmentContext: {},
+                        createdAt: "2026-07-26T12:00:00.000Z",
+                        updatedAt: "2026-07-26T12:00:00.000Z",
+                    },
+                ]}
+                loading={false}
+                error={null}
+                ackingId=""
+                acknowledgedFilter="false"
+                typeFilter=""
+                pagination={{ page: 1, limit: 10, total: 1, totalPages: 1 }}
+                headerLabels={labels}
+                onClose={() => {}}
+                onRefresh={() => {}}
+                onAcknowledgedFilterChange={() => {}}
+                onTypeFilterChange={() => {}}
+                onAcknowledge={() => {}}
+                onLoadPage={() => {}}
+            />
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "Explanation" }));
+
+        expect(screen.getByText("A rotated refresh token was reused.")).toBeInTheDocument();
+        expect(screen.getByText("The related session family was revoked.")).toBeInTheDocument();
+        expect(screen.getByText("Sign in again and reset the password if unexpected.")).toBeInTheDocument();
     });
 });

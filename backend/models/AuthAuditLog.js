@@ -11,6 +11,7 @@ const AuthAuditLogSchema = new mongoose.Schema(
                 "REGISTER",
                 "USER_MANAGEMENT",
                 "PASSWORD_CHANGE",
+                "REFRESH_TOKEN_REPLAY",
             ],
             required: true,
         },

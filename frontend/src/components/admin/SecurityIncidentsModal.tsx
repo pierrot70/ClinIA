@@ -44,6 +44,9 @@ type HeaderLabels = {
         cspViolationSummaryEvent: string;
         cspViolationSummaryProtection: string;
         cspViolationSummaryImpact: string;
+        refreshTokenReplaySummaryEvent: string;
+        refreshTokenReplaySummaryProtection: string;
+        refreshTokenReplaySummaryImpact: string;
         massDownloadSummaryEvent: string;
         massDownloadSummaryProtection: string;
         massDownloadSummaryImpact: string;
@@ -57,10 +60,12 @@ type HeaderLabels = {
         globalSummaryPreCloud: string;
         globalSummaryCsp: string;
         globalSummaryMassDownload: string;
+        globalSummaryRefreshTokenReplay: string;
         globalSummaryOther: string;
         globalSummaryPriorityPreCloud: string;
         globalSummaryPriorityMassDownload: string;
         globalSummaryPriorityCsp: string;
+        globalSummaryPriorityRefreshTokenReplay: string;
         globalSummaryPriorityGeneric: string;
         explanationTitle: string;
         explanationWhatHappened: string;
@@ -73,6 +78,9 @@ type HeaderLabels = {
         cspViolationWhatHappened: string;
         cspViolationWhatWasBlocked: string;
         cspViolationNextStep: string;
+        refreshTokenReplayWhatHappened: string;
+        refreshTokenReplayWhatWasBlocked: string;
+        refreshTokenReplayNextStep: string;
         pagePrefix: string;
         pageSeparator: string;
         resultSuffix: string;
@@ -144,6 +152,14 @@ export function SecurityIncidentsModal({
             };
         }
 
+        if (item.type === "REFRESH_TOKEN_REPLAY") {
+            return {
+                whatHappened: labels.refreshTokenReplayWhatHappened,
+                whatWasBlocked: labels.refreshTokenReplayWhatWasBlocked,
+                nextStep: labels.refreshTokenReplayNextStep,
+            };
+        }
+
         return {
             whatHappened: labels.explanationWhatHappened,
             whatWasBlocked: labels.explanationWhatWasBlocked,
@@ -159,6 +175,8 @@ export function SecurityIncidentsModal({
                     ? "csp"
                     : item.type === "MASS_DOWNLOAD_ATTEMPT"
                         ? "massDownload"
+                        : item.type === "REFRESH_TOKEN_REPLAY"
+                            ? "refreshTokenReplay"
                         : "other";
             summary[key] = (summary[key] || 0) + 1;
             return summary;
@@ -167,6 +185,7 @@ export function SecurityIncidentsModal({
         const categories = [
             counts.preCloud ? `${counts.preCloud} ${labels.globalSummaryPreCloud}` : "",
             counts.massDownload ? `${counts.massDownload} ${labels.globalSummaryMassDownload}` : "",
+            counts.refreshTokenReplay ? `${counts.refreshTokenReplay} ${labels.globalSummaryRefreshTokenReplay}` : "",
             counts.csp ? `${counts.csp} ${labels.globalSummaryCsp}` : "",
             counts.other ? `${counts.other} ${labels.globalSummaryOther}` : "",
         ].filter(Boolean);
@@ -178,6 +197,8 @@ export function SecurityIncidentsModal({
             priority = labels.globalSummaryPriorityMassDownload;
         } else if (unacknowledged.some((item) => item.type === "CSP_VIOLATION")) {
             priority = labels.globalSummaryPriorityCsp;
+        } else if (unacknowledged.some((item) => item.type === "REFRESH_TOKEN_REPLAY")) {
+            priority = labels.globalSummaryPriorityRefreshTokenReplay;
         }
 
         return {
@@ -263,6 +284,7 @@ export function SecurityIncidentsModal({
                                 <option value="MASS_DOWNLOAD_ATTEMPT">MASS_DOWNLOAD_ATTEMPT</option>
                                 <option value="NON_SECURE_CONTENT">NON_SECURE_CONTENT</option>
                                 <option value="CSP_VIOLATION">CSP_VIOLATION</option>
+                                <option value="REFRESH_TOKEN_REPLAY">REFRESH_TOKEN_REPLAY</option>
                             </select>
                         </label>
                     </div>

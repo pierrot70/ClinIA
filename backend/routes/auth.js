@@ -361,6 +361,7 @@ router.post("/refresh", enforceSensitiveAuthOrigin, refreshRateLimiter, async (r
 
         if (
             err.code === "INVALID_REFRESH_TOKEN" ||
+            err.code === "REFRESH_TOKEN_REUSED" ||
             err.code === "REFRESH_TOKEN_EXPIRED" ||
             err.code === "APP_SHUTDOWN"
         ) {

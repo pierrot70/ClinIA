@@ -1,6 +1,7 @@
 import { AUTH_ROLES } from "../auth/constants.js";
 import { AdminUser } from "../models/AdminUser.js";
 import { AppSettings } from "../models/AppSettings.js";
+import { revokeRefreshTokenFamiliesForUsers } from "./auth/refreshTokenFamilies.js";
 import { logSafeError } from "../utils/requestLogSafety.js";
 
 const SETTINGS_KEY = "main";
@@ -120,16 +121,24 @@ export async function enforceScheduledShutdownIfDue() {
         return false;
     }
 
+    const usersToRevoke = await AdminUser.find({
+        role: { $ne: AUTH_ROLES.SUPERADMIN },
+    }).select("_id");
+    const now = new Date();
+
+    await revokeRefreshTokenFamiliesForUsers(
+        usersToRevoke.map((user) => user._id),
+        "SCHEDULED_SHUTDOWN",
+        now
+    );
+
     await AdminUser.updateMany(
-        {
-            role: { $ne: AUTH_ROLES.SUPERADMIN },
-            refreshTokenHash: { $ne: null },
-        },
+        { role: { $ne: AUTH_ROLES.SUPERADMIN } },
         {
             $set: {
                 refreshTokenHash: null,
                 refreshTokenExpiresAt: null,
-                lastLogoutAt: new Date(),
+                lastLogoutAt: now,
             },
         }
     );

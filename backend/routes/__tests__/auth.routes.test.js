@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { registerSelf } = vi.hoisted(() => ({
+const { registerSelf, refresh } = vi.hoisted(() => ({
     registerSelf: vi.fn(),
+    refresh: vi.fn(),
 }));
 
 vi.mock("../../services/auth.js", () => ({
@@ -17,7 +18,7 @@ vi.mock("../../services/auth.js", () => ({
     reauthenticate: vi.fn(),
     resetUserPassword: vi.fn(),
     completeForcedPasswordChange: vi.fn(),
-    refresh: vi.fn(),
+    refresh,
     setUserActiveStatus: vi.fn(),
     updateUser: vi.fn(),
 }));
@@ -117,5 +118,36 @@ describe("POST /register-self security", () => {
         });
         expect(registerSelf.mock.calls[0][0]).not.toHaveProperty("role");
         expect(res.status).toHaveBeenCalledWith(201);
+    });
+});
+
+describe("POST /refresh replay protection", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it("returns 401 when a rotated refresh token is replayed", async () => {
+        refresh.mockRejectedValue({
+            code: "REFRESH_TOKEN_REUSED",
+            message: "Session invalidee apres reutilisation d'un refresh token.",
+        });
+        const handler = getLastRouteHandler("post", "/refresh");
+        const req = {
+            body: { refreshToken: "a".repeat(64) },
+            headers: {},
+            cookies: {},
+        };
+        const res = makeRes();
+
+        await handler(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "REFRESH_TOKEN_REUSED",
+                message: "Session invalidee apres reutilisation d'un refresh token.",
+                retryable: false,
+            },
+        });
     });
 });

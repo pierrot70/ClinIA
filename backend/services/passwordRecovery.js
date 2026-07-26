@@ -2,6 +2,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 
 import { recordAuthAuditEvent } from "../audit/authAudit.js";
+import { revokeRefreshTokenFamiliesForUser } from "./auth/refreshTokenFamilies.js";
 import { logSafeError } from "../utils/requestLogSafety.js";
 import { AdminUser } from "../models/AdminUser.js";
 import {
@@ -88,6 +89,7 @@ export async function requestPasswordRecoveryCode({ email, now = new Date() }) {
     user.passwordRecoveryRequestedAt = now;
     user.passwordRecoveryGrantHash = null;
     user.passwordRecoveryGrantExpiresAt = null;
+    await revokeRefreshTokenFamiliesForUser(user._id, "PASSWORD_RECOVERY");
     await user.save();
 
     try {

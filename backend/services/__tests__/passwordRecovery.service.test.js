@@ -4,6 +4,7 @@ const findOneMock = vi.fn();
 const sendPasswordRecoveryCodeMock = vi.fn();
 const sendPasswordChangedConfirmationMock = vi.fn();
 const recordAuthAuditEventMock = vi.fn();
+const revokeRefreshTokenFamiliesForUserMock = vi.fn();
 
 vi.mock("../../models/AdminUser.js", () => ({
     AdminUser: {
@@ -20,6 +21,10 @@ vi.mock("../../audit/authAudit.js", () => ({
     recordAuthAuditEvent: recordAuthAuditEventMock,
 }));
 
+vi.mock("../auth/refreshTokenFamilies.js", () => ({
+    revokeRefreshTokenFamiliesForUser: revokeRefreshTokenFamiliesForUserMock,
+}));
+
 describe("password recovery service", () => {
     beforeEach(() => {
         vi.stubEnv("PASSWORD_RECOVERY_SECRET", "test-recovery-secret");
@@ -27,6 +32,7 @@ describe("password recovery service", () => {
         sendPasswordRecoveryCodeMock.mockReset().mockResolvedValue(undefined);
         sendPasswordChangedConfirmationMock.mockReset().mockResolvedValue(undefined);
         recordAuthAuditEventMock.mockReset().mockResolvedValue(undefined);
+        revokeRefreshTokenFamiliesForUserMock.mockReset().mockResolvedValue(undefined);
     });
 
     it("stores only a hash and expires the six-digit code after ten minutes", async () => {

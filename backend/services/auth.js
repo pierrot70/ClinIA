@@ -31,6 +31,17 @@ import {
 } from "./auth/passwordAdminService.js";
 import { assertSuperAdmin, createAuthError } from "./auth/shared.js";
 import { getTrustedRequestIp } from "../utils/requestIp.js";
+import { createSecurityIncident } from "./securityIncidents.js";
+import { logSafeError } from "../utils/requestLogSafety.js";
+import {
+    createRefreshTokenFamilyId,
+    createRefreshTokenSession,
+    findRefreshTokenSession,
+    REFRESH_TOKEN_SESSION_STATUS,
+    revokeRefreshTokenFamiliesForUser,
+    revokeRefreshTokenFamily,
+    rotateActiveRefreshTokenSession,
+} from "./auth/refreshTokenFamilies.js";
 
 export { listAuthLogGraphs, listAuthLogs };
 
@@ -287,20 +298,70 @@ function assertRegisterInput({ username, password, role }) {
     return normalizedUsername;
 }
 
-async function setRotatedRefreshToken(user) {
+async function setRotatedRefreshToken(user, familyId = createRefreshTokenFamilyId()) {
     const refreshToken = makeRefreshToken();
-    user.refreshTokenHash = hashToken(refreshToken);
-    user.refreshTokenExpiresAt = new Date(
-        Date.now() + REFRESH_TOKEN_TTL_MS
-    );
+    const tokenHash = hashToken(refreshToken);
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+
+    await createRefreshTokenSession({
+        userId: user._id,
+        familyId,
+        tokenHash,
+        expiresAt,
+    });
+
+    // Maintained temporarily for compatibility with active sessions created
+    // before refresh-token family tracking was introduced.
+    user.refreshTokenHash = tokenHash;
+    user.refreshTokenExpiresAt = expiresAt;
     await user.save();
 
     return refreshToken;
 }
 
+async function revokeRefreshSessionFamilyForReplay(user, familyId, req) {
+    const now = new Date();
+    await revokeRefreshTokenFamily(familyId, "REFRESH_TOKEN_REPLAY", now);
+    clearActiveSession(user, now);
+    await user.save();
+
+    await recordAuthAuditEvent({
+        action: "REFRESH_TOKEN_REPLAY",
+        outcome: "FAILED",
+        userId: user._id,
+        username: user.username,
+        role: user.role,
+        ip: getRequestIp(req),
+        reason: "ROTATED_TOKEN_REUSED",
+    });
+
+    try {
+        await createSecurityIncident({
+            type: "REFRESH_TOKEN_REPLAY",
+            phase: "auth",
+            reason: "Un refresh token deja remplace a ete reutilise.",
+            requestPath: "/api/auth/refresh",
+            transport: "internal_auth",
+            matches: [],
+            context: {
+                userId: String(user._id),
+                role: user.role,
+            },
+        });
+    } catch (error) {
+        logSafeError("REFRESH_TOKEN_REPLAY_INCIDENT_WRITE_FAILED", error);
+    }
+
+    throw createAuthError(
+        "REFRESH_TOKEN_REUSED",
+        "Session invalidee apres reutilisation d'un refresh token. Reconnectez-vous."
+    );
+}
+
 export async function validateSessionState(user, now = Date.now()) {
     if (isSessionAbsoluteExpired(user, now)) {
         clearActiveSession(user, new Date(now));
+        await revokeRefreshTokenFamiliesForUser(user._id, "SESSION_ABSOLUTE_TIMEOUT");
         await user.save();
         throw createAuthError(
             "SESSION_ABSOLUTE_TIMEOUT",
@@ -310,6 +371,7 @@ export async function validateSessionState(user, now = Date.now()) {
 
     if (isSessionIdleExpired(user, now)) {
         clearActiveSession(user, new Date(now));
+        await revokeRefreshTokenFamiliesForUser(user._id, "SESSION_IDLE_TIMEOUT");
         await user.save();
         throw createAuthError(
             "SESSION_IDLE_TIMEOUT",
@@ -505,6 +567,7 @@ export async function login({ username, email, password, req }) {
     user.lastActivityAt = user.lastLoginAt;
     user.authTokenInvalidBefore = null;
 
+    await revokeRefreshTokenFamiliesForUser(user._id, "NEW_LOGIN");
     const refreshToken = await setRotatedRefreshToken(user);
     const accessToken = signAccessToken(user);
 
@@ -538,11 +601,39 @@ export async function refresh({ refreshToken, req }) {
     assertRefreshInput(refreshToken);
 
     const tokenHash = hashToken(refreshToken);
-    const user = await AdminUser.findOne({
-        refreshTokenHash: tokenHash,
-    });
+    let tokenSession = await findRefreshTokenSession(tokenHash);
+    let user = null;
 
-    if (!user) {
+    if (tokenSession) {
+        user = await AdminUser.findById(tokenSession.userId);
+    } else {
+        // One-time compatibility path for a still-valid session issued before
+        // token family tracking. It immediately becomes a rotated member.
+        user = await AdminUser.findOne({ refreshTokenHash: tokenHash });
+        if (user) {
+            const expiresAt = user.refreshTokenExpiresAt;
+            if (expiresAt && expiresAt.getTime() > Date.now()) {
+                const familyId = createRefreshTokenFamilyId();
+                await createRefreshTokenSession({
+                    userId: user._id,
+                    familyId,
+                    tokenHash,
+                    expiresAt,
+                    status: REFRESH_TOKEN_SESSION_STATUS.ROTATED,
+                    rotatedAt: new Date(),
+                });
+                tokenSession = {
+                    userId: user._id,
+                    familyId,
+                    status: REFRESH_TOKEN_SESSION_STATUS.ROTATED,
+                    expiresAt,
+                    legacyUpgrade: true,
+                };
+            }
+        }
+    }
+
+    if (!user || !tokenSession) {
         throw createAuthError(
             "INVALID_REFRESH_TOKEN",
             "Refresh token invalide."
@@ -550,10 +641,25 @@ export async function refresh({ refreshToken, req }) {
     }
 
     if (
-        !user.refreshTokenExpiresAt ||
-        user.refreshTokenExpiresAt.getTime() <= Date.now()
+        tokenSession.status === REFRESH_TOKEN_SESSION_STATUS.ROTATED &&
+        !tokenSession.legacyUpgrade
+    ) {
+        await revokeRefreshSessionFamilyForReplay(user, tokenSession.familyId, req);
+    }
+
+    if (tokenSession.status !== REFRESH_TOKEN_SESSION_STATUS.ACTIVE && !tokenSession.legacyUpgrade) {
+        throw createAuthError(
+            "INVALID_REFRESH_TOKEN",
+            "Refresh token invalide."
+        );
+    }
+
+    if (
+        !tokenSession.expiresAt ||
+        new Date(tokenSession.expiresAt).getTime() <= Date.now()
     ) {
         clearActiveSession(user);
+        await revokeRefreshTokenFamily(tokenSession.familyId, "EXPIRED");
         await user.save();
 
         throw createAuthError(
@@ -564,6 +670,7 @@ export async function refresh({ refreshToken, req }) {
 
     if (isShutdownEnforcedForRole(user.role)) {
         clearActiveSession(user);
+        await revokeRefreshTokenFamily(tokenSession.familyId, "APP_SHUTDOWN");
         await user.save();
         throw createAuthError(
             "APP_SHUTDOWN",
@@ -574,7 +681,30 @@ export async function refresh({ refreshToken, req }) {
     await validateSessionState(user);
     user.lastActivityAt = new Date();
 
-    const newRefreshToken = await setRotatedRefreshToken(user);
+    let familyId = tokenSession.familyId;
+    if (!tokenSession.legacyUpgrade) {
+        const rotated = await rotateActiveRefreshTokenSession(tokenHash);
+        if (!rotated) {
+            const currentTokenSession = await findRefreshTokenSession(tokenHash);
+            if (
+                currentTokenSession?.status === REFRESH_TOKEN_SESSION_STATUS.ROTATED
+            ) {
+                await revokeRefreshSessionFamilyForReplay(
+                    user,
+                    currentTokenSession.familyId,
+                    req
+                );
+            }
+
+            throw createAuthError(
+                "INVALID_REFRESH_TOKEN",
+                "Refresh token invalide."
+            );
+        }
+        familyId = rotated.familyId;
+    }
+
+    const newRefreshToken = await setRotatedRefreshToken(user, familyId);
     const accessToken = signAccessToken(user);
 
     return {
@@ -611,6 +741,7 @@ export async function logout({ refreshToken, authUser, req }) {
     }
 
     clearActiveSession(user, new Date());
+    await revokeRefreshTokenFamiliesForUser(user._id, "LOGOUT");
     await user.save();
 
     await recordAuthAuditEvent({

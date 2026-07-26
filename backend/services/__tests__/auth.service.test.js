@@ -10,6 +10,13 @@ const mockAuthAuditFind = vi.fn();
 const mockAuthAuditAggregate = vi.fn();
 
 const recordAuthAuditEvent = vi.fn();
+const createRefreshTokenFamilyId = vi.fn(() => "family-123");
+const createRefreshTokenSession = vi.fn();
+const findRefreshTokenSession = vi.fn();
+const revokeRefreshTokenFamiliesForUser = vi.fn();
+const revokeRefreshTokenFamily = vi.fn();
+const rotateActiveRefreshTokenSession = vi.fn();
+const createSecurityIncident = vi.fn();
 
 vi.mock("../../models/AdminUser.js", () => ({
     AdminUser: {
@@ -31,6 +38,25 @@ vi.mock("../../models/AuthAuditLog.js", () => ({
 
 vi.mock("../../audit/authAudit.js", () => ({
     recordAuthAuditEvent,
+}));
+
+vi.mock("../../services/securityIncidents.js", () => ({
+    createSecurityIncident,
+}));
+
+vi.mock("../../services/auth/refreshTokenFamilies.js", () => ({
+    createRefreshTokenFamilyId,
+    createRefreshTokenSession,
+    findRefreshTokenSession,
+    revokeRefreshTokenFamiliesForUser,
+    revokeRefreshTokenFamily,
+    rotateActiveRefreshTokenSession,
+    REFRESH_TOKEN_SESSION_STATUS: {
+        ACTIVE: "ACTIVE",
+        ROTATED: "ROTATED",
+        REVOKED: "REVOKED",
+        EXPIRED: "EXPIRED",
+    },
 }));
 
 const compare = vi.fn();
@@ -84,6 +110,13 @@ function buildUser(overrides = {}) {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    createRefreshTokenFamilyId.mockReturnValue("family-123");
+    createRefreshTokenSession.mockResolvedValue(undefined);
+    findRefreshTokenSession.mockResolvedValue(null);
+    revokeRefreshTokenFamiliesForUser.mockResolvedValue(undefined);
+    revokeRefreshTokenFamily.mockResolvedValue(undefined);
+    rotateActiveRefreshTokenSession.mockResolvedValue(null);
+    createSecurityIncident.mockResolvedValue(undefined);
     process.env.JWT_ACCESS_SECRET = "test-access-secret";
 });
 
@@ -226,7 +259,14 @@ describe("auth service", () => {
             refreshTokenHash: "old-hash",
             refreshTokenExpiresAt: new Date(Date.now() + 5 * 60 * 1000),
         });
-        mockFindOne.mockResolvedValue(user);
+        findRefreshTokenSession.mockResolvedValue({
+            userId: user._id,
+            familyId: "family-123",
+            status: "ACTIVE",
+            expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+        });
+        mockFindById.mockResolvedValue(user);
+        rotateActiveRefreshTokenSession.mockResolvedValue({ familyId: "family-123" });
         sign.mockReturnValue("new-access-token");
 
         const result = await refresh({
@@ -239,6 +279,7 @@ describe("auth service", () => {
         expect(result.refreshToken.length).toBeGreaterThan(40);
         expect(user.save).toHaveBeenCalledTimes(1);
         expect(user.refreshTokenHash).not.toBe("old-hash");
+        expect(rotateActiveRefreshTokenSession).toHaveBeenCalledTimes(1);
     });
 
     it("invalidates expired refresh token", async () => {
@@ -247,7 +288,13 @@ describe("auth service", () => {
             refreshTokenExpiresAt: new Date(Date.now() - 1_000),
             authTokenInvalidBefore: null,
         });
-        mockFindOne.mockResolvedValue(user);
+        findRefreshTokenSession.mockResolvedValue({
+            userId: user._id,
+            familyId: "family-123",
+            status: "ACTIVE",
+            expiresAt: new Date(Date.now() - 1_000),
+        });
+        mockFindById.mockResolvedValue(user);
 
         await expect(
             refresh({
@@ -262,6 +309,49 @@ describe("auth service", () => {
         expect(user.refreshTokenExpiresAt).toBeNull();
         expect(user.authTokenInvalidBefore).toBeInstanceOf(Date);
         expect(user.save).toHaveBeenCalledTimes(1);
+    });
+
+    it("revokes the full family when a rotated refresh token is replayed", async () => {
+        const user = buildUser({
+            refreshTokenHash: "current-hash",
+            refreshTokenExpiresAt: new Date(Date.now() + 5 * 60 * 1000),
+        });
+        findRefreshTokenSession.mockResolvedValue({
+            userId: user._id,
+            familyId: "family-compromised",
+            status: "ROTATED",
+            expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+        });
+        mockFindById.mockResolvedValue(user);
+
+        await expect(
+            refresh({
+                refreshToken: "a".repeat(64),
+                req: { headers: {}, ip: "127.0.0.1" },
+            })
+        ).rejects.toMatchObject({ code: "REFRESH_TOKEN_REUSED" });
+
+        expect(revokeRefreshTokenFamily).toHaveBeenCalledWith(
+            "family-compromised",
+            "REFRESH_TOKEN_REPLAY",
+            expect.any(Date)
+        );
+        expect(user.refreshTokenHash).toBeNull();
+        expect(user.authTokenInvalidBefore).toBeInstanceOf(Date);
+        expect(recordAuthAuditEvent).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: "REFRESH_TOKEN_REPLAY",
+                outcome: "FAILED",
+                reason: "ROTATED_TOKEN_REUSED",
+            })
+        );
+        expect(createSecurityIncident).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: "REFRESH_TOKEN_REPLAY",
+                phase: "auth",
+                requestPath: "/api/auth/refresh",
+            })
+        );
     });
 
     it("logs out by authenticated user and records logout audit", async () => {

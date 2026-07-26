@@ -9,7 +9,7 @@ const SecurityIncidentSchema = new mongoose.Schema(
         },
         phase: {
             type: String,
-            enum: ["pre_cloud", "post_cloud", "client_enforcement"],
+            enum: ["pre_cloud", "post_cloud", "client_enforcement", "auth"],
             required: true,
         },
         reason: {
