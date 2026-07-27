@@ -23,6 +23,7 @@ type RegisterResponse = {
             username?: string;
             email?: string | null;
             role?: NewUserRole;
+            mfaRequired?: boolean;
         };
         temporaryPassword?: string | null;
         data?: {
@@ -43,11 +44,16 @@ type ManagedUser = {
     isActive: boolean;
     createdAt?: string;
     lastLoginAt?: string | null;
+    mfaRequired?: boolean;
+    mfaEnabled?: boolean;
 };
 
 type UsersListResponse = {
     data?: {
         users?: ManagedUser[];
+        mfaPolicy?: {
+            privilegedRolesRequired?: boolean;
+        };
         pagination?: {
             page?: number;
             limit?: number;
@@ -70,6 +76,8 @@ const UserRegisterPage: React.FC = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [role, setRole] = useState<NewUserRole>("MEDECIN");
+    const [mfaRequired, setMfaRequired] = useState(false);
+    const [privilegedMfaRequired, setPrivilegedMfaRequired] = useState(false);
     const [saving, setSaving] = useState(false);
     const [users, setUsers] = useState<ManagedUser[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
@@ -84,6 +92,7 @@ const UserRegisterPage: React.FC = () => {
     const [editUsername, setEditUsername] = useState("");
     const [editEmail, setEditEmail] = useState("");
     const [editRole, setEditRole] = useState<NewUserRole>("MEDECIN");
+    const [editMfaRequired, setEditMfaRequired] = useState(false);
     const [resetPassword, setResetPassword] = useState("");
     const [temporaryPasswordResult, setTemporaryPasswordResult] = useState<string | null>(null);
     const [editSaveStatus, setEditSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
@@ -92,6 +101,13 @@ const UserRegisterPage: React.FC = () => {
     const [success, setSuccess] = useState<string | null>(null);
 
     const USERS_PAGE_SIZE = 10;
+    const isPrivilegedRole = (candidateRole: NewUserRole) =>
+        candidateRole === "ADMIN" || candidateRole === "SUPERADMIN";
+    const isMfaLockedForRole = (candidateRole: NewUserRole) =>
+        privilegedMfaRequired && isPrivilegedRole(candidateRole);
+    const effectiveMfaRequired = isMfaLockedForRole(role) || mfaRequired;
+    const effectiveEditMfaRequired =
+        isMfaLockedForRole(editRole) || editMfaRequired;
 
     const ensureSensitiveAccess = async () => {
         return requestSensitiveReauth();
@@ -139,6 +155,9 @@ const UserRegisterPage: React.FC = () => {
             }
 
             setUsers(payload?.data?.users || []);
+            setPrivilegedMfaRequired(
+                payload?.data?.mfaPolicy?.privilegedRolesRequired === true
+            );
             setUsersPage(payload?.data?.pagination?.page || page);
             setUsersTotalPages(payload?.data?.pagination?.totalPages || 1);
             setUsersTotal(payload?.data?.pagination?.total || 0);
@@ -233,6 +252,7 @@ const UserRegisterPage: React.FC = () => {
         setEditUsername(managedUser.username);
         setEditEmail(managedUser.email || "");
         setEditRole(managedUser.role);
+        setEditMfaRequired(managedUser.mfaRequired === true);
         setResetPassword("");
         setTemporaryPasswordResult(null);
         setEditSaveStatus("idle");
@@ -271,6 +291,7 @@ const UserRegisterPage: React.FC = () => {
                     username: editUsername,
                     email: editEmail.trim() || null,
                     role: editRole,
+                    mfaRequired: effectiveEditMfaRequired,
                 }),
             });
 
@@ -291,6 +312,7 @@ const UserRegisterPage: React.FC = () => {
             setEditUsername("");
             setEditEmail("");
             setEditRole("MEDECIN");
+            setEditMfaRequired(false);
             await loadUsers(usersPage);
         } catch (err) {
             if (err instanceof SessionExpiredError) {
@@ -489,6 +511,7 @@ const UserRegisterPage: React.FC = () => {
                     email: email.trim() || undefined,
                     password,
                     role,
+                    mfaRequired: effectiveMfaRequired,
                 }),
             });
 
@@ -509,6 +532,7 @@ const UserRegisterPage: React.FC = () => {
             setEmail("");
             setPassword("");
             setRole("MEDECIN");
+            setMfaRequired(false);
             await loadUsers(1);
         } catch (err) {
             if (err instanceof SessionExpiredError) {
@@ -620,6 +644,25 @@ const UserRegisterPage: React.FC = () => {
                             </option>
                         ))}
                     </select>
+                </div>
+
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <label className="flex items-start gap-2 text-sm font-medium text-gray-800" htmlFor="mfa-required">
+                        <input
+                            id="mfa-required"
+                            type="checkbox"
+                            checked={effectiveMfaRequired}
+                            disabled={isMfaLockedForRole(role)}
+                            onChange={(event) => setMfaRequired(event.target.checked)}
+                            className="mt-0.5 h-4 w-4"
+                        />
+                        <span>{labels.auth.userManagement.mfaRequiredLabel}</span>
+                    </label>
+                    <p className="mt-1 text-xs text-gray-600">
+                        {isMfaLockedForRole(role)
+                            ? labels.auth.userManagement.mfaPrivilegedRequired
+                            : labels.auth.userManagement.mfaRequiredHelp}
+                    </p>
                 </div>
 
                 <button
@@ -763,6 +806,13 @@ const UserRegisterPage: React.FC = () => {
                                         <div className="text-xs text-gray-500">
                                             Statut: {managedUser.isActive ? "Actif" : "Inactif"}
                                         </div>
+                                        <div className="text-xs text-gray-500">
+                                            MFA: {managedUser.mfaEnabled
+                                                ? labels.auth.userManagement.mfaStatusEnabled
+                                                : managedUser.mfaRequired
+                                                    ? labels.auth.userManagement.mfaStatusRequired
+                                                    : labels.auth.userManagement.mfaStatusDisabled}
+                                        </div>
                                     </div>
 
                                     <div className="flex flex-wrap gap-2">
@@ -866,6 +916,25 @@ const UserRegisterPage: React.FC = () => {
                                 </option>
                             ))}
                         </select>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <label className="flex items-start gap-2 text-sm font-medium text-gray-800" htmlFor="edit-mfa-required">
+                            <input
+                                id="edit-mfa-required"
+                                type="checkbox"
+                                checked={effectiveEditMfaRequired}
+                                disabled={isMfaLockedForRole(editRole)}
+                                onChange={(event) => setEditMfaRequired(event.target.checked)}
+                                className="mt-0.5 h-4 w-4"
+                            />
+                            <span>{labels.auth.userManagement.mfaRequiredLabel}</span>
+                        </label>
+                        <p className="mt-1 text-xs text-gray-600">
+                            {isMfaLockedForRole(editRole)
+                                ? labels.auth.userManagement.mfaPrivilegedRequired
+                                : labels.auth.userManagement.mfaRequiredHelp}
+                        </p>
                     </div>
 
                     <button

@@ -1,8 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { AuthSession, LoginCredentials } from "../services/authService";
+import type { AuthSession, LoginCredentials, MfaChallenge } from "../services/authService";
 import {
     authFetch,
     bootstrapSession,
+    completeMfaLogin as completeMfaLoginService,
     getValidAccessToken,
     getUser,
     hasActiveSession,
@@ -30,6 +31,10 @@ interface AuthContextValue {
     user: AuthSession["user"] | null;
     isAuthenticated: boolean;
     login: (credentials: LoginCredentials) => Promise<AuthSession>;
+    completeMfaLogin: (challenge: MfaChallenge, code: string) => Promise<{
+        session: AuthSession;
+        recoveryCodes: string[];
+    }>;
     registerSelf: (credentials: LoginCredentials) => Promise<AuthSession>;
     logout: () => Promise<void>;
     refreshSession: () => Promise<boolean>;
@@ -186,6 +191,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return session;
     }, []);
 
+    const completeMfaLogin = useCallback(async (
+        challenge: MfaChallenge,
+        code: string
+    ) => {
+        const result = await completeMfaLoginService(challenge, code);
+        setUser(result.session.user);
+        setStatus("authenticated");
+        lastInteractionAtRef.current = Date.now();
+        lastServerTouchAtRef.current = Date.now();
+        return result;
+    }, []);
+
     const registerSelf = useCallback(async (credentials: LoginCredentials) => {
         const session = await registerSelfService(credentials);
         setUser(session.user);
@@ -230,6 +247,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             user,
             isAuthenticated: status === "authenticated",
             login,
+            completeMfaLogin,
             registerSelf,
             logout,
             refreshSession,
@@ -244,6 +262,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             status,
             user,
             login,
+            completeMfaLogin,
             registerSelf,
             logout,
             refreshSession,

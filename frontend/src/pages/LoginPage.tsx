@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { getDefaultRouteForRole, isAdminRole, type UserRole } from "../auth/roles";
 import { useAuth } from "../hooks/useAuth";
@@ -7,7 +7,6 @@ import { useTranslation } from "../hooks/useTranslation";
 import { labels } from "../i18n/uiLabels";
 import {
     completePasswordRecovery,
-    completeMfaLogin,
     consumeAuthSecurityNotice,
     MfaRequiredError,
     type MfaChallenge,
@@ -50,6 +49,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     const [mfaChallenge, setMfaChallenge] = useState<MfaChallenge | null>(null);
     const [mfaCode, setMfaCode] = useState("");
     const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
+    const enrollmentCompletionPendingRef = useRef(false);
 
     const location = useLocation();
     const navigate = useNavigate();
@@ -57,6 +57,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
         isAuthenticated,
         user,
         login,
+        completeMfaLogin,
         registerSelf,
         logout,
         passwordResetRequired,
@@ -120,7 +121,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
         setSecurityNotice(consumeAuthSecurityNotice());
     }, []);
 
-    if (isAuthenticated && user) {
+    if (isAuthenticated && user && !enrollmentCompletionPendingRef.current) {
         if (passwordResetRequired) {
             return <Navigate to="/security/password-reset-required" replace />;
         }
@@ -191,13 +192,16 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
         if (!mfaChallenge) return;
         setLoading(true);
         setError(null);
+        enrollmentCompletionPendingRef.current = mfaChallenge.enrollmentRequired;
         try {
             const result = await completeMfaLogin(mfaChallenge, mfaCode);
             setRecoveryCodes(result.recoveryCodes);
             if (result.recoveryCodes.length === 0) {
+                enrollmentCompletionPendingRef.current = false;
                 navigate(adminOnly ? getDefaultRouteForRole(result.session.user.role) : "/", { replace: true });
             }
         } catch (err) {
+            enrollmentCompletionPendingRef.current = false;
             setError(err instanceof Error ? err.message : loginFailedLabel);
         } finally {
             setLoading(false);

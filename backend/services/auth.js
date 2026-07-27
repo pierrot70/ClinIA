@@ -101,9 +101,22 @@ function signAccessToken(user) {
     );
 }
 
+function isPrivilegedRole(role) {
+    return role === AUTH_ROLES.ADMIN || role === AUTH_ROLES.SUPERADMIN;
+}
+
+function isPrivilegedMfaEnforced() {
+    return (
+        process.env.CLINIA_REQUIRE_MFA_FOR_PRIVILEGED === "true" ||
+        process.env.NODE_ENV === "production"
+    );
+}
+
 function requiresMfa(user) {
-    const required = process.env.CLINIA_REQUIRE_MFA_FOR_PRIVILEGED === "true" || process.env.NODE_ENV === "production";
-    return required && (user?.role === AUTH_ROLES.ADMIN || user?.role === AUTH_ROLES.SUPERADMIN);
+    return (
+        (isPrivilegedMfaEnforced() && isPrivilegedRole(user?.role)) ||
+        user?.mfaRequired === true
+    );
 }
 
 function signMfaChallenge(user, purpose) {
@@ -170,6 +183,8 @@ function mapPublicUser(user) {
         passwordResetRequired: user.passwordResetRequired === true,
         mustChangePasswordOnNextLogin:
             user.mustChangePasswordOnNextLogin === true,
+        mfaRequired: user.mfaRequired === true,
+        mfaEnabled: user.mfaEnabled === true,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt || null,
         lastLogoutAt: user.lastLogoutAt || null,
@@ -830,6 +845,7 @@ export async function register({
     email,
     password,
     role,
+    mfaRequired,
     authUser,
     req,
 }) {
@@ -859,6 +875,17 @@ export async function register({
         );
     }
 
+    if (typeof mfaRequired !== "undefined" && typeof mfaRequired !== "boolean") {
+        throw createAuthError("INVALID_INPUT", "Parametre MFA invalide.");
+    }
+
+    if (mfaRequired === true && authUser.role !== AUTH_ROLES.SUPERADMIN) {
+        throw createAuthError(
+            "FORBIDDEN",
+            "Seul un SUPERADMIN peut definir la politique MFA d'un utilisateur."
+        );
+    }
+
     const existing = await AdminUser.findOne({
         $or: [
             { username: normalizedUsername },
@@ -884,11 +911,14 @@ export async function register({
 
     const uniqueUsername = await makeUniqueUsername(normalizedUsername);
     const passwordHash = await hashPassword(password);
+    const roleRequiresMfa =
+        isPrivilegedMfaEnforced() && isPrivilegedRole(role);
     const created = await AdminUser.create({
         username: uniqueUsername,
         email: normalizedEmail,
         passwordHash,
         role,
+        mfaRequired: roleRequiresMfa || mfaRequired === true,
     });
 
     await recordAuthAuditEvent({
@@ -907,6 +937,7 @@ export async function register({
             username: created.username,
             email: created.email,
             role: created.role,
+            mfaRequired: created.mfaRequired === true,
         },
     };
 }
@@ -1033,7 +1064,7 @@ export async function listUsers({
     const skip = (effectivePage - 1) * parsedLimit;
 
     const users = await AdminUser.find(query)
-            .select("username email role isActive createdAt lastLoginAt lastLogoutAt")
+            .select("username email role isActive mfaRequired mfaEnabled createdAt lastLoginAt lastLogoutAt")
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(parsedLimit)
@@ -1041,6 +1072,9 @@ export async function listUsers({
 
     return {
         users: users.map(mapPublicUser),
+        mfaPolicy: {
+            privilegedRolesRequired: isPrivilegedMfaEnforced(),
+        },
         pagination: {
             page: effectivePage,
             limit: parsedLimit,
@@ -1064,7 +1098,7 @@ export async function listActiveUsers({ authUser }) {
         refreshTokenHash: { $ne: null },
         refreshTokenExpiresAt: { $gt: new Date() },
     })
-        .select("username email role isActive createdAt lastLoginAt lastLogoutAt")
+        .select("username email role isActive mfaRequired mfaEnabled createdAt lastLoginAt lastLogoutAt")
         .sort({ lastLoginAt: -1, createdAt: -1 })
         .lean();
 
@@ -1079,7 +1113,9 @@ export async function updateUser({ userId, updates, authUser, req }) {
     assertValidUserId(userId);
 
     const ip = getRequestIp(req);
-    const user = await AdminUser.findById(userId);
+    const user = await AdminUser.findById(userId).select(
+        "+mfaSecretEncrypted +mfaPendingSecretEncrypted +mfaPendingExpiresAt +mfaRecoveryCodeHashes"
+    );
     if (!user) {
         throw createAuthError("USER_NOT_FOUND", "Utilisateur introuvable.");
     }
@@ -1102,6 +1138,18 @@ export async function updateUser({ userId, updates, authUser, req }) {
             throw createAuthError("INVALID_INPUT", "Role invalide.");
         }
         next.role = updates.role;
+    }
+
+    if (typeof updates?.mfaRequired !== "undefined") {
+        if (typeof updates.mfaRequired !== "boolean") {
+            throw createAuthError("INVALID_INPUT", "Parametre MFA invalide.");
+        }
+        next.mfaRequired = updates.mfaRequired;
+    }
+
+    const effectiveRole = next.role || user.role;
+    if (isPrivilegedMfaEnforced() && isPrivilegedRole(effectiveRole)) {
+        next.mfaRequired = true;
     }
 
     if (Object.keys(next).length === 0) {
@@ -1141,6 +1189,26 @@ export async function updateUser({ userId, updates, authUser, req }) {
         }
     }
 
+    const mfaPolicyChanged =
+        typeof next.mfaRequired === "boolean" &&
+        next.mfaRequired !== (user.mfaRequired === true);
+
+    if (mfaPolicyChanged) {
+        clearActiveSession(user);
+        await revokeRefreshTokenFamiliesForUser(
+            user._id,
+            next.mfaRequired ? "MFA_REQUIRED_ENABLED" : "MFA_REQUIRED_DISABLED"
+        );
+    }
+
+    if (next.mfaRequired === false) {
+        user.mfaEnabled = false;
+        user.mfaSecretEncrypted = null;
+        user.mfaPendingSecretEncrypted = null;
+        user.mfaPendingExpiresAt = null;
+        user.mfaRecoveryCodeHashes = [];
+    }
+
     Object.assign(user, next);
     await user.save();
 
@@ -1151,7 +1219,9 @@ export async function updateUser({ userId, updates, authUser, req }) {
         username: authUser.username,
         role: authUser.role,
         ip,
-        reason: `UPDATE_USER:${String(user._id)}`,
+        reason: mfaPolicyChanged
+            ? `UPDATE_USER_MFA_POLICY:${next.mfaRequired ? "REQUIRED" : "DISABLED"}`
+            : `UPDATE_USER:${String(user._id)}`,
     });
 
     return {

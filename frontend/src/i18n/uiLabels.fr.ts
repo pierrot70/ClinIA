@@ -5,6 +5,16 @@ export const UI_LABELS_FR = {
         copy: "Copier",
     },
     auth: {
+        userManagement: {
+            mfaRequiredLabel: "Exiger la verification a deux facteurs (MFA)",
+            mfaRequiredHelp:
+                "L'utilisateur configurera son application d'authentification a sa prochaine connexion.",
+            mfaPrivilegedRequired:
+                "La MFA est obligatoire pour les comptes ADMIN et SUPERADMIN en production.",
+            mfaStatusEnabled: "MFA configuree",
+            mfaStatusRequired: "MFA requise a la prochaine connexion",
+            mfaStatusDisabled: "MFA non requise",
+        },
         session: {
             warningTitle: "Fin de session imminente",
             warningBody:

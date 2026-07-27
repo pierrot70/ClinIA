@@ -85,6 +85,7 @@ const {
     register,
     registerSelf,
     listUsers,
+    updateUser,
     listAuthLogGraphs,
     listAuthLogs,
     resetUserPassword,
@@ -448,6 +449,170 @@ describe("auth service", () => {
         });
 
         expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it("allows a superadmin to require MFA for a new clinician", async () => {
+        mockFindOne.mockResolvedValue(null);
+        hash.mockResolvedValue("hashed-password");
+        mockCreate.mockResolvedValue({
+            _id: "507f1f77bcf86cd799439015",
+            username: "newdoctor",
+            email: "newdoctor@clinia.local",
+            role: "MEDECIN",
+            mfaRequired: true,
+        });
+
+        const result = await register({
+            username: "newdoctor",
+            email: "newdoctor@clinia.local",
+            password: "password123",
+            role: "MEDECIN",
+            mfaRequired: true,
+            authUser: {
+                userId: "507f1f77bcf86cd799439011",
+                username: "superadmin",
+                role: "SUPERADMIN",
+            },
+            req: { headers: {}, ip: "127.0.0.1" },
+        });
+
+        expect(mockCreate).toHaveBeenCalledWith(
+            expect.objectContaining({ mfaRequired: true })
+        );
+        expect(result.user.mfaRequired).toBe(true);
+    });
+
+    it("requires MFA and invalidates existing sessions when a superadmin enables it", async () => {
+        const user = buildUser({
+            role: "MEDECIN",
+            mfaRequired: false,
+            refreshTokenHash: "existing-refresh-token",
+            refreshTokenExpiresAt: new Date(Date.now() + 60_000),
+        });
+        mockFindById.mockReturnValue({
+            select: vi.fn().mockResolvedValue(user),
+        });
+
+        const result = await updateUser({
+            userId: user._id,
+            updates: { mfaRequired: true },
+            authUser: {
+                userId: "507f1f77bcf86cd799439099",
+                username: "superadmin",
+                role: "SUPERADMIN",
+            },
+            req: { headers: {}, ip: "127.0.0.1" },
+        });
+
+        expect(user.mfaRequired).toBe(true);
+        expect(user.refreshTokenHash).toBeNull();
+        expect(user.authTokenInvalidBefore).toBeInstanceOf(Date);
+        expect(revokeRefreshTokenFamiliesForUser).toHaveBeenCalledWith(
+            user._id,
+            "MFA_REQUIRED_ENABLED"
+        );
+        expect(result.user.mfaRequired).toBe(true);
+    });
+
+    it("clears an optional MFA configuration when a superadmin disables it", async () => {
+        const user = buildUser({
+            role: "MEDECIN",
+            mfaRequired: true,
+            mfaEnabled: true,
+            mfaSecretEncrypted: "encrypted-secret",
+            mfaPendingSecretEncrypted: "pending-secret",
+            mfaPendingExpiresAt: new Date(Date.now() + 60_000),
+            mfaRecoveryCodeHashes: ["recovery-code"],
+        });
+        mockFindById.mockReturnValue({
+            select: vi.fn().mockResolvedValue(user),
+        });
+
+        const result = await updateUser({
+            userId: user._id,
+            updates: { mfaRequired: false },
+            authUser: {
+                userId: "507f1f77bcf86cd799439099",
+                username: "superadmin",
+                role: "SUPERADMIN",
+            },
+            req: { headers: {}, ip: "127.0.0.1" },
+        });
+
+        expect(user.mfaRequired).toBe(false);
+        expect(user.mfaEnabled).toBe(false);
+        expect(user.mfaSecretEncrypted).toBeNull();
+        expect(user.mfaPendingSecretEncrypted).toBeNull();
+        expect(user.mfaRecoveryCodeHashes).toEqual([]);
+        expect(revokeRefreshTokenFamiliesForUser).toHaveBeenCalledWith(
+            user._id,
+            "MFA_REQUIRED_DISABLED"
+        );
+        expect(result.user.mfaEnabled).toBe(false);
+    });
+
+    it("keeps MFA required for privileged accounts when the environment enforces it", async () => {
+        const previousPrivilegedMfaPolicy = process.env.CLINIA_REQUIRE_MFA_FOR_PRIVILEGED;
+        process.env.CLINIA_REQUIRE_MFA_FOR_PRIVILEGED = "true";
+        const user = buildUser({
+            role: "ADMIN",
+            mfaRequired: false,
+        });
+        mockFindById.mockReturnValue({
+            select: vi.fn().mockResolvedValue(user),
+        });
+
+        try {
+            const result = await updateUser({
+                userId: user._id,
+                updates: { mfaRequired: false },
+                authUser: {
+                    userId: "507f1f77bcf86cd799439099",
+                    username: "superadmin",
+                    role: "SUPERADMIN",
+                },
+                req: { headers: {}, ip: "127.0.0.1" },
+            });
+
+            expect(result.user.mfaRequired).toBe(true);
+            expect(revokeRefreshTokenFamiliesForUser).toHaveBeenCalledWith(
+                user._id,
+                "MFA_REQUIRED_ENABLED"
+            );
+        } finally {
+            if (previousPrivilegedMfaPolicy === undefined) {
+                delete process.env.CLINIA_REQUIRE_MFA_FOR_PRIVILEGED;
+            } else {
+                process.env.CLINIA_REQUIRE_MFA_FOR_PRIVILEGED = previousPrivilegedMfaPolicy;
+            }
+        }
+    });
+
+    it("allows a superadmin MFA policy to be disabled in staging", async () => {
+        const user = buildUser({
+            role: "SUPERADMIN",
+            mfaRequired: true,
+            mfaEnabled: true,
+            mfaSecretEncrypted: "encrypted-secret",
+        });
+        mockFindById.mockReturnValue({
+            select: vi.fn().mockResolvedValue(user),
+        });
+
+        const result = await updateUser({
+            userId: user._id,
+            updates: { mfaRequired: false },
+            authUser: {
+                userId: "507f1f77bcf86cd799439099",
+                username: "superadmin",
+                role: "SUPERADMIN",
+            },
+            req: { headers: {}, ip: "127.0.0.1" },
+        });
+
+        expect(result.user.mfaRequired).toBe(false);
+        expect(result.user.mfaEnabled).toBe(false);
+        expect(user.mfaSecretEncrypted).toBeNull();
     });
 
     it("self-registers only a USER with email/password", async () => {
