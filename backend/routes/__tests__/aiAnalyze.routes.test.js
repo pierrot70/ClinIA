@@ -6,6 +6,7 @@ import {
     buildCloudSafePatientPayload,
     detectPromptInjection,
     sanitizeRequestPayload,
+    validateAnalyzeRequestShape,
     validateClinicalInputBounds,
 } from "../../utils/requestSafety.js";
 import { extractPrimaryClinicalConcern } from "../../utils/clinicalAnalysis.js";
@@ -32,6 +33,7 @@ function createRouterDependencies({ openai, persistOrReuseDiagnosis }) {
         assessCloudClinicalPayload,
         buildCloudSafePatientPayload,
         sanitizeRequestPayload,
+        validateAnalyzeRequestShape,
         validateClinicalInputBounds,
         detectPromptInjection,
         extractPrimaryClinicalConcern,
@@ -90,6 +92,72 @@ describe("POST /api/ai/analyze real simulated path", () => {
             }),
         });
         expect(persistOrReuseDiagnosis).not.toHaveBeenCalled();
+    });
+
+    it("rejects unknown request fields before they can affect persistence", async () => {
+        const persistOrReuseDiagnosis = vi.fn();
+        const router = createAiAnalyzeRouter(
+            createRouterDependencies({ openai: {}, persistOrReuseDiagnosis })
+        );
+        const res = createResponseDouble();
+
+        await getAnalyzeHandler(router)(
+            {
+                body: {
+                    diagnosis: "Migraine",
+                    symptoms: ["Cephalee"],
+                    anonymousStorageProbe: "unique-value",
+                },
+                headers: {},
+                auth: null,
+            },
+            res
+        );
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+            error: expect.objectContaining({
+                code: "INVALID_CLINICAL_REQUEST_SHAPE",
+                fields: ["anonymousStorageProbe"],
+            }),
+        });
+        expect(persistOrReuseDiagnosis).not.toHaveBeenCalled();
+    });
+
+    it("keeps an anonymous demo response out of diagnosis persistence and cache", async () => {
+        vi.stubEnv("CLINIA_FORCE_MOCK", "false");
+        vi.stubEnv("CLINIA_MOCK_AI", "true");
+
+        const persistOrReuseDiagnosis = vi.fn();
+        const deps = createRouterDependencies({ openai: {}, persistOrReuseDiagnosis });
+        deps.getMockForDiagnosis = vi.fn(() => ({
+            diagnosis: { suspected: "Migraine" },
+        }));
+        const router = createAiAnalyzeRouter(deps);
+        const res = createResponseDouble();
+
+        await getAnalyzeHandler(router)(
+            {
+                body: {
+                    diagnosis: "Migraine",
+                    symptoms: ["Cephalee"],
+                },
+                headers: {},
+                auth: null,
+            },
+            res
+        );
+
+        expect(deps.findPersistedDiagnosisByFingerprint).not.toHaveBeenCalled();
+        expect(persistOrReuseDiagnosis).not.toHaveBeenCalled();
+        expect(res.json).toHaveBeenCalledWith(
+            expect.objectContaining({
+                meta: expect.objectContaining({
+                    source: "mock",
+                    ephemeral: true,
+                }),
+            })
+        );
     });
 
     it("keeps approved French aliases approved through both cloud safety checks", async () => {

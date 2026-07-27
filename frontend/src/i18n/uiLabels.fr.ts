@@ -594,6 +594,21 @@ export const UI_LABELS_FR = {
                     current_medications: "Medicaments actuels",
                 },
             },
+            requestBoundary: {
+                title: "Analyse non envoyee",
+                messages: {
+                    INVALID_CLINICAL_REQUEST_SHAPE:
+                        "La demande contient une information qui n'est pas reconnue par le formulaire ClinIA. Elle n'a pas ete envoyee au service d'analyse.",
+                    INVALID_CLINICAL_INPUT_BOUNDARY:
+                        "Certains parametres cliniques depassent les limites autorisees. Ils n'ont pas ete envoyes au service d'analyse.",
+                    CLINICAL_REQUEST_TOO_LARGE:
+                        "Les parametres cliniques sont trop volumineux pour etre analyses en une seule demande. Ils n'ont pas ete envoyes au service d'analyse.",
+                    ANONYMOUS_CLINICAL_DEMO_RATE_LIMITED:
+                        "La demonstration a atteint sa limite temporaire de requetes. Aucun resultat clinique n'a ete enregistre. Reessayez dans quelques instants.",
+                },
+                fieldsLabel: "Champs a corriger :",
+                action: "Corriger les parametres",
+            },
         },
         form: {
             openAiModelLabel: "Modèle OpenAI",

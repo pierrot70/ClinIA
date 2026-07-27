@@ -32,6 +32,7 @@ import {
     buildCloudSafePatientPayload,
     detectPromptInjection,
     sanitizeRequestPayload,
+    validateAnalyzeRequestShape,
     validateClinicalInputBounds,
 } from "./utils/requestSafety.js";
 
@@ -132,6 +133,7 @@ const aiAnalyzeRouter = createAiAnalyzeRouter({
     assessCloudClinicalPayload,
     buildCloudSafePatientPayload,
     sanitizeRequestPayload,
+    validateAnalyzeRequestShape,
     validateClinicalInputBounds,
     detectPromptInjection,
     extractPrimaryClinicalConcern,

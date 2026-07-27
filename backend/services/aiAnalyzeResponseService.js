@@ -11,6 +11,7 @@ export async function buildMockAnalyzeResponse({
     writeVerification = null,
     reverifyRequested = false,
     reqAuth = null,
+    persist = true,
 }) {
     const mock = getMockForDiagnosis(diagnosisSeed || diagnosis);
     const analysis = normalizeClinicalAnalysis(mock, {
@@ -18,7 +19,22 @@ export async function buildMockAnalyzeResponse({
         primaryConcern: diagnosis,
     });
 
-    const persist = await persistOrReuseDiagnosis({
+    if (!persist) {
+        return {
+            ok: true,
+            responsePayload: {
+                data: analysis,
+                meta: {
+                    source: "mock",
+                    model: "mock",
+                    ephemeral: true,
+                    ...neutralizationMeta,
+                },
+            },
+        };
+    }
+
+    const persisted = await persistOrReuseDiagnosis({
         fingerprint,
         input: patient,
         output: analysis,
@@ -36,14 +52,14 @@ export async function buildMockAnalyzeResponse({
         writeAudit,
     });
 
-    if (!persist.ok) {
-        return { ok: false, error: persist.error };
+    if (!persisted.ok) {
+        return { ok: false, error: persisted.error };
     }
 
     return {
         ok: true,
         responsePayload: {
-            data: persist.doc.output,
+            data: persisted.doc.output,
             meta: {
                 source: "mock",
                 model: "mock",
@@ -51,8 +67,10 @@ export async function buildMockAnalyzeResponse({
                 ...(writeVerification
                     ? {
                           writeVerification: {
-                              status: persist.writeAuditRecorded ? "CONFIRMED" : "UNAVAILABLE",
-                              verificationId: persist.writeAuditRecorded
+                              status: persisted.writeAuditRecorded
+                                  ? "CONFIRMED"
+                                  : "UNAVAILABLE",
+                              verificationId: persisted.writeAuditRecorded
                                   ? writeVerification.verificationId
                                   : null,
                               clientMutationId: writeVerification.clientMutationId,
@@ -101,8 +119,24 @@ export async function buildPersistedRealAnalyzeResponse({
     writeAudit,
     writeVerification = null,
     logger = console,
+    persist = true,
 }) {
-    const persist = await persistOrReuseDiagnosis({
+    if (!persist) {
+        return {
+            ok: true,
+            responsePayload: {
+                data: normalized,
+                meta: {
+                    source: "real",
+                    model,
+                    ephemeral: true,
+                    ...neutralizationMeta,
+                },
+            },
+        };
+    }
+
+    const persisted = await persistOrReuseDiagnosis({
         fingerprint,
         input: patient,
         output: normalized,
@@ -126,12 +160,12 @@ export async function buildPersistedRealAnalyzeResponse({
         hasDiagnosis: Boolean(normalized?.diagnosis?.suspected),
     });
 
-    if (!persist.ok) {
-        return { ok: false, error: persist.error };
+    if (!persisted.ok) {
+        return { ok: false, error: persisted.error };
     }
 
     const responsePayload = {
-        data: persist.doc.output,
+        data: persisted.doc.output,
         meta: {
             source: "real",
             model,
@@ -139,8 +173,8 @@ export async function buildPersistedRealAnalyzeResponse({
             ...(writeVerification
                 ? {
                       writeVerification: {
-                          status: persist.writeAuditRecorded ? "CONFIRMED" : "UNAVAILABLE",
-                          verificationId: persist.writeAuditRecorded
+                          status: persisted.writeAuditRecorded ? "CONFIRMED" : "UNAVAILABLE",
+                          verificationId: persisted.writeAuditRecorded
                               ? writeVerification.verificationId
                               : null,
                           clientMutationId: writeVerification.clientMutationId,
@@ -155,7 +189,7 @@ export async function buildPersistedRealAnalyzeResponse({
         source: "real",
         model,
         responseBytes: Buffer.byteLength(JSON.stringify(responsePayload), "utf8"),
-        writeVerificationRecorded: Boolean(persist.writeAuditRecorded),
+                writeVerificationRecorded: Boolean(persisted.writeAuditRecorded),
     });
 
     return { ok: true, responsePayload };

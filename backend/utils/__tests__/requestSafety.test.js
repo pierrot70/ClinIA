@@ -5,11 +5,37 @@ import {
     buildCloudSafePatientPayload,
     detectPromptInjection,
     sanitizeRequestPayload,
+    validateAnalyzeRequestShape,
     validateClinicalInputBounds,
     validateClinicalProfileBounds,
 } from "../requestSafety.js";
 
 describe("requestSafety", () => {
+    it("rejects unknown analyze DTO fields, including nested fields", () => {
+        expect(
+            validateAnalyzeRequestShape({
+                diagnosis: "Migraine",
+                symptoms: ["Cephalee"],
+                anonymousStorageProbe: "unique-value",
+                blood_pressure: {
+                    systolic: 120,
+                    hidden: "unique-value",
+                },
+                diabetes_context: {
+                    tolerance: "good",
+                    hidden: "unique-value",
+                },
+            })
+        ).toEqual({
+            valid: false,
+            invalidFields: [
+                "anonymousStorageProbe",
+                "blood_pressure.hidden",
+                "diabetes_context.hidden",
+            ],
+        });
+    });
+
     it("rejects oversized or implausible clinical inputs before cloud assessment", () => {
         expect(
             validateClinicalInputBounds({

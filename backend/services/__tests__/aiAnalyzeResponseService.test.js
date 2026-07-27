@@ -89,6 +89,37 @@ describe("aiAnalyzeResponseService", () => {
         });
     });
 
+    it("returns an anonymous demo response without persisting it", async () => {
+        const persistOrReuseDiagnosis = vi.fn();
+
+        const result = await buildMockAnalyzeResponse({
+            diagnosisSeed: "headache",
+            diagnosis: "Migraine",
+            fingerprint: "fp-anonymous",
+            patient: { diagnosis: "Migraine" },
+            neutralizationMeta: null,
+            getMockForDiagnosis: vi.fn(() => ({
+                diagnosis: { suspected: "Migraine" },
+            })),
+            normalizeClinicalAnalysis: vi.fn((value) => value),
+            persistOrReuseDiagnosis,
+            persist: false,
+        });
+
+        expect(result).toEqual({
+            ok: true,
+            responsePayload: {
+                data: { diagnosis: { suspected: "Migraine" } },
+                meta: {
+                    source: "mock",
+                    model: "mock",
+                    ephemeral: true,
+                },
+            },
+        });
+        expect(persistOrReuseDiagnosis).not.toHaveBeenCalled();
+    });
+
     it("persists and shapes a real OpenAI response payload", async () => {
         const logger = { log: vi.fn() };
         const persistOrReuseDiagnosis = vi.fn().mockResolvedValue({

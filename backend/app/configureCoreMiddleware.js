@@ -8,6 +8,7 @@ import { logSafeError } from "../utils/requestLogSafety.js";
 // A backend reachable directly must not trust forwarding headers. Production
 // deployments can opt into their exact reverse-proxy CIDR through the env var.
 const DEFAULT_TRUSTED_PROXY_CIDRS = ["loopback"];
+const AI_ANALYZE_BODY_LIMIT = "16kb";
 const CONTENT_SECURITY_POLICY = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -89,6 +90,9 @@ export function configureCoreMiddleware(app) {
             credentials: true,
         })
     );
+    // This public endpoint only accepts a compact clinical DTO. Parse it first
+    // with a dedicated limit so the generic API limit cannot be abused here.
+    app.use("/api/ai/analyze", express.json({ limit: AI_ANALYZE_BODY_LIMIT }));
     app.use(express.json({ limit: "1mb" }));
     app.use(createSecurityHeadersMiddleware());
 }

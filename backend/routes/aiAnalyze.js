@@ -25,6 +25,7 @@ export function createAiAnalyzeRouter(deps) {
         assessCloudClinicalPayload,
         buildCloudSafePatientPayload,
         sanitizeRequestPayload,
+        validateAnalyzeRequestShape,
         validateClinicalInputBounds,
         detectPromptInjection,
         extractPrimaryClinicalConcern,
@@ -79,6 +80,18 @@ export function createAiAnalyzeRouter(deps) {
         },
         async (req, res) => {
             try {
+                const shapeCheck = validateAnalyzeRequestShape(req.body ?? {});
+                if (!shapeCheck.valid) {
+                    return res.status(400).json({
+                        error: {
+                            code: "INVALID_CLINICAL_REQUEST_SHAPE",
+                            message:
+                                "La requete clinique contient des champs non autorises.",
+                            retryable: false,
+                            fields: shapeCheck.invalidFields,
+                        },
+                    });
+                }
                 const safeBody = sanitizeRequestPayload(req.body ?? {});
                 const boundaryCheck = validateClinicalInputBounds(safeBody);
                 if (!boundaryCheck.valid) {
@@ -154,18 +167,23 @@ export function createAiAnalyzeRouter(deps) {
                 }) || diagnosisSeed || "To be determined by ClinIA";
                 const patient = safeBody;
                 const requestContext = getRequestContext(req);
-                const writeVerification = createWriteVerificationContext(req);
-                const writeAudit = {
-                    actorUserId: req.auth?.userId ?? null,
-                    actorUsername: req.auth?.username ?? null,
-                    actorRole: req.auth?.role ?? null,
-                    ip: getRequestIp(req),
-                    requestId: requestContext.requestId,
-                    instanceId: requestContext.instanceId,
-                    verificationId: writeVerification.verificationId,
-                    clientMutationId: writeVerification.clientMutationId,
-                    requestPath: getSafeRequestPath(req),
-                };
+                const shouldPersistDiagnosis = Boolean(req.auth?.userId);
+                const writeVerification = shouldPersistDiagnosis
+                    ? createWriteVerificationContext(req)
+                    : null;
+                const writeAudit = shouldPersistDiagnosis
+                    ? {
+                          actorUserId: req.auth.userId,
+                          actorUsername: req.auth.username ?? null,
+                          actorRole: req.auth.role ?? null,
+                          ip: getRequestIp(req),
+                          requestId: requestContext.requestId,
+                          instanceId: requestContext.instanceId,
+                          verificationId: writeVerification.verificationId,
+                          clientMutationId: writeVerification.clientMutationId,
+                          requestPath: getSafeRequestPath(req),
+                      }
+                    : null;
                 let cloudSafePatient = buildCloudSafePatientPayload(patient);
                 let neutralizationMeta = null;
                 const fingerprint = makeFingerprint({
@@ -252,9 +270,9 @@ export function createAiAnalyzeRouter(deps) {
                     });
                 }
 
-                const cachedDiagnosis = await findPersistedDiagnosisByFingerprint(
-                    fingerprint
-                );
+                const cachedDiagnosis = shouldPersistDiagnosis
+                    ? await findPersistedDiagnosisByFingerprint(fingerprint)
+                    : null;
                 const {
                     normalizedCachedOutput,
                     cachedDiagnosisIsPlaceholderReal,
@@ -335,6 +353,7 @@ export function createAiAnalyzeRouter(deps) {
                         writeVerification,
                         reverifyRequested: reverifyRequested === true,
                         reqAuth: req.auth,
+                        persist: shouldPersistDiagnosis,
                     });
 
                     if (!mockResult.ok) {
@@ -398,6 +417,7 @@ export function createAiAnalyzeRouter(deps) {
                     persistOrReuseDiagnosis,
                     writeAudit,
                     writeVerification,
+                    persist: shouldPersistDiagnosis,
                 });
 
                 if (!finalResult.ok) {

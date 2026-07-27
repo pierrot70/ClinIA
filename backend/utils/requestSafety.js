@@ -1,4 +1,32 @@
 const MAX_STRING_LENGTH = 2000;
+const ANALYZE_REQUEST_FIELDS = new Set([
+    "age",
+    "sex",
+    "country",
+    "ethnicity",
+    "diagnosis",
+    "weight",
+    "height",
+    "blood_pressure",
+    "symptoms",
+    "medical_history",
+    "current_medications",
+    "diabetes_context",
+    // Request controls are accepted here but excluded from the clinical
+    // fingerprint and cloud payload by their respective services.
+    "forceReal",
+    "openaiModel",
+    "reverifyRequested",
+    "incidentAckId",
+]);
+const BLOOD_PRESSURE_FIELDS = new Set(["systolic", "diastolic"]);
+const DIABETES_CONTEXT_FIELDS = new Set([
+    "cardiovascular_risk",
+    "renal_function",
+    "fragility",
+    "tolerance",
+    "glycemic_goals",
+]);
 export const CLINICAL_INPUT_LIMITS = Object.freeze({
     diagnosis: 160,
     listItem: 120,
@@ -244,6 +272,60 @@ export function sanitizeRequestPayload(payload) {
 
 function isPlainObject(value) {
     return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function collectUnknownFields(payload, allowedFields, prefix = "") {
+    if (!isPlainObject(payload)) return [];
+
+    return Object.keys(payload)
+        .filter((field) => !allowedFields.has(field))
+        .map((field) => `${prefix}${field}`);
+}
+
+/**
+ * Defines the complete public DTO accepted by POST /api/ai/analyze.
+ * Unknown fields are rejected instead of being carried into cache keys or
+ * diagnosis persistence.
+ */
+export function validateAnalyzeRequestShape(payload = {}) {
+    if (!isPlainObject(payload)) {
+        return { valid: false, invalidFields: ["payload"] };
+    }
+
+    const invalidFields = collectUnknownFields(
+        payload,
+        ANALYZE_REQUEST_FIELDS
+    );
+
+    if (payload.blood_pressure !== undefined && payload.blood_pressure !== null) {
+        if (!isPlainObject(payload.blood_pressure)) {
+            addInvalidField(invalidFields, "blood_pressure");
+        } else {
+            for (const field of collectUnknownFields(
+                payload.blood_pressure,
+                BLOOD_PRESSURE_FIELDS,
+                "blood_pressure."
+            )) {
+                addInvalidField(invalidFields, field);
+            }
+        }
+    }
+
+    if (payload.diabetes_context !== undefined && payload.diabetes_context !== null) {
+        if (!isPlainObject(payload.diabetes_context)) {
+            addInvalidField(invalidFields, "diabetes_context");
+        } else {
+            for (const field of collectUnknownFields(
+                payload.diabetes_context,
+                DIABETES_CONTEXT_FIELDS,
+                "diabetes_context."
+            )) {
+                addInvalidField(invalidFields, field);
+            }
+        }
+    }
+
+    return { valid: invalidFields.length === 0, invalidFields };
 }
 
 function addInvalidField(invalidFields, field) {

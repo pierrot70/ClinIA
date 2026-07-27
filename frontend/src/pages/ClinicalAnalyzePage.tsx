@@ -35,6 +35,12 @@ import { clearLegacyClinicalBrowserStorage } from "../utils/clinicalBrowserStora
 
 type OpenAIModel = "gpt-4.1-mini" | "gpt-4-0613";
 const DEFAULT_OPENAI_MODEL: OpenAIModel = "gpt-4.1-mini";
+const REQUEST_BOUNDARY_ERROR_CODES = new Set([
+    "INVALID_CLINICAL_REQUEST_SHAPE",
+    "INVALID_CLINICAL_INPUT_BOUNDARY",
+    "CLINICAL_REQUEST_TOO_LARGE",
+    "ANONYMOUS_CLINICAL_DEMO_RATE_LIMITED",
+]);
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -49,6 +55,7 @@ export function ClinicalAnalyzePage() {
     const clinicalResultStrings = getClinicalResultStrings(targetLang);
     const clinicalIntroLabels = labels.clinicalDemo.intro;
     const cloudContentGuardLabels = labels.clinicalDemo.cloudContentGuard;
+    const requestBoundaryLabels = cloudContentGuardLabels.requestBoundary;
     const [openaiModel, setOpenaiModel] = useState<OpenAIModel>(DEFAULT_OPENAI_MODEL);
     const effectiveOpenaiModel = canConfigureAi ? openaiModel : DEFAULT_OPENAI_MODEL;
     const isProd = !!import.meta.env.PROD;
@@ -130,11 +137,21 @@ export function ClinicalAnalyzePage() {
     useEffect(() => {
         clearLegacyClinicalBrowserStorage();
     }, []);
+    const shouldRestoreFormForCorrection =
+        errorCode === "UNAPPROVED_CLOUD_CLINICAL_CONTENT" ||
+        (typeof errorCode === "string" && REQUEST_BOUNDARY_ERROR_CODES.has(errorCode));
+    const requestBoundaryMessage =
+        typeof errorCode === "string" && REQUEST_BOUNDARY_ERROR_CODES.has(errorCode)
+            ? requestBoundaryLabels.messages[
+                  errorCode as keyof typeof requestBoundaryLabels.messages
+              ]
+            : null;
+
     useEffect(() => {
-        if (errorCode === "UNAPPROVED_CLOUD_CLINICAL_CONTENT") {
+        if (shouldRestoreFormForCorrection) {
             setActiveTab("patient");
         }
-    }, [errorCode]);
+    }, [shouldRestoreFormForCorrection]);
     useEffect(() => {
         try {
             const raw = window.localStorage.getItem(COMMENT_TRACKING_STORAGE_KEY);
@@ -1048,6 +1065,47 @@ export function ClinicalAnalyzePage() {
                             </button>
                         </section>
                     ) : null}
+                    {requestBoundaryMessage ? (
+                        <section
+                            className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950"
+                            role="alert"
+                            aria-labelledby="clinical-request-boundary-title"
+                        >
+                            <h2
+                                id="clinical-request-boundary-title"
+                                className="text-base font-semibold"
+                            >
+                                {requestBoundaryLabels.title}
+                            </h2>
+                            <p className="mt-2 text-sm leading-6">
+                                {requestBoundaryMessage}
+                            </p>
+                            {errorFields.length > 0 ? (
+                                <div className="mt-3 text-sm">
+                                    <span className="font-semibold">
+                                        {requestBoundaryLabels.fieldsLabel}
+                                    </span>{" "}
+                                    {errorFields
+                                        .map(
+                                            (field) =>
+                                                cloudContentGuardLabels.fieldLabels[
+                                                    field as keyof typeof cloudContentGuardLabels.fieldLabels
+                                                ] || field
+                                        )
+                                        .join(", ")}
+                                </div>
+                            ) : null}
+                            {errorCode !== "ANONYMOUS_CLINICAL_DEMO_RATE_LIMITED" ? (
+                                <button
+                                    type="button"
+                                    className="mt-4 rounded border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100"
+                                    onClick={handleCorrectRejectedFields}
+                                >
+                                    {requestBoundaryLabels.action}
+                                </button>
+                            ) : null}
+                        </section>
+                    ) : null}
                     <ClinicalForm
                         key={targetLang + openaiModel}
                         onSubmit={handleSubmit}
@@ -1055,17 +1113,17 @@ export function ClinicalAnalyzePage() {
                         loading={loading}
                         compareLoading={comparisonLoading}
                         highlightFields={
-                            errorCode === "UNAPPROVED_CLOUD_CLINICAL_CONTENT"
+                            shouldRestoreFormForCorrection
                                 ? errorFields
                                 : []
                         }
                         initialData={
-                            errorCode === "UNAPPROVED_CLOUD_CLINICAL_CONTENT"
+                            shouldRestoreFormForCorrection
                                 ? lastPayload || undefined
                                 : undefined
                         }
                         restoreInitialDataForCorrection={
-                            errorCode === "UNAPPROVED_CLOUD_CLINICAL_CONTENT"
+                            shouldRestoreFormForCorrection
                         }
                     />
                 </div>

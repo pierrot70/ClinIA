@@ -366,6 +366,57 @@ describe("ClinicalAnalyzePage", () => {
         expect(screen.getByLabelText("clinical-diagnosis")).toHaveFocus();
     });
 
+    it("explains clinical input limits and keeps the form data available for correction", () => {
+        authUser = { role: "MEDECIN" };
+        configureClinicalAnalysisSlots(
+            {
+                result: null,
+                loading: false,
+                error: "Les parametres cliniques depassent les limites autorisees.",
+                errorCode: "INVALID_CLINICAL_INPUT_BOUNDARY",
+                errorFields: ["symptoms"],
+                analyze: vi.fn(),
+                resetAnalysis: vi.fn(),
+            },
+            {
+                result: null,
+                loading: false,
+                error: null,
+                errorCode: null,
+                errorFields: [],
+                analyze: vi.fn(),
+                resetAnalysis: vi.fn(),
+            },
+            {
+                result: null,
+                loading: false,
+                error: null,
+                errorCode: null,
+                errorFields: [],
+                analyze: vi.fn(),
+                resetAnalysis: vi.fn(),
+            }
+        );
+
+        render(
+            <MemoryRouter>
+                <ClinicalAnalyzePage />
+            </MemoryRouter>
+        );
+
+        expect(
+            screen.getByRole("alert", { name: "Analyse non envoyee" })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(/depassent les limites autorisees/i)
+        ).toBeInTheDocument();
+        expect(screen.getByText(/Symptomes principaux/)).toBeInTheDocument();
+        expect(clinicalFormSpy.mock.calls.at(-1)?.[0]).toMatchObject({
+            highlightFields: ["symptoms"],
+            restoreInitialDataForCorrection: true,
+        });
+    });
+
     it("shows model and simulation controls to administrators", () => {
         authUser = { role: "ADMIN" };
         configureClinicalAnalysisSlots(
