@@ -160,6 +160,14 @@ export function SecurityIncidentsModal({
             };
         }
 
+        if (item.type === "MFA_CHALLENGE_EXHAUSTED") {
+            return {
+                whatHappened: labels.mfaChallengeExhaustedWhatHappened,
+                whatWasBlocked: labels.mfaChallengeExhaustedWhatWasBlocked,
+                nextStep: labels.mfaChallengeExhaustedNextStep,
+            };
+        }
+
         return {
             whatHappened: labels.explanationWhatHappened,
             whatWasBlocked: labels.explanationWhatWasBlocked,
@@ -285,6 +293,7 @@ export function SecurityIncidentsModal({
                                 <option value="NON_SECURE_CONTENT">NON_SECURE_CONTENT</option>
                                 <option value="CSP_VIOLATION">CSP_VIOLATION</option>
                                 <option value="REFRESH_TOKEN_REPLAY">REFRESH_TOKEN_REPLAY</option>
+                                <option value="MFA_CHALLENGE_EXHAUSTED">MFA_CHALLENGE_EXHAUSTED</option>
                             </select>
                         </label>
                     </div>

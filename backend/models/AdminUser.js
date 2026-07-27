@@ -95,6 +95,7 @@ const AdminUserSchema = new mongoose.Schema({
     mfaChallengePurpose: { type: String, default: null, select: false },
     mfaChallengeExpiresAt: { type: Date, default: null, select: false },
     mfaChallengeAttempts: { type: Number, default: 0, select: false },
+    mfaLockedUntil: { type: Date, default: null },
     passwordRecoveryCodeHash: {
         type: String,
         default: null,

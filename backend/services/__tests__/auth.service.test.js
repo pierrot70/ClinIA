@@ -138,6 +138,7 @@ function buildUser(overrides = {}) {
         mfaChallengePurpose: null,
         mfaChallengeExpiresAt: null,
         mfaChallengeAttempts: 0,
+        mfaLockedUntil: null,
         save: vi.fn().mockResolvedValue(undefined),
         ...overrides,
     };
@@ -1114,13 +1115,14 @@ describe("auth service", () => {
                 user.mfaChallengePurpose = update.$set.mfaChallengePurpose;
                 user.mfaChallengeExpiresAt = update.$set.mfaChallengeExpiresAt;
                 user.mfaChallengeAttempts = update.$set.mfaChallengeAttempts;
+                user.mfaLockedUntil = update.$set.mfaLockedUntil ?? null;
                 return Promise.resolve(user);
             }
 
             return Promise.resolve(null);
         });
 
-        for (let attempt = 1; attempt <= 5; attempt += 1) {
+        for (let attempt = 1; attempt <= 4; attempt += 1) {
             await expect(completeMfaLogin({
                 mfaChallenge: "d".repeat(64),
                 code: "000000",
@@ -1128,11 +1130,43 @@ describe("auth service", () => {
             })).rejects.toMatchObject({ code: "INVALID_MFA_CODE" });
         }
 
+        await expect(completeMfaLogin({
+            mfaChallenge: "d".repeat(64),
+            code: "000000",
+            req: { headers: { "x-forwarded-for": "198.51.100.5" }, ip: "10.0.0.2" },
+        })).rejects.toMatchObject({
+            code: "MFA_TEMPORARILY_LOCKED",
+            mfaLockedUntil: expect.any(String),
+        });
+
         expect(user.mfaChallengeId).toBeNull();
         expect(user.mfaChallengeAttempts).toBe(5);
+        expect(user.mfaLockedUntil).toBeInstanceOf(Date);
         expect(recordAuthAuditEvent).toHaveBeenLastCalledWith(
             expect.objectContaining({ reason: "MFA_CHALLENGE_EXHAUSTED" })
         );
+        expect(createSecurityIncident).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: "MFA_CHALLENGE_EXHAUSTED",
+                phase: "auth",
+                requestPath: "/api/auth/login/mfa",
+                context: {
+                    userId: user._id,
+                    role: user.role,
+                },
+            })
+        );
+
+        mockFindOne.mockResolvedValue(user);
+        compare.mockResolvedValue(true);
+        await expect(login({
+            email: "admin@example.com",
+            password: "password123",
+            req: { headers: { "x-forwarded-for": "203.0.113.9" }, ip: "10.0.0.2" },
+        })).rejects.toMatchObject({
+            code: "MFA_TEMPORARILY_LOCKED",
+            mfaLockedUntil: expect.any(String),
+        });
 
         await expect(completeMfaLogin({
             mfaChallenge: "d".repeat(64),

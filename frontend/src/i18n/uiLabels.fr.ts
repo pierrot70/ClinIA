@@ -415,6 +415,12 @@ export const UI_LABELS_FR = {
                 "ClinIA a invalidé la famille complète de jetons associée et a exigé une nouvelle connexion. Le jeton lui-même n'est jamais affiché ni conservé dans cet écran.",
             refreshTokenReplayNextStep:
                 "Si cette reconnexion était attendue, reconnectez-vous simplement. Sinon, considérez la session comme compromise et réinitialisez le mot de passe du compte.",
+            mfaChallengeExhaustedWhatHappened:
+                "Cinq codes MFA invalides ont été présentés pour le même défi de connexion.",
+            mfaChallengeExhaustedWhatWasBlocked:
+                "ClinIA a invalidé ce défi MFA. Aucun code MFA n'est conservé dans cet incident.",
+            mfaChallengeExhaustedNextStep:
+                "Si cette situation n'était pas attendue, considérez la tentative comme suspecte et réinitialisez le mot de passe du compte. Une nouvelle connexion générera un nouveau défi MFA.",
             pagePrefix: "Page",
             pageSeparator: "/",
             resultSuffix: "résultats",
@@ -529,6 +535,10 @@ export const UI_LABELS_FR = {
             manualEntryKey: "Cle de configuration",
             codeLabel: "Code de verification ou code de recuperation",
             verify: "Verifier et se connecter",
+            challengeExpiredRestart:
+                "Ce defi MFA n'est plus valide. Reconnectez-vous avec vos identifiants pour obtenir un nouveau defi.",
+            temporarilyLocked:
+                "Trop de codes MFA invalides. Reessayez dans 15 minutes avec vos identifiants.",
             recoveryCodesTitle: "Codes de recuperation",
             recoveryCodesDescription: "Conservez ces codes dans un endroit sur. Chaque code ne peut etre utilise qu'une seule fois.",
             continue: "Continuer vers ClinIA",

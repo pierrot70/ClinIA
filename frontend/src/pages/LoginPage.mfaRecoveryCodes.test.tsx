@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
-import { MfaRequiredError } from "../services/authService";
+import { MfaRequiredError, MfaVerificationError } from "../services/authService";
 
 const auth = vi.hoisted(() => ({
     completeMfaLogin: vi.fn(),
@@ -103,6 +103,108 @@ describe("LoginPage MFA recovery codes", () => {
                 )
             ).toBeInTheDocument();
             expect(screen.queryByText("Mock Studio")).not.toBeInTheDocument();
+        });
+    });
+
+    it("returns to password login when the MFA challenge has been exhausted", async () => {
+        auth.login.mockRejectedValueOnce(
+            new MfaRequiredError({
+                mfaChallenge: "mfa-login-challenge",
+                enrollmentRequired: false,
+            })
+        );
+        auth.completeMfaLogin.mockRejectedValueOnce(
+            new MfaVerificationError(
+                "INVALID_MFA_CHALLENGE",
+                "Verification MFA invalide ou expiree."
+            )
+        );
+
+        render(
+            <MemoryRouter initialEntries={["/login"]}>
+                <Routes>
+                    <Route path="/login" element={<LoginPage />} />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        fireEvent.change(
+            screen.getByLabelText("Identifiant (courriel ou nom d'utilisateur)"),
+            { target: { value: "local-medecin@clinia.test" } }
+        );
+        fireEvent.change(screen.getByLabelText("Mot de passe"), {
+            target: { value: "password123" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Se connecter" }));
+
+        await screen.findByText("Verification a deux facteurs");
+        fireEvent.change(
+            screen.getByLabelText("Code de verification ou code de recuperation"),
+            { target: { value: "112233" } }
+        );
+        fireEvent.click(
+            screen.getByRole("button", { name: "Verifier et se connecter" })
+        );
+
+        await waitFor(() => {
+            expect(
+                screen.getByText(
+                    "Ce defi MFA n'est plus valide. Reconnectez-vous avec vos identifiants pour obtenir un nouveau defi."
+                )
+            ).toBeInTheDocument();
+            expect(screen.queryByText("Verification a deux facteurs")).not.toBeInTheDocument();
+            expect(screen.getByRole("button", { name: "Se connecter" })).toBeInTheDocument();
+        });
+    });
+
+    it("returns to password login with a cooldown message after five invalid MFA codes", async () => {
+        auth.login.mockRejectedValueOnce(
+            new MfaRequiredError({
+                mfaChallenge: "mfa-login-challenge",
+                enrollmentRequired: false,
+            })
+        );
+        auth.completeMfaLogin.mockRejectedValueOnce(
+            new MfaVerificationError(
+                "MFA_TEMPORARILY_LOCKED",
+                "Verification MFA temporairement bloquee suite a trop d'echecs.",
+                "2026-07-27T16:15:00.000Z"
+            )
+        );
+
+        render(
+            <MemoryRouter initialEntries={["/login"]}>
+                <Routes>
+                    <Route path="/login" element={<LoginPage />} />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        fireEvent.change(
+            screen.getByLabelText("Identifiant (courriel ou nom d'utilisateur)"),
+            { target: { value: "local-medecin@clinia.test" } }
+        );
+        fireEvent.change(screen.getByLabelText("Mot de passe"), {
+            target: { value: "password123" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Se connecter" }));
+
+        await screen.findByText("Verification a deux facteurs");
+        fireEvent.change(
+            screen.getByLabelText("Code de verification ou code de recuperation"),
+            { target: { value: "112233" } }
+        );
+        fireEvent.click(
+            screen.getByRole("button", { name: "Verifier et se connecter" })
+        );
+
+        await waitFor(() => {
+            expect(
+                screen.getByText(
+                    "Trop de codes MFA invalides. Reessayez dans 15 minutes avec vos identifiants."
+                )
+            ).toBeInTheDocument();
+            expect(screen.queryByText("Verification a deux facteurs")).not.toBeInTheDocument();
         });
     });
 });

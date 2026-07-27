@@ -1,14 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { completeMfaLogin, registerSelf, refresh } = vi.hoisted(() => ({
+const { completeMfaLogin, login, registerSelf, refresh } = vi.hoisted(() => ({
     completeMfaLogin: vi.fn(),
+    login: vi.fn(),
     registerSelf: vi.fn(),
     refresh: vi.fn(),
 }));
 
 vi.mock("../../services/auth.js", () => ({
     deleteUser: vi.fn(),
-    login: vi.fn(),
+    login,
     listActiveUsers: vi.fn(),
     listAuthLogGraphs: vi.fn(),
     listAuthLogs: vi.fn(),
@@ -154,6 +155,33 @@ describe("POST /refresh replay protection", () => {
     });
 });
 
+describe("POST /login MFA lockout", () => {
+    it("returns a temporary lock response instead of an internal error", async () => {
+        login.mockRejectedValue({
+            code: "MFA_TEMPORARILY_LOCKED",
+            message: "Verification MFA temporairement bloquee suite a trop d'echecs.",
+            mfaLockedUntil: "2026-07-27T16:15:00.000Z",
+        });
+        const handler = getLastRouteHandler("post", "/login");
+        const req = {
+            body: { email: "admin@example.com", password: "password123" },
+        };
+        const res = makeRes();
+
+        await handler(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(423);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "MFA_TEMPORARILY_LOCKED",
+                message: "Verification MFA temporairement bloquee suite a trop d'echecs.",
+                retryable: true,
+                mfaLockedUntil: "2026-07-27T16:15:00.000Z",
+            },
+        });
+    });
+});
+
 describe("POST /login/mfa", () => {
     it("sets the refresh cookie only after the MFA code is verified", async () => {
         completeMfaLogin.mockResolvedValue({
@@ -169,5 +197,28 @@ describe("POST /login/mfa", () => {
         expect(completeMfaLogin).toHaveBeenCalledWith({ mfaChallenge: "a".repeat(64), code: "123456", req });
         expect(res.cookie).toHaveBeenCalledWith("clinia_refresh_token", "refresh-token", expect.any(Object));
         expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    it("returns a temporary lock response when the MFA attempt limit is reached", async () => {
+        completeMfaLogin.mockRejectedValue({
+            code: "MFA_TEMPORARILY_LOCKED",
+            message: "Verification MFA temporairement bloquee suite a trop d'echecs.",
+            mfaLockedUntil: "2026-07-27T16:15:00.000Z",
+        });
+        const handler = getLastRouteHandler("post", "/login/mfa");
+        const req = { body: { mfaChallenge: "a".repeat(64), code: "123456" } };
+        const res = makeRes();
+
+        await handler(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(423);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "MFA_TEMPORARILY_LOCKED",
+                message: "Verification MFA temporairement bloquee suite a trop d'echecs.",
+                retryable: true,
+                mfaLockedUntil: "2026-07-27T16:15:00.000Z",
+            },
+        });
     });
 });

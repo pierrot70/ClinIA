@@ -87,7 +87,7 @@ export function minimizeSecurityIncidentMatches(matches) {
 
 export function minimizeSecurityIncidentContext(type, context) {
     if (!context || typeof context !== "object") return {};
-    if (["MASS_DOWNLOAD_ATTEMPT", "REFRESH_TOKEN_REPLAY"].includes(type)) {
+    if (["MASS_DOWNLOAD_ATTEMPT", "REFRESH_TOKEN_REPLAY", "MFA_CHALLENGE_EXHAUSTED"].includes(type)) {
         const result = {};
         const userId = nonEmptyString(context.userId, 48);
         if (userId) result.userId = userId;

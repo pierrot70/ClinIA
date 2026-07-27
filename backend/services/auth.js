@@ -8,6 +8,7 @@ import {
     AUTH_ROLE_VALUES,
     LOCKOUT_DURATION_MS,
     MAX_LOGIN_ATTEMPTS,
+    MFA_LOCKOUT_DURATION_MS,
     REFRESH_TOKEN_TTL_MS,
     SESSION_ABSOLUTE_TIMEOUT_MS,
     SESSION_IDLE_TIMEOUT_MS,
@@ -207,6 +208,7 @@ async function recordFailedMfaChallengeAttempt(user, challenge) {
 
     if (incremented) return { exhausted: false };
 
+    const mfaLockedUntil = new Date(Date.now() + MFA_LOCKOUT_DURATION_MS);
     const exhausted = await AdminUser.findOneAndUpdate(
         {
             ...activeFilter,
@@ -218,12 +220,44 @@ async function recordFailedMfaChallengeAttempt(user, challenge) {
                 mfaChallengePurpose: null,
                 mfaChallengeExpiresAt: null,
                 mfaChallengeAttempts: MFA_CHALLENGE_MAX_ATTEMPTS,
+                mfaLockedUntil,
             },
         },
         { new: true }
     );
 
-    return { exhausted: Boolean(exhausted) };
+    return {
+        exhausted: Boolean(exhausted),
+        mfaLockedUntil: exhausted ? mfaLockedUntil : null,
+    };
+}
+
+function createMfaTemporarilyLockedError(mfaLockedUntil) {
+    const error = createAuthError(
+        "MFA_TEMPORARILY_LOCKED",
+        "Verification MFA temporairement bloquee suite a trop d'echecs."
+    );
+    error.mfaLockedUntil = mfaLockedUntil.toISOString();
+    return error;
+}
+
+async function createMfaChallengeExhaustedIncident(user) {
+    try {
+        await createSecurityIncident({
+            type: "MFA_CHALLENGE_EXHAUSTED",
+            phase: "auth",
+            reason: "Le nombre maximal d'essais MFA pour un defi a ete atteint.",
+            requestPath: "/api/auth/login/mfa",
+            transport: "internal_auth",
+            matches: [],
+            context: {
+                userId: String(user._id),
+                role: user.role,
+            },
+        });
+    } catch (error) {
+        logSafeError("MFA_CHALLENGE_EXHAUSTED_INCIDENT_WRITE_FAILED", error);
+    }
 }
 
 function makeRefreshToken() {
@@ -459,6 +493,7 @@ async function setRotatedRefreshToken(user, familyId = createRefreshTokenFamilyI
 async function completeAuthenticatedSession(user, ip, mfaAction = null) {
     user.failedLoginAttempts = 0;
     user.lockUntil = null;
+    user.mfaLockedUntil = null;
     user.lastLoginAt = new Date();
     user.sessionStartedAt = user.lastLoginAt;
     user.lastActivityAt = user.lastLoginAt;
@@ -718,6 +753,24 @@ export async function login({ username, email, password, req }) {
 
     if (!requiresMfa(user)) return completeAuthenticatedSession(user, ip);
 
+    if (user.mfaLockedUntil && user.mfaLockedUntil.getTime() > Date.now()) {
+        await recordAuthAuditEvent({
+            action: "MFA_FAILED",
+            outcome: "FAILED",
+            userId: user._id,
+            username: user.username,
+            role: user.role,
+            ip,
+            reason: "MFA_TEMPORARILY_LOCKED",
+        });
+        throw createMfaTemporarilyLockedError(user.mfaLockedUntil);
+    }
+
+    if (user.mfaLockedUntil) {
+        user.mfaLockedUntil = null;
+        await user.save();
+    }
+
     if (!user.mfaEnabled) {
         const secret = createMfaSecret();
         user.mfaPendingSecretEncrypted = encryptMfaSecret(secret);
@@ -756,6 +809,10 @@ export async function completeMfaLogin({ mfaChallenge, code, req }) {
         if (!verifyTotp(decryptMfaSecret(user.mfaPendingSecretEncrypted), code)) {
             const attempt = await recordFailedMfaChallengeAttempt(user, challenge);
             await recordAuthAuditEvent({ action: "MFA_FAILED", outcome: "FAILED", userId: user._id, username: user.username, role: user.role, ip, reason: attempt.exhausted ? "MFA_CHALLENGE_EXHAUSTED" : "INVALID_MFA_CODE" });
+            if (attempt.exhausted) {
+                await createMfaChallengeExhaustedIncident(user);
+                throw createMfaTemporarilyLockedError(attempt.mfaLockedUntil);
+            }
             throw createAuthError("INVALID_MFA_CODE", "Code MFA invalide.");
         }
         if (!await consumeMfaChallenge(user, challenge)) throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
@@ -777,6 +834,10 @@ export async function completeMfaLogin({ mfaChallenge, code, req }) {
     if (!valid) {
         const attempt = await recordFailedMfaChallengeAttempt(user, challenge);
         await recordAuthAuditEvent({ action: "MFA_FAILED", outcome: "FAILED", userId: user._id, username: user.username, role: user.role, ip, reason: attempt.exhausted ? "MFA_CHALLENGE_EXHAUSTED" : "INVALID_MFA_CODE" });
+        if (attempt.exhausted) {
+            await createMfaChallengeExhaustedIncident(user);
+            throw createMfaTemporarilyLockedError(attempt.mfaLockedUntil);
+        }
         throw createAuthError("INVALID_MFA_CODE", "Code MFA invalide.");
     }
     if (!await consumeMfaChallenge(user, challenge)) throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");

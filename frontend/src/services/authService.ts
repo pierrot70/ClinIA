@@ -23,6 +23,7 @@ type BasicApiResponse = {
         code?: string;
         message?: string;
         restrictedUntil?: string;
+        mfaLockedUntil?: string;
     };
     message?: string;
 };
@@ -54,6 +55,18 @@ export class MfaRequiredError extends Error {
         super("MFA_REQUIRED");
         this.name = "MfaRequiredError";
         this.challenge = challenge;
+    }
+}
+
+export class MfaVerificationError extends Error {
+    code: string;
+    mfaLockedUntil?: string;
+
+    constructor(code: string, message: string, mfaLockedUntil?: string) {
+        super(message);
+        this.name = "MfaVerificationError";
+        this.code = code;
+        this.mfaLockedUntil = mfaLockedUntil;
     }
 }
 
@@ -365,7 +378,18 @@ async function loginWithAuthApi(credentials: LoginCredentials): Promise<AuthSess
 export async function completeMfaLogin(challenge: MfaChallenge, code: string): Promise<{ session: AuthSession; recoveryCodes: string[] }> {
     const response = await postJson("/api/auth/login/mfa", { mfaChallenge: challenge.mfaChallenge, code });
     const data = await safeJson(response);
-    if (!response.ok) throw new Error(getErrorMessage(data, "Code MFA invalide."));
+    if (!response.ok) {
+        const payload = getResponsePayload(data);
+        const code =
+            typeof payload.error === "object" && payload.error?.code
+                ? payload.error.code
+                : "MFA_VERIFICATION_FAILED";
+        throw new MfaVerificationError(
+            code,
+            getErrorMessage(data, "Code MFA invalide."),
+            typeof payload.error === "object" ? payload.error?.mfaLockedUntil : undefined
+        );
+    }
     const payload = getResponsePayload(data);
     const session = normalizeSessionFromResponse(data);
     applySession(session);

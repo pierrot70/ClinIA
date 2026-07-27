@@ -127,6 +127,17 @@ router.post("/login", loginRateLimiter, async (req, res) => {
             });
         }
 
+        if (err.code === "MFA_TEMPORARILY_LOCKED") {
+            return res.status(423).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: true,
+                    mfaLockedUntil: err.mfaLockedUntil,
+                },
+            });
+        }
+
         if (err.code === "INVALID_CREDENTIALS") {
             return res.status(401).json({
                 error: {
@@ -178,9 +189,18 @@ router.post("/login/mfa", loginRateLimiter, async (req, res) => {
         res.cookie(REFRESH_TOKEN_COOKIE_NAME, data.refreshToken, getRefreshCookieOptions(req));
         return res.status(200).json({ data: { ...data, refreshToken: undefined }, meta: { source: "real", model: "auth" } });
     } catch (err) {
-        const status = ["INVALID_INPUT", "INVALID_MFA_CHALLENGE", "INVALID_MFA_CODE"].includes(err.code) ? 401 : 500;
+        const status = err.code === "MFA_TEMPORARILY_LOCKED"
+            ? 423
+            : ["INVALID_INPUT", "INVALID_MFA_CHALLENGE", "INVALID_MFA_CODE"].includes(err.code) ? 401 : 500;
         if (status === 500) logSafeError("AUTH_MFA_LOGIN_FAILED", err);
-        return res.status(status).json({ error: { code: err.code || "AUTH_MFA_LOGIN_FAILED", message: status === 500 ? "Impossible de verifier le code MFA." : err.message, retryable: false } });
+        return res.status(status).json({
+            error: {
+                code: err.code || "AUTH_MFA_LOGIN_FAILED",
+                message: status === 500 ? "Impossible de verifier le code MFA." : err.message,
+                retryable: status === 423,
+                ...(err.mfaLockedUntil ? { mfaLockedUntil: err.mfaLockedUntil } : {}),
+            },
+        });
     }
 });
 

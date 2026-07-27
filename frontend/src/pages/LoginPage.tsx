@@ -9,6 +9,7 @@ import {
     completePasswordRecovery,
     consumeAuthSecurityNotice,
     MfaRequiredError,
+    MfaVerificationError,
     type MfaChallenge,
     requestPasswordRecovery,
     type AuthSecurityNotice,
@@ -202,6 +203,19 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
             }
         } catch (err) {
             enrollmentCompletionPendingRef.current = false;
+            if (
+                err instanceof MfaVerificationError &&
+                ["INVALID_MFA_CHALLENGE", "MFA_TEMPORARILY_LOCKED"].includes(err.code)
+            ) {
+                setMfaChallenge(null);
+                setMfaCode("");
+                setError(
+                    err.code === "MFA_TEMPORARILY_LOCKED"
+                        ? mfaLabels.temporarilyLocked
+                        : mfaLabels.challengeExpiredRestart
+                );
+                return;
+            }
             setError(err instanceof Error ? err.message : loginFailedLabel);
         } finally {
             setLoading(false);

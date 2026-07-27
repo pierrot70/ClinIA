@@ -46,6 +46,14 @@ describe("audit data minimization", () => {
             ip: "127.0.0.1",
             totalCost: 250,
         })).toEqual({ userId: "507f1f77bcf86cd799439011", totalCost: 250 });
+        expect(minimizeSecurityIncidentContext("MFA_CHALLENGE_EXHAUSTED", {
+            userId: "507f1f77bcf86cd799439011",
+            role: "SUPERADMIN",
+            ip: "127.0.0.1",
+        })).toEqual({
+            userId: "507f1f77bcf86cd799439011",
+            role: "SUPERADMIN",
+        });
         expect(minimizeAcknowledgmentContext({
             route: "/clinical",
             note: "CANARY-PHI",
