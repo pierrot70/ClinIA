@@ -21,6 +21,7 @@ import {
     reauthenticate,
     resetUserPassword,
     completeForcedPasswordChange,
+    completeMfaLogin,
     refresh,
     setUserActiveStatus,
     updateUser,
@@ -84,6 +85,10 @@ router.post("/login", loginRateLimiter, async (req, res) => {
             password,
             req,
         });
+
+        if (data.mfaRequired) {
+            return res.status(202).json({ data, meta: { source: "real", model: "auth" } });
+        }
 
         res.cookie(
             REFRESH_TOKEN_COOKIE_NAME,
@@ -160,6 +165,22 @@ router.post("/login", loginRateLimiter, async (req, res) => {
                 retryable: true,
             },
         });
+    }
+});
+
+router.post("/login/mfa", loginRateLimiter, async (req, res) => {
+    try {
+        const data = await completeMfaLogin({
+            mfaChallenge: req.body?.mfaChallenge,
+            code: req.body?.code,
+            req,
+        });
+        res.cookie(REFRESH_TOKEN_COOKIE_NAME, data.refreshToken, getRefreshCookieOptions(req));
+        return res.status(200).json({ data: { ...data, refreshToken: undefined }, meta: { source: "real", model: "auth" } });
+    } catch (err) {
+        const status = ["INVALID_INPUT", "INVALID_MFA_CHALLENGE", "INVALID_MFA_CODE"].includes(err.code) ? 401 : 500;
+        if (status === 500) logSafeError("AUTH_MFA_LOGIN_FAILED", err);
+        return res.status(status).json({ error: { code: err.code || "AUTH_MFA_LOGIN_FAILED", message: status === 500 ? "Impossible de verifier le code MFA." : err.message, retryable: false } });
     }
 });
 

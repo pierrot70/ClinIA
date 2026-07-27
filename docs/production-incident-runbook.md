@@ -6,6 +6,12 @@ Use this checklist when ClinIA appears unavailable or degraded.
 
 ```text
 User -> Cloudflare -> DigitalOcean Load Balancer -> clinia-coolify -> Coolify/Traefik -> frontend/backend -> MongoDB replica set
+
+## MFA et conteneurs de production
+
+- Les comptes `ADMIN` et `SUPERADMIN` utilisent obligatoirement la MFA TOTP en production. La premiere connexion apres ce deploiement affiche une cle a ajouter dans une application d'authentification, puis des codes de recuperation a conserver hors de ClinIA.
+- Avant le deploiement, definir dans Coolify le secret runtime `MFA_ENCRYPTION_KEY` avec une valeur generee par `openssl rand -base64 48`. Ne jamais modifier ni supprimer cette cle apres l'enrolement MFA: elle chiffre les secrets TOTP stockes en base.
+- Les conteneurs backend et frontend de production fonctionnent sous un utilisateur non-root, sans nouvelles privileges Linux, sans capabilities Linux et avec une racine en lecture seule. `/tmp` est le seul espace temporaire inscriptible.
 ```
 
 - Cloudflare DNS record: `clinique-ai.ca`

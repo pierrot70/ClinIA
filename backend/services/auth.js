@@ -42,6 +42,16 @@ import {
     revokeRefreshTokenFamily,
     rotateActiveRefreshTokenSession,
 } from "./auth/refreshTokenFamilies.js";
+import {
+    buildProvisioningUri,
+    createMfaSecret,
+    createRecoveryCodes,
+    decryptMfaSecret,
+    encryptMfaSecret,
+    hashRecoveryCode,
+    MFA_CHALLENGE_TTL_SECONDS,
+    verifyTotp,
+} from "./auth/mfa.js";
 
 export { listAuthLogGraphs, listAuthLogs };
 
@@ -89,6 +99,28 @@ function signAccessToken(user) {
             audience: "clinia-app",
         }
     );
+}
+
+function requiresMfa(user) {
+    const required = process.env.CLINIA_REQUIRE_MFA_FOR_PRIVILEGED === "true" || process.env.NODE_ENV === "production";
+    return required && (user?.role === AUTH_ROLES.ADMIN || user?.role === AUTH_ROLES.SUPERADMIN);
+}
+
+function signMfaChallenge(user, purpose) {
+    return jwt.sign({ purpose, role: user.role }, getJwtAccessSecret(), {
+        subject: String(user._id), algorithm: "HS256", expiresIn: MFA_CHALLENGE_TTL_SECONDS,
+        issuer: "clinia-backend", audience: "clinia-mfa",
+    });
+}
+
+function verifyMfaChallenge(challenge) {
+    try {
+        return jwt.verify(challenge, getJwtAccessSecret(), {
+            algorithms: ["HS256"], issuer: "clinia-backend", audience: "clinia-mfa",
+        });
+    } catch {
+        throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
+    }
 }
 
 function makeRefreshToken() {
@@ -317,6 +349,25 @@ async function setRotatedRefreshToken(user, familyId = createRefreshTokenFamilyI
     await user.save();
 
     return refreshToken;
+}
+
+async function completeAuthenticatedSession(user, ip, mfaAction = null) {
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+    user.lastLoginAt = new Date();
+    user.sessionStartedAt = user.lastLoginAt;
+    user.lastActivityAt = user.lastLoginAt;
+    user.authTokenInvalidBefore = null;
+    await revokeRefreshTokenFamiliesForUser(user._id, "NEW_LOGIN");
+    const refreshToken = await setRotatedRefreshToken(user);
+    const accessToken = signAccessToken(user);
+    await recordAuthAuditEvent({ action: mfaAction || "LOGIN", outcome: "SUCCESS", userId: user._id, username: user.username, role: user.role, ip });
+    return {
+        accessToken, refreshToken, expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+        user: { id: String(user._id), username: user.username, role: user.role,
+            passwordResetRequired: user.passwordResetRequired === true,
+            mustChangePasswordOnNextLogin: user.mustChangePasswordOnNextLogin === true },
+    };
 }
 
 async function revokeRefreshSessionFamilyForReplay(user, familyId, req) {
@@ -560,39 +611,57 @@ export async function login({ username, email, password, req }) {
         );
     }
 
-    user.failedLoginAttempts = 0;
-    user.lockUntil = null;
-    user.lastLoginAt = new Date();
-    user.sessionStartedAt = user.lastLoginAt;
-    user.lastActivityAt = user.lastLoginAt;
-    user.authTokenInvalidBefore = null;
+    if (!requiresMfa(user)) return completeAuthenticatedSession(user, ip);
 
-    await revokeRefreshTokenFamiliesForUser(user._id, "NEW_LOGIN");
-    const refreshToken = await setRotatedRefreshToken(user);
-    const accessToken = signAccessToken(user);
+    if (!user.mfaEnabled) {
+        const secret = createMfaSecret();
+        user.mfaPendingSecretEncrypted = encryptMfaSecret(secret);
+        user.mfaPendingExpiresAt = new Date(Date.now() + MFA_CHALLENGE_TTL_SECONDS * 1000);
+        await user.save();
+        return {
+            mfaRequired: true, mfaEnrollmentRequired: true,
+            mfaChallenge: signMfaChallenge(user, "mfa-enroll"),
+            manualEntryKey: secret,
+            provisioningUri: buildProvisioningUri({ secret, username: user.username }),
+        };
+    }
 
-    await recordAuthAuditEvent({
-        action: "LOGIN",
-        outcome: "SUCCESS",
-        userId: user._id,
-        username: user.username,
-        role: user.role,
-        ip,
-    });
+    return { mfaRequired: true, mfaEnrollmentRequired: false, mfaChallenge: signMfaChallenge(user, "mfa-login") };
+}
 
-    return {
-        accessToken,
-        refreshToken,
-        expiresIn: ACCESS_TOKEN_EXPIRES_IN,
-        user: {
-            id: String(user._id),
-            username: user.username,
-            role: user.role,
-            passwordResetRequired: user.passwordResetRequired === true,
-            mustChangePasswordOnNextLogin:
-                user.mustChangePasswordOnNextLogin === true,
-        },
-    };
+export async function completeMfaLogin({ mfaChallenge, code, req }) {
+    if (typeof mfaChallenge !== "string" || mfaChallenge.length < 32 || typeof code !== "string") {
+        throw createAuthError("INVALID_INPUT", "Code MFA invalide.");
+    }
+    const challenge = verifyMfaChallenge(mfaChallenge);
+    const user = await AdminUser.findById(challenge.sub).select("+mfaSecretEncrypted +mfaPendingSecretEncrypted +mfaPendingExpiresAt +mfaRecoveryCodeHashes");
+    if (!user || user.isActive === false || !requiresMfa(user)) throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
+    const ip = getRequestIp(req);
+    let recoveryCodes = null;
+    if (challenge.purpose === "mfa-enroll") {
+        if (!user.mfaPendingSecretEncrypted || !user.mfaPendingExpiresAt || user.mfaPendingExpiresAt <= new Date()) throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
+        if (!verifyTotp(decryptMfaSecret(user.mfaPendingSecretEncrypted), code)) throw createAuthError("INVALID_MFA_CODE", "Code MFA invalide.");
+        recoveryCodes = createRecoveryCodes();
+        user.mfaSecretEncrypted = user.mfaPendingSecretEncrypted;
+        user.mfaPendingSecretEncrypted = null;
+        user.mfaPendingExpiresAt = null;
+        user.mfaRecoveryCodeHashes = recoveryCodes.map(hashRecoveryCode);
+        user.mfaEnabled = true;
+        await user.save();
+        const session = await completeAuthenticatedSession(user, ip, "MFA_ENROLLED");
+        return { ...session, recoveryCodes };
+    }
+    if (challenge.purpose !== "mfa-login" || !user.mfaEnabled || !user.mfaSecretEncrypted) throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
+    const recoveryHash = hashRecoveryCode(code);
+    const recoveryIndex = user.mfaRecoveryCodeHashes.indexOf(recoveryHash);
+    const valid = recoveryIndex >= 0 || verifyTotp(decryptMfaSecret(user.mfaSecretEncrypted), code);
+    if (!valid) {
+        await recordAuthAuditEvent({ action: "MFA_FAILED", outcome: "FAILED", userId: user._id, username: user.username, role: user.role, ip, reason: "INVALID_MFA_CODE" });
+        throw createAuthError("INVALID_MFA_CODE", "Code MFA invalide.");
+    }
+    if (recoveryIndex >= 0) user.mfaRecoveryCodeHashes.splice(recoveryIndex, 1);
+    await user.save();
+    return completeAuthenticatedSession(user, ip, recoveryIndex >= 0 ? "MFA_RECOVERY_CODE_USED" : "MFA_LOGIN");
 }
 
 export async function refresh({ refreshToken, req }) {

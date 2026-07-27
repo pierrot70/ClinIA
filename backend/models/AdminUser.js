@@ -84,6 +84,11 @@ const AdminUserSchema = new mongoose.Schema({
         default: false,
         index: true,
     },
+    mfaEnabled: { type: Boolean, default: false, index: true },
+    mfaSecretEncrypted: { type: String, default: null, select: false },
+    mfaPendingSecretEncrypted: { type: String, default: null, select: false },
+    mfaPendingExpiresAt: { type: Date, default: null, select: false },
+    mfaRecoveryCodeHashes: { type: [String], default: [], select: false },
     passwordRecoveryCodeHash: {
         type: String,
         default: null,

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { registerSelf, refresh } = vi.hoisted(() => ({
+const { completeMfaLogin, registerSelf, refresh } = vi.hoisted(() => ({
+    completeMfaLogin: vi.fn(),
     registerSelf: vi.fn(),
     refresh: vi.fn(),
 }));
@@ -18,6 +19,7 @@ vi.mock("../../services/auth.js", () => ({
     reauthenticate: vi.fn(),
     resetUserPassword: vi.fn(),
     completeForcedPasswordChange: vi.fn(),
+    completeMfaLogin,
     refresh,
     setUserActiveStatus: vi.fn(),
     updateUser: vi.fn(),
@@ -149,5 +151,23 @@ describe("POST /refresh replay protection", () => {
                 retryable: false,
             },
         });
+    });
+});
+
+describe("POST /login/mfa", () => {
+    it("sets the refresh cookie only after the MFA code is verified", async () => {
+        completeMfaLogin.mockResolvedValue({
+            accessToken: "access-token", refreshToken: "refresh-token", expiresIn: "15m",
+            user: { id: "user-1", username: "admin", role: "ADMIN" },
+        });
+        const handler = getLastRouteHandler("post", "/login/mfa");
+        const req = { body: { mfaChallenge: "a".repeat(64), code: "123456" } };
+        const res = makeRes();
+
+        await handler(req, res);
+
+        expect(completeMfaLogin).toHaveBeenCalledWith({ mfaChallenge: "a".repeat(64), code: "123456", req });
+        expect(res.cookie).toHaveBeenCalledWith("clinia_refresh_token", "refresh-token", expect.any(Object));
+        expect(res.status).toHaveBeenCalledWith(200);
     });
 });

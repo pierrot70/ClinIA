@@ -7,7 +7,10 @@ import { useTranslation } from "../hooks/useTranslation";
 import { labels } from "../i18n/uiLabels";
 import {
     completePasswordRecovery,
+    completeMfaLogin,
     consumeAuthSecurityNotice,
+    MfaRequiredError,
+    type MfaChallenge,
     requestPasswordRecovery,
     type AuthSecurityNotice,
     verifyPasswordRecoveryCode,
@@ -44,6 +47,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [success, setSuccess] = useState<string | null>(null);
+    const [mfaChallenge, setMfaChallenge] = useState<MfaChallenge | null>(null);
+    const [mfaCode, setMfaCode] = useState("");
+    const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
 
     const location = useLocation();
     const navigate = useNavigate();
@@ -97,6 +103,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     const restrictedTitleLabel = useLoginLabel(labels.auth.session.restrictedTitle, "auth.session.restrictedTitle");
     const restrictedBodyLabel = useLoginLabel(labels.auth.session.restrictedBody, "auth.session.restrictedBody");
     const restrictedUntilPrefixLabel = useLoginLabel(labels.auth.session.restrictedUntilPrefix, "auth.session.restrictedUntilPrefix");
+    const mfaLabels = loginLabels.mfa;
 
     const redirectTarget = useMemo(() => {
         const from = (location.state as { from?: string } | null)?.from;
@@ -160,6 +167,11 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
 
             navigate(destination, { replace: true });
         } catch (err: unknown) {
+            if (err instanceof MfaRequiredError) {
+                setMfaChallenge(err.challenge);
+                setMfaCode("");
+                return;
+            }
             if (err instanceof Error && err.message) {
                 setError(err.message);
             } else {
@@ -169,6 +181,24 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                         : loginFailedLabel
                 );
             }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleMfaSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!mfaChallenge) return;
+        setLoading(true);
+        setError(null);
+        try {
+            const result = await completeMfaLogin(mfaChallenge, mfaCode);
+            setRecoveryCodes(result.recoveryCodes);
+            if (result.recoveryCodes.length === 0) {
+                navigate(adminOnly ? getDefaultRouteForRole(result.session.user.role) : "/", { replace: true });
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : loginFailedLabel);
         } finally {
             setLoading(false);
         }
@@ -289,7 +319,22 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                 </div>
             )}
 
-            {recoveryMode ? (
+            {recoveryCodes.length > 0 ? (
+                <div className="space-y-4">
+                    <h2 className="text-lg font-semibold text-gray-900">{mfaLabels.recoveryCodesTitle}</h2>
+                    <p className="text-sm text-gray-600">{mfaLabels.recoveryCodesDescription}</p>
+                    <pre className="rounded border bg-gray-50 p-3 text-sm whitespace-pre-wrap">{recoveryCodes.join("\n")}</pre>
+                    <button type="button" onClick={() => navigate(adminOnly ? "/mock-studio" : "/", { replace: true })} className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white">{mfaLabels.continue}</button>
+                </div>
+            ) : mfaChallenge ? (
+                <form onSubmit={handleMfaSubmit} className="space-y-4">
+                    <h2 className="text-lg font-semibold text-gray-900">{mfaLabels.title}</h2>
+                    <p className="text-sm text-gray-600">{mfaChallenge.enrollmentRequired ? mfaLabels.enrollmentDescription : mfaLabels.description}</p>
+                    {mfaChallenge.enrollmentRequired && mfaChallenge.manualEntryKey && <div className="rounded border bg-gray-50 p-3 text-sm"><strong>{mfaLabels.manualEntryKey}:</strong><br /><code className="break-all">{mfaChallenge.manualEntryKey}</code></div>}
+                    <div><label className="block text-xs font-semibold text-gray-700 mb-1" htmlFor="mfa-code">{mfaLabels.codeLabel}</label><input id="mfa-code" value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} autoComplete="one-time-code" inputMode="numeric" className="w-full border rounded-lg px-3 py-2 text-sm" required /></div>
+                    <button type="submit" disabled={loading} className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white disabled:opacity-50">{mfaLabels.verify}</button>
+                </form>
+            ) : recoveryMode ? (
                 <form onSubmit={handleRecoverySubmit} className="space-y-4">
                     <div>
                         <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="recovery-email">

@@ -512,6 +512,17 @@ export const UI_LABELS_FR = {
             passwordChanged: "Mot de passe modifie. Vous pouvez maintenant vous connecter.",
             continueFailed: "Impossible de poursuivre la reinitialisation.",
         },
+        mfa: {
+            title: "Verification a deux facteurs",
+            description: "Saisissez le code a six chiffres de votre application d'authentification.",
+            enrollmentDescription: "Ajoutez cette cle dans votre application d'authentification, puis saisissez le code affiche.",
+            manualEntryKey: "Cle de configuration",
+            codeLabel: "Code de verification ou code de recuperation",
+            verify: "Verifier et se connecter",
+            recoveryCodesTitle: "Codes de recuperation",
+            recoveryCodesDescription: "Conservez ces codes dans un endroit sur. Chaque code ne peut etre utilise qu'une seule fois.",
+            continue: "Continuer vers ClinIA",
+        },
     },
     // ClinicalAnalyzePage.tsx - expérience /clinical-demo.
     clinicalDemo: {

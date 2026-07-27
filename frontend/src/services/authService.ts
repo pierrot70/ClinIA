@@ -41,6 +41,22 @@ export interface AuthSession {
     accessToken: string;
 }
 
+export type MfaChallenge = {
+    mfaChallenge: string;
+    enrollmentRequired: boolean;
+    manualEntryKey?: string;
+    provisioningUri?: string;
+};
+
+export class MfaRequiredError extends Error {
+    challenge: MfaChallenge;
+    constructor(challenge: MfaChallenge) {
+        super("MFA_REQUIRED");
+        this.name = "MfaRequiredError";
+        this.challenge = challenge;
+    }
+}
+
 export class SessionExpiredError extends Error {
     constructor(message = "Session expired") {
         super(message);
@@ -81,6 +97,12 @@ type LoginApiResponse = {
             message?: string;
         };
     message?: string;
+    mfaRequired?: boolean;
+    mfaEnrollmentRequired?: boolean;
+    mfaChallenge?: string;
+    manualEntryKey?: string;
+    provisioningUri?: string;
+    recoveryCodes?: unknown[];
 };
 
 let inMemoryAccessToken: string | null = null;
@@ -324,11 +346,30 @@ async function loginWithAuthApi(credentials: LoginCredentials): Promise<AuthSess
     });
     const data = await safeJson(response);
 
+    const payload = getResponsePayload(data);
+    if (response.status === 202 && payload.mfaRequired === true && typeof payload.mfaChallenge === "string") {
+        throw new MfaRequiredError({
+            mfaChallenge: payload.mfaChallenge,
+            enrollmentRequired: payload.mfaEnrollmentRequired === true,
+            manualEntryKey: typeof payload.manualEntryKey === "string" ? payload.manualEntryKey : undefined,
+            provisioningUri: typeof payload.provisioningUri === "string" ? payload.provisioningUri : undefined,
+        });
+    }
     if (!response.ok) {
         throw new Error(getErrorMessage(data, "Invalid credentials"));
     }
 
     return normalizeSessionFromResponse(data);
+}
+
+export async function completeMfaLogin(challenge: MfaChallenge, code: string): Promise<{ session: AuthSession; recoveryCodes: string[] }> {
+    const response = await postJson("/api/auth/login/mfa", { mfaChallenge: challenge.mfaChallenge, code });
+    const data = await safeJson(response);
+    if (!response.ok) throw new Error(getErrorMessage(data, "Code MFA invalide."));
+    const payload = getResponsePayload(data);
+    const session = normalizeSessionFromResponse(data);
+    applySession(session);
+    return { session, recoveryCodes: Array.isArray(payload.recoveryCodes) ? payload.recoveryCodes.filter((value): value is string => typeof value === "string") : [] };
 }
 
 export async function login(credentials: LoginCredentials): Promise<AuthSession> {
