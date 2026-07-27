@@ -90,6 +90,11 @@ const AdminUserSchema = new mongoose.Schema({
     mfaPendingSecretEncrypted: { type: String, default: null, select: false },
     mfaPendingExpiresAt: { type: Date, default: null, select: false },
     mfaRecoveryCodeHashes: { type: [String], default: [], select: false },
+    // Server-side state makes each MFA challenge single-use and attempt-limited.
+    mfaChallengeId: { type: String, default: null, select: false },
+    mfaChallengePurpose: { type: String, default: null, select: false },
+    mfaChallengeExpiresAt: { type: Date, default: null, select: false },
+    mfaChallengeAttempts: { type: Number, default: 0, select: false },
     passwordRecoveryCodeHash: {
         type: String,
         default: null,

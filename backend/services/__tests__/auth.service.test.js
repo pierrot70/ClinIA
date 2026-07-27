@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFindOne = vi.fn();
 const mockFindById = vi.fn();
+const mockFindOneAndUpdate = vi.fn();
 const mockCreate = vi.fn();
 const mockFind = vi.fn();
 const mockCountDocuments = vi.fn();
@@ -22,6 +23,7 @@ vi.mock("../../models/AdminUser.js", () => ({
     AdminUser: {
         findOne: mockFindOne,
         findById: mockFindById,
+        findOneAndUpdate: mockFindOneAndUpdate,
         create: mockCreate,
         find: mockFind,
         countDocuments: mockCountDocuments,
@@ -70,11 +72,31 @@ vi.mock("bcryptjs", () => ({
 }));
 
 const sign = vi.fn();
+const verify = vi.fn();
 
 vi.mock("jsonwebtoken", () => ({
     default: {
         sign,
+        verify,
     },
+}));
+
+const createMfaSecret = vi.fn();
+const createRecoveryCodes = vi.fn();
+const decryptMfaSecret = vi.fn();
+const encryptMfaSecret = vi.fn();
+const hashRecoveryCode = vi.fn((code) => `hash:${code}`);
+const verifyTotp = vi.fn();
+
+vi.mock("../auth/mfa.js", () => ({
+    buildProvisioningUri: vi.fn(),
+    createMfaSecret,
+    createRecoveryCodes,
+    decryptMfaSecret,
+    encryptMfaSecret,
+    hashRecoveryCode,
+    MFA_CHALLENGE_TTL_SECONDS: 300,
+    verifyTotp,
 }));
 
 const {
@@ -90,6 +112,7 @@ const {
     listAuthLogs,
     resetUserPassword,
     completeForcedPasswordChange,
+    completeMfaLogin,
 } = await import("../auth.js");
 
 function buildUser(overrides = {}) {
@@ -104,6 +127,17 @@ function buildUser(overrides = {}) {
         lockUntil: null,
         refreshTokenHash: null,
         refreshTokenExpiresAt: null,
+        isActive: true,
+        mfaEnabled: false,
+        mfaRequired: false,
+        mfaSecretEncrypted: null,
+        mfaPendingSecretEncrypted: null,
+        mfaPendingExpiresAt: null,
+        mfaRecoveryCodeHashes: [],
+        mfaChallengeId: null,
+        mfaChallengePurpose: null,
+        mfaChallengeExpiresAt: null,
+        mfaChallengeAttempts: 0,
         save: vi.fn().mockResolvedValue(undefined),
         ...overrides,
     };
@@ -118,6 +152,13 @@ beforeEach(() => {
     revokeRefreshTokenFamily.mockResolvedValue(undefined);
     rotateActiveRefreshTokenSession.mockResolvedValue(null);
     createSecurityIncident.mockResolvedValue(undefined);
+    mockFindOneAndUpdate.mockResolvedValue(null);
+    createMfaSecret.mockReturnValue("mfa-secret");
+    createRecoveryCodes.mockReturnValue(["recovery-code"]);
+    decryptMfaSecret.mockReturnValue("mfa-secret");
+    encryptMfaSecret.mockImplementation((secret) => `encrypted:${secret}`);
+    verifyTotp.mockReturnValue(true);
+    hashRecoveryCode.mockImplementation((code) => `hash:${code}`);
     process.env.JWT_ACCESS_SECRET = "test-access-secret";
 });
 
@@ -154,6 +195,36 @@ describe("auth service", () => {
         );
         expect(result.user.passwordResetRequired).toBe(false);
         expect(result.user.mustChangePasswordOnNextLogin).toBe(false);
+    });
+
+    it("persists a single-use server-side MFA challenge before returning it", async () => {
+        const user = buildUser({ mfaRequired: true, mfaEnabled: false });
+        mockFindOne.mockResolvedValue(user);
+        compare.mockResolvedValue(true);
+        sign.mockReturnValue("mfa-challenge-token");
+
+        const result = await login({
+            email: "admin@example.com",
+            password: "password123",
+            req: { headers: {}, ip: "127.0.0.1" },
+        });
+
+        expect(result).toMatchObject({
+            mfaRequired: true,
+            mfaEnrollmentRequired: true,
+            mfaChallenge: "mfa-challenge-token",
+        });
+        expect(user.mfaChallengeId).toMatch(
+            /^[0-9a-f]{8}-[0-9a-f-]{27}$/i
+        );
+        expect(user.mfaChallengePurpose).toBe("mfa-enroll");
+        expect(user.mfaChallengeAttempts).toBe(0);
+        expect(user.save).toHaveBeenCalledTimes(1);
+        expect(sign).toHaveBeenCalledWith(
+            expect.objectContaining({ purpose: "mfa-enroll" }),
+            "test-access-secret",
+            expect.objectContaining({ jwtid: user.mfaChallengeId })
+        );
     });
 
     it("logs in with username and rotates refresh token", async () => {
@@ -963,5 +1034,110 @@ describe("auth service", () => {
             { date: "2026-05-16", total: 5, FAILED_LOGIN: 2, LOGIN: 3 },
             { date: "2026-05-17", total: 1, USER_MANAGEMENT: 1 },
         ]);
+    });
+
+    it("consumes an MFA challenge after one successful use, regardless of source IP", async () => {
+        const user = buildUser({
+            mfaEnabled: true,
+            mfaRequired: true,
+            mfaSecretEncrypted: "encrypted:mfa-secret",
+            mfaChallengeId: "challenge-123",
+            mfaChallengePurpose: "mfa-login",
+            mfaChallengeExpiresAt: new Date(Date.now() + 60_000),
+        });
+        const select = vi.fn().mockResolvedValue(user);
+        mockFindById.mockReturnValue({ select });
+        mockFindOneAndUpdate.mockResolvedValue(user);
+        verify.mockReturnValue({
+            sub: user._id,
+            purpose: "mfa-login",
+            jti: "challenge-123",
+        });
+        sign.mockReturnValue("access-token");
+
+        await completeMfaLogin({
+            mfaChallenge: "c".repeat(64),
+            code: "123456",
+            req: { headers: { "x-forwarded-for": "198.51.100.10" }, ip: "10.0.0.2" },
+        });
+
+        expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                mfaChallengeId: "challenge-123",
+                mfaChallengeAttempts: { $lt: 5 },
+            }),
+            expect.objectContaining({
+                $set: expect.objectContaining({ mfaChallengeId: null }),
+            }),
+            { new: true }
+        );
+        expect(user.mfaChallengeId).toBeNull();
+
+        await expect(completeMfaLogin({
+            mfaChallenge: "c".repeat(64),
+            code: "123456",
+            req: { headers: { "x-forwarded-for": "203.0.113.77" }, ip: "10.0.0.2" },
+        })).rejects.toMatchObject({ code: "INVALID_MFA_CHALLENGE" });
+    });
+
+    it("invalidates an MFA challenge after five failed attempts across different IPs", async () => {
+        const user = buildUser({
+            mfaEnabled: true,
+            mfaRequired: true,
+            mfaSecretEncrypted: "encrypted:mfa-secret",
+            mfaChallengeId: "challenge-456",
+            mfaChallengePurpose: "mfa-login",
+            mfaChallengeExpiresAt: new Date(Date.now() + 60_000),
+            mfaChallengeAttempts: 0,
+        });
+        mockFindById.mockReturnValue({ select: vi.fn().mockResolvedValue(user) });
+        verify.mockReturnValue({
+            sub: user._id,
+            purpose: "mfa-login",
+            jti: "challenge-456",
+        });
+        verifyTotp.mockReturnValue(false);
+        mockFindOneAndUpdate.mockImplementation((filter, update) => {
+            if (update.$inc) {
+                if (user.mfaChallengeAttempts >= filter.mfaChallengeAttempts.$lt) {
+                    return Promise.resolve(null);
+                }
+                user.mfaChallengeAttempts += update.$inc.mfaChallengeAttempts;
+                return Promise.resolve(user);
+            }
+
+            if (update.$set) {
+                if (filter.mfaChallengeAttempts !== user.mfaChallengeAttempts) {
+                    return Promise.resolve(null);
+                }
+                user.mfaChallengeId = update.$set.mfaChallengeId;
+                user.mfaChallengePurpose = update.$set.mfaChallengePurpose;
+                user.mfaChallengeExpiresAt = update.$set.mfaChallengeExpiresAt;
+                user.mfaChallengeAttempts = update.$set.mfaChallengeAttempts;
+                return Promise.resolve(user);
+            }
+
+            return Promise.resolve(null);
+        });
+
+        for (let attempt = 1; attempt <= 5; attempt += 1) {
+            await expect(completeMfaLogin({
+                mfaChallenge: "d".repeat(64),
+                code: "000000",
+                req: { headers: { "x-forwarded-for": `198.51.100.${attempt}` }, ip: "10.0.0.2" },
+            })).rejects.toMatchObject({ code: "INVALID_MFA_CODE" });
+        }
+
+        expect(user.mfaChallengeId).toBeNull();
+        expect(user.mfaChallengeAttempts).toBe(5);
+        expect(recordAuthAuditEvent).toHaveBeenLastCalledWith(
+            expect.objectContaining({ reason: "MFA_CHALLENGE_EXHAUSTED" })
+        );
+
+        await expect(completeMfaLogin({
+            mfaChallenge: "d".repeat(64),
+            code: "000000",
+            req: { headers: { "x-forwarded-for": "203.0.113.5" }, ip: "10.0.0.2" },
+        })).rejects.toMatchObject({ code: "INVALID_MFA_CHALLENGE" });
     });
 });
