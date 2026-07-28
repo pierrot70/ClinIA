@@ -14,6 +14,9 @@ const recordAuthAuditEvent = vi.fn();
 const createRefreshTokenFamilyId = vi.fn(() => "family-123");
 const createRefreshTokenSession = vi.fn();
 const findRefreshTokenSession = vi.fn();
+const hasActiveRefreshTokenSessionsForUser = vi.fn();
+const listActiveRefreshTokenSessionsForUser = vi.fn();
+const revokeRefreshTokenSessionForUser = vi.fn();
 const revokeRefreshTokenFamiliesForUser = vi.fn();
 const revokeRefreshTokenFamily = vi.fn();
 const rotateActiveRefreshTokenSession = vi.fn();
@@ -50,6 +53,9 @@ vi.mock("../../services/auth/refreshTokenFamilies.js", () => ({
     createRefreshTokenFamilyId,
     createRefreshTokenSession,
     findRefreshTokenSession,
+    hasActiveRefreshTokenSessionsForUser,
+    listActiveRefreshTokenSessionsForUser,
+    revokeRefreshTokenSessionForUser,
     revokeRefreshTokenFamiliesForUser,
     revokeRefreshTokenFamily,
     rotateActiveRefreshTokenSession,
@@ -139,6 +145,8 @@ function buildUser(overrides = {}) {
         mfaChallengeExpiresAt: null,
         mfaChallengeAttempts: 0,
         mfaLockedUntil: null,
+        activeSessionId: null,
+        activeSessionIds: [],
         save: vi.fn().mockResolvedValue(undefined),
         ...overrides,
     };
@@ -149,6 +157,9 @@ beforeEach(() => {
     createRefreshTokenFamilyId.mockReturnValue("family-123");
     createRefreshTokenSession.mockResolvedValue(undefined);
     findRefreshTokenSession.mockResolvedValue(null);
+    hasActiveRefreshTokenSessionsForUser.mockResolvedValue(false);
+    listActiveRefreshTokenSessionsForUser.mockResolvedValue([]);
+    revokeRefreshTokenSessionForUser.mockResolvedValue(undefined);
     revokeRefreshTokenFamiliesForUser.mockResolvedValue(undefined);
     revokeRefreshTokenFamily.mockResolvedValue(undefined);
     rotateActiveRefreshTokenSession.mockResolvedValue(null);
@@ -226,6 +237,28 @@ describe("auth service", () => {
             "test-access-secret",
             expect.objectContaining({ jwtid: user.mfaChallengeId })
         );
+    });
+
+    it("requires MFA enrollment before replacing an active optional-MFA session", async () => {
+        const user = buildUser({ mfaEnabled: false, mfaRequired: false });
+        mockFindOne.mockResolvedValue(user);
+        compare.mockResolvedValue(true);
+        hasActiveRefreshTokenSessionsForUser.mockResolvedValue(true);
+        sign.mockReturnValue("mfa-challenge-token");
+
+        const result = await login({
+            email: "admin@example.com",
+            password: "password123",
+            req: { headers: {}, ip: "127.0.0.1" },
+        });
+
+        expect(result).toMatchObject({
+            mfaRequired: true,
+            mfaEnrollmentRequired: true,
+            mfaChallenge: "mfa-challenge-token",
+        });
+        expect(user.mfaChallengePurpose).toBe("mfa-concurrent-enroll");
+        expect(revokeRefreshTokenFamiliesForUser).not.toHaveBeenCalled();
     });
 
     it("logs in with username and rotates refresh token", async () => {
@@ -327,6 +360,29 @@ describe("auth service", () => {
         });
     });
 
+    it("identifies a refresh from an evicted session", async () => {
+        const user = buildUser({
+            activeSessionIds: ["newer-session"],
+        });
+        findRefreshTokenSession.mockResolvedValue({
+            userId: user._id,
+            familyId: "family-123",
+            sessionId: "evicted-session",
+            status: "REVOKED",
+            expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+        });
+        mockFindById.mockResolvedValue(user);
+
+        await expect(
+            refresh({
+                refreshToken: "a".repeat(64),
+                req: { headers: {}, ip: "127.0.0.1" },
+            })
+        ).rejects.toMatchObject({
+            code: "SESSION_REPLACED",
+        });
+    });
+
     it("rotates refresh token when refresh is valid", async () => {
         const user = buildUser({
             refreshTokenHash: "old-hash",
@@ -335,9 +391,11 @@ describe("auth service", () => {
         findRefreshTokenSession.mockResolvedValue({
             userId: user._id,
             familyId: "family-123",
+            sessionId: "session-123",
             status: "ACTIVE",
             expiresAt: new Date(Date.now() + 5 * 60 * 1000),
         });
+        user.activeSessionIds = ["session-123"];
         mockFindById.mockResolvedValue(user);
         rotateActiveRefreshTokenSession.mockResolvedValue({ familyId: "family-123" });
         sign.mockReturnValue("new-access-token");
@@ -360,10 +418,12 @@ describe("auth service", () => {
             refreshTokenHash: "old-hash",
             refreshTokenExpiresAt: new Date(Date.now() - 1_000),
             authTokenInvalidBefore: null,
+            activeSessionIds: ["session-123"],
         });
         findRefreshTokenSession.mockResolvedValue({
             userId: user._id,
             familyId: "family-123",
+            sessionId: "session-123",
             status: "ACTIVE",
             expiresAt: new Date(Date.now() - 1_000),
         });
@@ -388,10 +448,12 @@ describe("auth service", () => {
         const user = buildUser({
             refreshTokenHash: "current-hash",
             refreshTokenExpiresAt: new Date(Date.now() + 5 * 60 * 1000),
+            activeSessionIds: ["session-123"],
         });
         findRefreshTokenSession.mockResolvedValue({
             userId: user._id,
             familyId: "family-compromised",
+            sessionId: "session-123",
             status: "ROTATED",
             expiresAt: new Date(Date.now() + 5 * 60 * 1000),
         });
@@ -1079,6 +1141,61 @@ describe("auth service", () => {
             code: "123456",
             req: { headers: { "x-forwarded-for": "203.0.113.77" }, ip: "10.0.0.2" },
         })).rejects.toMatchObject({ code: "INVALID_MFA_CHALLENGE" });
+    });
+
+    it("keeps two sessions and evicts the oldest when a third MFA session is created", async () => {
+        const user = buildUser({
+            mfaEnabled: true,
+            mfaRequired: true,
+            mfaSecretEncrypted: "encrypted:mfa-secret",
+            mfaChallengeId: "challenge-session-replacement",
+            mfaChallengePurpose: "mfa-login",
+            mfaChallengeExpiresAt: new Date(Date.now() + 60_000),
+            activeSessionIds: ["desktop-session", "phone-session"],
+        });
+        mockFindById.mockReturnValue({ select: vi.fn().mockResolvedValue(user) });
+        mockFindOneAndUpdate.mockResolvedValue(user);
+        verify.mockReturnValue({
+            sub: user._id,
+            purpose: "mfa-login",
+            jti: "challenge-session-replacement",
+        });
+        listActiveRefreshTokenSessionsForUser.mockResolvedValue([
+            { sessionId: "desktop-session", createdAt: new Date("2026-07-28T10:00:00.000Z") },
+            { sessionId: "phone-session", createdAt: new Date("2026-07-28T10:01:00.000Z") },
+        ]);
+        sign.mockReturnValue("access-token");
+
+        await completeMfaLogin({
+            mfaChallenge: "e".repeat(64),
+            code: "123456",
+            req: { headers: {}, ip: "127.0.0.1" },
+        });
+
+        expect(revokeRefreshTokenSessionForUser).toHaveBeenCalledWith(
+            user._id,
+            "desktop-session",
+            "SESSION_LIMIT_REACHED",
+            expect.any(Date)
+        );
+        expect(user.activeSessionIds).toEqual([
+            "phone-session",
+            expect.stringMatching(/^[0-9a-f-]{36}$/i),
+        ]);
+        expect(createSecurityIncident).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: "SESSION_LIMIT_REACHED",
+                phase: "auth",
+                requestPath: "/api/auth/login/mfa",
+                context: { userId: user._id, role: user.role },
+            })
+        );
+        expect(recordAuthAuditEvent).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: "SESSION_LIMIT_REACHED",
+                outcome: "SUCCESS",
+            })
+        );
     });
 
     it("invalidates an MFA challenge after five failed attempts across different IPs", async () => {

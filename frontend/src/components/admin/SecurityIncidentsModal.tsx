@@ -81,6 +81,9 @@ type HeaderLabels = {
         refreshTokenReplayWhatHappened: string;
         refreshTokenReplayWhatWasBlocked: string;
         refreshTokenReplayNextStep: string;
+        sessionLimitReachedWhatHappened: string;
+        sessionLimitReachedWhatWasBlocked: string;
+        sessionLimitReachedNextStep: string;
         pagePrefix: string;
         pageSeparator: string;
         resultSuffix: string;
@@ -157,6 +160,14 @@ export function SecurityIncidentsModal({
                 whatHappened: labels.refreshTokenReplayWhatHappened,
                 whatWasBlocked: labels.refreshTokenReplayWhatWasBlocked,
                 nextStep: labels.refreshTokenReplayNextStep,
+            };
+        }
+
+        if (item.type === "SESSION_LIMIT_REACHED") {
+            return {
+                whatHappened: labels.sessionLimitReachedWhatHappened,
+                whatWasBlocked: labels.sessionLimitReachedWhatWasBlocked,
+                nextStep: labels.sessionLimitReachedNextStep,
             };
         }
 
@@ -294,6 +305,7 @@ export function SecurityIncidentsModal({
                                 <option value="CSP_VIOLATION">CSP_VIOLATION</option>
                                 <option value="REFRESH_TOKEN_REPLAY">REFRESH_TOKEN_REPLAY</option>
                                 <option value="MFA_CHALLENGE_EXHAUSTED">MFA_CHALLENGE_EXHAUSTED</option>
+                                <option value="SESSION_LIMIT_REACHED">SESSION_LIMIT_REACHED</option>
                             </select>
                         </label>
                     </div>

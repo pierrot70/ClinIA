@@ -69,6 +69,18 @@ const AdminUserSchema = new mongoose.Schema({
         default: null,
         index: true,
     },
+    // Legacy single-session value retained while older issued tokens expire.
+    activeSessionId: {
+        type: String,
+        default: null,
+        index: true,
+    },
+    // Up to two active devices may coexist. The legacy single value above is
+    // retained temporarily so sessions issued before this policy remain valid.
+    activeSessionIds: {
+        type: [String],
+        default: [],
+    },
     massDownloadRestrictedUntil: {
         type: Date,
         default: null,

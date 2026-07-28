@@ -8,6 +8,7 @@ import {
     AUTH_ROLE_VALUES,
     LOCKOUT_DURATION_MS,
     MAX_LOGIN_ATTEMPTS,
+    MAX_CONCURRENT_AUTH_SESSIONS,
     MFA_LOCKOUT_DURATION_MS,
     REFRESH_TOKEN_TTL_MS,
     SESSION_ABSOLUTE_TIMEOUT_MS,
@@ -38,9 +39,12 @@ import {
     createRefreshTokenFamilyId,
     createRefreshTokenSession,
     findRefreshTokenSession,
+    hasActiveRefreshTokenSessionsForUser,
+    listActiveRefreshTokenSessionsForUser,
     REFRESH_TOKEN_SESSION_STATUS,
     revokeRefreshTokenFamiliesForUser,
     revokeRefreshTokenFamily,
+    revokeRefreshTokenSessionForUser,
     rotateActiveRefreshTokenSession,
 } from "./auth/refreshTokenFamilies.js";
 import {
@@ -72,6 +76,8 @@ function clearActiveSession(user, at = new Date()) {
     user.sessionStartedAt = null;
     user.lastActivityAt = null;
     user.lastLogoutAt = at;
+    user.activeSessionId = null;
+    user.activeSessionIds = [];
     revokeAccessTokens(user, at);
 }
 
@@ -87,11 +93,12 @@ function getJwtAccessSecret() {
     return secret;
 }
 
-function signAccessToken(user) {
+function signAccessToken(user, sessionId = user.activeSessionId) {
     return jwt.sign(
         {
             role: user.role,
             username: user.username,
+            sid: sessionId || null,
         },
         getJwtAccessSecret(),
         {
@@ -469,7 +476,11 @@ function assertRegisterInput({ username, password, role }) {
     return normalizedUsername;
 }
 
-async function setRotatedRefreshToken(user, familyId = createRefreshTokenFamilyId()) {
+async function setRotatedRefreshToken(
+    user,
+    familyId = createRefreshTokenFamilyId(),
+    sessionId = user.activeSessionId || null
+) {
     const refreshToken = makeRefreshToken();
     const tokenHash = hashToken(refreshToken);
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
@@ -477,6 +488,7 @@ async function setRotatedRefreshToken(user, familyId = createRefreshTokenFamilyI
     await createRefreshTokenSession({
         userId: user._id,
         familyId,
+        sessionId,
         tokenHash,
         expiresAt,
     });
@@ -490,17 +502,89 @@ async function setRotatedRefreshToken(user, familyId = createRefreshTokenFamilyI
     return refreshToken;
 }
 
+function getKnownActiveSessionIds(user) {
+    const known = Array.isArray(user?.activeSessionIds)
+        ? user.activeSessionIds.filter((value) => typeof value === "string" && value)
+        : [];
+
+    if (
+        typeof user?.activeSessionId === "string" &&
+        user.activeSessionId &&
+        !known.includes(user.activeSessionId)
+    ) {
+        known.unshift(user.activeSessionId);
+    }
+
+    return [...new Set(known)];
+}
+
+function isKnownActiveSession(user, sessionId) {
+    return typeof sessionId === "string" &&
+        getKnownActiveSessionIds(user).includes(sessionId);
+}
+
 async function completeAuthenticatedSession(user, ip, mfaAction = null) {
+    const now = new Date();
+    const activeSessions = await listActiveRefreshTokenSessionsForUser(user._id, now);
+    const activeSessionIds = [
+        ...getKnownActiveSessionIds(user),
+        ...activeSessions
+            .map((session) => session?.sessionId)
+            .filter((value) => typeof value === "string" && value),
+    ].filter((value, index, values) => values.indexOf(value) === index);
+    const sessionId = crypto.randomUUID();
+    let evictedSessionId = null;
+
+    if (activeSessionIds.length >= MAX_CONCURRENT_AUTH_SESSIONS) {
+        evictedSessionId = activeSessionIds.shift();
+        await revokeRefreshTokenSessionForUser(
+            user._id,
+            evictedSessionId,
+            "SESSION_LIMIT_REACHED",
+            now
+        );
+        if (user.activeSessionId === evictedSessionId) {
+            user.activeSessionId = null;
+        }
+    }
+
     user.failedLoginAttempts = 0;
     user.lockUntil = null;
     user.mfaLockedUntil = null;
-    user.lastLoginAt = new Date();
+    user.lastLoginAt = now;
     user.sessionStartedAt = user.lastLoginAt;
     user.lastActivityAt = user.lastLoginAt;
     user.authTokenInvalidBefore = null;
-    await revokeRefreshTokenFamiliesForUser(user._id, "NEW_LOGIN");
-    const refreshToken = await setRotatedRefreshToken(user);
-    const accessToken = signAccessToken(user);
+    user.activeSessionIds = [...activeSessionIds, sessionId];
+    const refreshToken = await setRotatedRefreshToken(user, undefined, sessionId);
+    const accessToken = signAccessToken(user, sessionId);
+
+    if (evictedSessionId) {
+        await recordAuthAuditEvent({
+            action: "SESSION_LIMIT_REACHED",
+            outcome: "SUCCESS",
+            userId: user._id,
+            username: user.username,
+            role: user.role,
+            ip,
+            reason: "OLDEST_SESSION_REVOKED",
+        });
+
+        try {
+            await createSecurityIncident({
+                type: "SESSION_LIMIT_REACHED",
+                phase: "auth",
+                reason: "Une nouvelle connexion MFA a ferme la session active la plus ancienne.",
+                requestPath: "/api/auth/login/mfa",
+                transport: "internal_auth",
+                matches: [],
+                context: { userId: String(user._id), role: user.role },
+            });
+        } catch (error) {
+            logSafeError("SESSION_LIMIT_INCIDENT_WRITE_FAILED", error);
+        }
+    }
+
     await recordAuthAuditEvent({ action: mfaAction || "LOGIN", outcome: "SUCCESS", userId: user._id, username: user.username, role: user.role, ip });
     return {
         accessToken, refreshToken, expiresIn: ACCESS_TOKEN_EXPIRES_IN,
@@ -751,7 +835,12 @@ export async function login({ username, email, password, req }) {
         );
     }
 
-    if (!requiresMfa(user)) return completeAuthenticatedSession(user, ip);
+    const replacesExistingSession =
+        await hasActiveRefreshTokenSessionsForUser(user._id);
+
+    if (!requiresMfa(user) && !replacesExistingSession) {
+        return completeAuthenticatedSession(user, ip);
+    }
 
     if (user.mfaLockedUntil && user.mfaLockedUntil.getTime() > Date.now()) {
         await recordAuthAuditEvent({
@@ -775,7 +864,10 @@ export async function login({ username, email, password, req }) {
         const secret = createMfaSecret();
         user.mfaPendingSecretEncrypted = encryptMfaSecret(secret);
         user.mfaPendingExpiresAt = new Date(Date.now() + MFA_CHALLENGE_TTL_SECONDS * 1000);
-        const mfaChallenge = createMfaChallenge(user, "mfa-enroll");
+        const mfaChallenge = createMfaChallenge(
+            user,
+            replacesExistingSession ? "mfa-concurrent-enroll" : "mfa-enroll"
+        );
         await user.save();
         return {
             mfaRequired: true, mfaEnrollmentRequired: true,
@@ -798,13 +890,13 @@ export async function completeMfaLogin({ mfaChallenge, code, req }) {
     const user = await AdminUser.findById(challenge.sub).select(
         "+mfaSecretEncrypted +mfaPendingSecretEncrypted +mfaPendingExpiresAt +mfaRecoveryCodeHashes +mfaChallengeId +mfaChallengePurpose +mfaChallengeExpiresAt +mfaChallengeAttempts"
     );
-    if (!user || user.isActive === false || !requiresMfa(user)) throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
+    if (!user || user.isActive === false) throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
     const ip = getRequestIp(req);
     let recoveryCodes = null;
     if (!hasActiveMfaChallenge(user, challenge)) {
         throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
     }
-    if (challenge.purpose === "mfa-enroll") {
+    if (["mfa-enroll", "mfa-concurrent-enroll"].includes(challenge.purpose)) {
         if (!user.mfaPendingSecretEncrypted || !user.mfaPendingExpiresAt || user.mfaPendingExpiresAt <= new Date()) throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
         if (!verifyTotp(decryptMfaSecret(user.mfaPendingSecretEncrypted), code)) {
             const attempt = await recordFailedMfaChallengeAttempt(user, challenge);
@@ -822,6 +914,9 @@ export async function completeMfaLogin({ mfaChallenge, code, req }) {
         user.mfaPendingExpiresAt = null;
         user.mfaRecoveryCodeHashes = recoveryCodes.map(hashRecoveryCode);
         user.mfaEnabled = true;
+        if (challenge.purpose === "mfa-concurrent-enroll") {
+            user.mfaRequired = true;
+        }
         clearMfaChallenge(user);
         await user.save();
         const session = await completeAuthenticatedSession(user, ip, "MFA_ENROLLED");
@@ -869,6 +964,7 @@ export async function refresh({ refreshToken, req }) {
                 await createRefreshTokenSession({
                     userId: user._id,
                     familyId,
+                    sessionId: user.activeSessionId || null,
                     tokenHash,
                     expiresAt,
                     status: REFRESH_TOKEN_SESSION_STATUS.ROTATED,
@@ -877,6 +973,7 @@ export async function refresh({ refreshToken, req }) {
                 tokenSession = {
                     userId: user._id,
                     familyId,
+                    sessionId: user.activeSessionId || null,
                     status: REFRESH_TOKEN_SESSION_STATUS.ROTATED,
                     expiresAt,
                     legacyUpgrade: true,
@@ -889,6 +986,14 @@ export async function refresh({ refreshToken, req }) {
         throw createAuthError(
             "INVALID_REFRESH_TOKEN",
             "Refresh token invalide."
+        );
+    }
+
+    const sessionId = tokenSession.sessionId || user.activeSessionId || null;
+    if (!isKnownActiveSession(user, sessionId)) {
+        throw createAuthError(
+            "SESSION_REPLACED",
+            "Cette session a ete remplacee par une connexion plus recente."
         );
     }
 
@@ -956,8 +1061,12 @@ export async function refresh({ refreshToken, req }) {
         familyId = rotated.familyId;
     }
 
-    const newRefreshToken = await setRotatedRefreshToken(user, familyId);
-    const accessToken = signAccessToken(user);
+    const newRefreshToken = await setRotatedRefreshToken(
+        user,
+        familyId,
+        sessionId
+    );
+    const accessToken = signAccessToken(user, sessionId);
 
     return {
         accessToken,
@@ -979,9 +1088,14 @@ export async function logout({ refreshToken, authUser, req }) {
 
     let user = null;
 
+    let tokenSession = null;
     if (typeof refreshToken === "string" && refreshToken.trim()) {
         const tokenHash = hashToken(refreshToken);
+        tokenSession = await findRefreshTokenSession(tokenHash);
         user = await AdminUser.findOne({ refreshTokenHash: tokenHash });
+        if (!user && tokenSession?.userId) {
+            user = await AdminUser.findById(tokenSession.userId);
+        }
     }
 
     if (!user && authUser?.userId) {
@@ -992,8 +1106,21 @@ export async function logout({ refreshToken, authUser, req }) {
         return { success: true };
     }
 
-    clearActiveSession(user, new Date());
-    await revokeRefreshTokenFamiliesForUser(user._id, "LOGOUT");
+    const sessionId = authUser?.sessionId || tokenSession?.sessionId || user.activeSessionId;
+    const now = new Date();
+
+    if (!sessionId) {
+        clearActiveSession(user, now);
+        await revokeRefreshTokenFamiliesForUser(user._id, "LOGOUT", now);
+    } else {
+        user.activeSessionIds = getKnownActiveSessionIds(user)
+            .filter((value) => value !== sessionId);
+        if (user.activeSessionId === sessionId) {
+            user.activeSessionId = null;
+        }
+        user.lastLogoutAt = now;
+        await revokeRefreshTokenSessionForUser(user._id, sessionId, "LOGOUT", now);
+    }
     await user.save();
 
     await recordAuthAuditEvent({

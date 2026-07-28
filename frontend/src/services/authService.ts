@@ -31,6 +31,7 @@ type BasicApiResponse = {
 export type AuthSecurityNotice = {
     code:
         | "TOKEN_REVOKED"
+        | "SESSION_REPLACED"
         | "ACCOUNT_TEMPORARILY_RESTRICTED"
         | "PASSWORD_CHANGE_REQUIRED";
     message: string;
@@ -145,6 +146,7 @@ export function consumeAuthSecurityNotice(): AuthSecurityNotice | null {
         const parsed = JSON.parse(raw) as AuthSecurityNotice | null;
         if (
             parsed?.code === "TOKEN_REVOKED" ||
+            parsed?.code === "SESSION_REPLACED" ||
             parsed?.code === "ACCOUNT_TEMPORARILY_RESTRICTED" ||
             parsed?.code === "PASSWORD_CHANGE_REQUIRED"
         ) {
@@ -235,6 +237,7 @@ function extractAuthSecurityNotice(
 
     if (
         code !== "TOKEN_REVOKED" &&
+        code !== "SESSION_REPLACED" &&
         code !== "ACCOUNT_TEMPORARILY_RESTRICTED" &&
         code !== "PASSWORD_CHANGE_REQUIRED"
     ) {
@@ -255,7 +258,7 @@ function redirectToLoginIfSessionWasForcedOut(
     user: AuthUser | null,
     notice: AuthSecurityNotice | null = null
 ): void {
-    if (!user || user.role === "SUPERADMIN") {
+    if (!user) {
         return;
     }
 
@@ -524,8 +527,9 @@ export async function refreshAccessToken(): Promise<string | null> {
 
             if (!response.ok) {
                 const previousUser = inMemoryUser;
+                const securityNotice = extractAuthSecurityNotice(data);
                 clearSession();
-                redirectToLoginIfSessionWasForcedOut(previousUser);
+                redirectToLoginIfSessionWasForcedOut(previousUser, securityNotice);
                 return null;
             }
 

@@ -4,6 +4,8 @@ const create = vi.fn();
 const findOne = vi.fn();
 const findOneAndUpdate = vi.fn();
 const updateMany = vi.fn();
+const countDocuments = vi.fn();
+const find = vi.fn();
 
 vi.mock("../../../models/RefreshTokenSession.js", () => ({
     RefreshTokenSession: {
@@ -11,6 +13,8 @@ vi.mock("../../../models/RefreshTokenSession.js", () => ({
         findOne,
         findOneAndUpdate,
         updateMany,
+        countDocuments,
+        find,
     },
     REFRESH_TOKEN_SESSION_STATUS: {
         ACTIVE: "ACTIVE",
@@ -24,6 +28,9 @@ const {
     createRefreshTokenSession,
     revokeRefreshTokenFamily,
     revokeRefreshTokenFamiliesForUsers,
+    hasActiveRefreshTokenSessionsForUser,
+    listActiveRefreshTokenSessionsForUser,
+    revokeRefreshTokenSessionForUser,
     rotateActiveRefreshTokenSession,
 } = await import("../refreshTokenFamilies.js");
 
@@ -37,6 +44,7 @@ describe("refresh token families", () => {
         await createRefreshTokenSession({
             userId: "507f1f77bcf86cd799439011",
             familyId: "family-123",
+            sessionId: null,
             tokenHash: "a".repeat(64),
             expiresAt,
         });
@@ -44,6 +52,7 @@ describe("refresh token families", () => {
         expect(create).toHaveBeenCalledWith({
             userId: "507f1f77bcf86cd799439011",
             familyId: "family-123",
+            sessionId: null,
             tokenHash: "a".repeat(64),
             expiresAt,
             status: "ACTIVE",
@@ -109,6 +118,59 @@ describe("refresh token families", () => {
                     status: "REVOKED",
                     revokedAt: now,
                     revocationReason: "SCHEDULED_SHUTDOWN",
+                },
+            }
+        );
+    });
+
+    it("recognizes only unexpired active or rotated sessions as concurrent", async () => {
+        const now = new Date("2026-07-26T10:00:00.000Z");
+        countDocuments.mockResolvedValue(1);
+
+        await expect(
+            hasActiveRefreshTokenSessionsForUser("user-1", now)
+        ).resolves.toBe(true);
+
+        expect(countDocuments).toHaveBeenCalledWith({
+            userId: "user-1",
+            status: { $in: ["ACTIVE", "ROTATED"] },
+            expiresAt: { $gt: now },
+        });
+    });
+
+    it("lists active sessions in creation order and revokes a single session", async () => {
+        const now = new Date("2026-07-26T10:00:00.000Z");
+        const lean = vi.fn().mockResolvedValue([{ sessionId: "desktop-session" }]);
+        const select = vi.fn().mockReturnValue({ lean });
+        const sort = vi.fn().mockReturnValue({ select });
+        find.mockReturnValue({ sort });
+
+        await expect(listActiveRefreshTokenSessionsForUser("user-1", now))
+            .resolves.toEqual([{ sessionId: "desktop-session" }]);
+        expect(find).toHaveBeenCalledWith({
+            userId: "user-1",
+            status: { $in: ["ACTIVE", "ROTATED"] },
+            expiresAt: { $gt: now },
+        });
+        expect(sort).toHaveBeenCalledWith({ createdAt: 1 });
+
+        await revokeRefreshTokenSessionForUser(
+            "user-1",
+            "desktop-session",
+            "SESSION_LIMIT_REACHED",
+            now
+        );
+        expect(updateMany).toHaveBeenCalledWith(
+            {
+                userId: "user-1",
+                sessionId: "desktop-session",
+                status: { $in: ["ACTIVE", "ROTATED"] },
+            },
+            {
+                $set: {
+                    status: "REVOKED",
+                    revokedAt: now,
+                    revocationReason: "SESSION_LIMIT_REACHED",
                 },
             }
         );

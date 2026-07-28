@@ -14,6 +14,7 @@ export function createRefreshTokenFamilyId() {
 export async function createRefreshTokenSession({
     userId,
     familyId,
+    sessionId = null,
     tokenHash,
     expiresAt,
     status = REFRESH_TOKEN_SESSION_STATUS.ACTIVE,
@@ -22,6 +23,7 @@ export async function createRefreshTokenSession({
     return RefreshTokenSession.create({
         userId,
         familyId,
+        sessionId,
         tokenHash,
         expiresAt,
         status,
@@ -31,6 +33,76 @@ export async function createRefreshTokenSession({
 
 export async function findRefreshTokenSession(tokenHash) {
     return RefreshTokenSession.findOne({ tokenHash });
+}
+
+export async function hasActiveRefreshTokenSessionsForUser(
+    userId,
+    now = new Date()
+) {
+    if (!userId) return false;
+
+    const count = await RefreshTokenSession.countDocuments({
+        userId,
+        status: {
+            $in: [
+                REFRESH_TOKEN_SESSION_STATUS.ACTIVE,
+                REFRESH_TOKEN_SESSION_STATUS.ROTATED,
+            ],
+        },
+        expiresAt: { $gt: now },
+    });
+
+    return count > 0;
+}
+
+export async function listActiveRefreshTokenSessionsForUser(
+    userId,
+    now = new Date()
+) {
+    if (!userId) return [];
+
+    return RefreshTokenSession.find({
+        userId,
+        status: {
+            $in: [
+                REFRESH_TOKEN_SESSION_STATUS.ACTIVE,
+                REFRESH_TOKEN_SESSION_STATUS.ROTATED,
+            ],
+        },
+        expiresAt: { $gt: now },
+    })
+        .sort({ createdAt: 1 })
+        .select("familyId sessionId createdAt")
+        .lean();
+}
+
+export async function revokeRefreshTokenSessionForUser(
+    userId,
+    sessionId,
+    reason,
+    now = new Date()
+) {
+    if (!userId || !sessionId) return;
+
+    await RefreshTokenSession.updateMany(
+        {
+            userId,
+            sessionId,
+            status: {
+                $in: [
+                    REFRESH_TOKEN_SESSION_STATUS.ACTIVE,
+                    REFRESH_TOKEN_SESSION_STATUS.ROTATED,
+                ],
+            },
+        },
+        {
+            $set: {
+                status: REFRESH_TOKEN_SESSION_STATUS.REVOKED,
+                revokedAt: now,
+                revocationReason: reason,
+            },
+        }
+    );
 }
 
 export async function rotateActiveRefreshTokenSession(tokenHash, now = new Date()) {

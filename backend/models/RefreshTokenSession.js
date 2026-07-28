@@ -18,6 +18,10 @@ const RefreshTokenSessionSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        sessionId: {
+            type: String,
+            default: null,
+        },
         tokenHash: {
             type: String,
             required: true,
@@ -63,6 +67,10 @@ RefreshTokenSessionSchema.index(
 RefreshTokenSessionSchema.index(
     { userId: 1, status: 1 },
     { name: "user_status" }
+);
+RefreshTokenSessionSchema.index(
+    { userId: 1, sessionId: 1, status: 1 },
+    { name: "user_session_status" }
 );
 RefreshTokenSessionSchema.index(
     { expiresAt: 1 },

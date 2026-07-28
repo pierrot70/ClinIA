@@ -38,6 +38,7 @@ import LoginPage from "./LoginPage";
 describe("LoginPage MFA recovery codes", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        window.sessionStorage.clear();
         auth.isAuthenticated = false;
         auth.user = null;
         auth.login.mockRejectedValue(
@@ -62,6 +63,35 @@ describe("LoginPage MFA recovery codes", () => {
                 recoveryCodes: ["RECOVERY-ONE", "RECOVERY-TWO"],
             };
         });
+    });
+
+    it("shows a full-screen explanation when a newer sign-in replaced this session", async () => {
+        window.sessionStorage.setItem(
+            "clinia.auth.security_notice",
+            JSON.stringify({
+                code: "SESSION_REPLACED",
+                message: "Cette session a ete remplacee.",
+            })
+        );
+
+        render(
+            <MemoryRouter initialEntries={["/login"]}>
+                <Routes>
+                    <Route path="/login" element={<LoginPage />} />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        expect(await screen.findByRole("alertdialog")).toHaveTextContent(
+            "Une connexion plus recente a remplace cette session."
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", { name: "Se reconnecter avec MFA" })
+        );
+
+        expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Se connecter" })).toBeInTheDocument();
     });
 
     it("shows recovery codes before redirecting after a successful MFA enrollment", async () => {

@@ -102,6 +102,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     const recoveryContinueFailedLabel = useLoginLabel(recoveryLabels.continueFailed, "login.recovery.continueFailed");
     const revokedTitleLabel = useLoginLabel(labels.auth.session.revokedTitle, "auth.session.revokedTitle");
     const revokedBodyLabel = useLoginLabel(labels.auth.session.revokedBody, "auth.session.revokedBody");
+    const replacedTitleLabel = useLoginLabel(labels.auth.session.replacedTitle, "auth.session.replacedTitle");
+    const replacedBodyLabel = useLoginLabel(labels.auth.session.replacedBody, "auth.session.replacedBody");
+    const replacedActionLabel = useLoginLabel(labels.auth.session.replacedAction, "auth.session.replacedAction");
     const restrictedTitleLabel = useLoginLabel(labels.auth.session.restrictedTitle, "auth.session.restrictedTitle");
     const restrictedBodyLabel = useLoginLabel(labels.auth.session.restrictedBody, "auth.session.restrictedBody");
     const restrictedUntilPrefixLabel = useLoginLabel(labels.auth.session.restrictedUntilPrefix, "auth.session.restrictedUntilPrefix");
@@ -292,7 +295,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                         : descriptionLogin}
             </p>
 
-            {securityNotice && (
+            {securityNotice && securityNotice.code !== "SESSION_REPLACED" && (
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                     <p className="font-semibold">
                         {securityNotice.code === "ACCOUNT_TEMPORARILY_RESTRICTED"
@@ -310,6 +313,31 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                                 {restrictedUntilPrefixLabel} {securityNotice.restrictedUntil}
                             </p>
                         )}
+                </div>
+            )}
+
+            {securityNotice?.code === "SESSION_REPLACED" && (
+                <div
+                    className="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-950/75 px-4"
+                    role="alertdialog"
+                    aria-modal="true"
+                    aria-labelledby="session-replaced-title"
+                >
+                    <section className="w-full max-w-2xl rounded-xl border border-amber-300 bg-white p-8 text-center shadow-2xl">
+                        <h2 id="session-replaced-title" className="text-2xl font-semibold text-slate-950">
+                            {replacedTitleLabel}
+                        </h2>
+                        <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-700">
+                            {replacedBodyLabel}
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => setSecurityNotice(null)}
+                            className="mt-7 rounded bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+                        >
+                            {replacedActionLabel}
+                        </button>
+                    </section>
                 </div>
             )}
 

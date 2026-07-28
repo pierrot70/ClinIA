@@ -30,6 +30,19 @@ function isTokenRevokedByServer(user, payload) {
         issuedAtMs <= new Date(user.authTokenInvalidBefore).getTime();
 }
 
+function isTokenFromInactiveSession(user, payload) {
+    const activeSessionIds = Array.isArray(user?.activeSessionIds)
+        ? user.activeSessionIds
+        : [];
+    const legacySessionId = user?.activeSessionId;
+    const knownSessionIds = new Set([
+        ...activeSessionIds,
+        ...(legacySessionId ? [legacySessionId] : []),
+    ]);
+
+    return knownSessionIds.size > 0 && !knownSessionIds.has(payload?.sid);
+}
+
 function isAllowedWhilePasswordResetRequired(req) {
     const path = req.originalUrl || req.path || req.url || "";
     const method = (req.method || "GET").toUpperCase();
@@ -85,7 +98,7 @@ export async function verifyJWT(req, res, next) {
         }
 
         const user = await AdminUser.findById(payload.sub)
-            .select("_id username role isActive authTokenInvalidBefore sessionStartedAt lastActivityAt refreshTokenHash refreshTokenExpiresAt lastLogoutAt passwordResetRequired mustChangePasswordOnNextLogin");
+            .select("_id username role isActive authTokenInvalidBefore activeSessionId activeSessionIds sessionStartedAt lastActivityAt refreshTokenHash refreshTokenExpiresAt lastLogoutAt passwordResetRequired mustChangePasswordOnNextLogin");
 
         if (!user || user.isActive === false) {
             return res.status(401).json({
@@ -102,6 +115,16 @@ export async function verifyJWT(req, res, next) {
                 error: {
                     code: "INVALID_TOKEN",
                     message: "Token d'acces invalide ou expire.",
+                    retryable: false,
+                },
+            });
+        }
+
+        if (isTokenFromInactiveSession(user, payload)) {
+            return res.status(401).json({
+                error: {
+                    code: "SESSION_REPLACED",
+                    message: "Cette session a ete remplacee par une connexion plus recente.",
                     retryable: false,
                 },
             });
@@ -171,6 +194,7 @@ export async function verifyJWT(req, res, next) {
             userId: String(user._id),
             role: user.role,
             username: user.username,
+            sessionId: payload.sid || null,
             passwordResetRequired: user.passwordResetRequired === true,
             mustChangePasswordOnNextLogin:
                 user.mustChangePasswordOnNextLogin === true,

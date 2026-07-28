@@ -25,6 +25,18 @@ function isTokenRevokedByServer(user, payload) {
         issuedAtMs <= new Date(user.authTokenInvalidBefore).getTime();
 }
 
+function isTokenFromInactiveSession(user, payload) {
+    const activeSessionIds = Array.isArray(user?.activeSessionIds)
+        ? user.activeSessionIds
+        : [];
+    const legacySessionId = user?.activeSessionId;
+    const knownSessionIds = new Set([
+        ...activeSessionIds,
+        ...(legacySessionId ? [legacySessionId] : []),
+    ]);
+    return knownSessionIds.size > 0 && !knownSessionIds.has(payload?.sid);
+}
+
 export async function attachOptionalAuth(req, res, next) {
     const token = getTokenFromRequest(req);
 
@@ -44,14 +56,15 @@ export async function attachOptionalAuth(req, res, next) {
         }
 
         const user = await AdminUser.findById(payload.sub)
-            .select("_id username role isActive authTokenInvalidBefore")
+            .select("_id username role isActive authTokenInvalidBefore activeSessionId activeSessionIds")
             .lean();
 
         if (
             !user ||
             user.isActive === false ||
             user.role !== payload.role ||
-            isTokenRevokedByServer(user, payload)
+            isTokenRevokedByServer(user, payload) ||
+            isTokenFromInactiveSession(user, payload)
         ) {
             return next();
         }
@@ -60,6 +73,7 @@ export async function attachOptionalAuth(req, res, next) {
             userId: String(user._id),
             role: user.role,
             username: user.username,
+            sessionId: payload.sid || null,
         };
     } catch {
         // Never block analyze flow when auth is optional.

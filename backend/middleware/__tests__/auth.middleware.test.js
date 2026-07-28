@@ -88,6 +88,7 @@ describe("verifyJWT middleware", () => {
             userId: "user-1",
             role: "ADMIN",
             username: "admin",
+            sessionId: null,
             passwordResetRequired: false,
             mustChangePasswordOnNextLogin: false,
         });
@@ -103,6 +104,43 @@ describe("verifyJWT middleware", () => {
         expect(validateSessionState).toHaveBeenCalledTimes(1);
         expect(touchSessionActivity).toHaveBeenCalledTimes(1);
         expect(next).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects an access token from a replaced session", async () => {
+        process.env.JWT_ACCESS_SECRET = "test-access-secret";
+        verify.mockReturnValue({
+            sub: "user-1",
+            role: "ADMIN",
+            username: "admin",
+            sid: "replaced-session",
+            iat: Math.floor(Date.now() / 1000),
+        });
+        findById.mockReturnValue({
+            select: vi.fn().mockResolvedValue({
+                _id: "user-1",
+                role: "ADMIN",
+                username: "admin",
+                isActive: true,
+                activeSessionId: "current-session",
+                authTokenInvalidBefore: null,
+            }),
+        });
+
+        const req = { headers: { authorization: "Bearer old-token" } };
+        const res = makeRes();
+        const next = vi.fn();
+
+        await verifyJWT(req, res, next);
+
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "SESSION_REPLACED",
+                message: "Cette session a ete remplacee par une connexion plus recente.",
+                retryable: false,
+            },
+        });
+        expect(next).not.toHaveBeenCalled();
     });
 
     it("blocks protected access while a forced password reset is pending", async () => {
@@ -182,6 +220,7 @@ describe("verifyJWT middleware", () => {
             userId: "user-1",
             role: "ADMIN",
             username: "admin",
+            sessionId: null,
             passwordResetRequired: true,
             mustChangePasswordOnNextLogin: false,
         });

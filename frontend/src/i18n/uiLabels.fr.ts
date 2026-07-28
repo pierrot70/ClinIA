@@ -25,6 +25,10 @@ export const UI_LABELS_FR = {
             revokedTitle: "Session interrompue par securite",
             revokedBody:
                 "Une activite inhabituelle a ete detectee sur ce compte. Votre session a ete invalidee par securite et une reconnexion est necessaire pour poursuivre. Si cette activite ne venait pas de vous, changez votre mot de passe des maintenant.",
+            replacedTitle: "Session fermee",
+            replacedBody:
+                "Une connexion plus recente a remplace cette session. Vos donnees ne sont pas perdues. Reconnectez-vous et terminez la verification MFA pour continuer.",
+            replacedAction: "Se reconnecter avec MFA",
             restrictedTitle: "Acces temporairement restreint",
             restrictedBody:
                 "Une activite inhabituelle a ete detectee sur ce compte. Votre session a ete invalidee par securite et une reconnexion est necessaire. ClinIA bloque temporairement l'acces aux routes sensibles pendant la periode de restriction. Si cette activite ne venait pas de vous, changez votre mot de passe des maintenant.",
@@ -415,6 +419,12 @@ export const UI_LABELS_FR = {
                 "ClinIA a invalidé la famille complète de jetons associée et a exigé une nouvelle connexion. Le jeton lui-même n'est jamais affiché ni conservé dans cet écran.",
             refreshTokenReplayNextStep:
                 "Si cette reconnexion était attendue, reconnectez-vous simplement. Sinon, considérez la session comme compromise et réinitialisez le mot de passe du compte.",
+            sessionLimitReachedWhatHappened:
+                "Une troisième connexion MFA a été ouverte pour ce compte.",
+            sessionLimitReachedWhatWasBlocked:
+                "ClinIA a fermé la session active la plus ancienne. Les autres sessions actives du compte restent disponibles.",
+            sessionLimitReachedNextStep:
+                "Si ce changement d'appareil n'était pas attendu, réinitialisez le mot de passe du compte et examinez les sessions concernées.",
             mfaChallengeExhaustedWhatHappened:
                 "Cinq codes MFA invalides ont été présentés pour le même défi de connexion.",
             mfaChallengeExhaustedWhatWasBlocked:
