@@ -207,6 +207,60 @@ describe("ClinicalAnalyzePage", () => {
         });
     });
 
+    it("requires acknowledgement before displaying a reused clinical analysis", () => {
+        authUser = { role: "MEDECIN" };
+        configureClinicalAnalysisSlots(
+            {
+                result: { hypothesis: "Hypertension" },
+                loading: false,
+                error: null,
+                errorCode: null,
+                errorFields: [],
+                responseMeta: { cacheHit: true, source: "real", model: "gpt-4.1-mini" },
+                analyze: vi.fn(),
+                resetAnalysis: vi.fn(),
+            },
+            {
+                result: null,
+                loading: false,
+                error: null,
+                errorCode: null,
+                errorFields: [],
+                responseMeta: null,
+                analyze: vi.fn(),
+                resetAnalysis: vi.fn(),
+            },
+            {
+                result: null,
+                loading: false,
+                error: null,
+                errorCode: null,
+                errorFields: [],
+                responseMeta: null,
+                analyze: vi.fn(),
+                resetAnalysis: vi.fn(),
+            }
+        );
+
+        render(
+            <MemoryRouter>
+                <ClinicalAnalyzePage />
+            </MemoryRouter>
+        );
+
+        expect(screen.getByRole("dialog")).toHaveTextContent(
+            "Analyse equivalente deja disponible"
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: "J'ai pris connaissance du resultat reutilise",
+            })
+        );
+
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
     it("replays the same clinical payload with the acknowledged incident ID", async () => {
         const blockingIncident = {
             required: true,

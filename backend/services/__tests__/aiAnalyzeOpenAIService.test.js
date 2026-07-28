@@ -116,6 +116,10 @@ describe("aiAnalyzeOpenAIService", () => {
             upstreamRequestId: "upstream-1",
         });
         expect(recordOpenAISuccess).toHaveBeenCalledTimes(1);
+        const request = openai.chat.completions.create.mock.calls[0][0];
+        expect(request.messages[0].content).toContain(
+            "All textual values in the returned clinical JSON must be in English"
+        );
         expect(logger.log).toHaveBeenCalledWith(
             "OPENAI_RESPONSE_RECEIVED",
             expect.objectContaining({

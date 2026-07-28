@@ -3,12 +3,19 @@ import type { ClinicalPayload, ClinicalAnalysis } from "../types/clinical";
 import type { SecurityIncidentBlockingData } from "../types/api";
 import { authFetch } from "../services/authService";
 
+export type ClinicalAnalysisResponseMeta = {
+  source?: string;
+  model?: string;
+  cacheHit?: boolean;
+};
+
 export function useClinicalAnalysis() {
   const [result, setResult] = useState<ClinicalAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [errorFields, setErrorFields] = useState<string[]>([]);
+  const [responseMeta, setResponseMeta] = useState<ClinicalAnalysisResponseMeta | null>(null);
 
   const analyze = useCallback(async (
     payload: ClinicalPayload
@@ -17,6 +24,7 @@ export function useClinicalAnalysis() {
     setError(null);
     setErrorCode(null);
     setErrorFields([]);
+    setResponseMeta(null);
     setResult(null);
     try {
       const res = await authFetch("/api/ai/analyze", {
@@ -35,15 +43,22 @@ export function useClinicalAnalysis() {
               )
             : []
         );
+        setResponseMeta(null);
         setResult(null);
         return json?.blocking ?? null;
       } else {
         setResult(json?.data ?? json);
+        setResponseMeta(
+          json?.meta && typeof json.meta === "object"
+            ? json.meta as ClinicalAnalysisResponseMeta
+            : null
+        );
         return null;
       }
     } catch (e) {
       setError("Erreur réseau ou serveur.");
       setErrorFields([]);
+      setResponseMeta(null);
       setResult(null);
       return null;
     } finally {
@@ -56,6 +71,7 @@ export function useClinicalAnalysis() {
     setError(null);
     setErrorCode(null);
     setErrorFields([]);
+    setResponseMeta(null);
     setLoading(false);
   }, []);
 
@@ -65,6 +81,7 @@ export function useClinicalAnalysis() {
     error,
     errorCode,
     errorFields,
+    responseMeta,
     analyze,
     resetAnalysis,
   };

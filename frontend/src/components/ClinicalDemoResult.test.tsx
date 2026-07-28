@@ -231,4 +231,44 @@ describe("ClinicalDemoResult", () => {
         );
         expect(onCopyRequest).toHaveBeenCalledTimes(1);
     });
+
+    it("renders a legacy cached result without assuming list-shaped fields", () => {
+        render(
+            <ClinicalDemoResult
+                demoData={{
+                    summary: "A previously saved clinical summary.",
+                    treatments: { legacy: true } as any,
+                    questions: { legacy: true } as any,
+                }}
+            />
+        );
+
+        expect(
+            screen.getByRole("button", { name: /Résumé clinique du patient/i })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: /Questions cliniques à explorer/i })
+        ).toBeInTheDocument();
+    });
+
+    it("renders a structured clinical summary returned by OpenAI", () => {
+        render(
+            <ClinicalDemoResult
+                demoData={{
+                    treatments: [],
+                    clinical_summary: {
+                        assessment: "Hypertension requires follow-up.",
+                    } as any,
+                }}
+            />
+        );
+
+        fireEvent.click(
+            screen.getByRole("button", { name: /Résumé clinique du patient/i })
+        );
+
+        expect(
+            screen.getByText(/Hypertension requires follow-up/)
+        ).toBeInTheDocument();
+    });
 });

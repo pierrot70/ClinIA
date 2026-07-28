@@ -98,7 +98,7 @@ export async function executeOpenAIAnalyze({
             {
                 role: "system",
                 content:
-                    `You are ClinIA, a clinical decision support AI. Provide structured therapeutic options, monitoring, red flags, and a clinician-facing summary for the primary clinical concern or confirmed diagnosis supplied by the user. Do not issue a final diagnosis, do not prescribe autonomously, and return valid JSON only. ${diabetesInstruction}`.trim(),
+                    `You are ClinIA, a clinical decision support AI. Provide structured therapeutic options, monitoring, red flags, and a clinician-facing summary for the primary clinical concern or confirmed diagnosis supplied by the user. Do not issue a final diagnosis, do not prescribe autonomously, and return valid JSON only. All textual values in the returned clinical JSON must be in English, regardless of the language used in the input. ${diabetesInstruction}`.trim(),
             },
             {
                 role: "user",

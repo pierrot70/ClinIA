@@ -54,6 +54,7 @@ export function ClinicalAnalyzePage() {
     const targetLang = i18n.locale;
     const clinicalResultStrings = getClinicalResultStrings(targetLang);
     const clinicalIntroLabels = labels.clinicalDemo.intro;
+    const cachedResultNoticeLabels = labels.clinicalDemo.cachedResultNotice;
     const cloudContentGuardLabels = labels.clinicalDemo.cloudContentGuard;
     const requestBoundaryLabels = cloudContentGuardLabels.requestBoundary;
     const [openaiModel, setOpenaiModel] = useState<OpenAIModel>(DEFAULT_OPENAI_MODEL);
@@ -68,6 +69,7 @@ export function ClinicalAnalyzePage() {
         error,
         errorCode,
         errorFields,
+        responseMeta,
         analyze,
         resetAnalysis,
     } = useClinicalAnalysis();
@@ -103,6 +105,8 @@ export function ClinicalAnalyzePage() {
         useState<"real" | "mock" | "degraded" | null>(null);
     const [reverifyLoading, setReverifyLoading] = useState(false);
     const [copyRequestFeedback, setCopyRequestFeedback] = useState<string | null>(null);
+    const [cachedResultConfirmationRequired, setCachedResultConfirmationRequired] =
+        useState(false);
 
     const [forceReal, setForceReal] = useState(false);
 
@@ -133,6 +137,21 @@ export function ClinicalAnalyzePage() {
         targetLang,
         translationKey: "clinicalDemo.intro.subtitle",
     });
+    const { translated: cachedResultNoticeTitle } = useTranslation({
+        text: cachedResultNoticeLabels.title,
+        targetLang,
+        translationKey: "clinicalDemo.cachedResultNotice.title",
+    });
+    const { translated: cachedResultNoticeDescription } = useTranslation({
+        text: cachedResultNoticeLabels.description,
+        targetLang,
+        translationKey: "clinicalDemo.cachedResultNotice.description",
+    });
+    const { translated: cachedResultNoticeConfirmation } = useTranslation({
+        text: cachedResultNoticeLabels.confirmation,
+        targetLang,
+        translationKey: "clinicalDemo.cachedResultNotice.confirmation",
+    });
 
     useEffect(() => {
         clearLegacyClinicalBrowserStorage();
@@ -146,6 +165,12 @@ export function ClinicalAnalyzePage() {
                   errorCode as keyof typeof requestBoundaryLabels.messages
               ]
             : null;
+
+    useEffect(() => {
+        if (result && responseMeta?.cacheHit === true) {
+            setCachedResultConfirmationRequired(true);
+        }
+    }, [result, responseMeta?.cacheHit]);
 
     useEffect(() => {
         if (shouldRestoreFormForCorrection) {
@@ -783,6 +808,33 @@ export function ClinicalAnalyzePage() {
 
         return (
         <div className="max-w-5xl mx-auto p-6 space-y-6">
+            {cachedResultConfirmationRequired && (
+                <div
+                    className="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-950/75 px-4"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="cached-analysis-title"
+                >
+                    <section className="w-full max-w-2xl rounded-lg border-2 border-amber-300 bg-white p-7 text-center shadow-2xl">
+                        <h2
+                            id="cached-analysis-title"
+                            className="text-2xl font-semibold text-slate-950"
+                        >
+                            {cachedResultNoticeTitle}
+                        </h2>
+                        <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-700">
+                            {cachedResultNoticeDescription}
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => setCachedResultConfirmationRequired(false)}
+                            className="mt-6 rounded bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+                        >
+                            {cachedResultNoticeConfirmation}
+                        </button>
+                    </section>
+                </div>
+            )}
             {showTranslationError && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
                     <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
@@ -1530,7 +1582,11 @@ export function ClinicalAnalyzePage() {
                 </div>
             )}
 
-            {activeTab === "clinical" && !loading && !comparisonLoading && !isComparisonMode && (
+            {activeTab === "clinical" &&
+                !loading &&
+                !comparisonLoading &&
+                !isComparisonMode &&
+                !cachedResultConfirmationRequired && (
                 <div className="space-y-4">
                     <div className="flex justify-start">
                         <button

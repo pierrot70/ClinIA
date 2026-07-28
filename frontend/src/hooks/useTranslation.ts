@@ -79,8 +79,8 @@ function baseLocale(locale: string) {
   return locale.toLowerCase().split("-")[0];
 }
 
-function shouldTranslateText(text: string) {
-  return /[\p{L}\p{N}]/u.test(text.trim());
+function shouldTranslateText(text: unknown) {
+  return typeof text === "string" && /[\p{L}\p{N}]/u.test(text.trim());
 }
 
 export function useTranslation({ text, targetLang, namespace = "clinical-demo", sourceLocale = "fr", openaiModel, translationKey }: {

@@ -40,6 +40,37 @@ describe('useClinicalAnalysis', () => {
     expect(result.current.loading).toBe(false);
   });
 
+  it('exposes only safe cache metadata when an analysis result is reused', async () => {
+    mockAuthFetch.mockResolvedValueOnce({
+      json: async () => ({
+        data: { hypothesis: 'Hypertension' },
+        meta: {
+          cacheHit: true,
+          source: 'real',
+          model: 'gpt-4.1-mini',
+        },
+      }),
+    });
+    const { result } = renderHook(() => useClinicalAnalysis());
+
+    await act(async () => {
+      await result.current.analyze({
+        age: 55,
+        sex: 'male',
+        symptoms: ['Hypertension'],
+        medical_history: [],
+        current_medications: [],
+      });
+    });
+
+    expect(result.current.responseMeta).toEqual({
+      cacheHit: true,
+      source: 'real',
+      model: 'gpt-4.1-mini',
+    });
+    expect(JSON.stringify(result.current.responseMeta)).not.toContain('patient');
+  });
+
   it('should set error on API error', async () => {
     mockAuthFetch.mockResolvedValueOnce({
       json: async () => ({ error: { message: 'Erreur API' } }),

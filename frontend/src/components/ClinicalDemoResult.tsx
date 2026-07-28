@@ -120,39 +120,57 @@ function TranslatedContentText({
   language,
   className,
 }: {
-  text: string;
+  text: unknown;
   language: "fr" | "en";
   className?: string;
 }) {
-  const translation = useTranslation({ text, targetLang: language });
+  const sourceText = typeof text === "string" ? text : "";
+  const translation = useTranslation({ text: sourceText, targetLang: language });
   const translated =
     language === "en" &&
     (translation.loading ||
-      translation.translated === text ||
+      translation.translated === sourceText ||
       shouldHideFrenchSourceInEnglish(translation.translated))
-      ? getImmediateEnglishClinicalContent(text) || "Clinical details are available in the source analysis."
+      ? getImmediateEnglishClinicalContent(sourceText) || "Clinical details are available in the source analysis."
       : translation.translated;
 
-  return <p className={className}>{translated}</p>;
+  if (sourceText) {
+    return <p className={className}>{translated}</p>;
+  }
+
+  if (text && typeof text === "object") {
+    return (
+      <pre className={className}>
+        {JSON.stringify(text, null, 2)}
+      </pre>
+    );
+  }
+
+  return null;
 }
 
 function TranslatedContentSpan({
   text,
   language,
 }: {
-  text: string;
+  text: unknown;
   language: "fr" | "en";
 }) {
-  const translation = useTranslation({ text, targetLang: language });
+  const sourceText = typeof text === "string" ? text : "";
+  const translation = useTranslation({ text: sourceText, targetLang: language });
   const translated =
     language === "en" &&
     (translation.loading ||
-      translation.translated === text ||
+      translation.translated === sourceText ||
       shouldHideFrenchSourceInEnglish(translation.translated))
-      ? getImmediateEnglishClinicalContent(text) || "Clinical details are available in the source analysis."
+      ? getImmediateEnglishClinicalContent(sourceText) || "Clinical details are available in the source analysis."
       : translation.translated;
 
-  return <>{translated}</>;
+  if (sourceText) {
+    return <>{translated}</>;
+  }
+
+  return text && typeof text === "object" ? <>{JSON.stringify(text)}</> : null;
 }
 
 function SuggestedTreatmentDescription({
@@ -345,16 +363,18 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
     other_ai_fields,
     relevanceByAgeChart,
   } = demoData || {};
-  const top = treatments && treatments[0];
+  // Cached results can predate the current response schema. Treat optional lists
+  // defensively so one legacy document cannot blank the whole clinical screen.
+  const normalizedTreatments = Array.isArray(treatments) ? treatments : [];
+  const normalizedQuestions = Array.isArray(questions) ? questions : [];
+  const top = normalizedTreatments[0];
   const patientSummaryLabel = buildPatientSummaryLabel(contentStrings.patientSummary, patientDisplayName);
   const dynamicQuestions = buildDynamicQuestions({
     summary,
-    treatments: Array.isArray(treatments)
-      ? (treatments as Array<Record<string, any>>)
-      : [],
+    treatments: normalizedTreatments as Array<Record<string, any>>,
     language: contentLanguage,
   });
-  const renderedQuestions = dynamicQuestions.length > 0 ? dynamicQuestions : questions ?? [];
+  const renderedQuestions = dynamicQuestions.length > 0 ? dynamicQuestions : normalizedQuestions;
 
   // Gestion des erreurs IA
   if (error) {
@@ -408,7 +428,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   ].some(hasRenderableValue);
 
   // Si aucun traitement mais on a des détails IA, afficher les sections IA avancées
-  if ((!treatments || treatments.length === 0) && hasIADetails) {
+  if (normalizedTreatments.length === 0 && hasIADetails) {
     return (
       <div className="space-y-6">
         <ResultAccordion title={summarySectionTitle} hint={summarySectionHint} defaultOpen={false}>
@@ -586,7 +606,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   }
 
   // Mapping IA ou démo
-  const mappedTreatments = (treatments ?? []).map((t: any, i: number) => ({
+  const mappedTreatments = normalizedTreatments.map((t: any, i: number) => ({
     id: t.id ?? `ia-${i}`,
     name: t.name || t.shortName || "-",
     shortName: t.shortName ?? t.name ?? "IA",

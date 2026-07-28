@@ -574,6 +574,13 @@ export const UI_LABELS_FR = {
             subtitle:
                 "Recherche clinique plus rapide. Alternatives comparables. References consultables.",
         },
+        cachedResultNotice: {
+            title: "Analyse equivalente deja disponible",
+            description:
+                "ClinIA a trouve une analyse clinique equivalente deja enregistree. Aucun nouvel appel a OpenAI n'a ete necessaire.",
+            confirmation:
+                "J'ai pris connaissance du resultat reutilise",
+        },
         cloudContentGuard: {
             title: "Analyse interrompue avant transmission",
             description:
