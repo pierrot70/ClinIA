@@ -55,6 +55,8 @@ export function ClinicalAnalyzePage() {
     const clinicalResultStrings = getClinicalResultStrings(targetLang);
     const clinicalIntroLabels = labels.clinicalDemo.intro;
     const cachedResultNoticeLabels = labels.clinicalDemo.cachedResultNotice;
+    const navigationLabels = labels.clinicalDemo.navigation;
+    const loadingLabels = labels.clinicalDemo.loading;
     const cloudContentGuardLabels = labels.clinicalDemo.cloudContentGuard;
     const requestBoundaryLabels = cloudContentGuardLabels.requestBoundary;
     const [openaiModel, setOpenaiModel] = useState<OpenAIModel>(DEFAULT_OPENAI_MODEL);
@@ -151,6 +153,16 @@ export function ClinicalAnalyzePage() {
         text: cachedResultNoticeLabels.confirmation,
         targetLang,
         translationKey: "clinicalDemo.cachedResultNotice.confirmation",
+    });
+    const { translated: backToClinicalDemoLabel } = useTranslation({
+        text: navigationLabels.backToClinicalDemo,
+        targetLang,
+        translationKey: "clinicalDemo.navigation.backToClinicalDemo",
+    });
+    const { translated: openAiRequestInProgressLabel } = useTranslation({
+        text: loadingLabels.openAiRequestInProgress,
+        targetLang,
+        translationKey: "clinicalDemo.loading.openAiRequestInProgress",
     });
 
     useEffect(() => {
@@ -702,6 +714,16 @@ export function ClinicalAnalyzePage() {
     const { translated: loadingLabel } = useTranslation({ text: "Chargement...", targetLang, openaiModel: effectiveOpenaiModel });
     const commentLabels = labels.clinicalDemo.comments;
     const comparisonLabels = labels.clinicalDemo.comparison;
+    const { translated: reverifyActionLabel } = useTranslation({
+        text: comparisonLabels.reverifyAction,
+        targetLang,
+        translationKey: "clinicalDemo.comparison.reverifyAction",
+    });
+    const { translated: reverifyLoadingLabel } = useTranslation({
+        text: comparisonLabels.reverifyLoading,
+        targetLang,
+        translationKey: "clinicalDemo.comparison.reverifyLoading",
+    });
     const comparisonQuickFacts = comparisonPayloads
         ? [
               buildQuickFact(
@@ -1191,7 +1213,7 @@ export function ClinicalAnalyzePage() {
                                 onClick={handleBackToClinicalDemo}
                                 className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                             >
-                                Retour a /clinical-demo
+                                {backToClinicalDemoLabel} /clinical-demo
                             </button>
                             {user?.role === "SUPERADMIN" ? (
                                 <button
@@ -1201,8 +1223,8 @@ export function ClinicalAnalyzePage() {
                                     className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
                                 >
                                     {reverifyLoading
-                                        ? comparisonLabels.reverifyLoading
-                                        : comparisonLabels.reverifyAction}
+                                        ? reverifyLoadingLabel
+                                        : reverifyActionLabel}
                                 </button>
                             ) : null}
                         </div>
@@ -1210,7 +1232,7 @@ export function ClinicalAnalyzePage() {
                     <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-lime-200 bg-lime-50/80 p-10 text-center">
                         <div className="clinia-neon-loader" aria-hidden="true" />
                         <div className="clinia-neon-text text-sm font-semibold uppercase tracking-[0.2em]">
-                            Requete OpenAI en cours...
+                            {openAiRequestInProgressLabel}
                         </div>
                     </div>
                 </div>
@@ -1225,7 +1247,7 @@ export function ClinicalAnalyzePage() {
                                 onClick={handleBackToClinicalDemo}
                                 className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                             >
-                                Retour a /clinical-demo
+                                {backToClinicalDemoLabel} /clinical-demo
                             </button>
                             {user?.role === "SUPERADMIN" ? (
                                 <button
@@ -1235,8 +1257,8 @@ export function ClinicalAnalyzePage() {
                                     className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
                                 >
                                     {reverifyLoading
-                                        ? comparisonLabels.reverifyLoading
-                                        : comparisonLabels.reverifyAction}
+                                        ? reverifyLoadingLabel
+                                        : reverifyActionLabel}
                                 </button>
                             ) : null}
                         </div>

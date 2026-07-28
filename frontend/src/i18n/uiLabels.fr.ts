@@ -581,6 +581,12 @@ export const UI_LABELS_FR = {
             confirmation:
                 "J'ai pris connaissance du resultat reutilise",
         },
+        navigation: {
+            backToClinicalDemo: "Retour a",
+        },
+        loading: {
+            openAiRequestInProgress: "Requete OpenAI en cours...",
+        },
         cloudContentGuard: {
             title: "Analyse interrompue avant transmission",
             description:

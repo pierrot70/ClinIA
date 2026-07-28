@@ -230,6 +230,28 @@ describe("useTranslation", () => {
         });
     });
 
+    it("keeps the cached-analysis notice in English when its approved cache entry is unavailable", async () => {
+        translateTextMock.mockRejectedValue(new Error("Translation cache miss"));
+
+        const { result } = renderHook(() =>
+            useTranslation({
+                text: labels.clinicalDemo.cachedResultNotice.title,
+                targetLang: "en-CA",
+                translationKey: "clinicalDemo.cachedResultNotice.title",
+            })
+        );
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        expect(result.current.translated).toBe("Equivalent analysis already available");
+        expect(translateTextMock).toHaveBeenCalledWith({
+            translationKey: "clinicalDemo.cachedResultNotice.title",
+            targetLang: "en-CA",
+        });
+    });
+
     it("does not send an unapproved dynamic label to the backend", async () => {
         translateTextMock.mockClear();
         const { result } = renderHook(() =>

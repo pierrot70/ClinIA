@@ -72,6 +72,41 @@ export const APPROVED_UI_TRANSLATION_CATALOG = Object.freeze([
         text: "Mode simulation",
     },
     {
+        key: "clinicalDemo.cachedResultNotice.title",
+        namespace: "clinical-demo",
+        text: "Analyse equivalente deja disponible",
+    },
+    {
+        key: "clinicalDemo.cachedResultNotice.description",
+        namespace: "clinical-demo",
+        text: "ClinIA a trouve une analyse clinique equivalente deja enregistree. Aucun nouvel appel a OpenAI n'a ete necessaire.",
+    },
+    {
+        key: "clinicalDemo.cachedResultNotice.confirmation",
+        namespace: "clinical-demo",
+        text: "J'ai pris connaissance du resultat reutilise",
+    },
+    {
+        key: "clinicalDemo.navigation.backToClinicalDemo",
+        namespace: "clinical-demo",
+        text: "Retour a",
+    },
+    {
+        key: "clinicalDemo.loading.openAiRequestInProgress",
+        namespace: "clinical-demo",
+        text: "Requete OpenAI en cours...",
+    },
+    {
+        key: "clinicalDemo.comparison.reverifyAction",
+        namespace: "clinical-demo",
+        text: "Relancer pour verification (SUPERADMIN)",
+    },
+    {
+        key: "clinicalDemo.comparison.reverifyLoading",
+        namespace: "clinical-demo",
+        text: "Verification OpenAI en cours...",
+    },
+    {
         key: "clinicalPatientSelection.manual",
         namespace: "clinical-demo",
         text: "Saisie manuelle",

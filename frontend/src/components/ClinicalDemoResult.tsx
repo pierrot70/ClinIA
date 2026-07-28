@@ -329,6 +329,17 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   const contentLanguage: "fr" | "en" = baseTargetLang === "fr" ? "fr" : "en";
   const contentStrings = getClinicalResultStrings(contentLanguage);
   const resultLabels = labels.clinicalDemo.resultAccordions;
+  const comparisonLabels = labels.clinicalDemo.comparison;
+  const { translated: reverifyActionLabel } = useTranslation({
+    text: comparisonLabels.reverifyAction,
+    targetLang,
+    translationKey: "clinicalDemo.comparison.reverifyAction",
+  });
+  const { translated: reverifyLoadingLabel } = useTranslation({
+    text: comparisonLabels.reverifyLoading,
+    targetLang,
+    translationKey: "clinicalDemo.comparison.reverifyLoading",
+  });
   const { translated: translatedSummaryTitle } = useTranslation({ text: resultLabels.summaryTitle, targetLang });
   const { translated: translatedSummaryHint } = useTranslation({ text: resultLabels.summaryHint, targetLang });
   const { translated: translatedRecommendationsTitle } = useTranslation({ text: resultLabels.recommendationsTitle, targetLang });
@@ -646,8 +657,8 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                   className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
                 >
                   {reverifyLoading
-                    ? "Verification OpenAI en cours..."
-                    : "Relancer pour verification (SUPERADMIN)"}
+                    ? reverifyLoadingLabel
+                    : reverifyActionLabel}
                 </button>
               ) : null}
             </div>
