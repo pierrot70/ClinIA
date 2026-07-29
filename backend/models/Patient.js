@@ -178,8 +178,6 @@ const PatientSchema = new mongoose.Schema(
             type: String,
             default: undefined,
             trim: true,
-            unique: true,
-            sparse: true,
         },
         courriel: {
             type: String,
@@ -242,7 +240,7 @@ const PatientSchema = new mongoose.Schema(
         },
         telephoneSearch: {
             type: String,
-            default: "",
+            default: null,
             select: false,
         },
         healthInsuranceNumberSearch: {
@@ -303,16 +301,23 @@ PatientSchema.index(
 );
 PatientSchema.index(
     { ownerUserId: 1, telephoneSearch: 1 },
-    { name: "owner_telephone_search_idx" }
-);
-PatientSchema.index(
-    { ownerUserId: 1, healthInsuranceNumberSearch: 1 },
-    { name: "owner_health_insurance_number_search_idx" }
-);
-PatientSchema.index(
-    { country: 1, healthInsuranceJurisdiction: 1, healthInsuranceNumberSearch: 1 },
     {
-        name: "health_insurance_number_unique_idx",
+        name: "owner_telephone_unique_idx",
+        unique: true,
+        partialFilterExpression: {
+            telephoneSearch: { $type: "string" },
+        },
+    }
+);
+PatientSchema.index(
+    {
+        ownerUserId: 1,
+        country: 1,
+        healthInsuranceJurisdiction: 1,
+        healthInsuranceNumberSearch: 1,
+    },
+    {
+        name: "owner_health_insurance_number_unique_idx",
         unique: true,
         partialFilterExpression: {
             healthInsuranceNumberSearch: { $type: "string" },

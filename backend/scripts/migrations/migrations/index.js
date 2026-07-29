@@ -14,6 +14,8 @@ import { migration as addRefreshTokenFamilyIndexes }
     from "./20260726-add-refresh-token-family-indexes.js";
 import { migration as addRefreshTokenSessionIndex }
     from "./20260728-add-refresh-token-session-index.js";
+import { migration as scopePatientIdentifiersByOwner }
+    from "./20260729-scope-patient-identifiers-by-owner.js";
 export const migrations = [
     registerMigrationFramework,
     addPatientLanguageDefault,
@@ -23,4 +25,5 @@ export const migrations = [
     minimizeClinicalAuditContent,
     addRefreshTokenFamilyIndexes,
     addRefreshTokenSessionIndex,
+    scopePatientIdentifiersByOwner,
 ];

@@ -50,12 +50,14 @@ export function buildPatientSearchKeys(patient = {}) {
     const healthInsuranceNumberSearch = normalizeIdentifier(
         patient.num_assurance_maladie
     );
+    const telephoneSearch = normalizeIdentifier(patient.telephone);
 
     return {
         nomSearch: normalizeText(patient.nom),
         prenomSearch: normalizeText(patient.prenom),
         addresseSearch: normalizeText(patient.addresse),
-        telephoneSearch: normalizeIdentifier(patient.telephone),
+        // Null keeps optional phone numbers out of the unique partial index.
+        telephoneSearch: telephoneSearch || null,
         healthInsuranceNumberSearch: healthInsuranceNumberSearch || null,
     };
 }

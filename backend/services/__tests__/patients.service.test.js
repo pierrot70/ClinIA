@@ -103,6 +103,31 @@ beforeEach(() => {
 });
 
 describe("patients service audit logs", () => {
+    it("does not perform a cross-owner duplicate lookup for the same patient identifiers", async () => {
+        patientSave
+            .mockResolvedValueOnce({ _id: "patient-owner-one" })
+            .mockResolvedValueOnce({ _id: "patient-owner-two" });
+        const dto = {
+            nom: "Doe",
+            prenom: "Jane",
+            telephone: "5145550101",
+            num_assurance_maladie: "RAMQ1234567890",
+        };
+
+        await createPatient(dto, { userId: "owner-one", role: "MEDECIN" });
+        await createPatient(dto, { userId: "owner-two", role: "MEDECIN" });
+
+        expect(patientExists).not.toHaveBeenCalled();
+        expect(PatientModel).toHaveBeenNthCalledWith(
+            1,
+            expect.objectContaining({ ownerUserId: "owner-one" })
+        );
+        expect(PatientModel).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({ ownerUserId: "owner-two" })
+        );
+    });
+
     it("commits a patient creation and all receipt audits in one Mongo transaction", async () => {
         patientExists.mockResolvedValue(null);
         patientSave.mockResolvedValue({ _id: "patient-atomic" });

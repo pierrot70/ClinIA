@@ -99,6 +99,35 @@ describe("patient routes atomic write receipts", () => {
         }));
     });
 
+    it("returns the same generic conflict response without revealing the conflicting identifier", async () => {
+        const handler = getRouteHandler("post", "/");
+        dto.toCreatePatientDTO.mockReturnValue({
+            nom: "Doe",
+            prenom: "Jane",
+            telephone: "5145550101",
+        });
+        services.createPatientWithWriteVerification.mockRejectedValue({
+            code: 11000,
+            keyPattern: { telephoneSearch: 1 },
+            keyValue: { telephoneSearch: "5145550101" },
+        });
+        const res = makeRes();
+
+        await handler(request({ body: { nom: "Doe", prenom: "Jane" } }), res);
+
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "PATIENT_CONFLICT",
+                message:
+                    "Impossible d'enregistrer ce dossier avec ces informations. Vérifiez les données.",
+                retryable: false,
+            },
+        });
+        expect(JSON.stringify(res.json.mock.calls)).not.toContain("telephoneSearch");
+        expect(JSON.stringify(res.json.mock.calls)).not.toContain("5145550101");
+    });
+
     it("does not request a transaction for rejected unsafe clinical parameters", async () => {
         const handler = getRouteHandler("post", "/");
         dto.toCreatePatientDTO.mockReturnValue({
