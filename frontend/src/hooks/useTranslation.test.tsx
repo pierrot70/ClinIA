@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { labels } from "../i18n/uiLabels";
 import { useTranslation } from "./useTranslation";
@@ -13,6 +13,11 @@ vi.mock("../services/translationApi", () => ({
 }));
 
 describe("useTranslation", () => {
+    beforeEach(() => {
+        window.localStorage.clear();
+        translateTextMock.mockReset();
+    });
+
     it("does not translate French Canadian labels when the source is French", async () => {
         translateTextMock.mockRejectedValue(new Error("Translation API error"));
 
@@ -307,5 +312,27 @@ describe("useTranslation", () => {
         await waitFor(() => {
             expect(result.current.translated).toBe("Connexion médecin");
         });
+    });
+
+    it("reuses an approved UI translation from persistent browser storage without a network call", async () => {
+        window.localStorage.setItem(
+            "clinia_ui_translation_v1:clinicalDemo.cachedResultNotice.title|es",
+            "Analisis equivalente ya disponible"
+        );
+
+        const { result } = renderHook(() =>
+            useTranslation({
+                text: labels.clinicalDemo.cachedResultNotice.title,
+                targetLang: "es",
+                translationKey: "clinicalDemo.cachedResultNotice.title",
+            })
+        );
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        expect(result.current.translated).toBe("Analisis equivalente ya disponible");
+        expect(translateTextMock).not.toHaveBeenCalled();
     });
 });

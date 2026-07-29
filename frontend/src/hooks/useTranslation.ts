@@ -74,6 +74,29 @@ const criticalLabelFallbacks: Record<string, Record<string, string>> = {
 };
 
 const translationCache = new Map();
+const APPROVED_UI_TRANSLATION_STORAGE_PREFIX = "clinia_ui_translation_v1";
+
+function getStoredTranslation(cacheKey: string) {
+  try {
+    const translation = window.localStorage.getItem(
+      `${APPROVED_UI_TRANSLATION_STORAGE_PREFIX}:${cacheKey}`
+    );
+    return translation || null;
+  } catch {
+    return null;
+  }
+}
+
+function storeTranslation(cacheKey: string, translation: string) {
+  try {
+    window.localStorage.setItem(
+      `${APPROVED_UI_TRANSLATION_STORAGE_PREFIX}:${cacheKey}`,
+      translation
+    );
+  } catch {
+    // Translation labels remain available from the in-memory cache if storage is unavailable.
+  }
+}
 
 function baseLocale(locale: string) {
   return locale.toLowerCase().split("-")[0];
@@ -131,6 +154,15 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
       setLoading(false);
       return;
     }
+    // Only opaque, backend-approved UI keys reach this branch. Never persist
+    // clinical text, patient data, or generated analysis content in browser storage.
+    const storedTranslation = getStoredTranslation(cacheKey);
+    if (storedTranslation) {
+      translationCache.set(cacheKey, storedTranslation);
+      setTranslated(storedTranslation);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     translateText({ translationKey, targetLang })
       .then((result) => {
@@ -140,6 +172,7 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
             clean = text;
           }
           translationCache.set(cacheKey, clean);
+          storeTranslation(cacheKey, clean);
           setTranslated(clean);
           setLoading(false);
         }
