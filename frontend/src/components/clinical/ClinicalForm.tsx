@@ -3,6 +3,7 @@ import { useTranslation } from "../../hooks/useTranslation";
 import { useAuth } from "../../hooks/useAuth";
 import { useDebounce } from "../../hooks/useDebounce";
 import {
+    fetchPatientById,
     fetchPatientsPaginated,
     updatePatient,
     type Patient,
@@ -699,16 +700,23 @@ export function ClinicalForm({
         setIsDiabetesModalOpen(false);
     }
 
-    function selectPatient(patient: Patient) {
+    async function selectPatient(patient: Patient) {
+        const response = await fetchPatientById(patient._id);
+        if ("error" in response) {
+            setPatientSaveError(response.error.message);
+            return;
+        }
+
+        const detail = response.data;
         setPatientSaveError("");
-        setSelectedPatient(patient);
+        setSelectedPatient(detail);
         setPatientSearch("");
         setPatientMatches([]);
         setSelectedClinicalField("");
         setSelectedExampleCase("");
         setHasRestoredClinicalData(false);
         setIsDiabetesModalOpen(false);
-        applyFormData(buildPayloadFromPatientProfile(patient, browserCountryCode));
+        applyFormData(buildPayloadFromPatientProfile(detail, browserCountryCode));
     }
 
     function returnToManualInput() {

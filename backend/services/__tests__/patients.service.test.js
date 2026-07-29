@@ -17,6 +17,20 @@ const startSession = vi.fn(async () => transactionSession);
 const recordPatientAuditEvent = vi.fn();
 const recordWriteOperationAuditEvent = vi.fn();
 
+function patientListQuery(rows = []) {
+    return {
+        select: vi.fn().mockReturnValue({
+            sort: vi.fn().mockReturnValue({
+                skip: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockReturnValue({
+                        lean: vi.fn().mockResolvedValue(rows),
+                    }),
+                }),
+            }),
+        }),
+    };
+}
+
 vi.mock("mongoose", () => ({
     default: {
         startSession,
@@ -214,11 +228,14 @@ describe("patients service audit logs", () => {
 
     it("excludes archived patients from active searches", async () => {
         patientCountDocuments.mockResolvedValue(0);
+        const select = vi.fn();
         patientFind.mockReturnValue({
-            sort: vi.fn().mockReturnValue({
-                skip: vi.fn().mockReturnValue({
-                    limit: vi.fn().mockReturnValue({
-                        lean: vi.fn().mockResolvedValue([]),
+            select: select.mockReturnValue({
+                sort: vi.fn().mockReturnValue({
+                    skip: vi.fn().mockReturnValue({
+                        limit: vi.fn().mockReturnValue({
+                            lean: vi.fn().mockResolvedValue([]),
+                        }),
                     }),
                 }),
             }),
@@ -234,19 +251,14 @@ describe("patients service audit logs", () => {
             ownerUserId: "507f1f77bcf86cd799439011",
             archivedAt: null,
         });
+        expect(select).toHaveBeenCalledWith(
+            "_id nom prenom num_assurance_maladie addresse telephone archivedAt"
+        );
     });
 
     it("lists archived dossiers only when explicitly requested", async () => {
         patientCountDocuments.mockResolvedValue(0);
-        patientFind.mockReturnValue({
-            sort: vi.fn().mockReturnValue({
-                skip: vi.fn().mockReturnValue({
-                    limit: vi.fn().mockReturnValue({
-                        lean: vi.fn().mockResolvedValue([]),
-                    }),
-                }),
-            }),
-        });
+        patientFind.mockReturnValue(patientListQuery());
 
         await listPatients(
             {},
@@ -318,15 +330,9 @@ describe("patients service audit logs", () => {
 
     it("searches a clinician's patients by first and last name without regex injection", async () => {
         patientCountDocuments.mockResolvedValue(1);
-        patientFind.mockReturnValue({
-            sort: vi.fn().mockReturnValue({
-                skip: vi.fn().mockReturnValue({
-                    limit: vi.fn().mockReturnValue({
-                        lean: vi.fn().mockResolvedValue([{ _id: "patient-1", prenom: "Pierre", nom: "Lasante" }]),
-                    }),
-                }),
-            }),
-        });
+        patientFind.mockReturnValue(
+            patientListQuery([{ _id: "patient-1", prenom: "Pierre", nom: "Lasante" }])
+        );
 
         const result = await listPatients(
             { q: "Pierre Lasante" },
@@ -357,15 +363,7 @@ describe("patients service audit logs", () => {
 
     it("escapes every direct patient search filter before using it as a Mongo regex", async () => {
         patientCountDocuments.mockResolvedValue(0);
-        patientFind.mockReturnValue({
-            sort: vi.fn().mockReturnValue({
-                skip: vi.fn().mockReturnValue({
-                    limit: vi.fn().mockReturnValue({
-                        lean: vi.fn().mockResolvedValue([]),
-                    }),
-                }),
-            }),
-        });
+        patientFind.mockReturnValue(patientListQuery());
 
         await listPatients(
             {
@@ -392,15 +390,7 @@ describe("patients service audit logs", () => {
 
     it("limits the general search to four escaped terms", async () => {
         patientCountDocuments.mockResolvedValue(0);
-        patientFind.mockReturnValue({
-            sort: vi.fn().mockReturnValue({
-                skip: vi.fn().mockReturnValue({
-                    limit: vi.fn().mockReturnValue({
-                        lean: vi.fn().mockResolvedValue([]),
-                    }),
-                }),
-            }),
-        });
+        patientFind.mockReturnValue(patientListQuery());
 
         await listPatients(
             { q: "un deux trois quatre cinq six" },
@@ -420,15 +410,7 @@ describe("patients service audit logs", () => {
 
     it("limits direct patient search patterns to 80 characters", async () => {
         patientCountDocuments.mockResolvedValue(0);
-        patientFind.mockReturnValue({
-            sort: vi.fn().mockReturnValue({
-                skip: vi.fn().mockReturnValue({
-                    limit: vi.fn().mockReturnValue({
-                        lean: vi.fn().mockResolvedValue([]),
-                    }),
-                }),
-            }),
-        });
+        patientFind.mockReturnValue(patientListQuery());
 
         await listPatients(
             { nom: "a".repeat(120) },
@@ -439,6 +421,42 @@ describe("patients service audit logs", () => {
         expect(
             patientFind.mock.calls[0][0].nomSearch.$regex.source
         ).toHaveLength(81);
+    });
+
+    it("never returns clinical profiles, notes, or documents in a patient list", async () => {
+        patientCountDocuments.mockResolvedValue(1);
+        patientFind.mockReturnValue(patientListQuery([{
+            _id: "patient-safe-list",
+            nom: "Doe",
+            prenom: "Jane",
+            num_assurance_maladie: "RAMQ1234567890",
+            addresse: "1 Rue Test",
+            telephone: "5145550101",
+            archivedAt: null,
+            courriel: "jane@example.test",
+            documents: [{ title: "rapport-confidentiel.pdf" }],
+            secure_request_profile: {
+                clinicalNotes: "Note clinique confidentielle",
+            },
+        }]));
+
+        const result = await listPatients(
+            {},
+            {},
+            { userId: "507f1f77bcf86cd799439011", role: "MEDECIN" }
+        );
+
+        expect(result.data).toEqual([{
+            _id: "patient-safe-list",
+            nom: "Doe",
+            prenom: "Jane",
+            num_assurance_maladie: "RAMQ1234567890",
+            addresse: "1 Rue Test",
+            telephone: "5145550101",
+            archivedAt: null,
+        }]);
+        expect(JSON.stringify(result.data)).not.toContain("clinicalNotes");
+        expect(JSON.stringify(result.data)).not.toContain("rapport-confidentiel.pdf");
     });
 
     it("lists patient audit logs with pagination for admins", async () => {

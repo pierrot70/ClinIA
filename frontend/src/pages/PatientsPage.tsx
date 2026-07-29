@@ -7,6 +7,7 @@ import {
     createPatient,
     archivePatient,
     restorePatient,
+    fetchPatientById,
     fetchPatientsPaginated,
     updatePatient,
     type Patient,
@@ -521,26 +522,43 @@ export function PatientsPage() {
     }
 
     async function handleEdit(patient: Patient) {
+        const response = await fetchPatientById(patient._id);
+        if ("error" in response) {
+            setError(response.error);
+            return;
+        }
+
+        const detail = response.data;
         setEditingId(patient._id);
         setViewMode("create");
             setForm({
-                nom: patient.nom ?? "",
-                prenom: patient.prenom ?? "",
-                num_assurance_maladie: patient.num_assurance_maladie ?? "",
-                country: patient.country ?? "CA",
+                nom: detail.nom ?? "",
+                prenom: detail.prenom ?? "",
+                num_assurance_maladie: detail.num_assurance_maladie ?? "",
+                country: detail.country ?? "CA",
                 healthInsuranceJurisdiction:
-                    patient.healthInsuranceJurisdiction ?? "UNKNOWN",
-                addresse: patient.addresse ?? "",
-                telephone: patient.telephone ?? "",
-                courriel: patient.courriel ?? "",
+                    detail.healthInsuranceJurisdiction ?? "UNKNOWN",
+                addresse: detail.addresse ?? "",
+                telephone: detail.telephone ?? "",
+                courriel: detail.courriel ?? "",
                 language:
-                    patient.language === "sp"
+                    detail.language === "sp"
                         ? "es"
-                        : patient.language ?? "fr",
-                lat: patient.lat?.toString() ?? "",
-                long: patient.long?.toString() ?? "",
-                texto: Boolean(patient.texto),
+                        : detail.language ?? "fr",
+                lat: detail.lat?.toString() ?? "",
+                long: detail.long?.toString() ?? "",
+                texto: Boolean(detail.texto),
             });
+    }
+
+    async function handleOpenClinicalNotes(patientId: string) {
+        const response = await fetchPatientById(patientId);
+        if ("error" in response) {
+            setError(response.error);
+            return;
+        }
+
+        setNotesPatient(response.data);
     }
 
     async function handleArchive(id: string) {
@@ -1122,7 +1140,9 @@ export function PatientsPage() {
                                                 </button>
                                                 <button
                                                     className="px-2 py-1 border rounded"
-                                                    onClick={() => setNotesPatient(p)}
+                                                    onClick={() =>
+                                                        handleOpenClinicalNotes(p._id)
+                                                    }
                                                 >
                                                     {labels.patientClinicalNotes.open}
                                                 </button>

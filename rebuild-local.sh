@@ -19,6 +19,10 @@ if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
   WIPE_VOLUMES="${WIPE_VOLUMES:-0}"
   NO_CACHE="${NO_CACHE:-0}"
   PULL="${PULL:-0}"
+  STAGING_FRONTEND_HOST="${STAGING_FRONTEND_HOST:-127.0.0.1}"
+  STAGING_FRONTEND_PORT="${STAGING_FRONTEND_PORT:-5174}"
+  STAGING_FRONTEND_API_URL="${STAGING_FRONTEND_API_URL:-http://localhost:4002}"
+  STAGING_FRONTEND_LOG_FILE="${STAGING_FRONTEND_LOG_FILE:-/tmp/clinia-staging-frontend-vite.log}"
 
   sdc() {
     docker compose -p "$STAGING_PROJECT_NAME" -f "$STAGING_COMPOSE_FILE" "$@"
@@ -39,6 +43,52 @@ if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
 
     echo "ERREUR $label url=$url"
     exit 1
+  }
+
+  restart_staging_frontend() {
+    local pid command
+    local -a listener_pids=()
+
+    mapfile -t listener_pids < <(
+      lsof -tiTCP:"$STAGING_FRONTEND_PORT" -sTCP:LISTEN 2>/dev/null || true
+    )
+
+    for pid in "${listener_pids[@]}"; do
+      command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+      if [[ "$command" != *"vite"* && "$command" != *"node"* ]]; then
+        echo "ERREUR le port $STAGING_FRONTEND_PORT est utilise par un processus non-Vite: $command"
+        exit 1
+      fi
+
+      echo "Arret du frontend Vite existant pid=$pid"
+      kill "$pid"
+    done
+
+    if [[ "${#listener_pids[@]}" -gt 0 ]]; then
+      sleep 1
+    fi
+
+    echo "Demarrage du frontend Vite api=$STAGING_FRONTEND_API_URL port=$STAGING_FRONTEND_PORT"
+    (
+      cd "$ROOT_DIR/frontend"
+      VITE_API_URL="$STAGING_FRONTEND_API_URL" \
+        nohup npm run dev -- --host "$STAGING_FRONTEND_HOST" --port "$STAGING_FRONTEND_PORT" \
+          >"$STAGING_FRONTEND_LOG_FILE" 2>&1 &
+    )
+  }
+
+  run_staging_unit_tests() {
+    headline "Running frontend unit tests"
+    (
+      cd "$ROOT_DIR/frontend"
+      npm test -- --run
+    )
+
+    headline "Running backend unit tests"
+    (
+      cd "$ROOT_DIR/backend"
+      npm test -- --run
+    )
   }
 
   headline "ClinIA local staging rebuild"
@@ -92,6 +142,12 @@ if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
   wait_for_staging_url "backend" "http://localhost:4002/api/health/ready"
   wait_for_staging_url "backend-replica" "http://localhost:4003/api/health/ready"
 
+  headline "Restarting staging frontend"
+  restart_staging_frontend
+  wait_for_staging_url "frontend" "http://$STAGING_FRONTEND_HOST:$STAGING_FRONTEND_PORT"
+
+  run_staging_unit_tests
+
   sdc exec -T mongo-rs-1 sh -c 'mongosh --quiet \
     --username "$CLINIA_RS_ROOT_USERNAME" \
     --password="$CLINIA_RS_ROOT_PASSWORD" \
@@ -101,6 +157,8 @@ if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
   headline "Staging ready"
   echo "Backend primary : http://localhost:4002"
   echo "Backend replica : http://localhost:4003"
+  echo "Frontend Vite   : http://$STAGING_FRONTEND_HOST:$STAGING_FRONTEND_PORT"
+  echo "Frontend log    : $STAGING_FRONTEND_LOG_FILE"
   echo "Mongo RS stack  : docker compose -p \"$STAGING_PROJECT_NAME\" -f \"$STAGING_COMPOSE_FILE\" ps"
   echo "Alert drill     : ALERT_ORIGIN=DEV ./scripts/run-local-mongo-alert-drill.sh"
   exit 0

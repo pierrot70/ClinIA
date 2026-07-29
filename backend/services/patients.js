@@ -172,6 +172,8 @@ export async function createPatient(
 }
 
 export async function listPatients(filters = {}, opts = {}, authUser) {
+    const patientListProjection =
+        "_id nom prenom num_assurance_maladie addresse telephone archivedAt";
     const archiveStatus = opts.archiveStatus === "archived" ? "archived" : "active";
     const query = {
         ...buildOwnerScope(authUser),
@@ -244,6 +246,7 @@ export async function listPatients(filters = {}, opts = {}, authUser) {
 
     const [data, total] = await Promise.all([
         Patient.find(query)
+            .select(patientListProjection)
             .sort(sort)
             .skip(skip)
             .limit(limit)
@@ -252,7 +255,16 @@ export async function listPatients(filters = {}, opts = {}, authUser) {
     ]);
 
     return {
-        data,
+        // Keep list responses safe even if a future query projection changes.
+        data: data.map((patient) => ({
+            _id: patient._id,
+            nom: patient.nom,
+            prenom: patient.prenom,
+            num_assurance_maladie: patient.num_assurance_maladie,
+            addresse: patient.addresse,
+            telephone: patient.telephone,
+            archivedAt: patient.archivedAt,
+        })),
         meta: {
             page,
             limit,

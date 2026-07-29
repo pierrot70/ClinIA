@@ -211,6 +211,31 @@ async function safeJson(response: Response): Promise<any> {
 }
 
 /* ------------------------------------------------------------------ */
+/* GET patient detail                                                   */
+/* ------------------------------------------------------------------ */
+
+export async function fetchPatientById(
+    patientId: string
+): Promise<ApiResponse<Patient>> {
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await authFetch(`/api/patients/${patientId}`);
+                return (await safeJson(response)) as ApiResponse<Patient>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de récupérer le dossier patient.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
+}
+
+/* ------------------------------------------------------------------ */
 /* GET patients (pagination backend)                                   */
 /* ------------------------------------------------------------------ */
 

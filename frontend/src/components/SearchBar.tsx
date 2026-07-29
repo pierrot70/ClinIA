@@ -6,6 +6,7 @@ import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { useClinicalAnalysisNavigation } from "../contexts/ClinicalAnalysisNavigationContext";
 import {
   createPatient,
+  fetchPatientById,
   fetchPatientSecureRequestDocuments,
   fetchPatientsPaginated,
   updatePatient,
@@ -202,6 +203,29 @@ const SearchBar: React.FC = () => {
     try {
       window.localStorage.removeItem("clinia_waiting_dictation");
     } catch (e) {}
+  }, []);
+
+  const handlePatientSelection = useCallback(async (nextPatientId: string) => {
+    setSelectedPatientId(nextPatientId);
+    setSelectedDocumentIds([]);
+    setIsDocumentsModalOpen(false);
+    setCreatePatientError(null);
+
+    if (!nextPatientId || nextPatientId === CREATE_PATIENT_OPTION) {
+      return;
+    }
+
+    const response = await fetchPatientById(nextPatientId);
+    if ("error" in response) {
+      setPatientsError(response.error.message);
+      setSelectedPatientId("");
+      return;
+    }
+
+    setPatients((previous) => previous.map((patient) =>
+      patient._id === nextPatientId ? response.data : patient
+    ));
+    setIsDocumentsModalOpen(true);
   }, []);
 
   const handleCreatePatient = useCallback(async () => {
@@ -705,16 +729,7 @@ const SearchBar: React.FC = () => {
           Patient
           <select
             value={selectedPatientId}
-            onChange={(e) => {
-              const nextPatientId = e.target.value;
-              const nextPatient =
-                patients.find((patient) => patient._id === nextPatientId) || null;
-
-              setSelectedPatientId(nextPatientId);
-              setSelectedDocumentIds([]);
-              setIsDocumentsModalOpen(Boolean(nextPatient));
-              setCreatePatientError(null);
-            }}
+            onChange={(e) => void handlePatientSelection(e.target.value)}
             className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-primary"
           >
             <option value="">
