@@ -29,6 +29,7 @@ const UNIQUE_INDEXES = [
 ];
 
 const OBSOLETE_INDEX_NAMES = new Set([
+    "num_assurance_maladie_1",
     "telephone_1",
     "owner_telephone_search_idx",
     "owner_health_insurance_number_search_idx",

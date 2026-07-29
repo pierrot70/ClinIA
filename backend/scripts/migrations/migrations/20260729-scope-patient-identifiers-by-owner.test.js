@@ -8,6 +8,7 @@ describe("20260729-scope-patient-identifiers-by-owner", () => {
             createIndex: vi.fn().mockResolvedValue(undefined),
             indexes: vi.fn().mockResolvedValue([
                 { name: "_id_" },
+                { name: "num_assurance_maladie_1", unique: true },
                 { name: "telephone_1", unique: true },
                 { name: "owner_telephone_search_idx" },
                 { name: "owner_health_insurance_number_search_idx" },
@@ -43,6 +44,9 @@ describe("20260729-scope-patient-identifiers-by-owner", () => {
             })
         );
         expect(collection.dropIndex).toHaveBeenCalledWith("telephone_1");
+        expect(collection.dropIndex).toHaveBeenCalledWith(
+            "num_assurance_maladie_1"
+        );
         expect(collection.dropIndex).toHaveBeenCalledWith(
             "health_insurance_number_unique_idx"
         );
