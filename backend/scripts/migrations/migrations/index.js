@@ -18,6 +18,8 @@ import { migration as scopePatientIdentifiersByOwner }
     from "./20260729-scope-patient-identifiers-by-owner.js";
 import { migration as dropLegacyGlobalPatientInsuranceIndex }
     from "./20260729-drop-legacy-global-patient-insurance-index.js";
+import { migration as dropGlobalPatientInsuranceIndex }
+    from "./20260730-drop-global-patient-insurance-index.js";
 export const migrations = [
     registerMigrationFramework,
     addPatientLanguageDefault,
@@ -29,4 +31,5 @@ export const migrations = [
     addRefreshTokenSessionIndex,
     scopePatientIdentifiersByOwner,
     dropLegacyGlobalPatientInsuranceIndex,
+    dropGlobalPatientInsuranceIndex,
 ];

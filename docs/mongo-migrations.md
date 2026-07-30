@@ -32,6 +32,8 @@ SCHEMA_GUARD_OK guard=patient_owner_scoped_indexes
 
 Un echec n'affiche que le nom et la structure de l'index en cause, jamais de dossier patient. Corriger l'index par une migration dediee avant tout deploiement applicatif.
 
+Si un ancien environnement a applique des migrations dans un ordre different, ne jamais modifier retroactivement une migration deja enregistree. Ajouter une migration corrective nouvelle et idempotente, puis laisser le garde-fou confirmer le schema final.
+
 ## Drill de transformation reversible
 
 Le drill suivant n'utilise qu'une collection de test et la nettoie a la fin:
