@@ -1,14 +1,17 @@
 import crypto from "node:crypto";
 import mongoose from "mongoose";
 import { migrations } from "./migrations/index.js";
+import { verifyAppliedSchemaGuards } from "./schemaGuards.js";
 
 const WRITE_CONCERN = { w: "majority", j: true, wtimeout: 5000 };
 const REGISTRY_COLLECTION = "schemamigrations";
 const LOCK_COLLECTION = "schemamigrationlocks";
 const LOCK_ID = "mongo-migrations";
 
+class SafeMigrationError extends Error {}
+
 function fail(message) {
-    throw new Error(message);
+    throw new SafeMigrationError(message);
 }
 
 function parseArguments(argv) {
@@ -184,11 +187,15 @@ async function run() {
         await releaseLock(db, lockOwner);
     }
 
+    await verifyAppliedSchemaGuards({ db, registry });
     console.log(`APPLY_COMPLETE applied=${pending.length}`);
 }
 
 run()
-    .catch(() => {
+    .catch((error) => {
+        if (error instanceof SafeMigrationError) {
+            console.error(`ERROR ${error.message}`);
+        }
         console.error("ERROR migration_failed");
         process.exitCode = 1;
     })

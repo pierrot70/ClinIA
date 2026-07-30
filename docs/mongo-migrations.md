@@ -24,6 +24,14 @@ Depuis la racine du depot:
 
 Le premier `dry-run` annonce la migration de registre. L'execution `--apply` cree son entree dans `schemamigrations`. Le dernier `dry-run` doit indiquer `already_applied` et `pending=0`.
 
+Apres chaque `--apply`, le runner execute automatiquement les garde-fous de schema sur les metadonnees Mongo reelles. Par exemple, une fois la migration de portee des identifiants patients appliquee, il confirme les index uniques par proprietaire et refuse un index unique global obsolete sur le telephone ou le numero d'assurance. Le resultat attendu est:
+
+```text
+SCHEMA_GUARD_OK guard=patient_owner_scoped_indexes
+```
+
+Un echec n'affiche que le nom et la structure de l'index en cause, jamais de dossier patient. Corriger l'index par une migration dediee avant tout deploiement applicatif.
+
 ## Drill de transformation reversible
 
 Le drill suivant n'utilise qu'une collection de test et la nettoie a la fin:
