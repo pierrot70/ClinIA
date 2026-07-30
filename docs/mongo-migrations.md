@@ -34,6 +34,30 @@ Un echec n'affiche que le nom et la structure de l'index en cause, jamais de dos
 
 Si un ancien environnement a applique des migrations dans un ordre different, ne jamais modifier retroactivement une migration deja enregistree. Ajouter une migration corrective nouvelle et idempotente, puis laisser le garde-fou confirmer le schema final.
 
+## Audit global des index
+
+Avant une nouvelle migration importante, verifier les index reels de toutes les collections gerees par les modeles ClinIA. Cette commande est strictement en lecture seule: elle ne cree, ne supprime et ne reconstruit aucun index.
+
+```bash
+./scripts/audit-mongo-indexes.sh
+```
+
+Le resultat attendu est `INDEX_AUDIT_COMPLETE status=OK`. Un `ERROR` indique un index attendu absent ou avec une configuration differente du modele. Un `WARNING index_audit_extra` signale un index supplementaire, possiblement herite; il doit etre examine puis retire seulement par une migration dediee si son retrait est approprie.
+
+Sur le droplet, apres le deploiement du code, executer l'audit dans le backend principal:
+
+```bash
+BACKEND_CONTAINER="$(
+  docker ps --format '{{.Names}}' |
+  grep '^backend-' |
+  grep -v '^backend-replica-' |
+  head -n1
+)"
+
+docker exec "$BACKEND_CONTAINER" \
+  node /app/scripts/migrations/auditMongoIndexes.js
+```
+
 ## Drill de transformation reversible
 
 Le drill suivant n'utilise qu'une collection de test et la nettoie a la fin:
