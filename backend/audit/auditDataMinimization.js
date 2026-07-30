@@ -87,11 +87,11 @@ export function minimizeSecurityIncidentMatches(matches) {
 
 export function minimizeSecurityIncidentContext(type, context) {
     if (!context || typeof context !== "object") return {};
-    if (["MASS_DOWNLOAD_ATTEMPT", "REFRESH_TOKEN_REPLAY", "MFA_CHALLENGE_EXHAUSTED", "CONCURRENT_SESSION_REPLACED", "SESSION_LIMIT_REACHED"].includes(type)) {
+    if (["MASS_DOWNLOAD_ATTEMPT", "REFRESH_TOKEN_REPLAY", "MFA_CHALLENGE_EXHAUSTED", "CONCURRENT_SESSION_REPLACED", "SESSION_LIMIT_REACHED", "LOGIN_FAILURE_THROTTLED"].includes(type)) {
         const result = {};
         const userId = nonEmptyString(context.userId, 48);
         if (userId) result.userId = userId;
-        for (const key of ["totalCost", "threshold", "eventCost", "windowMs", "incidentsCreated"]) {
+        for (const key of ["totalCost", "threshold", "eventCost", "windowMs", "incidentsCreated", "penaltyLevel"]) {
             const value = boundedCount(context[key]);
             if (value !== undefined) result[key] = value;
         }

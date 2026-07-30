@@ -431,6 +431,12 @@ export const UI_LABELS_FR = {
                 "ClinIA a invalidé ce défi MFA. Aucun code MFA n'est conservé dans cet incident.",
             mfaChallengeExhaustedNextStep:
                 "Si cette situation n'était pas attendue, considérez la tentative comme suspecte et réinitialisez le mot de passe du compte. Une nouvelle connexion générera un nouveau défi MFA.",
+            loginFailureThrottledWhatHappened:
+                "Des échecs répétés de connexion provenant de la même origine réseau ont déclenché un délai de protection progressif.",
+            loginFailureThrottledWhatWasBlocked:
+                "Les nouveaux essais depuis cette origine ont été temporairement ralentis. Les autres réseaux du médecin ne sont pas bloqués par cet incident.",
+            loginFailureThrottledNextStep:
+                "Si l'origine est légitime, attendez le délai puis reconnectez-vous. Sinon, vérifiez l'activité du compte et réinitialisez son mot de passe si nécessaire.",
             pagePrefix: "Page",
             pageSeparator: "/",
             resultSuffix: "résultats",

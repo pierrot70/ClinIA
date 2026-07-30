@@ -54,6 +54,16 @@ describe("audit data minimization", () => {
             userId: "507f1f77bcf86cd799439011",
             role: "SUPERADMIN",
         });
+        expect(minimizeSecurityIncidentContext("LOGIN_FAILURE_THROTTLED", {
+            userId: "507f1f77bcf86cd799439011",
+            role: "MEDECIN",
+            penaltyLevel: 2,
+            ip: "127.0.0.1",
+        })).toEqual({
+            userId: "507f1f77bcf86cd799439011",
+            role: "MEDECIN",
+            penaltyLevel: 2,
+        });
         expect(minimizeAcknowledgmentContext({
             route: "/clinical",
             note: "CANARY-PHI",

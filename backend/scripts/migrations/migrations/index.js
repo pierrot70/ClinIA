@@ -22,6 +22,8 @@ import { migration as dropGlobalPatientInsuranceIndex }
     from "./20260730-drop-global-patient-insurance-index.js";
 import { migration as dropOutOfOrderPatientSearchIndexes }
     from "./20260730-drop-out-of-order-patient-search-indexes.js";
+import { migration as addLoginFailureThrottleIndexes }
+    from "./20260730-add-login-failure-throttle-indexes.js";
 export const migrations = [
     registerMigrationFramework,
     addPatientLanguageDefault,
@@ -35,4 +37,5 @@ export const migrations = [
     dropLegacyGlobalPatientInsuranceIndex,
     dropGlobalPatientInsuranceIndex,
     dropOutOfOrderPatientSearchIndexes,
+    addLoginFailureThrottleIndexes,
 ];

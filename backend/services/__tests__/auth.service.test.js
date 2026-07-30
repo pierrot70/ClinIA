@@ -21,6 +21,9 @@ const revokeRefreshTokenFamiliesForUser = vi.fn();
 const revokeRefreshTokenFamily = vi.fn();
 const rotateActiveRefreshTokenSession = vi.fn();
 const createSecurityIncident = vi.fn();
+const clearLoginFailureThrottle = vi.fn();
+const getLoginFailureThrottle = vi.fn();
+const recordLoginFailure = vi.fn();
 
 vi.mock("../../models/AdminUser.js", () => ({
     AdminUser: {
@@ -47,6 +50,12 @@ vi.mock("../../audit/authAudit.js", () => ({
 
 vi.mock("../../services/securityIncidents.js", () => ({
     createSecurityIncident,
+}));
+
+vi.mock("../../services/auth/loginFailureThrottle.js", () => ({
+    clearLoginFailureThrottle,
+    getLoginFailureThrottle,
+    recordLoginFailure,
 }));
 
 vi.mock("../../services/auth/refreshTokenFamilies.js", () => ({
@@ -164,6 +173,14 @@ beforeEach(() => {
     revokeRefreshTokenFamily.mockResolvedValue(undefined);
     rotateActiveRefreshTokenSession.mockResolvedValue(null);
     createSecurityIncident.mockResolvedValue(undefined);
+    clearLoginFailureThrottle.mockResolvedValue(undefined);
+    getLoginFailureThrottle.mockResolvedValue({ blocked: false, blockedUntil: null });
+    recordLoginFailure.mockResolvedValue({
+        blocked: false,
+        newlyBlocked: false,
+        penaltyLevel: 0,
+        shouldCreateIncident: false,
+    });
     mockFindOneAndUpdate.mockResolvedValue(null);
     createMfaSecret.mockReturnValue("mfa-secret");
     createRecoveryCodes.mockReturnValue(["recovery-code"]);
@@ -194,6 +211,10 @@ describe("auth service", () => {
             ],
         });
         expect(result.accessToken).toBe("access-token");
+        expect(clearLoginFailureThrottle).toHaveBeenCalledWith({
+            userId: user._id,
+            ip: "127.0.0.1",
+        });
         expect(result.refreshToken).toBeTypeOf("string");
         expect(result.refreshToken.length).toBeGreaterThan(40);
         expect(user.refreshTokenHash).toBeTypeOf("string");
@@ -302,7 +323,7 @@ describe("auth service", () => {
         expect(recordAuthAuditEvent).not.toHaveBeenCalled();
     });
 
-    it("increments failed attempts for invalid credentials", async () => {
+    it("records failed credentials against the account and source", async () => {
         const user = buildUser();
         mockFindOne.mockResolvedValue(user);
         compare.mockResolvedValue(false);
@@ -317,8 +338,11 @@ describe("auth service", () => {
             code: "INVALID_CREDENTIALS",
         });
 
-        expect(user.failedLoginAttempts).toBe(1);
-        expect(user.save).toHaveBeenCalledTimes(1);
+        expect(recordLoginFailure).toHaveBeenCalledWith({
+            userId: user._id,
+            ip: "127.0.0.1",
+        });
+        expect(user.save).not.toHaveBeenCalled();
         expect(recordAuthAuditEvent).toHaveBeenCalledWith(
             expect.objectContaining({
                 action: "FAILED_LOGIN",
@@ -328,10 +352,16 @@ describe("auth service", () => {
         );
     });
 
-    it("locks account after repeated failed logins", async () => {
-        const user = buildUser({ failedLoginAttempts: 4 });
+    it("creates one security incident when a source reaches the progressive delay", async () => {
+        const user = buildUser();
         mockFindOne.mockResolvedValue(user);
         compare.mockResolvedValue(false);
+        recordLoginFailure.mockResolvedValue({
+            blocked: true,
+            newlyBlocked: true,
+            penaltyLevel: 1,
+            shouldCreateIncident: true,
+        });
 
         await expect(
             login({
@@ -343,8 +373,34 @@ describe("auth service", () => {
             code: "INVALID_CREDENTIALS",
         });
 
-        expect(user.failedLoginAttempts).toBe(0);
-        expect(user.lockUntil).toBeInstanceOf(Date);
+        expect(createSecurityIncident).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: "LOGIN_FAILURE_THROTTLED",
+                phase: "auth",
+                context: expect.objectContaining({ penaltyLevel: 1 }),
+            })
+        );
+    });
+
+    it("does not let a throttled source create more audits or extend the delay", async () => {
+        const user = buildUser();
+        mockFindOne.mockResolvedValue(user);
+        getLoginFailureThrottle.mockResolvedValue({
+            blocked: true,
+            blockedUntil: new Date(Date.now() + 60_000),
+        });
+
+        await expect(
+            login({
+                username: "admin",
+                password: "password123",
+                req: { headers: {}, ip: "127.0.0.1" },
+            })
+        ).rejects.toMatchObject({ code: "INVALID_CREDENTIALS" });
+
+        expect(compare).not.toHaveBeenCalled();
+        expect(recordLoginFailure).not.toHaveBeenCalled();
+        expect(recordAuthAuditEvent).not.toHaveBeenCalled();
     });
 
     it("rejects refresh with unknown token", async () => {

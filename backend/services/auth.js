@@ -6,8 +6,6 @@ import {
     ACCESS_TOKEN_EXPIRES_IN,
     AUTH_ROLES,
     AUTH_ROLE_VALUES,
-    LOCKOUT_DURATION_MS,
-    MAX_LOGIN_ATTEMPTS,
     MAX_CONCURRENT_AUTH_SESSIONS,
     MFA_LOCKOUT_DURATION_MS,
     REFRESH_TOKEN_TTL_MS,
@@ -35,6 +33,11 @@ import { assertSuperAdmin, createAuthError } from "./auth/shared.js";
 import { getTrustedRequestIp } from "../utils/requestIp.js";
 import { createSecurityIncident } from "./securityIncidents.js";
 import { logSafeError } from "../utils/requestLogSafety.js";
+import {
+    clearLoginFailureThrottle,
+    getLoginFailureThrottle,
+    recordLoginFailure,
+} from "./auth/loginFailureThrottle.js";
 import {
     createRefreshTokenFamilyId,
     createRefreshTokenSession,
@@ -791,33 +794,28 @@ export async function login({ username, email, password, req }) {
         );
     }
 
-    if (user.lockUntil && user.lockUntil.getTime() > Date.now()) {
-        await recordAuthAuditEvent({
-            action: "FAILED_LOGIN",
-            outcome: "FAILED",
-            userId: user._id,
-            username: user.username,
-            role: user.role,
-            ip,
-            reason: "ACCOUNT_LOCKED",
-        });
+    const throttle = await getLoginFailureThrottle({
+        userId: user._id,
+        ip,
+    });
+
+    if (throttle.blocked) {
+        // Do not extend the cooldown or produce another audit event while this
+        // same source keeps retrying. That avoids turning the protection into a
+        // permanent lockout or an audit-volume attack.
         throw createAuthError(
-            "ACCOUNT_LOCKED",
-            "Compte temporairement verrouille suite a trop d'echecs."
+            "INVALID_CREDENTIALS",
+            "Nom d'utilisateur ou mot de passe invalide."
         );
     }
 
     const passwordOk = await bcrypt.compare(password, user.passwordHash);
 
     if (!passwordOk) {
-        user.failedLoginAttempts += 1;
-
-        if (user.failedLoginAttempts >= MAX_LOGIN_ATTEMPTS) {
-            user.lockUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
-            user.failedLoginAttempts = 0;
-        }
-
-        await user.save();
+        const throttleResult = await recordLoginFailure({
+            userId: user._id,
+            ip,
+        });
 
         await recordAuthAuditEvent({
             action: "FAILED_LOGIN",
@@ -829,11 +827,34 @@ export async function login({ username, email, password, req }) {
             reason: "INVALID_CREDENTIALS",
         });
 
+        if (throttleResult.shouldCreateIncident) {
+            try {
+                await createSecurityIncident({
+                    type: "LOGIN_FAILURE_THROTTLED",
+                    phase: "auth",
+                    reason:
+                        "Des echecs de connexion repetes provenant de la meme origine ont declenche un delai progressif.",
+                    requestPath: "/api/auth/login",
+                    transport: "internal_auth",
+                    matches: [],
+                    context: {
+                        userId: String(user._id),
+                        role: user.role,
+                        penaltyLevel: throttleResult.penaltyLevel,
+                    },
+                });
+            } catch (error) {
+                logSafeError("LOGIN_FAILURE_THROTTLE_INCIDENT_WRITE_FAILED", error);
+            }
+        }
+
         throw createAuthError(
             "INVALID_CREDENTIALS",
             "Nom d'utilisateur ou mot de passe invalide."
         );
     }
+
+    await clearLoginFailureThrottle({ userId: user._id, ip });
 
     const replacesExistingSession =
         await hasActiveRefreshTokenSessionsForUser(user._id);

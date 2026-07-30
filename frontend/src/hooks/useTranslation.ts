@@ -123,6 +123,7 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
 
   useEffect(() => {
     const requestVersion = ++requestVersionRef.current;
+    let disposed = false;
     setError(null);
     if (!shouldTranslateText(text)) {
       setTranslated(text);
@@ -166,7 +167,7 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
     setLoading(true);
     translateText({ translationKey, targetLang })
       .then((result) => {
-        if (requestVersionRef.current === requestVersion) {
+        if (!disposed && requestVersionRef.current === requestVersion) {
           let clean = result;
           if (typeof clean === "string" && clean.match(/^Le texte reste le m[êe]me/)) {
             clean = text;
@@ -178,7 +179,7 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
         }
       })
       .catch((err) => {
-        if (requestVersionRef.current === requestVersion) {
+        if (!disposed && requestVersionRef.current === requestVersion) {
           // Fallback local pour les labels critiques
           const fallback =
             criticalLabelFallbacks[text]?.[targetLang] ||
@@ -195,6 +196,10 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
           setLoading(false);
         }
       });
+
+    return () => {
+      disposed = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, targetLang, namespace, sourceLocale, translationKey]);
 

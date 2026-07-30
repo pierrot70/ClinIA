@@ -179,6 +179,14 @@ export function SecurityIncidentsModal({
             };
         }
 
+        if (item.type === "LOGIN_FAILURE_THROTTLED") {
+            return {
+                whatHappened: labels.loginFailureThrottledWhatHappened,
+                whatWasBlocked: labels.loginFailureThrottledWhatWasBlocked,
+                nextStep: labels.loginFailureThrottledNextStep,
+            };
+        }
+
         return {
             whatHappened: labels.explanationWhatHappened,
             whatWasBlocked: labels.explanationWhatWasBlocked,
@@ -306,6 +314,7 @@ export function SecurityIncidentsModal({
                                 <option value="REFRESH_TOKEN_REPLAY">REFRESH_TOKEN_REPLAY</option>
                                 <option value="MFA_CHALLENGE_EXHAUSTED">MFA_CHALLENGE_EXHAUSTED</option>
                                 <option value="SESSION_LIMIT_REACHED">SESSION_LIMIT_REACHED</option>
+                                <option value="LOGIN_FAILURE_THROTTLED">LOGIN_FAILURE_THROTTLED</option>
                             </select>
                         </label>
                     </div>

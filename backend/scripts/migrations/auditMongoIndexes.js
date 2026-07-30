@@ -8,6 +8,7 @@ import { ClinicianComment } from "../../models/ClinicianComment.js";
 import { Clinique } from "../../models/Clinique.js";
 import { DiagnosisResult } from "../../models/DiagnosisResult.js";
 import { MassDownloadWindow } from "../../models/MassDownloadWindow.js";
+import { LoginFailureThrottle } from "../../models/LoginFailureThrottle.js";
 import { OpenAIRequestAuditLog } from "../../models/OpenAIRequestAuditLog.js";
 import { Patient } from "../../models/Patient.js";
 import { PatientAuditLog } from "../../models/PatientAuditLog.js";
@@ -23,7 +24,7 @@ import { auditCollectionIndexes, hasIndexAuditErrors } from "./indexAudit.js";
 
 const MODELS = [
     AdminUser, AppSettings, Appointment, AuthAuditLog, ClinicianComment,
-    Clinique, DiagnosisResult, MassDownloadWindow, OpenAIRequestAuditLog,
+    Clinique, DiagnosisResult, MassDownloadWindow, LoginFailureThrottle, OpenAIRequestAuditLog,
     Patient, PatientAuditLog, PatientClinicalNoteVersion,
     PatientSecureRequestSnapshot, RateLimitWindow, RefreshTokenSession,
     SecurityIncident, Specialist, UiTranslationCache, WriteOperationAuditLog,
