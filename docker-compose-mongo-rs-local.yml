@@ -48,6 +48,13 @@ services:
       - mongo_rs_3:/data/db
       - mongo_keyfile:/keyfile:ro
 
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
   backend: &backend
     build:
       context: ./backend
@@ -69,6 +76,10 @@ services:
       OPENAI_MODEL: "gpt-4.1-mini"
       CLINIA_MOCK_AI: "true"
       CLINIA_ALLOW_SELF_REGISTRATION: "false"
+      SMTP_HOST: "mailpit"
+      SMTP_PORT: "1025"
+      SMTP_SECURE: "false"
+      SMTP_FROM: "ClinIA <securite@clinique-ai.ca>"
       CLINIA_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"
       CLINIA_TRUST_PROXY_CIDRS: "loopback"
       CLINIA_INSTANCE_ID: "mongo-rs-test-backend"
@@ -81,6 +92,7 @@ services:
       - mongo-rs-1
       - mongo-rs-2
       - mongo-rs-3
+      - mailpit
 
   backend-replica:
     <<: *backend
@@ -94,6 +106,10 @@ services:
       OPENAI_MODEL: "gpt-4.1-mini"
       CLINIA_MOCK_AI: "true"
       CLINIA_ALLOW_SELF_REGISTRATION: "false"
+      SMTP_HOST: "mailpit"
+      SMTP_PORT: "1025"
+      SMTP_SECURE: "false"
+      SMTP_FROM: "ClinIA <securite@clinique-ai.ca>"
       CLINIA_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"
       CLINIA_TRUST_PROXY_CIDRS: "loopback"
       CLINIA_INSTANCE_ID: "mongo-rs-test-backend-replica"

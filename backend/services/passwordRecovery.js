@@ -5,6 +5,7 @@ import { recordAuthAuditEvent } from "../audit/authAudit.js";
 import { revokeRefreshTokenFamiliesForUser } from "./auth/refreshTokenFamilies.js";
 import { logSafeError } from "../utils/requestLogSafety.js";
 import { AdminUser } from "../models/AdminUser.js";
+import { getPasswordPolicyViolation } from "../security/passwordPolicy.js";
 import {
     sendPasswordChangedConfirmation,
     sendPasswordRecoveryCode,
@@ -184,12 +185,11 @@ export async function completePasswordRecovery({
 }) {
     const normalizedEmail = normalizeEmail(email);
     const normalizedGrant = String(recoveryGrant || "").trim();
+    const passwordViolation = getPasswordPolicyViolation(newPassword);
     if (
         !normalizedEmail ||
         normalizedGrant.length < 30 ||
-        typeof newPassword !== "string" ||
-        newPassword.length < 8 ||
-        newPassword.length > 128
+        passwordViolation
     ) {
         throw createPasswordRecoveryError(
             "INVALID_PASSWORD_RECOVERY",

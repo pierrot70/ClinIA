@@ -2,6 +2,7 @@ import { recordAuthAuditEvent } from "../../audit/authAudit.js";
 import { AdminUser } from "../../models/AdminUser.js";
 import { assertSuperAdmin, createAuthError } from "./shared.js";
 import { revokeRefreshTokenFamiliesForUser } from "./refreshTokenFamilies.js";
+import { getPasswordPolicyViolation } from "../../security/passwordPolicy.js";
 
 export async function resetUserPassword({
     userId,
@@ -26,12 +27,9 @@ export async function resetUserPassword({
         ? deps.makeTemporaryPassword()
         : newPassword;
 
-    if (
-        typeof nextPassword !== "string" ||
-        nextPassword.length < 8 ||
-        nextPassword.length > 128
-    ) {
-        throw createAuthError("INVALID_INPUT", "Mot de passe invalide.");
+    const passwordViolation = getPasswordPolicyViolation(nextPassword);
+    if (passwordViolation) {
+        throw createAuthError("INVALID_INPUT", passwordViolation);
     }
 
     const ip = deps.getRequestIp(req);
@@ -78,12 +76,9 @@ export async function completeForcedPasswordChange({
         throw createAuthError("UNAUTHORIZED", "Authentification requise.");
     }
 
-    if (
-        typeof newPassword !== "string" ||
-        newPassword.length < 8 ||
-        newPassword.length > 128
-    ) {
-        throw createAuthError("INVALID_INPUT", "Mot de passe invalide.");
+    const passwordViolation = getPasswordPolicyViolation(newPassword);
+    if (passwordViolation) {
+        throw createAuthError("INVALID_INPUT", passwordViolation);
     }
 
     const ip = deps.getRequestIp(req);

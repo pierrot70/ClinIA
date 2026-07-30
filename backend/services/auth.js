@@ -31,6 +31,7 @@ import {
 } from "./auth/passwordAdminService.js";
 import { assertSuperAdmin, createAuthError } from "./auth/shared.js";
 import { getTrustedRequestIp } from "../utils/requestIp.js";
+import { getPasswordPolicyViolation } from "../security/passwordPolicy.js";
 import { createSecurityIncident } from "./securityIncidents.js";
 import { logSafeError } from "../utils/requestLogSafety.js";
 import {
@@ -465,9 +466,7 @@ function assertRegisterInput({ username, password, role }) {
         normalizedUsername.length < 3 ||
         normalizedUsername.length > 64 ||
         !identifierRegex.test(normalizedUsername) ||
-        typeof password !== "string" ||
-        password.length < 8 ||
-        password.length > 128 ||
+        getPasswordPolicyViolation(password) ||
         !AUTH_ROLE_VALUES.includes(role)
     ) {
         throw createAuthError(
@@ -1655,10 +1654,11 @@ export async function deleteUser({ userId, authUser, req }) {
 }
 
 export async function hashPassword(password) {
-    if (typeof password !== "string" || password.length < 8) {
+    const violation = getPasswordPolicyViolation(password);
+    if (violation) {
         throw createAuthError(
             "INVALID_INPUT",
-            "Le mot de passe doit contenir au moins 8 caracteres."
+            violation
         );
     }
 

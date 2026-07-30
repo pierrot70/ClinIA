@@ -279,4 +279,18 @@ describe("password recovery service", () => {
         ).rejects.toMatchObject({ code: "INVALID_PASSWORD_RECOVERY" });
         expect(user.save).not.toHaveBeenCalled();
     });
+
+    it("rejects a compromised password before looking up a recovery grant", async () => {
+        const { completePasswordRecovery } = await import("../passwordRecovery.js");
+
+        await expect(
+            completePasswordRecovery({
+                email: "doctor@clinia.local",
+                recoveryGrant: "valid-grant-value-that-is-long-enough",
+                newPassword: "passwordpassword",
+            })
+        ).rejects.toMatchObject({ code: "INVALID_PASSWORD_RECOVERY" });
+
+        expect(findOneMock).not.toHaveBeenCalled();
+    });
 });

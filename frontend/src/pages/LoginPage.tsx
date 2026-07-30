@@ -429,7 +429,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                                 <input
                                     id="recovery-new-password"
                                     type="password"
-                                    minLength={8}
+                                    minLength={12}
                                     maxLength={128}
                                     className="w-full rounded-lg border px-3 py-2 text-sm"
                                     value={newPassword}
@@ -445,7 +445,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                                 <input
                                     id="recovery-confirm-password"
                                     type="password"
-                                    minLength={8}
+                                    minLength={12}
                                     maxLength={128}
                                     className="w-full rounded-lg border px-3 py-2 text-sm"
                                     value={confirmPassword}

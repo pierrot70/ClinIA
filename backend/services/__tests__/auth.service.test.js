@@ -576,8 +576,29 @@ describe("auth service", () => {
     it("hashes password with bcrypt", async () => {
         hash.mockResolvedValue("hashed");
 
-        const out = await hashPassword("password123");
+        const out = await hashPassword("cobalt meadow lantern river");
         expect(out).toBe("hashed");
+    });
+
+    it("rejects a compromised password during account creation", async () => {
+        await expect(
+            register({
+                username: "newdoctor",
+                email: "newdoctor@clinia.local",
+                password: "passwordpassword",
+                role: "MEDECIN",
+                authUser: {
+                    userId: "507f1f77bcf86cd799439011",
+                    username: "admin",
+                    role: "ADMIN",
+                },
+                req: { headers: {}, ip: "127.0.0.1" },
+            })
+        ).rejects.toMatchObject({
+            code: "INVALID_INPUT",
+        });
+
+        expect(mockCreate).not.toHaveBeenCalled();
     });
 
     it("registers a new user when admin is authenticated", async () => {
@@ -593,7 +614,7 @@ describe("auth service", () => {
         const result = await register({
             username: "newdoctor",
             email: "newdoctor@clinia.local",
-            password: "password123",
+            password: "cobalt meadow lantern river",
             role: "MEDECIN",
             authUser: {
                 userId: "507f1f77bcf86cd799439011",
@@ -625,7 +646,7 @@ describe("auth service", () => {
             register({
                 username: "newsuper",
                 email: "newsuper@clinia.local",
-                password: "password123",
+                password: "cobalt meadow lantern river",
                 role: "SUPERADMIN",
                 authUser: {
                     userId: "507f1f77bcf86cd799439011",
@@ -655,7 +676,7 @@ describe("auth service", () => {
         const result = await register({
             username: "newdoctor",
             email: "newdoctor@clinia.local",
-            password: "password123",
+            password: "cobalt meadow lantern river",
             role: "MEDECIN",
             mfaRequired: true,
             authUser: {
@@ -817,7 +838,7 @@ describe("auth service", () => {
 
         const result = await registerSelf({
             email: "drsmith@clinia.local",
-            password: "password123",
+            password: "cobalt meadow lantern river",
             role: "SUPERADMIN",
             req: { headers: {}, ip: "127.0.0.1" },
         });
@@ -845,7 +866,7 @@ describe("auth service", () => {
         await expect(
             registerSelf({
                 email: "exists@clinia.local",
-                password: "password123",
+                password: "cobalt meadow lantern river",
                 req: { headers: {}, ip: "127.0.0.1" },
             })
         ).rejects.toMatchObject({
@@ -953,7 +974,7 @@ describe("auth service", () => {
         });
 
         expect(typeof result.temporaryPassword).toBe("string");
-        expect(result.temporaryPassword.length).toBeGreaterThanOrEqual(8);
+        expect(result.temporaryPassword.length).toBeGreaterThanOrEqual(12);
         expect(user.mustChangePasswordOnNextLogin).toBe(true);
         expect(user.passwordResetRequired).toBe(false);
         expect(recordAuthAuditEvent).toHaveBeenCalledWith(
@@ -997,6 +1018,30 @@ describe("auth service", () => {
                 reason: "FORCED_PASSWORD_CHANGE_COMPLETED",
             })
         );
+    });
+
+    it("rejects a compromised password during an administrative reset", async () => {
+        const user = buildUser();
+        mockFindById.mockResolvedValue(user);
+
+        await expect(
+            resetUserPassword({
+                userId: user._id,
+                newPassword: "passwordpassword",
+                authUser: {
+                    userId: "507f1f77bcf86cd799439099",
+                    username: "superadmin",
+                    role: "SUPERADMIN",
+                },
+                req: { headers: {}, ip: "127.0.0.1" },
+            })
+        ).rejects.toMatchObject({
+            code: "INVALID_INPUT",
+            message: expect.stringMatching(/compromis/),
+        });
+
+        expect(hash).not.toHaveBeenCalled();
+        expect(user.save).not.toHaveBeenCalled();
     });
 
     it("applies search and role filters to paginated user listing", async () => {
