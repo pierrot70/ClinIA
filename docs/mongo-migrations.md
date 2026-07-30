@@ -58,6 +58,8 @@ docker exec "$BACKEND_CONTAINER" \
   node /app/scripts/migrations/auditMongoIndexes.js
 ```
 
+Ne jamais supprimer manuellement un index signale. Ajouter une migration corrective idempotente, l'appliquer avec le protocole habituel, puis relancer l'audit pour confirmer `extras=0`.
+
 ## Drill de transformation reversible
 
 Le drill suivant n'utilise qu'une collection de test et la nettoie a la fin:
