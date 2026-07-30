@@ -8,6 +8,7 @@ import { labels } from "../i18n/uiLabels";
 import {
     completePasswordRecovery,
     consumeAuthSecurityNotice,
+    isPasswordRecoveryAvailable,
     MfaRequiredError,
     MfaVerificationError,
     type MfaChallenge,
@@ -41,6 +42,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     const [securityNotice, setSecurityNotice] = useState<AuthSecurityNotice | null>(null);
     const [loading, setLoading] = useState(false);
     const [recoveryMode, setRecoveryMode] = useState(false);
+    const [passwordRecoveryAvailable, setPasswordRecoveryAvailable] = useState(false);
     const [recoveryStep, setRecoveryStep] = useState<RecoveryStep>("request");
     const [recoveryCode, setRecoveryCode] = useState("");
     const [recoveryGrant, setRecoveryGrant] = useState("");
@@ -100,6 +102,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     const recoveryPasswordsMismatchLabel = useLoginLabel(recoveryLabels.passwordsMismatch, "login.recovery.passwordsMismatch");
     const recoveryPasswordChangedLabel = useLoginLabel(recoveryLabels.passwordChanged, "login.recovery.passwordChanged");
     const recoveryContinueFailedLabel = useLoginLabel(recoveryLabels.continueFailed, "login.recovery.continueFailed");
+    const recoveryUnavailableLabel = useLoginLabel(recoveryLabels.unavailable, "login.recovery.unavailable");
     const revokedTitleLabel = useLoginLabel(labels.auth.session.revokedTitle, "auth.session.revokedTitle");
     const revokedBodyLabel = useLoginLabel(labels.auth.session.revokedBody, "auth.session.revokedBody");
     const replacedTitleLabel = useLoginLabel(labels.auth.session.replacedTitle, "auth.session.replacedTitle");
@@ -123,6 +126,20 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
 
     useEffect(() => {
         setSecurityNotice(consumeAuthSecurityNotice());
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+
+        void isPasswordRecoveryAvailable().then((available) => {
+            if (active) {
+                setPasswordRecoveryAvailable(available);
+            }
+        });
+
+        return () => {
+            active = false;
+        };
     }, []);
 
     if (isAuthenticated && user && !enrollmentCompletionPendingRef.current) {
@@ -547,18 +564,26 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                             : loginActionLabel}
                 </button>
                 {!registerMode && (
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setRecoveryMode(true);
-                            setRecoveryStep("request");
-                            setError(null);
-                            setSuccess(null);
-                        }}
-                        className="w-full text-sm text-blue-600 hover:text-blue-700"
-                    >
-                        {forgotPasswordLabel}
-                    </button>
+                    <div className="space-y-2 text-center">
+                        <button
+                            type="button"
+                            disabled={!passwordRecoveryAvailable}
+                            onClick={() => {
+                                setRecoveryMode(true);
+                                setRecoveryStep("request");
+                                setError(null);
+                                setSuccess(null);
+                            }}
+                            className="w-full text-sm text-blue-600 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400"
+                        >
+                            {forgotPasswordLabel}
+                        </button>
+                        {!passwordRecoveryAvailable && (
+                            <p className="text-sm text-slate-600">
+                                {recoveryUnavailableLabel}
+                            </p>
+                        )}
+                    </div>
                 )}
             </form>
             )}

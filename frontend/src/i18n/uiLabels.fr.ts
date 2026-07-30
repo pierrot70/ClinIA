@@ -543,6 +543,8 @@ export const UI_LABELS_FR = {
             passwordsMismatch: "Les mots de passe ne correspondent pas.",
             passwordChanged: "Mot de passe modifie. Vous pouvez maintenant vous connecter.",
             continueFailed: "Impossible de poursuivre la reinitialisation.",
+            unavailable:
+                "La reinitialisation de mot de passe est temporairement indisponible. Contactez un administrateur ClinIA.",
         },
         mfa: {
             title: "Verification a deux facteurs",

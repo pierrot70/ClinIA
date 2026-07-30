@@ -48,6 +48,14 @@ describe("password recovery email service", () => {
         );
     });
 
+    it("reports recovery as unavailable when SMTP delivery is not configured", async () => {
+        vi.stubEnv("SMTP_HOST", "");
+        const { isPasswordRecoveryDeliveryConfigured } =
+            await import("../passwordRecoveryEmail.js");
+
+        expect(isPasswordRecoveryDeliveryConfigured()).toBe(false);
+    });
+
     it("sends a password changed confirmation without including a password", async () => {
         const { sendPasswordChangedConfirmation } =
             await import("../passwordRecoveryEmail.js");

@@ -1,10 +1,23 @@
 import nodemailer from "nodemailer";
 
+export function isPasswordRecoveryDeliveryConfigured() {
+    const host = String(process.env.SMTP_HOST || "").trim();
+    const port = Number.parseInt(process.env.SMTP_PORT || "587", 10);
+
+    return (
+        process.env.PASSWORD_RECOVERY_ENABLED !== "false" &&
+        Boolean(host) &&
+        Number.isFinite(port) &&
+        port > 0 &&
+        port <= 65535
+    );
+}
+
 function getSmtpConfig() {
     const host = String(process.env.SMTP_HOST || "").trim();
     const port = Number.parseInt(process.env.SMTP_PORT || "587", 10);
 
-    if (!host || !Number.isFinite(port)) {
+    if (!isPasswordRecoveryDeliveryConfigured()) {
         throw new Error("SMTP_HOST and SMTP_PORT are required");
     }
 

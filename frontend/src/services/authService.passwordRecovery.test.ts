@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
     completePasswordRecovery,
+    isPasswordRecoveryAvailable,
     requestPasswordRecovery,
     verifyPasswordRecoveryCode,
 } from "./authService";
@@ -77,5 +78,16 @@ describe("password recovery auth service", () => {
                 }),
             })
         );
+    });
+
+    it("reports when password recovery delivery is unavailable", async () => {
+        vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+            new Response(
+                JSON.stringify({ data: { passwordRecoveryAvailable: false } }),
+                { status: 200 }
+            )
+        );
+
+        await expect(isPasswordRecoveryAvailable()).resolves.toBe(false);
     });
 });

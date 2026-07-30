@@ -47,6 +47,7 @@ import {
     requestPasswordRecoveryCode,
     verifyPasswordRecoveryCode,
 } from "../services/passwordRecovery.js";
+import { isPasswordRecoveryDeliveryConfigured } from "../services/passwordRecoveryEmail.js";
 import {
     passwordRecoveryRequestRateLimiter,
     passwordRecoveryVerifyRateLimiter,
@@ -67,6 +68,7 @@ router.get("/app-status", async (_req, res) => {
             shutdownAt: shutdownState.shutdownAt,
             activatedAt: shutdownState.activatedAt,
             enforcedAt: shutdownState.enforcedAt,
+            passwordRecoveryAvailable: isPasswordRecoveryDeliveryConfigured(),
         },
         meta: {
             source: "real",
@@ -265,6 +267,16 @@ router.post("/register-self", loginRateLimiter, async (req, res) => {
 });
 
 router.post("/password-recovery/request", passwordRecoveryRequestRateLimiter, async (req, res) => {
+    if (!isPasswordRecoveryDeliveryConfigured()) {
+        return res.status(503).json({
+            error: {
+                code: "PASSWORD_RECOVERY_UNAVAILABLE",
+                message: "La reinitialisation de mot de passe est temporairement indisponible.",
+                retryable: true,
+            },
+        });
+    }
+
     try {
         await requestPasswordRecoveryCode({
             email: req.body?.email,

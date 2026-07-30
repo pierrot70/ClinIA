@@ -205,6 +205,11 @@ export const APPROVED_UI_TRANSLATION_CATALOG = Object.freeze([
     { key: "login.recovery.passwordsMismatch", namespace: "login", text: "Les mots de passe ne correspondent pas." },
     { key: "login.recovery.passwordChanged", namespace: "login", text: "Mot de passe modifie. Vous pouvez maintenant vous connecter." },
     { key: "login.recovery.continueFailed", namespace: "login", text: "Impossible de poursuivre la reinitialisation." },
+    {
+        key: "login.recovery.unavailable",
+        namespace: "login",
+        text: "La reinitialisation de mot de passe est temporairement indisponible. Contactez un administrateur ClinIA.",
+    },
     { key: "auth.session.revokedTitle", namespace: "login", text: "Session interrompue par securite" },
     { key: "auth.session.revokedBody", namespace: "login", text: "Une activite inhabituelle a ete detectee sur ce compte. Votre session a ete invalidee par securite et une reconnexion est necessaire pour poursuivre. Si cette activite ne venait pas de vous, changez votre mot de passe des maintenant." },
     { key: "auth.session.restrictedTitle", namespace: "login", text: "Acces temporairement restreint" },

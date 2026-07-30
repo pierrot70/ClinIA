@@ -28,6 +28,12 @@ type BasicApiResponse = {
     message?: string;
 };
 
+type AuthAppStatusResponse = {
+    data?: {
+        passwordRecoveryAvailable?: boolean;
+    };
+};
+
 export type AuthSecurityNotice = {
     code:
         | "TOKEN_REVOKED"
@@ -434,6 +440,20 @@ export async function requestPasswordRecovery(email: string): Promise<void> {
                 data?.message ||
                 "Impossible d'envoyer le code de verification."
         );
+    }
+}
+
+export async function isPasswordRecoveryAvailable(): Promise<boolean> {
+    try {
+        const response = await fetch(`${API_URL}/api/auth/app-status`);
+        if (!response.ok) {
+            return false;
+        }
+
+        const data = (await response.json()) as AuthAppStatusResponse;
+        return data.data?.passwordRecoveryAvailable === true;
+    } catch {
+        return false;
     }
 }
 
