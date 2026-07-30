@@ -161,6 +161,7 @@ write_backup_encryption_env_file() {
   {
     printf 'BACKUP_ENCRYPTION_REQUIRED=true\n'
     printf 'BACKUP_AGE_RECIPIENT=%s\n' "$(shell_quote "$age_recipient")"
+    printf 'BACKUP_DASHBOARD_READER_GID=10001\n'
   } >"$tmp_file"
 
   install -m 600 "$tmp_file" "$BACKUP_ENCRYPTION_ENV_FILE"

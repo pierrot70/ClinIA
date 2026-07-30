@@ -33,6 +33,7 @@ S3_SSE="${S3_SSE:-}"
 S3_ONLY_SHOW_ERRORS="${S3_ONLY_SHOW_ERRORS:-true}"
 BACKUP_ENCRYPTION_REQUIRED="${BACKUP_ENCRYPTION_REQUIRED:-false}"
 BACKUP_AGE_RECIPIENT="${BACKUP_AGE_RECIPIENT:-}"
+BACKUP_DASHBOARD_READER_GID="${BACKUP_DASHBOARD_READER_GID:-}"
 
 fail() {
   printf 'ERROR %s\n' "$1" >&2
@@ -242,9 +243,19 @@ upload_backup_to_s3() {
 require_command find
 require_command mkdir
 
+if [[ -n "$BACKUP_DASHBOARD_READER_GID" && ! "$BACKUP_DASHBOARD_READER_GID" =~ ^[0-9]+$ ]]; then
+  fail "invalid_backup_dashboard_reader_gid value=$BACKUP_DASHBOARD_READER_GID"
+fi
+
 mkdir -p "$BACKUP_OUTPUT_DIR" "$BACKUP_KEEP_DIR" "$BACKUP_LOG_DIR"
-chmod 700 "$BACKUP_OUTPUT_DIR"
-chmod 700 "$BACKUP_KEEP_DIR"
+if [[ -n "$BACKUP_DASHBOARD_READER_GID" ]]; then
+  chgrp "$BACKUP_DASHBOARD_READER_GID" "$BACKUP_OUTPUT_DIR" "$BACKUP_KEEP_DIR"
+  chmod 750 "$BACKUP_OUTPUT_DIR"
+  chmod 770 "$BACKUP_KEEP_DIR"
+else
+  chmod 700 "$BACKUP_OUTPUT_DIR"
+  chmod 700 "$BACKUP_KEEP_DIR"
+fi
 
 timestamp="$(date -u +%Y%m%d-%H%M%S)"
 log_path="${BACKUP_LOG_DIR%/}/mongo-backup-${timestamp}.log"
@@ -264,6 +275,7 @@ run_scheduled_backup() {
     MONGO_CONTAINER_PREFIX="$MONGO_CONTAINER_PREFIX" \
     BACKUP_ENCRYPTION_REQUIRED="$BACKUP_ENCRYPTION_REQUIRED" \
     BACKUP_AGE_RECIPIENT="$BACKUP_AGE_RECIPIENT" \
+    BACKUP_DASHBOARD_READER_GID="$BACKUP_DASHBOARD_READER_GID" \
     "$SCRIPT_DIR/backup-mongo.sh"
   )" || backup_status=$?
 
@@ -284,7 +296,11 @@ run_scheduled_backup() {
     return 1
   fi
 
-  "$SCRIPT_DIR/verify-mongo-backup.sh" "$backup_archive" || return "$?"
+  if [[ -n "$BACKUP_DASHBOARD_READER_GID" ]]; then
+    EXPECTED_PERMISSIONS=640 "$SCRIPT_DIR/verify-mongo-backup.sh" "$backup_archive" || return "$?"
+  else
+    "$SCRIPT_DIR/verify-mongo-backup.sh" "$backup_archive" || return "$?"
+  fi
   upload_backup_to_s3 "$backup_archive" || return "$?"
   cleanup_old_backups || return "$?"
 

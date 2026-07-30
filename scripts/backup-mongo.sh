@@ -15,6 +15,7 @@ BACKUP_LABEL="${BACKUP_LABEL:-clinia-mongo}"
 MIN_AVAILABLE_KB="${MIN_AVAILABLE_KB:-1048576}"
 BACKUP_ENCRYPTION_REQUIRED="${BACKUP_ENCRYPTION_REQUIRED:-false}"
 BACKUP_AGE_RECIPIENT="${BACKUP_AGE_RECIPIENT:-}"
+BACKUP_DASHBOARD_READER_GID="${BACKUP_DASHBOARD_READER_GID:-}"
 
 fail() {
   printf 'ERROR %s\n' "$1" >&2
@@ -65,6 +66,10 @@ require_command docker
 require_command gzip
 require_command sha256sum
 require_command stat
+
+if [[ -n "$BACKUP_DASHBOARD_READER_GID" && ! "$BACKUP_DASHBOARD_READER_GID" =~ ^[0-9]+$ ]]; then
+  fail "invalid_backup_dashboard_reader_gid value=$BACKUP_DASHBOARD_READER_GID"
+fi
 
 if [[ "$BACKUP_ENCRYPTION_REQUIRED" == "true" && -z "$BACKUP_AGE_RECIPIENT" ]]; then
   fail 'missing_backup_age_recipient set BACKUP_AGE_RECIPIENT to the public age1 recipient'
@@ -209,6 +214,15 @@ if [[ -f "$host_manifest_path" ]]; then
   chmod 600 "$host_manifest_path"
 fi
 
+if [[ -n "$BACKUP_DASHBOARD_READER_GID" ]]; then
+  # The dashboard can only read these root-owned files through its read-only mount.
+  for backup_file in "$host_archive_path" "$host_sha_path" "$host_manifest_path"; do
+    [[ -f "$backup_file" ]] || continue
+    chgrp "$BACKUP_DASHBOARD_READER_GID" "$backup_file"
+    chmod 640 "$backup_file"
+  done
+fi
+
 if [[ -n "$BACKUP_AGE_RECIPIENT" ]]; then
   [[ "$(head -n1 "$host_archive_path")" == 'age-encryption.org/v1' ]] ||
     fail "invalid_age_archive archive=$host_archive_path"
@@ -225,6 +239,9 @@ if [[ -f "$host_manifest_path" ]]; then
   info "manifest_file=$host_manifest_path"
 fi
 info "size_bytes=$size_bytes permissions=$permissions"
+if [[ -n "$BACKUP_DASHBOARD_READER_GID" ]]; then
+  info "dashboard_reader_gid=$BACKUP_DASHBOARD_READER_GID"
+fi
 if [[ -n "$BACKUP_AGE_RECIPIENT" ]]; then
   info 'encryption=age'
   info 'age_header=ok'

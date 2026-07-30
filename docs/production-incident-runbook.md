@@ -1235,6 +1235,14 @@ Dashboard visibility:
   `/var/backups/clinia/mongo:/var/backups/clinia/mongo:ro`.
 - The keep-marker directory must be mounted read-write in the backend containers:
   `/var/backups/clinia/mongo-keep:/var/backups/clinia/mongo-keep:rw`.
+- The backend runs without root privileges as UID/GID `10001`. To make backup
+  metadata visible without making it writable, set
+  `BACKUP_DASHBOARD_READER_GID=10001` in
+  `/root/clinia-backup-encryption.env`. New archives, checksum files, and
+  manifests stay owned by `root`, are mode `640`, and are readable only by this
+  group through the read-only mount. The backup directory is mode `750`; the
+  keep-marker directory is mode `770` so the dashboard can create only its
+  separate `.keep` markers.
 - Set `MONGO_BACKUP_DIR=/var/backups/clinia/mongo` and
   `MONGO_BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep` and
   `MONGO_BACKUP_RETENTION_DAYS=7` for the backend.

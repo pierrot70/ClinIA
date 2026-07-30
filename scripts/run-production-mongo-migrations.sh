@@ -7,10 +7,20 @@ BACKEND_CONTAINER_EXCLUDE_PREFIX="${BACKEND_CONTAINER_EXCLUDE_PREFIX:-backend-re
 BACKUP_OUTPUT_DIR="${BACKUP_OUTPUT_DIR:-/var/backups/clinia/mongo}"
 BACKUP_LABEL="${BACKUP_LABEL:-clinia-prod}"
 BACKUP_VERIFY_SCRIPT="${BACKUP_VERIFY_SCRIPT:-/opt/clinia/scripts/verify-mongo-backup.sh}"
+BACKUP_ENCRYPTION_ENV_FILE="${BACKUP_ENCRYPTION_ENV_FILE:-/root/clinia-backup-encryption.env}"
 MIGRATION_BACKUP_ARCHIVE="${MIGRATION_BACKUP_ARCHIVE:-}"
 MAX_BACKUP_AGE_HOURS="${MAX_BACKUP_AGE_HOURS:-24}"
 CONFIRM_PRODUCTION_MONGO_MIGRATIONS="${CONFIRM_PRODUCTION_MONGO_MIGRATIONS:-}"
 MIGRATION_BACKUP_CONFIRMED="${MIGRATION_BACKUP_CONFIRMED:-}"
+
+if [[ -f "$BACKUP_ENCRYPTION_ENV_FILE" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  . "$BACKUP_ENCRYPTION_ENV_FILE"
+  set +a
+fi
+
+BACKUP_DASHBOARD_READER_GID="${BACKUP_DASHBOARD_READER_GID:-}"
 
 fail() {
   printf 'ERROR %s\n' "$1" >&2
@@ -63,7 +73,11 @@ verify_backup_preflight() {
     fail "backup_too_old archive=$archive age_seconds=$age_seconds max_age_seconds=$max_age_seconds"
   fi
 
-  "$BACKUP_VERIFY_SCRIPT" "$archive"
+  if [[ -n "$BACKUP_DASHBOARD_READER_GID" ]]; then
+    EXPECTED_PERMISSIONS=640 "$BACKUP_VERIFY_SCRIPT" "$archive"
+  else
+    "$BACKUP_VERIFY_SCRIPT" "$archive"
+  fi
   info "backup_preflight=ok archive=$archive age_seconds=$age_seconds"
 }
 
