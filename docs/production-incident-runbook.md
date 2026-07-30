@@ -125,6 +125,22 @@ The monitor sends Slack alerts through `/root/clinia-backup-alert.env` when a
 check returns `WARN` or `CRITICAL`. Keep `ALERT_ON_SUCCESS=false` for this cron
 to avoid noisy heartbeat alerts every 15 minutes.
 
+Add a separate daily successful-health report at `05:05`. This sends one
+positive Slack heartbeat every 24 hours without delaying failure alerts:
+
+```bash
+sudo tee /etc/cron.d/clinia-production-health-report >/dev/null <<'EOF'
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+5 5 * * * root set -a; if [ -f /root/clinia-backup-alert.env ]; then . /root/clinia-backup-alert.env; fi; if [ -f /root/clinia-backup-s3.env ]; then . /root/clinia-backup-s3.env; fi; if [ -f /root/clinia-mongo-alerts.env ]; then . /root/clinia-mongo-alerts.env; fi; set +a; ALERT_ON_SUCCESS=true CHECK_CONTAINERS=true CHECK_MONGO_REPLICA=true CHECK_HTTP_READY=true CHECK_LOCAL_BACKUP=true CHECK_S3_BACKUP=true BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_LABEL=clinia-prod MONGO_REPLICA_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- /opt/clinia/scripts/production-health-check.sh >>/var/log/clinia/production-health-check.log 2>&1
+EOF
+```
+
+If an older hourly successful-health cron exists, remove that cron entry or
+replace it with the daily file above. Do not change the 15-minute monitor: it
+continues to send `WARN` and `CRITICAL` Slack alerts immediately.
+
 Mongo replica alert routing:
 
 Use dedicated Slack Incoming Webhooks for Mongo topology alerts:
@@ -417,7 +433,7 @@ signal.
 
 | Signal | Meaning | First action |
 | --- | --- | --- |
-| Slack `[ok] clinia-production-health` | Hourly heartbeat passed. App, Mongo, backups, S3, disk, and memory are within thresholds. | No action. |
+| Slack `[ok] clinia-production-health` | Daily heartbeat passed. App, Mongo, backups, S3, disk, and memory are within thresholds. | No action. |
 | Slack `[failed] clinia-production-health` | At least one health monitor check is critical. | Open `/var/log/clinia/production-health-check.log`, run the full manual health check, then follow the failed line below. |
 | `CRITICAL http_ready` | Public API readiness failed. | Test Cloudflare bypass with `curl --resolve`; inspect backend containers and logs. |
 | `CRITICAL mongo_replica_set` | Mongo topology is not normal. | Run replica set checks; confirm `1 PRIMARY`, `2 SECONDARY`, `health: 1`, and low lag. |
