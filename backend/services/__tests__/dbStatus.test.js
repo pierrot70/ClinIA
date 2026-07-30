@@ -328,6 +328,36 @@ describe("dbStatus service", () => {
         }
     });
 
+    it("lists age-encrypted backup metadata without inspecting its contents", async () => {
+        const backupDirectory = await mkdtemp(path.join(os.tmpdir(), "clinia-backups-"));
+        const archiveName = "clinia-prod-20260621-140000.archive.gz.age";
+        const archivePath = path.join(backupDirectory, archiveName);
+        const archiveContent = "age-encrypted backup bytes";
+        const sha256 = createHash("sha256").update(archiveContent).digest("hex");
+
+        try {
+            await writeFile(archivePath, archiveContent);
+            await writeFile(`${archivePath}.sha256`, `${sha256}  ${archiveName}\n`);
+
+            const snapshots = await readBackupSnapshots({
+                backupDirectory,
+                retentionDays: 7,
+            });
+
+            expect(snapshots.backups[0]).toMatchObject({
+                fileName: archiveName,
+                encrypted: true,
+                sha256FilePresent: true,
+                manifest: {
+                    available: false,
+                    error: "manifest_missing",
+                },
+            });
+        } finally {
+            await rm(backupDirectory, { recursive: true, force: true });
+        }
+    });
+
     it("marks a backup as protected and keeps protected backups beyond the recent display limit", async () => {
         const backupDirectory = await mkdtemp(path.join(os.tmpdir(), "clinia-backups-"));
         const keepDirectory = await mkdtemp(path.join(os.tmpdir(), "clinia-backups-keep-"));

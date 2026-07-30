@@ -13,6 +13,8 @@ MONGO_DATABASE="${MONGO_DATABASE:-}"
 MONGO_URI="${MONGO_URI:-}"
 BACKUP_LABEL="${BACKUP_LABEL:-clinia-mongo}"
 MIN_AVAILABLE_KB="${MIN_AVAILABLE_KB:-1048576}"
+BACKUP_ENCRYPTION_REQUIRED="${BACKUP_ENCRYPTION_REQUIRED:-false}"
+BACKUP_AGE_RECIPIENT="${BACKUP_AGE_RECIPIENT:-}"
 
 fail() {
   printf 'ERROR %s\n' "$1" >&2
@@ -64,6 +66,14 @@ require_command gzip
 require_command sha256sum
 require_command stat
 
+if [[ "$BACKUP_ENCRYPTION_REQUIRED" == "true" && -z "$BACKUP_AGE_RECIPIENT" ]]; then
+  fail 'missing_backup_age_recipient set BACKUP_AGE_RECIPIENT to the public age1 recipient'
+fi
+
+if [[ -n "$BACKUP_AGE_RECIPIENT" ]]; then
+  require_command age
+fi
+
 if ! docker info >/dev/null 2>&1; then
   fail 'docker_unavailable'
 fi
@@ -82,11 +92,21 @@ if [[ -z "$available_kb" || "$available_kb" -lt "$MIN_AVAILABLE_KB" ]]; then
 fi
 
 timestamp="$(date -u +%Y%m%d-%H%M%S)"
-archive_name="${BACKUP_LABEL}-${timestamp}.archive.gz"
-container_archive_path="/tmp/${archive_name}"
+raw_archive_name="${BACKUP_LABEL}-${timestamp}.archive.gz"
+archive_name="$raw_archive_name"
+if [[ -n "$BACKUP_AGE_RECIPIENT" ]]; then
+  archive_name="${raw_archive_name}.age"
+fi
+container_archive_path="/tmp/${raw_archive_name}"
 host_archive_path="${BACKUP_OUTPUT_DIR%/}/${archive_name}"
 host_sha_path="${host_archive_path}.sha256"
 host_manifest_path="${host_archive_path}.manifest.json"
+
+cleanup_container_archive() {
+  docker exec "$container" rm -f "$container_archive_path" >/dev/null 2>&1 || true
+}
+
+trap cleanup_container_archive EXIT
 
 db_arg="$(archive_db_argument)"
 
@@ -169,8 +189,17 @@ else
   fi
 fi
 
-docker cp "$container:$container_archive_path" "$host_archive_path"
+docker exec "$container" gzip -t "$container_archive_path"
+
+if [[ -n "$BACKUP_AGE_RECIPIENT" ]]; then
+  docker exec "$container" cat "$container_archive_path" |
+    age --encrypt --recipient "$BACKUP_AGE_RECIPIENT" --output "$host_archive_path"
+else
+  docker cp "$container:$container_archive_path" "$host_archive_path"
+fi
+
 docker exec "$container" rm -f "$container_archive_path" >/dev/null 2>&1 || true
+trap - EXIT
 
 chmod 600 "$host_archive_path"
 sha256sum "$host_archive_path" > "$host_sha_path"
@@ -180,7 +209,12 @@ if [[ -f "$host_manifest_path" ]]; then
   chmod 600 "$host_manifest_path"
 fi
 
-gzip -t "$host_archive_path"
+if [[ -n "$BACKUP_AGE_RECIPIENT" ]]; then
+  [[ "$(head -n1 "$host_archive_path")" == 'age-encryption.org/v1' ]] ||
+    fail "invalid_age_archive archive=$host_archive_path"
+else
+  gzip -t "$host_archive_path"
+fi
 
 size_bytes="$(stat -c '%s' "$host_archive_path")"
 permissions="$(stat -c '%a' "$host_archive_path")"
@@ -191,5 +225,11 @@ if [[ -f "$host_manifest_path" ]]; then
   info "manifest_file=$host_manifest_path"
 fi
 info "size_bytes=$size_bytes permissions=$permissions"
-info 'gzip=ok'
+if [[ -n "$BACKUP_AGE_RECIPIENT" ]]; then
+  info 'encryption=age'
+  info 'age_header=ok'
+else
+  info 'encryption=none'
+  info 'gzip=ok'
+fi
 info 'backup=ok'

@@ -39,7 +39,7 @@ find_latest_backup() {
   find "$BACKUP_OUTPUT_DIR" \
     -maxdepth 1 \
     -type f \
-    -name "${BACKUP_LABEL}-*.archive.gz" \
+    \( -name "${BACKUP_LABEL}-*.archive.gz" -o -name "${BACKUP_LABEL}-*.archive.gz.age" \) \
     -printf '%T@ %p\n' |
     sort -nr |
     awk 'NR == 1 { $1=""; sub(/^ /, ""); print }'

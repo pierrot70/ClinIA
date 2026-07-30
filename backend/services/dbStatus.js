@@ -39,7 +39,7 @@ function validateBackupFileName(fileName) {
     if (
         typeof fileName !== "string" ||
         path.basename(fileName) !== fileName ||
-        !/^clinia-prod-\d{8}-\d{6}\.archive\.gz$/.test(fileName)
+        !/^clinia-prod-\d{8}-\d{6}\.archive\.gz(?:\.age)?$/.test(fileName)
     ) {
         throw new Error("Invalid backup filename.");
     }
@@ -48,7 +48,7 @@ function validateBackupFileName(fileName) {
 }
 
 function parseBackupTimestamp(fileName) {
-    const match = fileName.match(/-(\d{8})-(\d{6})\.archive\.gz$/);
+    const match = fileName.match(/-(\d{8})-(\d{6})\.archive\.gz(?:\.age)?$/);
 
     if (!match) {
         return null;
@@ -144,6 +144,7 @@ async function buildBackupEntry({ backupDirectory, keepDirectory, fileName, nowM
 
     return {
         fileName,
+        encrypted: fileName.endsWith(".archive.gz.age"),
         sizeBytes: safeNumber(archiveStats.size),
         createdAt: parseBackupTimestamp(fileName) || archiveStats.mtime.toISOString(),
         modifiedAt: archiveStats.mtime.toISOString(),
@@ -169,7 +170,7 @@ export async function readBackupSnapshots({
     try {
         const entries = await readdir(backupDirectory);
         const allBackupFileNames = entries
-            .filter((entry) => entry.endsWith(".archive.gz"))
+            .filter((entry) => entry.endsWith(".archive.gz") || entry.endsWith(".archive.gz.age"))
             .sort()
             .reverse();
 
@@ -178,6 +179,7 @@ export async function readBackupSnapshots({
                 backupDirectory,
                 keepDirectory,
                 fileName,
+                encrypted: fileName.endsWith(".archive.gz.age"),
                 nowMs,
             }).catch((err) => ({
                 fileName,

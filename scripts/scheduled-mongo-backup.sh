@@ -3,6 +3,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKUP_ENCRYPTION_ENV_FILE="${BACKUP_ENCRYPTION_ENV_FILE:-/root/clinia-backup-encryption.env}"
+
+if [[ -f "$BACKUP_ENCRYPTION_ENV_FILE" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  . "$BACKUP_ENCRYPTION_ENV_FILE"
+  set +a
+fi
 
 BACKUP_OUTPUT_DIR="${BACKUP_OUTPUT_DIR:-/var/backups/clinia/mongo}"
 BACKUP_KEEP_DIR="${BACKUP_KEEP_DIR:-/var/backups/clinia/mongo-keep}"
@@ -23,6 +31,8 @@ S3_ENDPOINT_URL="${S3_ENDPOINT_URL:-}"
 S3_STORAGE_CLASS="${S3_STORAGE_CLASS:-}"
 S3_SSE="${S3_SSE:-}"
 S3_ONLY_SHOW_ERRORS="${S3_ONLY_SHOW_ERRORS:-true}"
+BACKUP_ENCRYPTION_REQUIRED="${BACKUP_ENCRYPTION_REQUIRED:-false}"
+BACKUP_AGE_RECIPIENT="${BACKUP_AGE_RECIPIENT:-}"
 
 fail() {
   printf 'ERROR %s\n' "$1" >&2
@@ -157,7 +167,7 @@ cleanup_old_backups() {
     info "retention=deleted archive=$archive_path"
   done < <(find "$BACKUP_OUTPUT_DIR" \
     -type f \
-    -name "${BACKUP_LABEL}-*.archive.gz" \
+    \( -name "${BACKUP_LABEL}-*.archive.gz" -o -name "${BACKUP_LABEL}-*.archive.gz.age" \) \
     -mtime +"$BACKUP_RETENTION_DAYS" \
     -print)
 
@@ -252,6 +262,8 @@ run_scheduled_backup() {
     BACKUP_LABEL="$BACKUP_LABEL" \
     MONGO_DATABASE="$MONGO_DATABASE" \
     MONGO_CONTAINER_PREFIX="$MONGO_CONTAINER_PREFIX" \
+    BACKUP_ENCRYPTION_REQUIRED="$BACKUP_ENCRYPTION_REQUIRED" \
+    BACKUP_AGE_RECIPIENT="$BACKUP_AGE_RECIPIENT" \
     "$SCRIPT_DIR/backup-mongo.sh"
   )" || backup_status=$?
 

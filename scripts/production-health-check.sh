@@ -518,7 +518,7 @@ check_local_backup() {
     find "$BACKUP_OUTPUT_DIR" \
       -maxdepth 1 \
       -type f \
-      -name "${BACKUP_LABEL}-*.archive.gz" \
+      \( -name "${BACKUP_LABEL}-*.archive.gz" -o -name "${BACKUP_LABEL}-*.archive.gz.age" \) \
       -printf '%T@ %p\n' 2>/dev/null |
       sort -nr |
       awk 'NR == 1 { $1=""; sub(/^ /, ""); print }'
@@ -569,7 +569,7 @@ aws_s3_ls() {
 latest_s3_backup_line() {
   aws_s3_ls "${S3_BACKUP_URI%/}/" |
     awk -v label="$BACKUP_LABEL" '
-      $4 ~ ("^" label "-[0-9]{8}-[0-9]{6}[.]archive[.]gz$") {
+      $4 ~ ("^" label "-[0-9]{8}-[0-9]{6}[.]archive[.]gz([.]age)?$") {
         print $1 " " $2 " " $3 " " $4
       }
     ' |

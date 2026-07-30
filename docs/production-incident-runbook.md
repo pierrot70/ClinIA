@@ -968,9 +968,9 @@ docker exec "$MONGO_CONTAINER" rm -f /tmp/clinia-restore-test.archive.gz
 ## Automated Mongo backups
 
 Use the scheduled backup wrapper for the minimum viable production baseline:
-daily backup, automatic `sha256` and `gzip` verification, local retention, and
-optional webhook alerting on failure. This still keeps the archive on the
-droplet; the next hardening step is copying verified archives to external object
+daily backup, automatic `sha256` verification, client-side `age` encryption,
+local retention, and optional webhook alerting on failure. The Mongo archive is
+encrypted before it leaves the Mongo container or is uploaded to external object
 storage such as DigitalOcean Spaces or S3.
 
 Current local retention target: `7` days.
@@ -1000,6 +1000,9 @@ sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scrip
 
 sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/configure-mongo-backup-s3.sh \
   -o /opt/clinia/scripts/configure-mongo-backup-s3.sh
+
+sudo apt-get update
+sudo apt-get install -y age
 
 sudo chmod 700 /var/backups/clinia/mongo
 sudo chmod 700 /var/backups/clinia/mongo-keep
@@ -1110,12 +1113,12 @@ the real Mongo prefix to confirm backups still succeed.
 External S3 storage:
 
 Use S3-compatible object storage after Slack alerting is working. The scheduled
-wrapper uploads only after the local archive passes `sha256` and `gzip`
-verification. It uploads:
+wrapper encrypts the archive with `age` before upload, then verifies its SHA-256
+checksum and encryption header. It uploads:
 
-- `clinia-prod-*.archive.gz`
-- `clinia-prod-*.archive.gz.sha256`
-- `clinia-prod-*.archive.gz.manifest.json` when present
+- `clinia-prod-*.archive.gz.age` (chiffre avec la cle publique `age` avant tout envoi Spaces)
+- `clinia-prod-*.archive.gz.age.sha256`
+- `clinia-prod-*.archive.gz.age.manifest.json` when present; the manifest contains only collection counts and operational metadata, never document content
 
 Install the AWS CLI if needed:
 
@@ -1146,11 +1149,17 @@ When prompted:
   `ca-central-1` or `nyc3`.
 - Paste the access key id and secret access key. Do not paste them in Slack or
   commit them.
+- `Public age recipient`: paste the public value beginning with `age1` from the
+  offline backup-key workstation. It is not secret. Never paste the private
+  `AGE-SECRET-KEY-...` identity on the droplet, in Coolify, Spaces, Slack, or
+  this repository.
 
-The helper writes `/root/clinia-backup-s3.env` with mode `600`, uploads a small
-test file, and rewrites the daily cron so it sources both Slack and S3 env files.
-If S3 upload fails during the daily backup, the whole backup job fails and Slack
-receives the failure alert.
+The helper writes `/root/clinia-backup-s3.env` and
+`/root/clinia-backup-encryption.env` with mode `600`, uploads a small encrypted
+test file, and rewrites the daily cron. The scheduled script also loads the
+encryption file itself, so encryption remains required even if the cron is later
+edited. If S3 upload fails during the daily backup, the whole backup job fails
+and Slack receives the failure alert.
 
 Manual cron equivalent with Slack and S3:
 
@@ -1159,7 +1168,7 @@ sudo tee /etc/cron.d/clinia-mongo-backup >/dev/null <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-15 5 * * * root set -a; . /root/clinia-backup-alert.env; . /root/clinia-backup-s3.env; set +a; BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep BACKUP_RETENTION_DAYS=7 BACKUP_LOG_DIR=/var/log/clinia MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- MONGO_DATABASE=clinia BACKUP_LABEL=clinia-prod /opt/clinia/scripts/scheduled-mongo-backup.sh
+15 5 * * * root set -a; . /root/clinia-backup-alert.env; . /root/clinia-backup-s3.env; . /root/clinia-backup-encryption.env; set +a; BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo BACKUP_KEEP_DIR=/var/backups/clinia/mongo-keep BACKUP_RETENTION_DAYS=7 BACKUP_LOG_DIR=/var/log/clinia MONGO_CONTAINER_PREFIX=mongo-gko400wwcs44csw8000o0sss- MONGO_DATABASE=clinia BACKUP_LABEL=clinia-prod /opt/clinia/scripts/scheduled-mongo-backup.sh
 EOF
 ```
 
@@ -1179,9 +1188,9 @@ BACKUP_LABEL=clinia-prod \
 
 Expected result:
 
-- the latest `clinia-prod-*.archive.gz` is downloaded locally;
+- the latest `clinia-prod-*.archive.gz.age` is downloaded locally;
 - its `.sha256` and `.manifest.json` are downloaded when present;
-- `sha256sum -c` and `gzip -t` pass;
+- `sha256sum -c` and the `age` header verification pass without a private key;
 - the helper prints the exact `restore-mongo-production.sh` command to run.
 
 Fetch a specific S3 archive:
@@ -1192,12 +1201,23 @@ set -a
 . /root/clinia-backup-s3.env
 set +a
 
-S3_RESTORE_ARCHIVE=clinia-prod-YYYYMMDD-HHMMSS.archive.gz \
+S3_RESTORE_ARCHIVE=clinia-prod-YYYYMMDD-HHMMSS.archive.gz.age \
 BACKUP_OUTPUT_DIR=/var/backups/clinia/mongo \
 BACKUP_LABEL=clinia-prod \
 /opt/clinia/scripts/fetch-mongo-backup-from-s3.sh
 '
 ```
+
+### Encrypted backup restoration policy
+
+The private `age` identity stays on the offline backup-key workstation. During
+a controlled restoration only, an authorized operator may place a temporary
+copy on the recovery host with mode `600`, run the restore with
+`BACKUP_AGE_IDENTITY_FILE=/secure/path/clinia-backup.key`, then remove that
+temporary file. The restore script decrypts to a mode-`600` temporary archive,
+checks its gzip stream, restores it, and removes the temporary plaintext on exit.
+Never keep the private identity in a cron file, Docker environment, Coolify,
+Spaces, Slack, or the repository.
 
 Dashboard visibility:
 

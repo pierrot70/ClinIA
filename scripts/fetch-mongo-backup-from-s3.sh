@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 BACKUP_OUTPUT_DIR="${BACKUP_OUTPUT_DIR:-/var/backups/clinia/mongo}"
 BACKUP_LABEL="${BACKUP_LABEL:-clinia-prod}"
 S3_BACKUP_URI="${S3_BACKUP_URI:-}"
@@ -49,7 +51,7 @@ aws_s3_cp() {
 latest_s3_archive_name() {
   aws_s3_ls "${S3_BACKUP_URI%/}/" |
     awk -v label="$BACKUP_LABEL" '
-      $4 ~ ("^" label "-[0-9]{8}-[0-9]{6}[.]archive[.]gz$") {
+      $4 ~ ("^" label "-[0-9]{8}-[0-9]{6}[.]archive[.]gz([.]age)?$") {
         print $1 " " $2 " " $4
       }
     ' |
@@ -64,12 +66,12 @@ selected_s3_archive_name() {
   if [[ -n "$S3_RESTORE_ARCHIVE" ]]; then
     archive_name="$(basename "$S3_RESTORE_ARCHIVE")"
     case "$archive_name" in
-      "${BACKUP_LABEL}"-*.archive.gz)
+      "${BACKUP_LABEL}"-*.archive.gz|"${BACKUP_LABEL}"-*.archive.gz.age)
         printf '%s\n' "$archive_name"
         return
         ;;
       *)
-        fail "invalid_s3_restore_archive value=$S3_RESTORE_ARCHIVE expected=${BACKUP_LABEL}-*.archive.gz"
+        fail "invalid_s3_restore_archive value=$S3_RESTORE_ARCHIVE expected=${BACKUP_LABEL}-*.archive.gz.age"
         ;;
     esac
   fi
@@ -103,8 +105,8 @@ verify_downloaded_archive() {
   [[ -f "$archive_path" ]] || fail "archive_not_found path=$archive_path"
   [[ -f "${archive_path}.sha256" ]] || fail "sha256_file_not_found path=${archive_path}.sha256"
 
-  sha256sum -c "${archive_path}.sha256"
-  gzip -t "$archive_path"
+  BACKUP_ENCRYPTION_REQUIRED="${BACKUP_ENCRYPTION_REQUIRED:-false}" \
+    "$SCRIPT_DIR/verify-mongo-backup.sh" "$archive_path"
 
   info "backup_verification=ok archive=$archive_path"
 }
@@ -113,7 +115,6 @@ require_command aws
 require_command awk
 require_command basename
 require_command chmod
-require_command gzip
 require_command sha256sum
 require_command sort
 require_command tail
@@ -145,6 +146,9 @@ info "s3_restore_ready archive=$local_archive"
 printf '\n'
 printf 'Run production restore with:\n'
 printf 'sudo CONFIRM_RESTORE_PRODUCTION=RESTORE_SELECTED_CLINIA_BACKUP \\\n'
+if [[ "$local_archive" == *.archive.gz.age ]]; then
+  printf '  BACKUP_AGE_IDENTITY_FILE=/secure/path/to/clinia-backup.key \\\n'
+fi
 printf '  RESTORE_ARCHIVE=%q \\\n' "$local_archive"
 printf '  BACKUP_OUTPUT_DIR=%q \\\n' "$BACKUP_OUTPUT_DIR"
 printf '  BACKUP_LABEL=%q \\\n' "$BACKUP_LABEL"

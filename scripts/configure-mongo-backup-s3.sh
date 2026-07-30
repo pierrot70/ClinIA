@@ -15,6 +15,7 @@ MONGO_CONTAINER_PREFIX="${MONGO_CONTAINER_PREFIX:-mongo-gko400wwcs44csw8000o0sss
 CRON_FILE="${CRON_FILE:-/etc/cron.d/clinia-mongo-backup}"
 ALERT_ENV_FILE="${ALERT_ENV_FILE:-/root/clinia-backup-alert.env}"
 S3_ENV_FILE="${S3_ENV_FILE:-/root/clinia-backup-s3.env}"
+BACKUP_ENCRYPTION_ENV_FILE="${BACKUP_ENCRYPTION_ENV_FILE:-/root/clinia-backup-encryption.env}"
 S3_TEST_FILE="${S3_TEST_FILE:-/tmp/clinia-s3-backup-test.txt}"
 CRON_SCHEDULE="${CRON_SCHEDULE:-15 5 * * *}"
 
@@ -147,29 +148,55 @@ write_s3_env_file() {
   info "s3_env_file=$S3_ENV_FILE"
 }
 
+write_backup_encryption_env_file() {
+  local age_recipient="$1"
+  local tmp_file
+
+  case "$age_recipient" in
+    age1*) ;;
+    *) fail 'invalid_age_recipient expected=age1 public recipient' ;;
+  esac
+
+  tmp_file="$(mktemp)"
+  {
+    printf 'BACKUP_ENCRYPTION_REQUIRED=true\n'
+    printf 'BACKUP_AGE_RECIPIENT=%s\n' "$(shell_quote "$age_recipient")"
+  } >"$tmp_file"
+
+  install -m 600 "$tmp_file" "$BACKUP_ENCRYPTION_ENV_FILE"
+  rm -f "$tmp_file"
+  info "backup_encryption_env_file=$BACKUP_ENCRYPTION_ENV_FILE"
+}
+
 test_s3_upload() {
   local destination
   local aws_args
   local s3_uri
+  local encrypted_test_file
 
   set -a
   # shellcheck disable=SC1090
   . "$S3_ENV_FILE"
+  # shellcheck disable=SC1090
+  . "$BACKUP_ENCRYPTION_ENV_FILE"
   set +a
 
   s3_uri="${S3_BACKUP_URI%/}"
-  destination="${s3_uri}/clinia-s3-backup-test-$(date -u +%Y%m%d-%H%M%S).txt"
+  destination="${s3_uri}/clinia-s3-backup-test-$(date -u +%Y%m%d-%H%M%S).txt.age"
+  encrypted_test_file="${S3_TEST_FILE}.age"
 
   printf 'clinia backup s3 test %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$S3_TEST_FILE"
+  age --encrypt --recipient "$BACKUP_AGE_RECIPIENT" --output "$encrypted_test_file" "$S3_TEST_FILE"
+  rm -f "$S3_TEST_FILE"
 
   aws_args=()
   if [[ -n "${S3_ENDPOINT_URL:-}" ]]; then
     aws_args+=(--endpoint-url "$S3_ENDPOINT_URL")
   fi
 
-  aws "${aws_args[@]}" s3 cp "$S3_TEST_FILE" "$destination" --only-show-errors
+  aws "${aws_args[@]}" s3 cp "$encrypted_test_file" "$destination" --only-show-errors
   aws "${aws_args[@]}" s3 ls "$destination" >/dev/null
-  rm -f "$S3_TEST_FILE"
+  rm -f "$encrypted_test_file"
 
   info "s3_test_upload=ok destination=$destination"
 }
@@ -177,6 +204,7 @@ test_s3_upload() {
 write_cron_file() {
   local alert_env_file_q
   local s3_env_file_q
+  local backup_encryption_env_file_q
   local backup_output_dir_q
   local backup_keep_dir_q
   local backup_log_dir_q
@@ -188,6 +216,7 @@ write_cron_file() {
 
   alert_env_file_q="$(shell_quote "$ALERT_ENV_FILE")"
   s3_env_file_q="$(shell_quote "$S3_ENV_FILE")"
+  backup_encryption_env_file_q="$(shell_quote "$BACKUP_ENCRYPTION_ENV_FILE")"
   backup_output_dir_q="$(shell_quote "$BACKUP_OUTPUT_DIR")"
   backup_keep_dir_q="$(shell_quote "$BACKUP_KEEP_DIR")"
   backup_log_dir_q="$(shell_quote "$BACKUP_LOG_DIR")"
@@ -201,7 +230,7 @@ write_cron_file() {
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-${CRON_SCHEDULE} root set -a; if [ -f ${alert_env_file_q} ]; then . ${alert_env_file_q}; fi; . ${s3_env_file_q}; set +a; BACKUP_OUTPUT_DIR=${backup_output_dir_q} BACKUP_KEEP_DIR=${backup_keep_dir_q} BACKUP_RETENTION_DAYS=${backup_retention_days_q} BACKUP_LOG_DIR=${backup_log_dir_q} MONGO_CONTAINER_PREFIX=${mongo_container_prefix_q} MONGO_DATABASE=${mongo_database_q} BACKUP_LABEL=${backup_label_q} ${scheduled_script_q}
+${CRON_SCHEDULE} root set -a; if [ -f ${alert_env_file_q} ]; then . ${alert_env_file_q}; fi; . ${s3_env_file_q}; . ${backup_encryption_env_file_q}; set +a; BACKUP_OUTPUT_DIR=${backup_output_dir_q} BACKUP_KEEP_DIR=${backup_keep_dir_q} BACKUP_RETENTION_DAYS=${backup_retention_days_q} BACKUP_LOG_DIR=${backup_log_dir_q} MONGO_CONTAINER_PREFIX=${mongo_container_prefix_q} MONGO_DATABASE=${mongo_database_q} BACKUP_LABEL=${backup_label_q} ${scheduled_script_q}
 EOF
 
   chmod 644 "$CRON_FILE"
@@ -214,12 +243,14 @@ main() {
   local region
   local access_key_id
   local secret_access_key
+  local age_recipient
 
   require_root
   require_command bash
   require_command curl
   require_command install
   require_command mktemp
+  require_command age
   install_aws_cli_hint
 
   s3_uri="$(normalize_s3_uri "$(prompt_required 'S3 destination, example s3://clinia-backups/mongo/prod: ')")"
@@ -227,9 +258,11 @@ main() {
   region="$(prompt_optional 'S3 region' 'ca-central-1')"
   access_key_id="$(prompt_required 'S3 access key id: ')"
   secret_access_key="$(prompt_secret_required 'S3 secret access key: ')"
+  age_recipient="$(prompt_required 'Public age recipient, example age1...: ')"
 
   install_backup_scripts
   write_s3_env_file "$s3_uri" "$endpoint_url" "$region" "$access_key_id" "$secret_access_key"
+  write_backup_encryption_env_file "$age_recipient"
   test_s3_upload
   write_cron_file
 

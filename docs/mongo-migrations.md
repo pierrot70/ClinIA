@@ -122,4 +122,4 @@ MAX_BACKUP_AGE_HOURS=24 \
 /opt/clinia/scripts/run-production-mongo-migrations.sh --apply
 ```
 
-Le preflight bloque si aucun backend principal n'est en cours, si aucune archive n'est trouvee, si l'archive est trop ancienne, ou si sa verification echoue. Pour imposer une archive precise, fournir `MIGRATION_BACKUP_ARCHIVE=/var/backups/clinia/mongo/<archive>.archive.gz`.
+Le preflight bloque si aucun backend principal n'est en cours, si aucune archive n'est trouvee, si l'archive est trop ancienne, ou si sa verification echoue. Les nouvelles archives de production sont chiffrees et portent l'extension `.archive.gz.age`; aucune cle privee n'est necessaire pour leur verification de disponibilite et de checksum. Pour imposer une archive precise, fournir `MIGRATION_BACKUP_ARCHIVE=/var/backups/clinia/mongo/<archive>.archive.gz.age`.

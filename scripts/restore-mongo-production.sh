@@ -21,6 +21,9 @@ REPLICA_WAIT_ATTEMPTS="${REPLICA_WAIT_ATTEMPTS:-60}"
 REPLICA_WAIT_SECONDS="${REPLICA_WAIT_SECONDS:-10}"
 HTTP_WAIT_ATTEMPTS="${HTTP_WAIT_ATTEMPTS:-30}"
 HTTP_WAIT_SECONDS="${HTTP_WAIT_SECONDS:-10}"
+BACKUP_AGE_IDENTITY_FILE="${BACKUP_AGE_IDENTITY_FILE:-}"
+RESTORE_WORKING_ARCHIVE=""
+RESTORE_WORKING_ARCHIVE_IS_TEMPORARY=false
 
 fail() {
   printf 'ERROR %s\n' "$1" >&2
@@ -41,7 +44,7 @@ backup_archive_query() {
   find "$BACKUP_OUTPUT_DIR" \
     -maxdepth 1 \
     -type f \
-    -name "${BACKUP_LABEL}-*.archive.gz" \
+    \( -name "${BACKUP_LABEL}-*.archive.gz" -o -name "${BACKUP_LABEL}-*.archive.gz.age" \) \
     -printf '%T@ %p\n' |
     sort "$sort_order"
 }
@@ -149,7 +152,39 @@ verify_selected_archive() {
   [[ -f "${archive}.sha256" ]] || fail "sha256_file_not_found path=${archive}.sha256"
 
   sha256sum -c "${archive}.sha256"
-  gzip -t "$archive"
+
+  if [[ "$archive" == *.archive.gz.age ]]; then
+    require_command age
+    [[ -n "$BACKUP_AGE_IDENTITY_FILE" ]] ||
+      fail 'missing_age_identity_file set BACKUP_AGE_IDENTITY_FILE to a temporary private age identity for this restore'
+    [[ -f "$BACKUP_AGE_IDENTITY_FILE" ]] || fail "age_identity_not_found path=$BACKUP_AGE_IDENTITY_FILE"
+    [[ "$(stat -c '%a' "$BACKUP_AGE_IDENTITY_FILE")" == '600' ]] ||
+      fail "unexpected_age_identity_permissions path=$BACKUP_AGE_IDENTITY_FILE expected=600"
+  else
+    gzip -t "$archive"
+  fi
+}
+
+materialize_restore_archive() {
+  local archive="$1"
+
+  if [[ "$archive" != *.archive.gz.age ]]; then
+    RESTORE_WORKING_ARCHIVE="$archive"
+    return
+  fi
+
+  RESTORE_WORKING_ARCHIVE="$(mktemp "${TMPDIR:-/tmp}/clinia-restore.XXXXXX.archive.gz")"
+  RESTORE_WORKING_ARCHIVE_IS_TEMPORARY=true
+  chmod 600 "$RESTORE_WORKING_ARCHIVE"
+  age --decrypt --identity "$BACKUP_AGE_IDENTITY_FILE" "$archive" > "$RESTORE_WORKING_ARCHIVE"
+  gzip -t "$RESTORE_WORKING_ARCHIVE"
+  info 'restore_archive_decryption=gzip_ok'
+}
+
+cleanup_restore_working_archive() {
+  if [[ "$RESTORE_WORKING_ARCHIVE_IS_TEMPORARY" == "true" && -n "$RESTORE_WORKING_ARCHIVE" ]]; then
+    rm -f "$RESTORE_WORKING_ARCHIVE"
+  fi
 }
 
 stop_backends() {
@@ -292,6 +327,8 @@ require_command docker
 require_command find
 require_command gzip
 require_command grep
+require_command mktemp
+require_command rm
 require_command sha256sum
 require_command sort
 
@@ -315,6 +352,8 @@ else
   info "restore_selection=$RESTORE_SELECTION"
 fi
 verify_selected_archive "$archive"
+trap cleanup_restore_working_archive EXIT
+materialize_restore_archive "$archive"
 
 mapfile -t MONGO_CONTAINERS < <(mongo_containers)
 [[ "${#MONGO_CONTAINERS[@]}" -gt 0 ]] || fail 'mongo_containers_not_found'
@@ -334,7 +373,7 @@ info "primary=$primary_container"
 info "database=$MONGO_DATABASE"
 
 stop_backends
-restore_archive_to_primary "$archive" "$primary_container"
+restore_archive_to_primary "$RESTORE_WORKING_ARCHIVE" "$primary_container"
 validate_collections "$primary_container"
 wait_for_replica_set "$primary_container"
 start_backends
