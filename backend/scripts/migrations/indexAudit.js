@@ -116,3 +116,7 @@ export function auditCollectionIndexes({ expectedIndexes, actualIndexes }) {
 export function hasIndexAuditErrors(result) {
     return result.missing.length > 0 || result.mismatched.length > 0;
 }
+
+export function hasIndexAuditDrift(result) {
+    return hasIndexAuditErrors(result) || result.extra.length > 0;
+}

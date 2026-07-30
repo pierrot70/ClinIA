@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 import mongoose from "mongoose";
 import { migrations } from "./migrations/index.js";
 import { verifyAppliedSchemaGuards } from "./schemaGuards.js";
+import { auditMongoIndexes } from "./auditMongoIndexes.js";
+import { evaluateIndexAuditOutcome } from "./migrationIndexAuditProtocol.js";
 
 const WRITE_CONCERN = { w: "majority", j: true, wtimeout: 5000 };
 const REGISTRY_COLLECTION = "schemamigrations";
@@ -48,6 +50,44 @@ function migrationChecksum(migration) {
         .createHash("sha256")
         .update(`${migration.id}:${migration.fingerprint}`)
         .digest("hex");
+}
+
+function indexAuditMaxDurationMs() {
+    const value = process.env.MONGO_INDEX_AUDIT_MAX_DURATION_MS || "5000";
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 100 || parsed > 60000) {
+        fail("invalid_MONGO_INDEX_AUDIT_MAX_DURATION_MS");
+    }
+    return parsed;
+}
+
+async function runIndexAudit({ db, phase, strict, maxDurationMs }) {
+    const startedAt = Date.now();
+    const result = await auditMongoIndexes({ db, phase });
+    const durationMs = Date.now() - startedAt;
+    const outcome = evaluateIndexAuditOutcome({
+        result,
+        durationMs,
+        maxDurationMs,
+        strict,
+    });
+
+    console.log(
+        `INDEX_AUDIT_${phase.toUpperCase()}_COMPLETE status=${outcome.status} duration_ms=${durationMs} checked_collections=${result.checkedCollections} errors=${result.errors} extras=${result.extras}`
+    );
+
+    if (outcome.reason === "duration_exceeded") {
+        console.warn(
+            `WARNING index_audit_duration_exceeded phase=${phase} duration_ms=${durationMs} max_duration_ms=${maxDurationMs}`
+        );
+    }
+    if (outcome.reason === "drift_remaining") {
+        fail(
+            `index_audit_postcheck_failed errors=${result.errors} extras=${result.extras}`
+        );
+    }
+
+    return result;
 }
 
 function selectedMigrations(options) {
@@ -151,6 +191,14 @@ async function run() {
 
     const lockOwner = await acquireLock(db);
     try {
+        const maxDurationMs = indexAuditMaxDurationMs();
+        await runIndexAudit({
+            db,
+            phase: "precheck",
+            strict: false,
+            maxDurationMs,
+        });
+
         for (const { migration, checksum } of pending) {
             const startedAt = Date.now();
             const registryEntry = {
@@ -183,11 +231,18 @@ async function run() {
             }
             console.log(`APPLIED id=${migration.id}`);
         }
+
+        await runIndexAudit({
+            db,
+            phase: "postcheck",
+            strict: true,
+            maxDurationMs,
+        });
+        await verifyAppliedSchemaGuards({ db, registry });
     } finally {
         await releaseLock(db, lockOwner);
     }
 
-    await verifyAppliedSchemaGuards({ db, registry });
     console.log(`APPLY_COMPLETE applied=${pending.length}`);
 }
 

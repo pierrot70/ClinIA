@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
     auditCollectionIndexes,
+    hasIndexAuditDrift,
     hasIndexAuditErrors,
 } from "./indexAudit.js";
 
@@ -86,5 +87,6 @@ describe("auditCollectionIndexes", () => {
         expect(result.extra).toHaveLength(1);
         expect(result.extra[0].name).toBe("legacy_global_phone_unique");
         expect(hasIndexAuditErrors(result)).toBe(false);
+        expect(hasIndexAuditDrift(result)).toBe(true);
     });
 });

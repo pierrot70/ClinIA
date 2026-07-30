@@ -24,7 +24,23 @@ Depuis la racine du depot:
 
 Le premier `dry-run` annonce la migration de registre. L'execution `--apply` cree son entree dans `schemamigrations`. Le dernier `dry-run` doit indiquer `already_applied` et `pending=0`.
 
-Apres chaque `--apply`, le runner execute automatiquement les garde-fous de schema sur les metadonnees Mongo reelles. Par exemple, une fois la migration de portee des identifiants patients appliquee, il confirme les index uniques par proprietaire et refuse un index unique global obsolete sur le telephone ou le numero d'assurance. Le resultat attendu est:
+Chaque `--apply` suit automatiquement ce protocole d'integrite des index, execute sous le verrou de migration:
+
+1. Pre-audit des metadonnees des index, avec mesure de duree (seuil d'alerte: 5 secondes par defaut).
+2. Application des migrations selectionnees.
+3. Audit final strict: aucun index attendu absent, different, ou supplementaire n'est accepte.
+4. Garde-fous de schema critiques.
+
+Le pre-audit est informatif: une migration selectionnee peut justement corriger un index absent, obsolete ou configure incorrectement. Il ne bloque donc jamais le debut d'une migration corrective, y compris en production. Le post-audit ne s'execute qu'apres toutes les migrations selectionnees et bloque la fin de l'execution seulement si un ecart subsiste. Les messages ne contiennent que des metadonnees d'index, jamais de dossier patient.
+
+Le seuil peut etre ajuste uniquement au besoin avec `MONGO_INDEX_AUDIT_MAX_DURATION_MS` (entre 100 et 60000, `5000` par defaut). Un depassement produit un avertissement mais ne bloque jamais la migration; seul un ecart d'index residuel au post-audit bloque la fin de l'execution. Le resultat nominal est:
+
+```text
+INDEX_AUDIT_PRECHECK_COMPLETE status=OK duration_ms=42 checked_collections=<n> errors=0 extras=0
+INDEX_AUDIT_POSTCHECK_COMPLETE status=OK duration_ms=42 checked_collections=<n> errors=0 extras=0
+```
+
+Apres l'audit final, le runner execute automatiquement les garde-fous de schema sur les metadonnees Mongo reelles. Par exemple, une fois la migration de portee des identifiants patients appliquee, il confirme les index uniques par proprietaire et refuse un index unique global obsolete sur le telephone ou le numero d'assurance. Le resultat attendu est:
 
 ```text
 SCHEMA_GUARD_OK guard=patient_owner_scoped_indexes
