@@ -24,4 +24,49 @@ describe("getTrustedRequestIp", () => {
             })
         ).toBe("127.0.0.1");
     });
+
+    it("uses Cloudflare's canonical client IP only through the configured proxy and a Cloudflare relay", () => {
+        const request = {
+            ip: "172.64.10.20",
+            headers: {
+                "cf-connecting-ip": "198.51.100.42",
+                "x-forwarded-for": "198.51.100.42, 172.64.10.20",
+            },
+            socket: { remoteAddress: "10.0.2.9" },
+        };
+
+        expect(getTrustedRequestIp(request, {
+            CLINIA_TRUST_PROXY_CIDRS: "10.0.2.0/24",
+        })).toBe("198.51.100.42");
+    });
+
+    it("rejects a forged Cloudflare header when the forwarding chain does not end at Cloudflare", () => {
+        const request = {
+            ip: "198.51.100.99",
+            headers: {
+                "cf-connecting-ip": "198.51.100.42",
+                "x-forwarded-for": "198.51.100.99",
+            },
+            socket: { remoteAddress: "10.0.2.9" },
+        };
+
+        expect(getTrustedRequestIp(request, {
+            CLINIA_TRUST_PROXY_CIDRS: "10.0.2.0/24",
+        })).toBe("198.51.100.99");
+    });
+
+    it("rejects a Cloudflare header from a peer outside the configured proxy CIDR", () => {
+        const request = {
+            ip: "198.51.100.99",
+            headers: {
+                "cf-connecting-ip": "198.51.100.42",
+                "x-forwarded-for": "198.51.100.42, 172.64.10.20",
+            },
+            socket: { remoteAddress: "203.0.113.10" },
+        };
+
+        expect(getTrustedRequestIp(request, {
+            CLINIA_TRUST_PROXY_CIDRS: "10.0.2.0/24",
+        })).toBe("198.51.100.99");
+    });
 });
