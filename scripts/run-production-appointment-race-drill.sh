@@ -74,6 +74,18 @@ load_mongo_password() {
     tail -n1
 }
 
+find_mongo_password() {
+  local container password
+  while IFS= read -r container; do
+    password="$(load_mongo_password "$container")"
+    if [[ -n "$password" ]]; then
+      printf '%s' "$password"
+      return
+    fi
+  done < <(mongo_containers)
+  return 1
+}
+
 find_primary_mongo_container() {
   local container
   while IFS= read -r container; do
@@ -305,8 +317,7 @@ docker info >/dev/null 2>&1 || fail "docker_unavailable"
 
 BACKEND_CONTAINER="$(find_backend_container)"
 [[ -n "$BACKEND_CONTAINER" ]] || fail "backend_container_not_found"
-MONGO_PASSWORD="$(mongo_containers | while IFS= read -r container; do load_mongo_password "$container"; done | awk 'NF { print; exit }')"
-[[ -n "$MONGO_PASSWORD" ]] || fail "mongo_root_password_not_found"
+MONGO_PASSWORD="$(find_mongo_password)" || fail "mongo_root_password_not_found"
 MONGO_CONTAINER="$(find_primary_mongo_container)" || fail "mongo_primary_not_found"
 
 info "PRODUCTION_APPOINTMENT_RACE_DRILL_STARTED backend_container=$BACKEND_CONTAINER marker=$DRILL_MARKER"
