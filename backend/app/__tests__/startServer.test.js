@@ -107,4 +107,35 @@ describe("startServer", () => {
             component: "mongo",
         });
     });
+
+    it("does not start when OPENAI_MODEL is not approved", async () => {
+        const connect = vi.fn();
+        const mongoose = { connect };
+        const initShutdownState = vi.fn();
+        const logger = {
+            log: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
+        };
+        const listen = vi.fn();
+
+        const startServer = createStartServer({
+            mongoose,
+            initShutdownState,
+            logger,
+            mongoUri: "mongodb://example/clinia",
+            openaiModel: "gpt-typo",
+        });
+
+        await startServer({ app: { listen } });
+
+        expect(connect).not.toHaveBeenCalled();
+        expect(listen).not.toHaveBeenCalled();
+        expect(logger.error).toHaveBeenCalledWith("CLINIA_SAFE_ERROR", {
+            event: "OPENAI_MODEL_CONFIGURATION_INVALID",
+            name: "Error",
+            code: null,
+            component: "config",
+        });
+    });
 });

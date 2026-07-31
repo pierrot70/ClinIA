@@ -15,6 +15,7 @@ import {
 } from "../services/aiAnalyzeResponseService.js";
 import { createWriteVerificationContext } from "../audit/writeVerification.js";
 import { resolveAnalyzeExecutionMode } from "../services/aiAnalyzeAccessService.js";
+import { resolveOpenAIModel } from "../services/aiModelPolicy.js";
 import { requireRole } from "../middleware/requireRole.js";
 import { getRequestContext } from "../app/requestContext.js";
 import { getSafeRequestPath, logSafeError } from "../utils/requestLogSafety.js";
@@ -139,6 +140,20 @@ export function createAiAnalyzeRouter(deps) {
                     });
                 }
 
+                const modelPolicy = resolveOpenAIModel({
+                    requestedModel: openaiModel,
+                    role: req.auth?.role,
+                });
+                if (!modelPolicy.allowed) {
+                    return res.status(modelPolicy.status).json({
+                        error: {
+                            code: modelPolicy.code,
+                            message: modelPolicy.message,
+                            retryable: false,
+                        },
+                    });
+                }
+
                 const diagnosisInput =
                     typeof safeBody.diagnosis === "string"
                         ? safeBody.diagnosis.trim()
@@ -186,9 +201,11 @@ export function createAiAnalyzeRouter(deps) {
                     : null;
                 let cloudSafePatient = buildCloudSafePatientPayload(patient);
                 let neutralizationMeta = null;
+                const model = modelPolicy.model;
                 const fingerprint = makeFingerprint({
                     diagnosis,
                     patient: buildFingerprintPatientPayload(patient),
+                    model,
                 });
 
                 const isProd = process.env.NODE_ENV === "production";
@@ -210,9 +227,6 @@ export function createAiAnalyzeRouter(deps) {
                 } else if (forceMock && forceReal === true) {
                     console.warn("⚠️ forceReal ignored because CLINIA_FORCE_MOCK=true");
                 }
-
-                const model =
-                    openaiModel || process.env.OPENAI_MODEL;
 
                 console.log("AI_REQUEST from Frontend", {
                     model,

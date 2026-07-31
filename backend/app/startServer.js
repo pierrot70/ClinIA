@@ -1,4 +1,5 @@
 import { logSafeError } from "../utils/requestLogSafety.js";
+import { assertConfiguredOpenAIModel } from "../services/aiModelPolicy.js";
 
 function getMongoUsername(mongoUri) {
     const match = String(mongoUri || "").match(
@@ -42,6 +43,16 @@ export function createStartServer(deps) {
     } = deps;
 
     return async function startServer({ app }) {
+        try {
+            assertConfiguredOpenAIModel(openaiModel);
+        } catch (err) {
+            logSafeError("OPENAI_MODEL_CONFIGURATION_INVALID", err, {
+                logger,
+                component: "config",
+            });
+            return;
+        }
+
         return Promise.resolve()
             .then(() => {
                 assertProductionMongoLeastPrivilege({ mongoUri, nodeEnv });

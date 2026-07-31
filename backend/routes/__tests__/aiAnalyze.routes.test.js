@@ -124,6 +124,116 @@ describe("POST /api/ai/analyze real simulated path", () => {
         expect(persistOrReuseDiagnosis).not.toHaveBeenCalled();
     });
 
+    it("rejects an unknown OpenAI model before cloud processing", async () => {
+        const persistOrReuseDiagnosis = vi.fn();
+        const router = createAiAnalyzeRouter(
+            createRouterDependencies({ openai: {}, persistOrReuseDiagnosis })
+        );
+        const res = createResponseDouble();
+
+        await getAnalyzeHandler(router)(
+            {
+                body: {
+                    diagnosis: "Migraine",
+                    symptoms: ["Cephalee"],
+                    openaiModel: "gpt-expensive-unapproved",
+                },
+                headers: {},
+                auth: {
+                    userId: "doctor-1",
+                    username: "doctor",
+                    role: "MEDECIN",
+                },
+            },
+            res
+        );
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+            error: expect.objectContaining({
+                code: "INVALID_OPENAI_MODEL",
+            }),
+        });
+        expect(persistOrReuseDiagnosis).not.toHaveBeenCalled();
+    });
+
+    it("prevents an ordinary user from overriding the configured OpenAI model", async () => {
+        vi.stubEnv("OPENAI_MODEL", "gpt-4.1-mini");
+
+        const persistOrReuseDiagnosis = vi.fn();
+        const router = createAiAnalyzeRouter(
+            createRouterDependencies({ openai: {}, persistOrReuseDiagnosis })
+        );
+        const res = createResponseDouble();
+
+        await getAnalyzeHandler(router)(
+            {
+                body: {
+                    diagnosis: "Migraine",
+                    symptoms: ["Cephalee"],
+                    openaiModel: "gpt-4-0613",
+                },
+                headers: {},
+                auth: {
+                    userId: "doctor-1",
+                    username: "doctor",
+                    role: "MEDECIN",
+                },
+            },
+            res
+        );
+
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(res.json).toHaveBeenCalledWith({
+            error: expect.objectContaining({
+                code: "OPENAI_MODEL_OVERRIDE_FORBIDDEN",
+            }),
+        });
+        expect(persistOrReuseDiagnosis).not.toHaveBeenCalled();
+    });
+
+    it("includes the resolved model in the persisted analysis fingerprint", async () => {
+        vi.stubEnv("CLINIA_FORCE_MOCK", "false");
+        vi.stubEnv("CLINIA_MOCK_AI", "true");
+        vi.stubEnv("OPENAI_MODEL", "gpt-4.1-mini");
+
+        const persistOrReuseDiagnosis = vi.fn().mockResolvedValue({
+            ok: true,
+            doc: { output: { diagnosis: { suspected: "Migraine" } } },
+            writeAuditRecorded: false,
+        });
+        const deps = createRouterDependencies({ openai: {}, persistOrReuseDiagnosis });
+        deps.getMockForDiagnosis = vi.fn(() => ({
+            diagnosis: { suspected: "Migraine" },
+        }));
+        const router = createAiAnalyzeRouter(deps);
+        const res = createResponseDouble();
+
+        await getAnalyzeHandler(router)(
+            {
+                body: {
+                    diagnosis: "Migraine",
+                    symptoms: ["Cephalee"],
+                    openaiModel: "gpt-4-0613",
+                },
+                headers: {},
+                auth: {
+                    userId: "superadmin-1",
+                    username: "superadmin",
+                    role: "SUPERADMIN",
+                },
+            },
+            res
+        );
+
+        expect(deps.makeFingerprint).toHaveBeenCalledWith(
+            expect.objectContaining({
+                diagnosis: "Migraine",
+                model: "gpt-4-0613",
+            })
+        );
+    });
+
     it("keeps an anonymous demo response out of diagnosis persistence and cache", async () => {
         vi.stubEnv("CLINIA_FORCE_MOCK", "false");
         vi.stubEnv("CLINIA_MOCK_AI", "true");

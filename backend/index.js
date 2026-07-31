@@ -60,6 +60,7 @@ import {
     persistOrReuseDiagnosis,
     upgradePersistedDiagnosisOutput,
 } from "./services/diagnosisPersistence.js";
+import { makeDiagnosisFingerprint } from "./services/analysisFingerprint.js";
 
 dotenv.config();
 
@@ -87,12 +88,7 @@ const openai = new OpenAI({
 /* Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-function makeFingerprint({ diagnosis, patient }) {
-    return crypto
-        .createHash("sha256")
-        .update(JSON.stringify({ diagnosis, patient }))
-        .digest("hex");
-}
+const makeFingerprint = makeDiagnosisFingerprint;
 
 function makeSourceHash(sourceStrings) {
     return crypto
