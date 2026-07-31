@@ -779,6 +779,35 @@ sudo CONFIRM_PRODUCTION_MONGO_MIGRATIONS=RUN_CLINIA_MONGO_MIGRATIONS \
   /opt/clinia/scripts/run-production-mongo-migrations.sh --apply
 ```
 
+## Drill de concurrence des rendez-vous
+
+Après une migration qui modifie les contraintes de rendez-vous, ce drill crée
+des données synthétiques, lance deux créations concurrentes pour le même
+patient/date/heure avec deux spécialistes différents, puis nettoie ses
+fixtures. Il exige une sauvegarde récente vérifiée, une confirmation explicite
+et conserve seulement les reçus d'audit attendus.
+
+Installer le script après le déploiement :
+
+```bash
+sudo curl -fsSL https://raw.githubusercontent.com/pierrot70/ClinIA/coolify/scripts/run-production-appointment-race-drill.sh \
+  -o /opt/clinia/scripts/run-production-appointment-race-drill.sh
+sudo chmod 755 /opt/clinia/scripts/run-production-appointment-race-drill.sh
+```
+
+Lancer seulement après avoir vérifié la sauvegarde :
+
+```bash
+sudo CONFIRM_PRODUCTION_APPOINTMENT_RACE_DRILL=RUN_CLINIA_PRODUCTION_APPOINTMENT_RACE_DRILL \
+  MIGRATION_BACKUP_CONFIRMED=YES \
+  MAX_BACKUP_AGE_HOURS=24 \
+  /opt/clinia/scripts/run-production-appointment-race-drill.sh
+```
+
+Le résultat attendu est une réponse `201`, une réponse `409` avec
+`PATIENT_ALREADY_BOOKED`, puis
+`PRODUCTION_APPOINTMENT_RACE_DRILL_PASSED`.
+
 For a destructive or precision-reducing change, use a separate migration with an explicit compatibility period. Never delete the source field in the same migration that creates a replacement field.
 
 ## Mongo backup and restore drill

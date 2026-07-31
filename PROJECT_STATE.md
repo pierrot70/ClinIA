@@ -69,6 +69,9 @@ plage fixe 08:00–17:00.
    Le script `scripts/run-staging-appointment-race-drill.sh` prépare toutefois
    automatiquement les données et le JWT de test pour vérifier cette course
    dès que le stack STAGING est disponible.
+   Un équivalent production, protégé par une confirmation explicite et une
+   sauvegarde vérifiée, est disponible dans
+   `scripts/run-production-appointment-race-drill.sh`.
 4. Vérifier manuellement le parcours UI (création, seconde réservation,
    troisième refus, déplacement, annulation/statut) et la compatibilité de tous
    les consommateurs de l'ancien contrat `string[]` de `GET /slots`.
