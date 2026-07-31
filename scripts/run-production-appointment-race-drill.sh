@@ -13,6 +13,7 @@ BASE_URL="${BASE_URL:-https://clinique-ai.ca}"
 BACKUP_OUTPUT_DIR="${BACKUP_OUTPUT_DIR:-/var/backups/clinia/mongo}"
 BACKUP_LABEL="${BACKUP_LABEL:-clinia-prod}"
 BACKUP_VERIFY_SCRIPT="${BACKUP_VERIFY_SCRIPT:-/opt/clinia/scripts/verify-mongo-backup.sh}"
+BACKUP_ENCRYPTION_ENV_FILE="${BACKUP_ENCRYPTION_ENV_FILE:-/root/clinia-backup-encryption.env}"
 MAX_BACKUP_AGE_HOURS="${MAX_BACKUP_AGE_HOURS:-24}"
 CONFIRM_PRODUCTION_APPOINTMENT_RACE_DRILL="${CONFIRM_PRODUCTION_APPOINTMENT_RACE_DRILL:-}"
 MIGRATION_BACKUP_CONFIRMED="${MIGRATION_BACKUP_CONFIRMED:-}"
@@ -29,6 +30,15 @@ SPECIALIST_A_ID=""
 SPECIALIST_B_ID=""
 APPOINTMENT_DATE=""
 TOKEN=""
+
+if [[ -f "$BACKUP_ENCRYPTION_ENV_FILE" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  . "$BACKUP_ENCRYPTION_ENV_FILE"
+  set +a
+fi
+
+BACKUP_DASHBOARD_READER_GID="${BACKUP_DASHBOARD_READER_GID:-}"
 
 info() {
   printf 'INFO %s\n' "$*"
@@ -150,7 +160,11 @@ verify_backup_preflight() {
   (( age_seconds >= 0 && age_seconds <= max_age_seconds )) ||
     fail "backup_too_old archive=$archive age_seconds=$age_seconds max_age_seconds=$max_age_seconds"
 
-  "$BACKUP_VERIFY_SCRIPT" "$archive" >/dev/null
+  if [[ -n "$BACKUP_DASHBOARD_READER_GID" ]]; then
+    EXPECTED_PERMISSIONS=640 "$BACKUP_VERIFY_SCRIPT" "$archive" >/dev/null
+  else
+    "$BACKUP_VERIFY_SCRIPT" "$archive" >/dev/null
+  fi
   info "backup_preflight=ok archive=$archive age_seconds=$age_seconds"
 }
 
