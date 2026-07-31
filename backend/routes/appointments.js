@@ -1,16 +1,15 @@
 import express from "express";
 import {
-    createAppointment,
-    getAvailableSlots,
+    createAppointmentWithWriteVerification,
+    getAvailableSlotSchedule,
     getAppointmentById,
-    cancelAppointment,
-    updateAppointmentStatus,
-    updateAppointmentSchedule,
+    cancelAppointmentWithWriteVerification,
+    updateAppointmentStatusWithWriteVerification,
+    updateAppointmentScheduleWithWriteVerification,
     listAppointmentsPaginated,
 } from "../services/appointments.js";
 import { toCreateAppointmentDTO } from "../dto/appointment.dto.js";
 import mongoose from "mongoose";
-import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
 import { getRequestContext } from "../app/requestContext.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 import { getReplicaSetStatus } from "../services/dbStatus.js";
@@ -27,20 +26,12 @@ function getRequestIp(req) {
     return getTrustedRequestIp(req);
 }
 
-async function recordAppointmentWriteAudit(req, {
-    operation,
-    appointmentId,
-    patientId = null,
-    changedFields = [],
-}) {
+async function buildAppointmentWriteAudit(req, { changedFields = [] }) {
     const requestContext = getRequestContext(req);
     const { verificationId, clientMutationId } =
         createWriteVerificationContext(req);
 
-    const writeAuditRecorded = await recordWriteOperationAuditEvent({
-        collectionName: "appointments",
-        operation,
-        outcome: "SUCCESS",
+    return {
         verificationId,
         clientMutationId,
         actorUserId: req.auth?.userId ?? null,
@@ -49,19 +40,11 @@ async function recordAppointmentWriteAudit(req, {
         ip: getRequestIp(req),
         requestId: requestContext.requestId,
         instanceId: requestContext.instanceId,
-        resourceId: appointmentId ? String(appointmentId) : null,
-        patientId: patientId ? String(patientId) : null,
         changedFields,
         requestPath: getSafeRequestPath(req),
         writeConcern: CLINICAL_WRITE_CONCERN,
         replicaSet: await getReplicaSetStatus(),
-    });
-
-    return buildWriteVerificationMeta({
-        writeAuditRecorded,
-        verificationId,
-        clientMutationId,
-    });
+    };
 }
 
 /* ------------------------------------------------------------------ */
@@ -69,13 +52,16 @@ async function recordAppointmentWriteAudit(req, {
 /* ------------------------------------------------------------------ */
 
 router.get("/slots", async (req, res) => {
-    const { specialist, date } = req.query;
+    const { specialist, date, patient } = req.query;
 
     try {
-        const slots = await getAvailableSlots(specialist, date);
+        const schedule = await getAvailableSlotSchedule(specialist, date, {
+            patient,
+            authUser: req.auth,
+        });
 
         return res.status(200).json({
-            data: slots,
+            data: schedule,
             meta: {
                 source: "real",
                 model: "computed",
@@ -123,12 +109,15 @@ router.post("/", async (req, res) => {
     }
 
     try {
-        const appointment = await createAppointment(dto, req.auth);
-        const writeVerification = await recordAppointmentWriteAudit(req, {
-            operation: "CREATE",
-            appointmentId: appointment._id,
-            patientId: appointment.patient,
+        const audit = await buildAppointmentWriteAudit(req, {
             changedFields: Object.keys(dto),
+        });
+        const { appointment, writeAuditRecorded } =
+            await createAppointmentWithWriteVerification(dto, req.auth, audit);
+        const writeVerification = buildWriteVerificationMeta({
+            writeAuditRecorded,
+            verificationId: audit.verificationId,
+            clientMutationId: audit.clientMutationId,
         });
 
         return res.status(201).json({
@@ -156,7 +145,11 @@ router.post("/", async (req, res) => {
             });
         }
 
-        if (err.code === "SPECIALIST_ALREADY_BOOKED") {
+        if (
+            err.code === "SPECIALIST_ALREADY_BOOKED" ||
+            err.code === "PATIENT_ALREADY_BOOKED" ||
+            err.code === "MAXIMUM_APPOINTMENTS_REACHED"
+        ) {
             return res.status(409).json({
                 error: {
                     code: err.code,
@@ -322,12 +315,15 @@ router.get("/:id", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
     try {
-        const appointment = await cancelAppointment(req.params.id, req.auth);
-        const writeVerification = await recordAppointmentWriteAudit(req, {
-            operation: "DELETE",
-            appointmentId: appointment._id,
-            patientId: appointment.patient,
+        const audit = await buildAppointmentWriteAudit(req, {
             changedFields: ["status"],
+        });
+        const { appointment, writeAuditRecorded } =
+            await cancelAppointmentWithWriteVerification(req.params.id, req.auth, audit);
+        const writeVerification = buildWriteVerificationMeta({
+            writeAuditRecorded,
+            verificationId: audit.verificationId,
+            clientMutationId: audit.clientMutationId,
         });
 
         return res.status(200).json({
@@ -393,13 +389,20 @@ router.patch("/:id/status", async (req, res) => {
     }
 
     try {
-        const appointment =
-            await updateAppointmentStatus(req.params.id, status, req.auth);
-        const writeVerification = await recordAppointmentWriteAudit(req, {
-            operation: "UPDATE",
-            appointmentId: appointment._id,
-            patientId: appointment.patient,
+        const audit = await buildAppointmentWriteAudit(req, {
             changedFields: ["status"],
+        });
+        const { appointment, writeAuditRecorded } =
+            await updateAppointmentStatusWithWriteVerification(
+                req.params.id,
+                status,
+                req.auth,
+                audit
+            );
+        const writeVerification = buildWriteVerificationMeta({
+            writeAuditRecorded,
+            verificationId: audit.verificationId,
+            clientMutationId: audit.clientMutationId,
         });
 
         return res.status(200).json({
@@ -468,16 +471,20 @@ router.patch("/:id/schedule", async (req, res) => {
     }
 
     try {
-        const appointment = await updateAppointmentSchedule(
-            req.params.id,
-            { date, time },
-            req.auth
-        );
-        const writeVerification = await recordAppointmentWriteAudit(req, {
-            operation: "UPDATE",
-            appointmentId: appointment._id,
-            patientId: appointment.patient,
+        const audit = await buildAppointmentWriteAudit(req, {
             changedFields: ["date", "time"],
+        });
+        const { appointment, writeAuditRecorded } =
+            await updateAppointmentScheduleWithWriteVerification(
+                req.params.id,
+                { date, time },
+                req.auth,
+                audit
+            );
+        const writeVerification = buildWriteVerificationMeta({
+            writeAuditRecorded,
+            verificationId: audit.verificationId,
+            clientMutationId: audit.clientMutationId,
         });
 
         return res.status(200).json({
@@ -496,10 +503,25 @@ router.patch("/:id/schedule", async (req, res) => {
                 "INVALID_TIME",
                 "INVALID_DATE",
                 "STATUS_IMMUTABLE",
-                "SPECIALIST_ALREADY_BOOKED",
             ].includes(err.code)
         ) {
             return res.status(400).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        if (
+            [
+                "SPECIALIST_ALREADY_BOOKED",
+                "PATIENT_ALREADY_BOOKED",
+                "MAXIMUM_APPOINTMENTS_REACHED",
+            ].includes(err.code)
+        ) {
+            return res.status(409).json({
                 error: {
                     code: err.code,
                     message: err.message,

@@ -114,6 +114,31 @@ AppointmentSchema.index(
     }
 );
 
+// A patient cannot attend two appointments at the same instant, even with
+// different specialists. MongoDB enforces this independently of concurrent
+// availability checks performed by separate clinicians.
+AppointmentSchema.index(
+    { patient: 1, date: 1, time: 1 },
+    {
+        name: "patient_date_time_scheduled_unique",
+        unique: true,
+        partialFilterExpression: {
+            status: "scheduled",
+        },
+    }
+);
+
+// Supports patient-specific daily scheduling without scanning appointments.
+AppointmentSchema.index(
+    { patient: 1, specialist: 1, date: 1, status: 1, time: 1 },
+    {
+        name: "patient_specialist_date_scheduled_time_idx",
+        partialFilterExpression: {
+            status: "scheduled",
+        },
+    }
+);
+
 export const Appointment =
     mongoose.models.Appointment ||
     mongoose.model("Appointment", AppointmentSchema);

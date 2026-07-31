@@ -617,10 +617,23 @@ Payload:
 
 Query:
 ```ts
-{ specialist: string, date: string }
+{ specialist: string, date: string, patient?: string }
 ```
 
-Reponse attendue: `ApiResponse<string[]>`.
+Reponse attendue:
+
+```ts
+ApiResponse<{
+  slots: string[];
+  existingAppointmentTimes: string[];
+  maximumAppointmentsReached: boolean;
+}>
+```
+
+Lorsque `patient` est fourni, il est limité au dossier autorisé pour
+l'utilisateur connecté. Les créneaux du spécialiste déjà réservés, les heures
+antérieures au rendez-vous existant du patient avec ce spécialiste et les
+créneaux passés ne sont pas retournés.
 
 `DELETE /api/appointments/:id`: annule un rendez-vous, reponse `ApiResponse<Appointment>`.
 

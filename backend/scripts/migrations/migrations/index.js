@@ -24,6 +24,12 @@ import { migration as dropOutOfOrderPatientSearchIndexes }
     from "./20260730-drop-out-of-order-patient-search-indexes.js";
 import { migration as addLoginFailureThrottleIndexes }
     from "./20260730-add-login-failure-throttle-indexes.js";
+import { migration as addPatientDateTimeAppointmentIndex }
+    from "./20260731-add-patient-date-time-appointment-index.js";
+import { migration as addPatientSpecialistDayAppointmentIndex }
+    from "./20260731-add-patient-specialist-day-appointment-index.js";
+import { migration as backfillAppointmentBookingGuards }
+    from "./20260731-backfill-appointment-booking-guards.js";
 export const migrations = [
     registerMigrationFramework,
     addPatientLanguageDefault,
@@ -38,4 +44,7 @@ export const migrations = [
     dropGlobalPatientInsuranceIndex,
     dropOutOfOrderPatientSearchIndexes,
     addLoginFailureThrottleIndexes,
+    addPatientDateTimeAppointmentIndex,
+    addPatientSpecialistDayAppointmentIndex,
+    backfillAppointmentBookingGuards,
 ];

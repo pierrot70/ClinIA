@@ -1120,14 +1120,14 @@ export const UI_LABELS_FR = {
             phonePlaceholder: "Téléphone",
             loading: "Recherche...",
             submit: "Rechercher",
-            empty: "Aucun patient trouvé.",
+            empty: "Aucun de vos patients ne correspond à cette recherche.",
         },
         specialist: {
             loading: "Chargement des spécialistes...",
             choose: "Choisir un spécialiste *",
             none: "Aucun spécialiste disponible dans cette clinique.",
             nearestClinicMissing: "Clinique la plus proche introuvable",
-            selectPatient: "Sélectionnez un patient",
+            selectPatient: "Choisissez d'abord un patient dans les résultats",
             noneInNearestClinic:
                 "Aucun spécialiste disponible dans la clinique la plus proche.",
             missingCoordinates:
@@ -1146,6 +1146,10 @@ export const UI_LABELS_FR = {
         slots: {
             label: "Créneaux disponibles",
             loading: "Chargement...",
+            existingPatientAppointment:
+                "Ce patient a déjà un rendez-vous avec ce spécialiste à {times}. Les créneaux proposés sont postérieurs.",
+            maximumPatientAppointments:
+                "Ce patient a déjà deux rendez-vous avec ce spécialiste aujourd'hui. Aucun autre créneau ne peut être ajouté.",
         },
         reasonPlaceholder: "Motif (optionnel)",
         action: {

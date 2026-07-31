@@ -1,19 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
-    createAppointment,
-    updateAppointmentStatus,
+    createAppointmentWithWriteVerification,
+    getAvailableSlotSchedule,
+    updateAppointmentStatusWithWriteVerification,
 } = vi.hoisted(() => ({
-    createAppointment: vi.fn(),
-    updateAppointmentStatus: vi.fn(),
+    createAppointmentWithWriteVerification: vi.fn(),
+    getAvailableSlotSchedule: vi.fn(),
+    updateAppointmentStatusWithWriteVerification: vi.fn(),
 }));
 
 const { toCreateAppointmentDTO } = vi.hoisted(() => ({
     toCreateAppointmentDTO: vi.fn(),
-}));
-
-const { recordWriteOperationAuditEvent } = vi.hoisted(() => ({
-    recordWriteOperationAuditEvent: vi.fn(),
 }));
 
 const { getReplicaSetStatus } = vi.hoisted(() => ({
@@ -21,21 +19,17 @@ const { getReplicaSetStatus } = vi.hoisted(() => ({
 }));
 
 vi.mock("../../services/appointments.js", () => ({
-    createAppointment,
-    getAvailableSlots: vi.fn(),
+    createAppointmentWithWriteVerification,
+    getAvailableSlotSchedule,
     getAppointmentById: vi.fn(),
-    cancelAppointment: vi.fn(),
-    updateAppointmentStatus,
-    updateAppointmentSchedule: vi.fn(),
+    cancelAppointmentWithWriteVerification: vi.fn(),
+    updateAppointmentStatusWithWriteVerification,
+    updateAppointmentScheduleWithWriteVerification: vi.fn(),
     listAppointmentsPaginated: vi.fn(),
 }));
 
 vi.mock("../../dto/appointment.dto.js", () => ({
     toCreateAppointmentDTO,
-}));
-
-vi.mock("../../audit/writeOperationAudit.js", () => ({
-    recordWriteOperationAuditEvent,
 }));
 
 vi.mock("../../services/dbStatus.js", () => ({
@@ -68,7 +62,6 @@ function getRouteHandler(method, path) {
 describe("appointments routes write verification", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        recordWriteOperationAuditEvent.mockResolvedValue(true);
         getReplicaSetStatus.mockResolvedValue({
             summary: {
                 status: "OK",
@@ -81,6 +74,45 @@ describe("appointments routes write verification", () => {
                 laggingThresholdSeconds: 10,
             },
         });
+    });
+
+    it("passes the authenticated patient context when listing available slots", async () => {
+        const handler = getRouteHandler("get", "/slots");
+        const req = {
+            query: {
+                specialist: "specialist-1",
+                date: "2026-08-03",
+                patient: "patient-1",
+            },
+            auth: {
+                userId: "doctor-1",
+                role: "MEDECIN",
+            },
+        };
+        const res = makeRes();
+
+        getAvailableSlotSchedule.mockResolvedValue({
+            slots: ["12:45"],
+            existingAppointmentTimes: ["12:30"],
+            maximumAppointmentsReached: false,
+        });
+
+        await handler(req, res);
+
+        expect(getAvailableSlotSchedule).toHaveBeenCalledWith(
+            "specialist-1",
+            "2026-08-03",
+            { patient: "patient-1", authUser: req.auth }
+        );
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    slots: ["12:45"],
+                    existingAppointmentTimes: ["12:30"],
+                }),
+            })
+        );
     });
 
     it("returns a write verification receipt on appointment creation", async () => {
@@ -96,7 +128,10 @@ describe("appointments routes write verification", () => {
         const appointment = { _id: "appointment-1", ...dto };
 
         toCreateAppointmentDTO.mockReturnValue(dto);
-        createAppointment.mockResolvedValue(appointment);
+        createAppointmentWithWriteVerification.mockResolvedValue({
+            appointment,
+            writeAuditRecorded: true,
+        });
 
         const req = {
             body: dto,
@@ -119,10 +154,7 @@ describe("appointments routes write verification", () => {
 
         await handler(req, res);
 
-        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith({
-            collectionName: "appointments",
-            operation: "CREATE",
-            outcome: "SUCCESS",
+        expect(createAppointmentWithWriteVerification).toHaveBeenCalledWith(dto, req.auth, {
             verificationId: expect.stringMatching(/^WRV-[A-Z0-9]+-[A-F0-9]{12}$/),
             clientMutationId: "appointment-create-client-1",
             actorUserId: "user-1",
@@ -131,8 +163,6 @@ describe("appointments routes write verification", () => {
             ip: "10.0.0.10",
             requestId: "request-appointment-create",
             instanceId: "instance-a",
-            resourceId: "appointment-1",
-            patientId: "patient-1",
             changedFields: ["patient", "specialist", "clinique", "date", "time", "priority"],
             requestPath: "/api/appointments",
             writeConcern: {
@@ -168,6 +198,43 @@ describe("appointments routes write verification", () => {
         });
     });
 
+    it("returns a conflict when MongoDB rejects a concurrent same-patient booking", async () => {
+        const handler = getRouteHandler("post", "/");
+        const dto = {
+            patient: "patient-1",
+            specialist: "specialist-2",
+            date: "2026-08-03",
+            time: "12:45",
+            priority: "normal",
+        };
+        toCreateAppointmentDTO.mockReturnValue(dto);
+        createAppointmentWithWriteVerification.mockRejectedValue({
+            code: "PATIENT_ALREADY_BOOKED",
+            message:
+                "Ce patient a déjà un rendez-vous planifié à cette date et cette heure.",
+        });
+        const req = {
+            body: dto,
+            headers: {},
+            auth: { userId: "doctor-1", role: "MEDECIN" },
+            originalUrl: "/api/appointments",
+            requestContext: { requestId: "request-race", instanceId: "instance-a" },
+        };
+        const res = makeRes();
+
+        await handler(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "PATIENT_ALREADY_BOOKED",
+                message:
+                    "Ce patient a déjà un rendez-vous planifié à cette date et cette heure.",
+                retryable: false,
+            },
+        });
+    });
+
     it("returns a write verification receipt on appointment status update", async () => {
         const handler = getRouteHandler("patch", "/:id/status");
         const appointment = {
@@ -175,7 +242,10 @@ describe("appointments routes write verification", () => {
             status: "completed",
         };
 
-        updateAppointmentStatus.mockResolvedValue(appointment);
+        updateAppointmentStatusWithWriteVerification.mockResolvedValue({
+            appointment,
+            writeAuditRecorded: true,
+        });
 
         const req = {
             params: { id: "appointment-2" },
@@ -200,15 +270,14 @@ describe("appointments routes write verification", () => {
 
         await handler(req, res);
 
-        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith(
+        expect(updateAppointmentStatusWithWriteVerification).toHaveBeenCalledWith(
+            "appointment-2",
+            "completed",
+            req.auth,
             expect.objectContaining({
-                collectionName: "appointments",
-                operation: "UPDATE",
-                outcome: "SUCCESS",
                 verificationId: expect.stringMatching(/^WRV-[A-Z0-9]+-[A-F0-9]{12}$/),
                 clientMutationId: "appointment-status-client-1",
                 ip: "10.0.0.10",
-                resourceId: "appointment-2",
                 changedFields: ["status"],
             })
         );

@@ -27,6 +27,15 @@ import {
     WriteVerificationReceipt,
 } from "../components/system/WriteVerificationReceipt";
 
+function toLocalDateKey(value: string): string | null {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+
+    return `${parsed.getFullYear()}-${String(
+        parsed.getMonth() + 1
+    ).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+}
+
 function useAppointmentsPageLabels(targetLang: string) {
     const source = labels.appointmentsPage;
     const options = { targetLang, namespace: "appointments-page" };
@@ -54,6 +63,8 @@ function useAppointmentsPageLabels(targetLang: string) {
     const { translated: urgentPriority } = useTranslation({ text: source.priority.urgent, ...options });
     const { translated: slotsLabel } = useTranslation({ text: source.slots.label, ...options });
     const { translated: slotsLoading } = useTranslation({ text: source.slots.loading, ...options });
+    const { translated: existingPatientAppointment } = useTranslation({ text: source.slots.existingPatientAppointment, ...options });
+    const { translated: maximumPatientAppointments } = useTranslation({ text: source.slots.maximumPatientAppointments, ...options });
     const { translated: reasonPlaceholder } = useTranslation({ text: source.reasonPlaceholder, ...options });
     const { translated: createLoading } = useTranslation({ text: source.action.loading, ...options });
     const { translated: createSubmit } = useTranslation({ text: source.action.submit, ...options });
@@ -84,6 +95,8 @@ function useAppointmentsPageLabels(targetLang: string) {
         urgentPriority,
         slotsLabel,
         slotsLoading,
+        existingPatientAppointment,
+        maximumPatientAppointments,
         reasonPlaceholder,
         createLoading,
         createSubmit,
@@ -114,6 +127,8 @@ export function AppointmentsPage() {
         useState<"normal" | "urgent">("normal");
 
     const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+    const [existingAppointmentTimes, setExistingAppointmentTimes] = useState<string[]>([]);
+    const [maximumAppointmentsReached, setMaximumAppointmentsReached] = useState(false);
     const [slotsLoading, setSlotsLoading] = useState(false);
     const [loading, setLoading] = useState(false);
     const [apiError, setApiError] = useState<ApiError | null>(null);
@@ -355,6 +370,9 @@ export function AppointmentsPage() {
         if (!stillValid) {
             setSpecialist("");
             setAvailableSlots([]);
+            setExistingAppointmentTimes([]);
+            setMaximumAppointmentsReached(false);
+            setTime("");
         }
     }, [clinique, filteredSpecialists, specialist]);
 
@@ -362,26 +380,96 @@ export function AppointmentsPage() {
     /* Chargement des créneaux                                            */
     /* ------------------------------------------------------------------ */
 
-    async function refreshSlots() {
+    async function refreshSlots(): Promise<string[]> {
         if (!specialist || !date) {
             setAvailableSlots([]);
-            return;
+            setExistingAppointmentTimes([]);
+            setMaximumAppointmentsReached(false);
+            return [];
         }
 
         setSlotsLoading(true);
+        try {
+            const response = await fetchAvailableSlots(
+                specialist,
+                date,
+                patientId || undefined
+            );
+            const schedule = "data" in response ? response.data : null;
+            const slots = schedule?.slots ?? [];
 
-        const response = await fetchAvailableSlots(specialist, date);
-
-        if ("data" in response) {
-            setAvailableSlots(response.data);
+            setAvailableSlots(slots);
+            setExistingAppointmentTimes(schedule?.existingAppointmentTimes ?? []);
+            setMaximumAppointmentsReached(
+                schedule?.maximumAppointmentsReached ?? false
+            );
+            return slots;
+        } finally {
+            setSlotsLoading(false);
         }
-
-        setSlotsLoading(false);
     }
 
     useEffect(() => {
-        refreshSlots();
-    }, [specialist, date]);
+        void refreshSlots();
+    }, [specialist, date, patientId]);
+
+    async function handleSpecialistChange(specialistId: string) {
+        setSpecialist(specialistId);
+        setDate("");
+        setTime("");
+        setAvailableSlots([]);
+        setExistingAppointmentTimes([]);
+        setMaximumAppointmentsReached(false);
+
+        const selectedSpecialist = specialists.find(
+            (candidate) => candidate._id === specialistId
+        );
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const availableDates = Array.from(
+            new Set(
+                (selectedSpecialist?.disponibilites ?? [])
+                    .map(toLocalDateKey)
+                    .filter((candidate): candidate is string => {
+                        if (!candidate) return false;
+                        return new Date(`${candidate}T00:00:00`) >= today;
+                    })
+            )
+        ).sort();
+
+        for (const candidateDate of availableDates) {
+            const response = await fetchAvailableSlots(
+                specialistId,
+                candidateDate,
+                patientId || undefined
+            );
+            const schedule = "data" in response ? response.data : null;
+            const slots = schedule?.slots ?? [];
+
+            if (schedule?.maximumAppointmentsReached) {
+                setDate(candidateDate);
+                setAvailableSlots([]);
+                setExistingAppointmentTimes(
+                    schedule.existingAppointmentTimes
+                );
+                setMaximumAppointmentsReached(true);
+                return;
+            }
+
+            if (slots.length > 0) {
+                setDate(candidateDate);
+                setAvailableSlots(slots);
+                setExistingAppointmentTimes(
+                    schedule?.existingAppointmentTimes ?? []
+                );
+                setMaximumAppointmentsReached(
+                    schedule?.maximumAppointmentsReached ?? false
+                );
+                setTime(slots[0]);
+                return;
+            }
+        }
+    }
 
     /* ------------------------------------------------------------------ */
     /* Validation                                                         */
@@ -424,9 +512,9 @@ export function AppointmentsPage() {
 
         setLastWriteVerification(response.meta.writeVerification ?? null);
         setSuccess(true);
-        await refreshSlots();
+        const refreshedSlots = await refreshSlots();
 
-        if (!availableSlots.includes(time)) {
+        if (!refreshedSlots.includes(time)) {
             setTime("");
         }
 
@@ -586,7 +674,9 @@ export function AppointmentsPage() {
                 <select
                     className="border rounded p-2"
                     value={specialist}
-                    onChange={(e) => setSpecialist(e.target.value)}
+                    onChange={(e) => {
+                        void handleSpecialistChange(e.target.value);
+                    }}
                     disabled={
                         !patientId ||
                         cliniquesLoading ||
@@ -657,7 +747,10 @@ export function AppointmentsPage() {
                     type="date"
                     className="border rounded p-2"
                     value={date}
-                    onChange={(e) => setDate(e.target.value)}
+                    onChange={(e) => {
+                        setDate(e.target.value);
+                        setTime("");
+                    }}
                 />
 
                 <input
@@ -678,6 +771,19 @@ export function AppointmentsPage() {
                             {ui.slotsLoading}
                         </div>
                     )}
+
+                    {maximumAppointmentsReached ? (
+                        <div className="mb-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                            {ui.maximumPatientAppointments}
+                        </div>
+                    ) : existingAppointmentTimes.length > 0 ? (
+                        <div className="mb-2 rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">
+                            {ui.existingPatientAppointment.replace(
+                                "{times}",
+                                existingAppointmentTimes.join(", ")
+                            )}
+                        </div>
+                    ) : null}
 
                     <div className="flex flex-wrap gap-2">
                         {availableSlots.map((slot) => (

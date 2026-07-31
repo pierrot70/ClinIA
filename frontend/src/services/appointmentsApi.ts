@@ -48,6 +48,12 @@ export interface CreateAppointmentPayload {
     priority: "normal" | "urgent";
 }
 
+export interface AvailableSlotSchedule {
+    slots: string[];
+    existingAppointmentTimes: string[];
+    maximumAppointmentsReached: boolean;
+}
+
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
@@ -152,17 +158,20 @@ export async function createAppointment(
 
 export async function fetchAvailableSlots(
     specialist: string,
-    date: string
-): Promise<ApiResponse<string[]>> {
+    date: string,
+    patient?: string
+): Promise<ApiResponse<AvailableSlotSchedule>> {
     return withSecurityIncidentGuard(
         (async () => {
             try {
+                const query = new URLSearchParams({ specialist, date });
+                if (patient) {
+                    query.set("patient", patient);
+                }
                 const response = await authFetch(
-                    `${API_URL}/api/appointments/slots?specialist=${encodeURIComponent(
-                        specialist
-                    )}&date=${encodeURIComponent(date)}`
+                    `${API_URL}/api/appointments/slots?${query.toString()}`
                 );
-                return (await safeJson(response)) as ApiResponse<string[]>;
+                return (await safeJson(response)) as ApiResponse<AvailableSlotSchedule>;
             } catch {
                 return {
                     error: {

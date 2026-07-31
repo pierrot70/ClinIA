@@ -59,6 +59,7 @@ export function AppointmentsListPage() {
     const [editDate, setEditDate] = useState("");
     const [editTime, setEditTime] = useState("");
     const [editSpecialist, setEditSpecialist] = useState("");
+    const [editPatientId, setEditPatientId] = useState("");
     const [editOriginalDate, setEditOriginalDate] = useState("");
     const [editOriginalTime, setEditOriginalTime] = useState("");
     const [editSlots, setEditSlots] = useState<string[]>([]);
@@ -216,11 +217,12 @@ export function AppointmentsListPage() {
 
             const response = await fetchAvailableSlots(
                 editSpecialist,
-                editDate
+                editDate,
+                editPatientId
             );
 
             if (!cancelled && "data" in response) {
-                setEditSlots(response.data);
+                setEditSlots(response.data.slots);
             }
 
             if (!cancelled) {
@@ -233,7 +235,7 @@ export function AppointmentsListPage() {
         return () => {
             cancelled = true;
         };
-    }, [editingId, editSpecialist, editDate]);
+    }, [editingId, editSpecialist, editDate, editPatientId]);
 
     async function loadAppointments() {
         setLoading(true);
@@ -437,6 +439,7 @@ export function AppointmentsListPage() {
         setEditDate(appointment.date);
         setEditTime(appointment.time);
         setEditSpecialist(appointment.specialist);
+        setEditPatientId(appointment.patient ?? "");
         setEditOriginalDate(appointment.date);
         setEditOriginalTime(appointment.time);
         setEditSlots([]);
@@ -447,6 +450,7 @@ export function AppointmentsListPage() {
         setEditDate("");
         setEditTime("");
         setEditSpecialist("");
+        setEditPatientId("");
         setEditOriginalDate("");
         setEditOriginalTime("");
         setEditSlots([]);

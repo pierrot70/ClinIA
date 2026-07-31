@@ -1,16 +1,90 @@
 import { Appointment } from "../models/Appointment.js";
+import { AppointmentBookingGuard } from "../models/AppointmentBookingGuard.js";
 import { Specialist } from "../models/Specialist.js";
 import { Patient } from "../models/Patient.js";
 import { Clinique } from "../models/Clinique.js";
 import mongoose from "mongoose";
 import { buildOwnerScope } from "../auth/resourceAccess.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
+import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
+
+function getClinicalWriteOptions(session) {
+    return session
+        ? { ...CLINICAL_WRITE_CONCERN, session }
+        : CLINICAL_WRITE_CONCERN;
+}
+
+const MAX_SAME_DAY_PATIENT_SPECIALIST_APPOINTMENTS = 2;
+
+function isPatientDateTimeDuplicate(error) {
+    const keyPattern = error?.keyPattern || {};
+    return error?.code === 11000 && (
+        (keyPattern.patient === 1 && keyPattern.date === 1 && keyPattern.time === 1) ||
+        error?.message?.includes("patient_date_time_scheduled_unique")
+    );
+}
+
+function patientAlreadyBookedError() {
+    return {
+        code: "PATIENT_ALREADY_BOOKED",
+        message:
+            "Ce patient a déjà un rendez-vous planifié à cette date et cette heure.",
+    };
+}
+
+function getBookingGuardKey({ patient, specialist, date }) {
+    return { patient, specialist, date };
+}
+
+async function reserveDailyAppointmentCapacity({ patient, specialist, date, session }) {
+    try {
+        const guard = await AppointmentBookingGuard.findOneAndUpdate(
+            {
+                ...getBookingGuardKey({ patient, specialist, date }),
+                scheduledCount: {
+                    $lt: MAX_SAME_DAY_PATIENT_SPECIALIST_APPOINTMENTS,
+                },
+            },
+            {
+                $inc: { scheduledCount: 1 },
+                $setOnInsert: getBookingGuardKey({ patient, specialist, date }),
+            },
+            {
+                new: true,
+                upsert: true,
+                session,
+            }
+        );
+
+        if (guard) return;
+    } catch (error) {
+        // A competing request can lose the unique guard-document insert race.
+        if (error?.code !== 11000) throw error;
+    }
+
+    throw {
+        code: "MAXIMUM_APPOINTMENTS_REACHED",
+        message:
+            "Ce patient a déjà le nombre maximal de rendez-vous avec ce spécialiste pour cette journée.",
+    };
+}
+
+async function releaseDailyAppointmentCapacity({ patient, specialist, date, session }) {
+    await AppointmentBookingGuard.updateOne(
+        {
+            ...getBookingGuardKey({ patient, specialist, date }),
+            scheduledCount: { $gt: 0 },
+        },
+        { $inc: { scheduledCount: -1 } },
+        { session }
+    );
+}
 
 /* ------------------------------------------------------------------ */
 /* Service Appointment                                                 */
 /* ------------------------------------------------------------------ */
 
-export async function createAppointment(dto, authUser) {
+export async function createAppointment(dto, authUser, { session = null } = {}) {
     /* ---------------- Validation métier ---------------- */
 
     const ALLOWED_PRIORITIES = ["normal", "urgent"];
@@ -29,12 +103,10 @@ export async function createAppointment(dto, authUser) {
         };
     }
 
-    // Heures ouvrables
-    const [hour] = dto.time.split(":").map(Number);
-    if (hour < 8 || hour >= 17) {
+    if (!isQuarterHourTime(dto.time)) {
         throw {
             code: "INVALID_TIME",
-            message: "Le rendez-vous doit être entre 08:00 et 17:00.",
+            message: "Le créneau doit être aligné sur 15 minutes.",
         };
     }
 
@@ -110,7 +182,8 @@ export async function createAppointment(dto, authUser) {
 
     const availableSlots = await getAvailableSlots(
         dto.specialist,
-        dto.date
+        dto.date,
+        { patient: dto.patient }
     );
     if (!availableSlots.includes(dto.time)) {
         throw {
@@ -120,24 +193,12 @@ export async function createAppointment(dto, authUser) {
         };
     }
 
-    /* -------------------------------------------------- */
-    /* RÈGLE MÉTIER MAJEURE                               */
-    /* Un patient = un seul rendez-vous par spécialiste  */
-    /* -------------------------------------------------- */
-
-    const existing = await Appointment.findOne({
+    await reserveDailyAppointmentCapacity({
         patient: dto.patient,
         specialist: dto.specialist,
-        status: "scheduled",
-    }).lean();
-
-    if (existing) {
-        throw {
-            code: "SPECIALIST_ALREADY_BOOKED",
-            message:
-                "Ce patient a déjà un rendez-vous avec ce spécialiste.",
-        };
-    }
+        date: dto.date,
+        session,
+    });
 
     /* ---------------- Persistance ---------------- */
 
@@ -151,7 +212,14 @@ export async function createAppointment(dto, authUser) {
         ownerUserId: patient.ownerUserId || authUser.userId,
     });
 
-    return appointment.save(CLINICAL_WRITE_CONCERN);
+    try {
+        return await appointment.save(getClinicalWriteOptions(session));
+    } catch (error) {
+        if (isPatientDateTimeDuplicate(error)) {
+            throw patientAlreadyBookedError();
+        }
+        throw error;
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -203,7 +271,7 @@ export async function getAppointmentById(id, authUser) {
 /* Cancel appointment (soft delete)                                   */
 /* ------------------------------------------------------------------ */
 
-export async function cancelAppointment(id, authUser) {
+export async function cancelAppointment(id, authUser, { session = null } = {}) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
             code: "INVALID_ID",
@@ -230,8 +298,17 @@ export async function cancelAppointment(id, authUser) {
         };
     }
 
+    const releasesDailyCapacity = appointment.status === "scheduled";
     appointment.status = "cancelled";
-    await appointment.save(CLINICAL_WRITE_CONCERN);
+    await appointment.save(getClinicalWriteOptions(session));
+    if (releasesDailyCapacity) {
+        await releaseDailyAppointmentCapacity({
+            patient: appointment.patient,
+            specialist: appointment.specialist,
+            date: appointment.date,
+            session,
+        });
+    }
 
     return appointment;
 }
@@ -242,7 +319,7 @@ export async function cancelAppointment(id, authUser) {
 
 const ALLOWED_STATUSES = ["scheduled", "cancelled", "completed"];
 
-export async function updateAppointmentStatus(id, newStatus, authUser) {
+export async function updateAppointmentStatus(id, newStatus, authUser, { session = null } = {}) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
             code: "INVALID_ID",
@@ -289,8 +366,19 @@ export async function updateAppointmentStatus(id, newStatus, authUser) {
         };
     }
 
+    const releasesDailyCapacity =
+        appointment.status === "scheduled" && newStatus !== "scheduled";
+
     appointment.status = newStatus;
-    await appointment.save(CLINICAL_WRITE_CONCERN);
+    await appointment.save(getClinicalWriteOptions(session));
+    if (releasesDailyCapacity) {
+        await releaseDailyAppointmentCapacity({
+            patient: appointment.patient,
+            specialist: appointment.specialist,
+            date: appointment.date,
+            session,
+        });
+    }
 
     return appointment;
 }
@@ -299,7 +387,7 @@ export async function updateAppointmentStatus(id, newStatus, authUser) {
 /* Update appointment schedule (date/time)                             */
 /* ------------------------------------------------------------------ */
 
-export async function updateAppointmentSchedule(id, { date, time }, authUser) {
+export async function updateAppointmentSchedule(id, { date, time }, authUser, { session = null } = {}) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
             code: "INVALID_ID",
@@ -314,11 +402,10 @@ export async function updateAppointmentSchedule(id, { date, time }, authUser) {
         };
     }
 
-    const [hour] = time.split(":").map(Number);
-    if (Number.isNaN(hour) || hour < 8 || hour >= 17) {
+    if (!isQuarterHourTime(time)) {
         throw {
             code: "INVALID_TIME",
-            message: "Le rendez-vous doit être entre 08:00 et 17:00.",
+            message: "Le créneau doit être aligné sur 15 minutes.",
         };
     }
 
@@ -350,6 +437,21 @@ export async function updateAppointmentSchedule(id, { date, time }, authUser) {
         };
     }
 
+    const availableSlots = await getAvailableSlots(
+        String(appointment.specialist),
+        date,
+        {
+            patient: String(appointment.patient),
+            excludeAppointmentId: String(appointment._id),
+        }
+    );
+    if (!availableSlots.includes(time)) {
+        throw {
+            code: "NO_AVAILABILITY",
+            message: "Aucun créneau disponible pour ce spécialiste.",
+        };
+    }
+
     const conflictQuery = Appointment.findOne({
         _id: { $ne: appointment._id },
         specialist: appointment.specialist,
@@ -370,20 +472,109 @@ export async function updateAppointmentSchedule(id, { date, time }, authUser) {
         };
     }
 
+    const previousDate = appointment.date;
+    const movesToAnotherDay = previousDate !== date;
+    if (movesToAnotherDay) {
+        await reserveDailyAppointmentCapacity({
+            patient: appointment.patient,
+            specialist: appointment.specialist,
+            date,
+            session,
+        });
+    }
+
     appointment.date = date;
     appointment.time = time;
-    await appointment.save(CLINICAL_WRITE_CONCERN);
+    try {
+        await appointment.save(getClinicalWriteOptions(session));
+    } catch (error) {
+        if (isPatientDateTimeDuplicate(error)) {
+            throw patientAlreadyBookedError();
+        }
+        throw error;
+    }
+    if (movesToAnotherDay) {
+        await releaseDailyAppointmentCapacity({
+            patient: appointment.patient,
+            specialist: appointment.specialist,
+            date: previousDate,
+            session,
+        });
+    }
 
     return appointment;
+}
+
+async function runAppointmentWriteTransaction(callback) {
+    const session = await mongoose.startSession();
+
+    try {
+        let result;
+        await session.withTransaction(async () => {
+            result = await callback(session);
+        }, { writeConcern: CLINICAL_WRITE_CONCERN });
+        return result;
+    } finally {
+        await session.endSession();
+    }
+}
+
+async function recordAppointmentWriteReceipt(appointment, audit, session) {
+    await recordWriteOperationAuditEvent({
+        ...audit,
+        collectionName: "appointments",
+        outcome: "SUCCESS",
+        resourceId: String(appointment._id),
+        patientId: appointment.patient ? String(appointment.patient) : null,
+        session,
+        throwOnError: true,
+    });
+}
+
+async function executeAppointmentWriteWithReceipt(writeAppointment, audit) {
+    return runAppointmentWriteTransaction(async (session) => {
+        const appointment = await writeAppointment(session);
+        await recordAppointmentWriteReceipt(appointment, audit, session);
+
+        return {
+            appointment,
+            writeAuditRecorded: true,
+        };
+    });
+}
+
+export function createAppointmentWithWriteVerification(dto, authUser, audit) {
+    return executeAppointmentWriteWithReceipt(
+        (session) => createAppointment(dto, authUser, { session }),
+        { ...audit, operation: "CREATE" }
+    );
+}
+
+export function cancelAppointmentWithWriteVerification(id, authUser, audit) {
+    return executeAppointmentWriteWithReceipt(
+        (session) => cancelAppointment(id, authUser, { session }),
+        { ...audit, operation: "DELETE" }
+    );
+}
+
+export function updateAppointmentStatusWithWriteVerification(id, status, authUser, audit) {
+    return executeAppointmentWriteWithReceipt(
+        (session) => updateAppointmentStatus(id, status, authUser, { session }),
+        { ...audit, operation: "UPDATE" }
+    );
+}
+
+export function updateAppointmentScheduleWithWriteVerification(id, schedule, authUser, audit) {
+    return executeAppointmentWriteWithReceipt(
+        (session) => updateAppointmentSchedule(id, schedule, authUser, { session }),
+        { ...audit, operation: "UPDATE" }
+    );
 }
 
 /* ------------------------------------------------------------------ */
 /* Available slots                                                     */
 /* ------------------------------------------------------------------ */
 
-const WORK_START_HOUR = 8;
-const WORK_END_HOUR = 17;
-const SLOT_STEP_MINUTES = 15;
 function formatTime(date) {
     return `${date
         .getHours()
@@ -394,18 +585,8 @@ function formatTime(date) {
         .padStart(2, "0")}`;
 }
 
-function generateDailySlots() {
-    const slots = [];
-    for (let h = WORK_START_HOUR; h < WORK_END_HOUR; h++) {
-        for (let m = 0; m < 60; m += SLOT_STEP_MINUTES) {
-            slots.push(
-                `${h.toString().padStart(2, "0")}:${m
-                    .toString()
-                    .padStart(2, "0")}`
-            );
-        }
-    }
-    return slots;
+function isQuarterHourTime(value) {
+    return /^([01]\d|2[0-3]):(00|15|30|45)$/.test(value || "");
 }
 
 async function getSpecialistAvailableTimes(specialist, date) {
@@ -437,7 +618,25 @@ async function getSpecialistAvailableTimes(specialist, date) {
     return availableTimes;
 }
 
-export async function getAvailableSlots(specialist, date) {
+export async function getAvailableSlots(
+    specialist,
+    date,
+    { patient = null, excludeAppointmentId = null, authUser = null } = {}
+) {
+    const schedule = await getAvailableSlotSchedule(specialist, date, {
+        patient,
+        excludeAppointmentId,
+        authUser,
+    });
+
+    return schedule.slots;
+}
+
+export async function getAvailableSlotSchedule(
+    specialist,
+    date,
+    { patient = null, excludeAppointmentId = null, authUser = null } = {}
+) {
     if (!specialist || !date) {
         throw {
             code: "INVALID_INPUT",
@@ -453,34 +652,110 @@ export async function getAvailableSlots(specialist, date) {
         };
     }
 
-    const allSlots = generateDailySlots();
+    const today = new Date();
+    const targetDate = new Date(`${date}T00:00`);
+
+    if (targetDate < new Date(today.toDateString())) {
+        return {
+            slots: [],
+            existingAppointmentTimes: [],
+            maximumAppointmentsReached: false,
+        };
+    }
+
+    const now = new Date();
+
+    let latestPatientTime = null;
+    let existingAppointmentTimes = [];
+    if (patient) {
+        if (!mongoose.Types.ObjectId.isValid(patient)) {
+            if (authUser) {
+                throw {
+                    code: "INVALID_INPUT",
+                    message: "Identifiant patient invalide.",
+                };
+            }
+        } else if (authUser) {
+            const patientExists = await Patient.exists({
+                _id: patient,
+                ...buildOwnerScope(authUser),
+            });
+
+            if (!patientExists) {
+                throw {
+                    code: "INVALID_INPUT",
+                    message: "Patient introuvable.",
+                };
+            }
+        }
+
+        if (mongoose.Types.ObjectId.isValid(patient)) {
+            const patientAppointmentsQuery = {
+                patient,
+                specialist,
+                date,
+                status: "scheduled",
+            };
+            if (excludeAppointmentId) {
+                patientAppointmentsQuery._id = { $ne: excludeAppointmentId };
+            }
+
+            const patientAppointments = await Appointment.find(
+                patientAppointmentsQuery,
+                { time: 1, _id: 0 }
+            ).lean();
+
+            existingAppointmentTimes = patientAppointments
+                .map((appointment) => appointment.time)
+                .sort();
+
+            latestPatientTime = existingAppointmentTimes.reduce(
+                (latest, appointment) =>
+                    !latest || appointment > latest
+                        ? appointment
+                        : latest,
+                null
+            );
+        }
+    }
+
+    const maximumAppointmentsReached = existingAppointmentTimes.length >= 2;
+    if (maximumAppointmentsReached) {
+        return {
+            slots: [],
+            existingAppointmentTimes,
+            maximumAppointmentsReached,
+        };
+    }
+
     const specialistTimes = await getSpecialistAvailableTimes(
         specialist,
         date
     );
     if (specialistTimes.size === 0) {
-        return [];
+        return {
+            slots: [],
+            existingAppointmentTimes,
+            maximumAppointmentsReached,
+        };
+    }
+
+    const bookedQuery = { specialist, date, status: "scheduled" };
+    if (excludeAppointmentId) {
+        bookedQuery._id = { $ne: excludeAppointmentId };
     }
 
     const booked = await Appointment.find(
-        { specialist, date, status: "scheduled" },
+        bookedQuery,
         { time: 1, _id: 0 }
     ).lean();
 
     const bookedTimes = new Set(booked.map((a) => a.time));
 
-    const today = new Date();
-    const targetDate = new Date(`${date}T00:00`);
-
-    if (targetDate < new Date(today.toDateString())) return [];
-
-    const now = new Date();
-
-    return allSlots.filter((slot) => {
-        if (specialistTimes.size > 0 && !specialistTimes.has(slot)) {
-            return false;
-        }
+    const slots = [...specialistTimes].sort().filter((slot) => {
         if (bookedTimes.has(slot)) return false;
+
+        if (latestPatientTime && slot <= latestPatientTime) return false;
 
         if (targetDate.toDateString() === now.toDateString()) {
             const slotDate = new Date(`${date}T${slot}`);
@@ -489,6 +764,12 @@ export async function getAvailableSlots(specialist, date) {
 
         return true;
     });
+
+    return {
+        slots,
+        existingAppointmentTimes,
+        maximumAppointmentsReached,
+    };
 }
 
 export async function listAppointmentsPaginated({

@@ -278,6 +278,7 @@ Commandes CRUD simples:
 ```bash
 VERBOSE=0 ./scripts/run-staging-patient-write-drill.sh
 VERBOSE=0 ./scripts/run-staging-appointment-write-drill.sh
+./scripts/run-staging-appointment-race-drill.sh
 VERBOSE=0 ./scripts/run-staging-diagnosis-result-write-drill.sh
 VERBOSE=0 ./scripts/run-staging-clinician-comment-write-drill.sh
 VERBOSE=0 ./scripts/run-staging-specialist-write-drill.sh
