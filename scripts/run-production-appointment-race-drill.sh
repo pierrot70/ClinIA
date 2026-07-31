@@ -3,7 +3,7 @@
 # Proves through the public API that concurrent appointments cannot book the
 # same patient at the same instant. It creates only synthetic fixtures and
 # removes them on exit; audit receipts are intentionally retained.
-set -euo pipefail
+set -Eeuo pipefail
 
 BACKEND_CONTAINER_PREFIX="${BACKEND_CONTAINER_PREFIX:-backend-}"
 BACKEND_CONTAINER_EXCLUDE_PREFIX="${BACKEND_CONTAINER_EXCLUDE_PREFIX:-backend-replica-}"
@@ -37,6 +37,13 @@ info() {
 warn() {
   printf 'WARN %s\n' "$*" >&2
 }
+
+report_unexpected_error() {
+  local status="$1" line="$2" function_name="$3"
+  warn "production_appointment_race_drill_error status=$status line=$line function=$function_name"
+}
+
+trap 'report_unexpected_error "$?" "$LINENO" "${FUNCNAME[0]:-main}"' ERR
 
 fail() {
   printf 'ERROR %s\n' "$*" >&2
