@@ -77,7 +77,10 @@ load_mongo_password() {
 find_primary_mongo_container() {
   local container
   while IFS= read -r container; do
-    if docker exec -e MONGO_PASSWORD="$MONGO_PASSWORD" "$container" \
+    if docker exec \
+      -e MONGO_PASSWORD="$MONGO_PASSWORD" \
+      -e MONGO_ROOT_USERNAME="$MONGO_ROOT_USERNAME" \
+      "$container" \
       sh -c 'mongosh --quiet \
         --username "$MONGO_ROOT_USERNAME" \
         --password="$MONGO_PASSWORD" \
