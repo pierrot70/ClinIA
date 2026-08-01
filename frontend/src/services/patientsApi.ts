@@ -52,8 +52,8 @@ export interface Patient {
     archivedByUserId?: string | null;
     texto?: boolean;
     language?: PatientLanguage | "sp";
-    lat?: number;
-    long?: number;
+    lat?: number | null;
+    long?: number | null;
     documents?: PatientDocument[];
     secure_request_profile?: {
         objective?: string;
@@ -130,8 +130,8 @@ export interface PatientPayload {
     created_by_reference?: string;
     texto?: boolean;
     language?: PatientLanguage;
-    lat?: number;
-    long?: number;
+    lat?: number | null;
+    long?: number | null;
     secure_request_profile?: {
         objective?: string;
         sex?: string;

@@ -1121,6 +1121,7 @@ export const UI_LABELS_FR = {
             loading: "Recherche...",
             submit: "Rechercher",
             empty: "Aucun de vos patients ne correspond à cette recherche.",
+            selected: "Patient sélectionné : {name}. Choisissez ensuite une clinique.",
         },
         specialist: {
             loading: "Chargement des spécialistes...",
@@ -1157,6 +1158,16 @@ export const UI_LABELS_FR = {
             submit: "Créer le rendez-vous",
             success: "Rendez-vous créé avec succès.",
             failure: "Le rendez-vous n'a pas été sauvegardé.",
+        },
+    },
+    appointmentsList: {
+        filters: {
+            allClinics: "Toutes les cliniques",
+        },
+        table: {
+            clinic: "Clinique",
+            sortDateAscending: "Trier par date et heure : du plus tôt au plus tard",
+            sortDateDescending: "Trier par date et heure : du plus tard au plus tôt",
         },
     },
     // PatientsPage.tsx - page /patients, création et recherche de patients.

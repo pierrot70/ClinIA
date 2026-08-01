@@ -8,6 +8,78 @@ import {
     normalizePatientCountry,
 } from "../utils/patientSearchKeys.js";
 
+const PATIENT_FIELD_LIMITS = Object.freeze({
+    nom: 100,
+    prenom: 100,
+    addresse: 255,
+    telephone: 32,
+    courriel: 254,
+});
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
+const PHONE_ALLOWED_CHARACTERS_PATTERN = /^\+?[\d().\s-]+$/u;
+
+function invalidInput(message) {
+    return { code: "INVALID_INPUT", message };
+}
+
+function normalizeBoundedString(value, field, fallback = "") {
+    if (value === undefined) return fallback;
+
+    if (typeof value !== "string") {
+        throw invalidInput(`Le champ ${field} doit être du texte.`);
+    }
+
+    const normalized = value.trim();
+    if (normalized.length > PATIENT_FIELD_LIMITS[field]) {
+        throw invalidInput(
+            `Le champ ${field} ne peut pas dépasser ${PATIENT_FIELD_LIMITS[field]} caractères.`
+        );
+    }
+
+    return normalized;
+}
+
+function normalizeTelephone(value) {
+    const telephone = normalizeBoundedString(value, "telephone", undefined);
+    if (telephone === undefined || telephone === "") return undefined;
+
+    const digitCount = (telephone.match(/\d/g) ?? []).length;
+    if (
+        !PHONE_ALLOWED_CHARACTERS_PATTERN.test(telephone) ||
+        digitCount < 7 ||
+        digitCount > 15
+    ) {
+        throw invalidInput("Le numéro de téléphone est invalide.");
+    }
+
+    return telephone;
+}
+
+function normalizeEmail(value) {
+    const courriel = normalizeBoundedString(value, "courriel", "");
+    if (courriel && !EMAIL_PATTERN.test(courriel)) {
+        throw invalidInput("L'adresse courriel est invalide.");
+    }
+
+    return courriel;
+}
+
+function normalizeCoordinate(value, field, minimum, maximum) {
+    if (value === undefined || value === null) return value;
+
+    if (
+        typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        value < minimum ||
+        value > maximum
+    ) {
+        throw invalidInput(`La coordonnée ${field} est invalide.`);
+    }
+
+    return value;
+}
+
 function normalizeBoolean(value) {
     if (typeof value === "boolean") return value;
     if (typeof value === "string") {
@@ -137,11 +209,10 @@ function normalizeSecureRequestProfile(value) {
  * - applique les defaults
  * - garantit une forme stable pour la couche service
  */
-export function toCreatePatientDTO(body) {
-    const telephoneRaw = body.telephone?.trim();
+export function toCreatePatientDTO(body = {}) {
     return {
-        nom: body.nom?.trim(),
-        prenom: body.prenom?.trim(),
+        nom: normalizeBoundedString(body.nom, "nom", undefined),
+        prenom: normalizeBoundedString(body.prenom, "prenom", undefined),
         num_assurance_maladie:
             body.num_assurance_maladie?.trim(),
         country: normalizePatientCountry(body.country),
@@ -150,30 +221,28 @@ export function toCreatePatientDTO(body) {
             body.num_assurance_maladie,
             "UNKNOWN"
         ),
-        addresse: body.addresse?.trim() ?? "",
-        telephone:
-            telephoneRaw && telephoneRaw.length > 0
-                ? telephoneRaw
-                : undefined,
-        courriel: body.courriel?.trim() ?? "",
+        addresse: normalizeBoundedString(body.addresse, "addresse"),
+        telephone: normalizeTelephone(body.telephone),
+        courriel: normalizeEmail(body.courriel),
         created_by_reference:
             body.created_by_reference?.trim() ?? "",
         texto: normalizeBoolean(body.texto),
         language: normalizePatientLanguage(body.language, "fr"),
-        lat: typeof body.lat === "number" ? body.lat : undefined,
-        long: typeof body.long === "number" ? body.long : undefined,
+        lat: normalizeCoordinate(body.lat, "latitude", -90, 90),
+        long: normalizeCoordinate(body.long, "longitude", -180, 180),
         secure_request_profile: normalizeSecureRequestProfile(
             body.secure_request_profile
         ),
     };
 }
 
-export function toUpdatePatientDTO(body) {
+export function toUpdatePatientDTO(body = {}) {
     const dto = {};
 
-    if (body.nom !== undefined) dto.nom = body.nom?.trim();
+    if (body.nom !== undefined)
+        dto.nom = normalizeBoundedString(body.nom, "nom", undefined);
     if (body.prenom !== undefined)
-        dto.prenom = body.prenom?.trim();
+        dto.prenom = normalizeBoundedString(body.prenom, "prenom", undefined);
     if (body.num_assurance_maladie !== undefined)
         dto.num_assurance_maladie =
             body.num_assurance_maladie?.trim();
@@ -189,15 +258,15 @@ export function toUpdatePatientDTO(body) {
             );
     }
     if (body.addresse !== undefined)
-        dto.addresse = body.addresse?.trim() ?? "";
+        dto.addresse = normalizeBoundedString(body.addresse, "addresse");
     if (body.telephone !== undefined) {
-        const tel = body.telephone?.trim();
+        const tel = normalizeTelephone(body.telephone);
         if (tel && tel.length > 0) {
             dto.telephone = tel;
         }
     }
     if (body.courriel !== undefined)
-        dto.courriel = body.courriel?.trim() ?? "";
+        dto.courriel = normalizeEmail(body.courriel);
     if (body.created_by_reference !== undefined) {
         dto.created_by_reference =
             body.created_by_reference?.trim() ?? "";
@@ -207,11 +276,9 @@ export function toUpdatePatientDTO(body) {
     if (body.language !== undefined)
         dto.language = normalizePatientLanguage(body.language, "fr");
     if (body.lat !== undefined)
-        dto.lat =
-            typeof body.lat === "number" ? body.lat : undefined;
+        dto.lat = normalizeCoordinate(body.lat, "latitude", -90, 90);
     if (body.long !== undefined)
-        dto.long =
-            typeof body.long === "number" ? body.long : undefined;
+        dto.long = normalizeCoordinate(body.long, "longitude", -180, 180);
     if (body.secure_request_profile !== undefined) {
         dto.secure_request_profile = normalizeSecureRequestProfile(
             body.secure_request_profile

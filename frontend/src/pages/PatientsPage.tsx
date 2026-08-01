@@ -384,14 +384,14 @@ export function PatientsPage() {
         }
         if (values.lat.trim()) {
             const latValue = Number(values.lat.trim());
-            if (!Number.isFinite(latValue)) {
+            if (!Number.isFinite(latValue) || latValue < -90 || latValue > 90) {
                 throw new Error(ui.invalidLatitude);
             }
             payload.lat = latValue;
         }
         if (values.long.trim()) {
             const longValue = Number(values.long.trim());
-            if (!Number.isFinite(longValue)) {
+            if (!Number.isFinite(longValue) || longValue < -180 || longValue > 180) {
                 throw new Error(ui.invalidLongitude);
             }
             payload.long = longValue;
@@ -878,6 +878,11 @@ export function PatientsPage() {
                         />
                         <input
                             className="border rounded p-2"
+                            type="number"
+                            min={-90}
+                            max={90}
+                            step="any"
+                            inputMode="decimal"
                             placeholder={ui.latitudePlaceholder}
                             value={form.lat}
                             onChange={(e) =>
@@ -889,6 +894,11 @@ export function PatientsPage() {
                         />
                         <input
                             className="border rounded p-2"
+                            type="number"
+                            min={-180}
+                            max={180}
+                            step="any"
+                            inputMode="decimal"
                             placeholder={ui.longitudePlaceholder}
                             value={form.long}
                             onChange={(e) =>

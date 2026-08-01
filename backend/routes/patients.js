@@ -215,7 +215,17 @@ router.post("/", async (req, res) => {
     if (rejectOutOfBoundsClinicalProfile(res, req.body?.secure_request_profile)) {
         return;
     }
-    const dto = toCreatePatientDTO(req.body);
+    let dto;
+    try {
+        dto = toCreatePatientDTO(req.body);
+    } catch (err) {
+        if (err.code === "INVALID_INPUT") {
+            return res.status(400).json({
+                error: { code: err.code, message: err.message, retryable: false },
+            });
+        }
+        throw err;
+    }
 
     if (!dto.nom || !dto.prenom) {
         return res.status(400).json({
@@ -585,7 +595,17 @@ router.patch("/:id", async (req, res) => {
     if (rejectOutOfBoundsClinicalProfile(res, req.body?.secure_request_profile)) {
         return;
     }
-    const dto = toUpdatePatientDTO(req.body);
+    let dto;
+    try {
+        dto = toUpdatePatientDTO(req.body);
+    } catch (err) {
+        if (err.code === "INVALID_INPUT") {
+            return res.status(400).json({
+                error: { code: err.code, message: err.message, retryable: false },
+            });
+        }
+        throw err;
+    }
 
     if (Object.keys(dto).length === 0) {
         return res.status(400).json({

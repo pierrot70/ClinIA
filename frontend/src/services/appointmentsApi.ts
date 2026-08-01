@@ -10,6 +10,7 @@ import { authFetch } from "./authService";
 export interface Appointment {
     _id: string;
     patient?: string;
+    patientName?: string | null;
     patientInsuranceNumber?: string;
     specialist: string;
     clinique?: string | null;
@@ -25,6 +26,8 @@ export type AppointmentStatus =
     | "scheduled"
     | "cancelled"
     | "completed";
+
+export type AppointmentSortDirection = "asc" | "desc";
 
 export interface PaginatedAppointments {
     data: Appointment[];
@@ -81,8 +84,10 @@ export async function fetchAppointmentsPaginated(
         page: number;
         limit: number;
         specialist?: string;
+        clinique?: string;
         status?: AppointmentStatus;
         patientInsuranceNumber?: string;
+        sortDirection?: AppointmentSortDirection;
     }
 ): Promise<ApiResponse<PaginatedAppointments>> {
     const query = new URLSearchParams();
@@ -93,6 +98,9 @@ export async function fetchAppointmentsPaginated(
     if (params.specialist) {
         query.set("specialist", params.specialist);
     }
+    if (params.clinique) {
+        query.set("clinique", params.clinique);
+    }
     if (params.status) {
         query.set("status", params.status);
     }
@@ -101,6 +109,9 @@ export async function fetchAppointmentsPaginated(
             "patientInsuranceNumber",
             params.patientInsuranceNumber
         );
+    }
+    if (params.sortDirection) {
+        query.set("sortDirection", params.sortDirection);
     }
 
     return withSecurityIncidentGuard(

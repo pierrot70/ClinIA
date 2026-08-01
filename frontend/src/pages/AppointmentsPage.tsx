@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { labels } from "../i18n/uiLabels";
 import { useTranslation } from "../hooks/useTranslation";
@@ -12,6 +12,7 @@ import {
     type Clinique,
 } from "../services/cliniqueApi";
 import {
+    fetchPatientById,
     fetchPatientsPaginated,
     type Patient,
 } from "../services/patientsApi";
@@ -26,6 +27,10 @@ import {
     formatWriteVerificationMessage,
     WriteVerificationReceipt,
 } from "../components/system/WriteVerificationReceipt";
+import {
+    calculateDistanceKm,
+    sortByDistance,
+} from "../utils/geography";
 
 function toLocalDateKey(value: string): string | null {
     const parsed = new Date(value);
@@ -51,6 +56,7 @@ function useAppointmentsPageLabels(targetLang: string) {
     const { translated: patientSearchLoading } = useTranslation({ text: source.patientSearch.loading, ...options });
     const { translated: patientSearchSubmit } = useTranslation({ text: source.patientSearch.submit, ...options });
     const { translated: patientSearchEmpty } = useTranslation({ text: source.patientSearch.empty, ...options });
+    const { translated: patientSearchSelected } = useTranslation({ text: source.patientSearch.selected, ...options });
     const { translated: specialistsLoading } = useTranslation({ text: source.specialist.loading, ...options });
     const { translated: chooseSpecialist } = useTranslation({ text: source.specialist.choose, ...options });
     const { translated: noSpecialist } = useTranslation({ text: source.specialist.none, ...options });
@@ -83,6 +89,7 @@ function useAppointmentsPageLabels(targetLang: string) {
         patientSearchLoading,
         patientSearchSubmit,
         patientSearchEmpty,
+        patientSearchSelected,
         specialistsLoading,
         chooseSpecialist,
         noSpecialist,
@@ -113,6 +120,7 @@ export function AppointmentsPage() {
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
     const ui = useAppointmentsPageLabels(targetLang);
+    const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const [insuranceNumber, setInsuranceNumber] = useState("");
     const [patientId, setPatientId] = useState("");
@@ -362,6 +370,39 @@ export function AppointmentsPage() {
         );
     }, [clinique, specialists]);
 
+    const sortedCliniques = useMemo(
+        () => sortByDistance(selectedPatient ?? {}, cliniques),
+        [cliniques, selectedPatient]
+    );
+
+    function formatDistance(distance: number): string {
+        return `${new Intl.NumberFormat(targetLang, {
+            maximumFractionDigits: 1,
+        }).format(distance)} km`;
+    }
+
+    async function handlePatientSelection(patient: Patient) {
+        setPatientsError(null);
+
+        const response = await fetchPatientById(patient._id);
+        if ("error" in response) {
+            setPatientsError(response.error);
+            return;
+        }
+
+        const selected = response.data;
+        setPatientId(selected._id);
+        setSelectedPatient(selected);
+        setInsuranceNumber(selected.num_assurance_maladie);
+        setClinique("");
+        setSpecialist("");
+        setTime("");
+        setAvailableSlots([]);
+        setExistingAppointmentTimes([]);
+        setMaximumAppointmentsReached(false);
+        setApiError(null);
+    }
+
     useEffect(() => {
         if (!clinique || !specialist) return;
         const stillValid = filteredSpecialists.some(
@@ -512,13 +553,8 @@ export function AppointmentsPage() {
 
         setLastWriteVerification(response.meta.writeVerification ?? null);
         setSuccess(true);
-        const refreshedSlots = await refreshSlots();
-
-        if (!refreshedSlots.includes(time)) {
-            setTime("");
-        }
-
         setLoading(false);
+        navigate("/appointments/list");
     }
 
     /* ------------------------------------------------------------------ */
@@ -620,13 +656,14 @@ export function AppointmentsPage() {
                             key={p._id}
                             type="button"
                             onClick={() => {
-                                setPatientId(p._id);
-                                setSelectedPatient(p);
-                                setInsuranceNumber(
-                                    p.num_assurance_maladie
-                                );
+                                void handlePatientSelection(p);
                             }}
-                            className="text-left border rounded p-2 hover:bg-gray-100"
+                            aria-pressed={selectedPatient?._id === p._id}
+                            className={`text-left border rounded p-2 hover:bg-gray-100 ${
+                                selectedPatient?._id === p._id
+                                    ? "border-primary bg-blue-50"
+                                    : ""
+                            }`}
                         >
                                     <div className="text-sm font-medium">
                                         {p.prenom} {p.nom}
@@ -643,6 +680,15 @@ export function AppointmentsPage() {
                             ))}
                         </div>
                     )}
+
+                    {selectedPatient && (
+                        <div className="rounded border border-blue-200 bg-blue-50 p-2 text-sm text-blue-900">
+                            {ui.patientSearchSelected.replace(
+                                "{name}",
+                                `${selectedPatient.prenom} ${selectedPatient.nom}`.trim()
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <select
@@ -656,14 +702,18 @@ export function AppointmentsPage() {
                             ? ui.cliniquesLoading
                             : ui.chooseClinique}
                     </option>
-                    {cliniques
-                        .slice()
-                        .sort((a, b) => a.nom.localeCompare(b.nom, "fr"))
-                        .map((item) => (
+                    {sortedCliniques.map((item) => {
+                        const distance = selectedPatient
+                            ? calculateDistanceKm(selectedPatient, item)
+                            : null;
+                        return (
                             <option key={item._id} value={item._id}>
-                                {item.nom}
+                                {distance === null
+                                    ? item.nom
+                                    : `${item.nom} — ${formatDistance(distance)}`}
                             </option>
-                        ))}
+                        );
+                    })}
                 </select>
                 {!cliniquesLoading && cliniques.length === 0 && (
                     <div className="text-xs text-gray-500">

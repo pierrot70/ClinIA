@@ -145,6 +145,29 @@ describe("patient routes atomic write receipts", () => {
         expect(services.createPatientWithWriteVerification).not.toHaveBeenCalled();
     });
 
+    it("returns invalid demographic DTO input as a client error before creating a patient", async () => {
+        const handler = getRouteHandler("post", "/");
+        dto.toCreatePatientDTO.mockImplementation(() => {
+            throw {
+                code: "INVALID_INPUT",
+                message: "Le numéro de téléphone est invalide.",
+            };
+        });
+        const res = makeRes();
+
+        await handler(request({ body: { nom: "Lasante", prenom: "Pierre" } }), res);
+
+        expect(services.createPatientWithWriteVerification).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "INVALID_INPUT",
+                message: "Le numéro de téléphone est invalide.",
+                retryable: false,
+            },
+        });
+    });
+
     it("rejects an oversized clinical note before creating a patient", async () => {
         const handler = getRouteHandler("post", "/");
         const res = makeRes();

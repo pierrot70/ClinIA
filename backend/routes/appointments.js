@@ -193,6 +193,19 @@ router.get("/", async (req, res) => {
 
     const filters = {};
 
+    if (req.query.sortDirection !== undefined) {
+        if (!["asc", "desc"].includes(req.query.sortDirection)) {
+            return res.status(400).json({
+                error: {
+                    code: "INVALID_INPUT",
+                    message: "Ordre de tri invalide.",
+                    retryable: false,
+                },
+            });
+        }
+        filters.sortDirection = req.query.sortDirection;
+    }
+
     if (req.query.specialist) {
         if (!mongoose.Types.ObjectId.isValid(req.query.specialist)) {
             return res.status(400).json({
@@ -204,6 +217,18 @@ router.get("/", async (req, res) => {
             });
         }
         filters.specialist = req.query.specialist;
+    }
+    if (req.query.clinique) {
+        if (!mongoose.Types.ObjectId.isValid(req.query.clinique)) {
+            return res.status(400).json({
+                error: {
+                    code: "INVALID_INPUT",
+                    message: "Identifiant de clinique invalide.",
+                    retryable: false,
+                },
+            });
+        }
+        filters.clinique = req.query.clinique;
     }
     if (req.query.status) {
         filters.status = req.query.status;

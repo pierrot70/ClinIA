@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
     createAppointmentWithWriteVerification,
     getAvailableSlotSchedule,
+    listAppointmentsPaginated,
     updateAppointmentStatusWithWriteVerification,
 } = vi.hoisted(() => ({
     createAppointmentWithWriteVerification: vi.fn(),
     getAvailableSlotSchedule: vi.fn(),
+    listAppointmentsPaginated: vi.fn(),
     updateAppointmentStatusWithWriteVerification: vi.fn(),
 }));
 
@@ -25,7 +27,7 @@ vi.mock("../../services/appointments.js", () => ({
     cancelAppointmentWithWriteVerification: vi.fn(),
     updateAppointmentStatusWithWriteVerification,
     updateAppointmentScheduleWithWriteVerification: vi.fn(),
-    listAppointmentsPaginated: vi.fn(),
+    listAppointmentsPaginated,
 }));
 
 vi.mock("../../dto/appointment.dto.js", () => ({
@@ -113,6 +115,31 @@ describe("appointments routes write verification", () => {
                 }),
             })
         );
+    });
+
+    it("filters the appointment list by a validated clinic identifier", async () => {
+        const handler = getRouteHandler("get", "/");
+        const clinique = "507f1f77bcf86cd799439021";
+        const req = {
+            query: { clinique, page: "2", limit: "10", sortDirection: "desc" },
+            auth: { userId: "doctor-1", role: "MEDECIN" },
+        };
+        const res = makeRes();
+        listAppointmentsPaginated.mockResolvedValue({
+            data: [],
+            meta: { page: 2, limit: 10, total: 0, totalPages: 0 },
+        });
+
+        await handler(req, res);
+
+        expect(listAppointmentsPaginated).toHaveBeenCalledWith({
+            clinique,
+            page: 2,
+            limit: 10,
+            sortDirection: "desc",
+            authUser: req.auth,
+        });
+        expect(res.status).toHaveBeenCalledWith(200);
     });
 
     it("returns a write verification receipt on appointment creation", async () => {

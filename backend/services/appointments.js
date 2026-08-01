@@ -776,30 +776,61 @@ export async function listAppointmentsPaginated({
                                                     page = 1,
                                                     limit = 20,
                                                     specialist,
+                                                    clinique,
                                                     status,
                                                     patientInsuranceNumber,
+                                                    sortDirection = "asc",
                                                     authUser,
                                                 }) {
     const query = buildOwnerScope(authUser);
 
     if (specialist) query.specialist = specialist;
+    if (clinique) query.clinique = clinique;
     if (status) query.status = status;
     if (patientInsuranceNumber)
         query.patientInsuranceNumber = patientInsuranceNumber;
+
+    const sortOrder = sortDirection === "desc" ? -1 : 1;
 
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
         Appointment.find(query)
-            .sort({ date: 1, time: 1 })
+            .sort({ date: sortOrder, time: sortOrder })
             .skip(skip)
             .limit(limit)
             .lean(),
         Appointment.countDocuments(query),
     ]);
 
+    const patientIds = Array.from(
+        new Set(
+            data
+                .map((appointment) => appointment.patient)
+                .filter(Boolean)
+                .map((patientId) => String(patientId))
+        )
+    );
+    const patients = patientIds.length
+        ? await Patient.find({
+            _id: { $in: patientIds },
+            ...buildOwnerScope(authUser),
+        })
+            .select("_id nom prenom")
+            .lean()
+        : [];
+    const patientNames = new Map(
+        patients.map((patient) => [
+            String(patient._id),
+            `${patient.prenom || ""} ${patient.nom || ""}`.trim() || null,
+        ])
+    );
+
     return {
-        data,
+        data: data.map((appointment) => ({
+            ...appointment,
+            patientName: patientNames.get(String(appointment.patient)) || null,
+        })),
         meta: {
             page,
             limit,

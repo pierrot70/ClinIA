@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const findOne = vi.fn();
 const find = vi.fn();
+const countDocuments = vi.fn();
 const appointmentSave = vi.fn();
 const bookingGuardFindOneAndUpdate = vi.fn();
 const bookingGuardUpdateOne = vi.fn();
 const patientFindOne = vi.fn();
+const patientFind = vi.fn();
 const specialistFindById = vi.fn();
 const cliniqueExists = vi.fn();
 const recordWriteOperationAuditEvent = vi.fn();
@@ -23,6 +25,7 @@ vi.mock("../../models/Appointment.js", () => {
 
     Appointment.findOne = findOne;
     Appointment.find = find;
+    Appointment.countDocuments = countDocuments;
 
     return { Appointment };
 });
@@ -35,7 +38,7 @@ vi.mock("../../models/AppointmentBookingGuard.js", () => ({
 }));
 
 vi.mock("../../models/Patient.js", () => ({
-    Patient: { findOne: patientFindOne },
+    Patient: { findOne: patientFindOne, find: patientFind },
 }));
 
 vi.mock("../../models/Specialist.js", () => ({
@@ -56,6 +59,7 @@ const {
     createAppointment,
     getAvailableSlotSchedule,
     getAvailableSlots,
+    listAppointmentsPaginated,
     updateAppointmentSchedule,
     updateAppointmentStatus,
 } = await import("../appointments.js");
@@ -88,6 +92,44 @@ describe("appointments service", () => {
         userId: "507f1f77bcf86cd799439099",
         role: "MEDECIN",
     };
+
+    it("returns only the current page's patient display names", async () => {
+        const appointment = {
+            _id: "appointment-1",
+            patient: "507f1f77bcf86cd799439012",
+            date: "2099-01-01",
+            time: "10:00",
+        };
+        const appointmentQuery = {
+            sort: vi.fn().mockReturnThis(),
+            skip: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockReturnThis(),
+            lean: vi.fn().mockResolvedValue([appointment]),
+        };
+        find.mockReturnValue(appointmentQuery);
+        countDocuments.mockResolvedValue(1);
+        patientFind.mockReturnValue({
+            select: vi.fn().mockReturnValue({
+                lean: vi.fn().mockResolvedValue([
+                    { _id: appointment.patient, prenom: "Bailey", nom: "Spenard" },
+                ]),
+            }),
+        });
+
+        await expect(listAppointmentsPaginated({
+            page: 1,
+            limit: 10,
+            authUser,
+        })).resolves.toMatchObject({
+            data: [{ _id: "appointment-1", patientName: "Bailey Spenard" }],
+        });
+
+        expect(patientFind).toHaveBeenCalledWith({
+            _id: { $in: [appointment.patient] },
+            ownerUserId: authUser.userId,
+        });
+        expect(appointmentQuery.sort).toHaveBeenCalledWith({ date: 1, time: 1 });
+    });
 
     it("exposes the specialist's configured evening slots", async () => {
         const specialistId = "507f1f77bcf86cd799439021";

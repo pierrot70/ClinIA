@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
     fetchAppointmentsPaginated,
@@ -7,16 +7,17 @@ import {
     updateAppointmentSchedule,
     updateAppointmentStatus,
     type Appointment,
+    type AppointmentSortDirection,
     type AppointmentStatus,
 } from "../services/appointmentsApi";
-import {
-    fetchPatientsPaginated,
-    type Patient,
-} from "../services/patientsApi";
 import {
     fetchSpecialistsPaginated,
     type Specialist,
 } from "../services/specialistsApi";
+import {
+    fetchCliniquesPaginated,
+    type Clinique,
+} from "../services/cliniqueApi";
 import type { ApiError } from "../types/api";
 import type { WriteVerificationMeta } from "../types/api";
 import {
@@ -25,6 +26,8 @@ import {
 } from "../components/system/WriteVerificationReceipt";
 import { labels } from "../i18n/uiLabels";
 import { logSafeClientError } from "../utils/safeClientLog";
+import { HomeI18nContext } from "../contexts/HomeI18nContext";
+import { useTranslation } from "../hooks/useTranslation";
 
 /* ------------------------------------------------------------------ */
 /* Hook debounce                                                       */
@@ -46,12 +49,33 @@ function useDebounce<T>(value: T, delay = 300): T {
 /* ------------------------------------------------------------------ */
 
 export function AppointmentsListPage() {
+    const i18n = useContext(HomeI18nContext) || { locale: "fr" };
+    const translationOptions = {
+        targetLang: i18n.locale,
+        namespace: "appointments-list",
+    };
+    const { translated: allClinics } = useTranslation({
+        text: labels.appointmentsList.filters.allClinics,
+        ...translationOptions,
+    });
+    const { translated: clinicColumn } = useTranslation({
+        text: labels.appointmentsList.table.clinic,
+        ...translationOptions,
+    });
+    const { translated: sortDateAscending } = useTranslation({
+        text: labels.appointmentsList.table.sortDateAscending,
+        ...translationOptions,
+    });
+    const { translated: sortDateDescending } = useTranslation({
+        text: labels.appointmentsList.table.sortDateDescending,
+        ...translationOptions,
+    });
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const [busyIds, setBusyIds] = useState<Record<string, boolean>>({});
-    const [patients, setPatients] = useState<Patient[]>([]);
     const [specialists, setSpecialists] = useState<Specialist[]>([]);
+    const [cliniques, setCliniques] = useState<Clinique[]>([]);
 
     /* ---------------- Edition horaire ---------------- */
 
@@ -96,11 +120,14 @@ export function AppointmentsListPage() {
 
     const [ramq, setRamq] = useState("");
     const [specialist, setSpecialist] = useState("");
+    const [clinique, setClinique] = useState("");
     const [status, setStatus] = useState<AppointmentStatus | "">("");
+    const [sortDirection, setSortDirection] =
+        useState<AppointmentSortDirection>("asc");
 
     const rawFilters = useMemo(
-        () => ({ ramq, specialist, status }),
-        [ramq, specialist, status]
+        () => ({ ramq, specialist, clinique, status, sortDirection }),
+        [ramq, specialist, clinique, status, sortDirection]
     );
 
     const filters = useDebounce(rawFilters, 300);
@@ -115,36 +142,33 @@ export function AppointmentsListPage() {
     useEffect(() => {
         let cancelled = false;
 
-        async function loadAllPatients() {
+        async function loadAllCliniques() {
             const pageSize = 50;
             let currentPage = 1;
             let totalPages = 1;
-            const all: Patient[] = [];
+            const all: Clinique[] = [];
 
             while (currentPage <= totalPages) {
-                const response = await fetchPatientsPaginated({
+                const response = await fetchCliniquesPaginated({
                     page: currentPage,
                     limit: pageSize,
                 });
 
-                if ("error" in response) {
-                    break;
-                }
+                if ("error" in response) break;
 
                 all.push(...response.data.data);
-                totalPages = Math.max(
-                    response.data.meta.totalPages || 1,
-                    1
-                );
+                totalPages = Math.max(response.data.meta.totalPages || 1, 1);
                 currentPage += 1;
             }
 
             if (!cancelled) {
-                setPatients(all);
+                setCliniques(
+                    all.sort((a, b) => a.nom.localeCompare(b.nom, "fr"))
+                );
             }
         }
 
-        loadAllPatients();
+        void loadAllCliniques();
 
         return () => {
             cancelled = true;
@@ -246,7 +270,9 @@ export function AppointmentsListPage() {
             limit,
             patientInsuranceNumber: filters.ramq || undefined,
             specialist: filters.specialist || undefined,
+            clinique: filters.clinique || undefined,
             status: filters.status || undefined,
+            sortDirection: filters.sortDirection,
         });
 
         if ("error" in response) {
@@ -300,21 +326,10 @@ export function AppointmentsListPage() {
         return { byId, byNumero, bySpecialite };
     }, [specialists]);
 
-    const patientLookup = useMemo(() => {
-        const byId = new Map<string, Patient>();
-        const byRamq = new Map<string, Patient>();
-
-        patients.forEach((p) => {
-            if (p._id) {
-                byId.set(p._id, p);
-            }
-            if (p.num_assurance_maladie) {
-                byRamq.set(p.num_assurance_maladie, p);
-            }
-        });
-
-        return { byId, byRamq };
-    }, [patients]);
+    const cliniqueLookup = useMemo(
+        () => new Map(cliniques.map((item) => [item._id, item.nom])),
+        [cliniques]
+    );
 
     function resolveSpecialist(raw: string) {
         if (!raw) return null;
@@ -340,18 +355,12 @@ export function AppointmentsListPage() {
     }
 
     function formatPatientName(appointment: Appointment) {
-        const byId = appointment.patient
-            ? patientLookup.byId.get(appointment.patient)
-            : undefined;
-        const byRamq = appointment.patientInsuranceNumber
-            ? patientLookup.byRamq.get(
-                  appointment.patientInsuranceNumber
-              )
-            : undefined;
-        const patient = byId || byRamq;
-        if (!patient) return "—";
-        const label = `${patient.prenom} ${patient.nom}`.trim();
-        return label || "—";
+        return appointment.patientName || "—";
+    }
+
+    function formatCliniqueName(appointment: Appointment) {
+        if (!appointment.clinique) return "—";
+        return cliniqueLookup.get(appointment.clinique) || "—";
     }
 
     function normalizeSpecialties(value: unknown) {
@@ -548,7 +557,7 @@ export function AppointmentsListPage() {
 
             {/* ---------------- Filtres ---------------- */}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <input
                     className="border rounded p-2"
                     placeholder="RAMQ"
@@ -575,6 +584,22 @@ export function AppointmentsListPage() {
                                     ? ` — ${sp.specialite}`
                                     : ""
                             }`}
+                        </option>
+                    ))}
+                </select>
+
+                <select
+                    className="border rounded p-2"
+                    value={clinique}
+                    onChange={(e) => {
+                        setPage(1);
+                        setClinique(e.target.value);
+                    }}
+                >
+                    <option value="">{allClinics}</option>
+                    {cliniques.map((item) => (
+                        <option key={item._id} value={item._id}>
+                            {item.nom}
                         </option>
                     ))}
                 </select>
@@ -616,7 +641,26 @@ export function AppointmentsListPage() {
                             <th className="p-2">Patient</th>
                             <th className="p-2">Spécialiste</th>
                             <th className="p-2">Spécialités</th>
-                            <th className="p-2">Date</th>
+                            <th className="p-2">{clinicColumn}</th>
+                            <th className="p-2" aria-sort={sortDirection === "asc" ? "ascending" : "descending"}>
+                                <button
+                                    type="button"
+                                    className="font-semibold hover:underline"
+                                    onClick={() => {
+                                        setPage(1);
+                                        setSortDirection((current) =>
+                                            current === "asc" ? "desc" : "asc"
+                                        );
+                                    }}
+                                    title={
+                                        sortDirection === "asc"
+                                            ? sortDateDescending
+                                            : sortDateAscending
+                                    }
+                                >
+                                    Date {sortDirection === "asc" ? "↑" : "↓"}
+                                </button>
+                            </th>
                             <th className="p-2">Heure</th>
                             <th className="p-2">Statut</th>
                             <th className="p-2">Actions</th>
@@ -652,6 +696,9 @@ export function AppointmentsListPage() {
                                         resolvedSpecialist,
                                         ""
                                     )}
+                                </td>
+                                <td className="p-2">
+                                    {formatCliniqueName(a)}
                                 </td>
                                 <td className="p-2">
                                     {editingId === a._id ? (
