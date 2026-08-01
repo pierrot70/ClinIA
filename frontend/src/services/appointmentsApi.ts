@@ -57,6 +57,35 @@ export interface AvailableSlotSchedule {
     maximumAppointmentsReached: boolean;
 }
 
+export interface AppointmentRecommendation {
+    clinique: {
+        _id: string;
+        nom: string;
+        distanceKm: number;
+    };
+    specialist: {
+        _id: string;
+        nom: string;
+        prenom: string;
+        specialite?: string;
+    };
+    date: string;
+    time: string;
+    availableSlots: string[];
+    existingAppointmentTimes: string[];
+}
+
+export interface ManualAppointmentOptions {
+    cliniques: Array<{ _id: string; nom: string }>;
+    specialists: Array<{
+        _id: string;
+        nom: string;
+        prenom: string;
+        clinique_associer: string;
+        specialite: string;
+    }>;
+}
+
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
@@ -188,6 +217,60 @@ export async function fetchAvailableSlots(
                     error: {
                         code: "INTERNAL_ERROR",
                         message: "Impossible de récupérer les créneaux.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/* FETCH nearest available appointment recommendation                  */
+/* ------------------------------------------------------------------ */
+
+export async function fetchAppointmentRecommendation(
+    patient: string,
+    specialty: string
+): Promise<ApiResponse<AppointmentRecommendation | null>> {
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const query = new URLSearchParams({ patient, specialty });
+                const response = await authFetch(
+                    `${API_URL}/api/appointments/recommendation?${query.toString()}`
+                );
+                return (await safeJson(response)) as ApiResponse<AppointmentRecommendation | null>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de proposer un rendez-vous.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
+}
+
+export async function fetchManualAppointmentOptions(
+    specialty: string
+): Promise<ApiResponse<ManualAppointmentOptions>> {
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const query = new URLSearchParams({ specialty });
+                const response = await authFetch(
+                    `${API_URL}/api/appointments/manual-options?${query.toString()}`
+                );
+                return (await safeJson(response)) as ApiResponse<ManualAppointmentOptions>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message:
+                            "Impossible de récupérer les options d'attribution manuelle.",
                         retryable: true,
                     },
                 };

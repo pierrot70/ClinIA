@@ -1,25 +1,21 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { labels } from "../i18n/uiLabels";
 import { useTranslation } from "../hooks/useTranslation";
 import {
     createAppointment,
+    fetchAppointmentRecommendation,
     fetchAvailableSlots,
+    fetchManualAppointmentOptions,
+    type AppointmentRecommendation,
+    type ManualAppointmentOptions,
 } from "../services/appointmentsApi";
-import {
-    fetchCliniquesPaginated,
-    type Clinique,
-} from "../services/cliniqueApi";
 import {
     fetchPatientById,
     fetchPatientsPaginated,
     type Patient,
 } from "../services/patientsApi";
-import {
-    fetchSpecialistsPaginated,
-    type Specialist,
-} from "../services/specialistsApi";
 import type { ApiError } from "../types/api";
 import type { WriteVerificationMeta } from "../types/api";
 import { SaveFeedback } from "../components/system/SaveFeedback";
@@ -27,19 +23,7 @@ import {
     formatWriteVerificationMessage,
     WriteVerificationReceipt,
 } from "../components/system/WriteVerificationReceipt";
-import {
-    calculateDistanceKm,
-    sortByDistance,
-} from "../utils/geography";
-
-function toLocalDateKey(value: string): string | null {
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return null;
-
-    return `${parsed.getFullYear()}-${String(
-        parsed.getMonth() + 1
-    ).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
-}
+import { SPECIALTIES } from "../data/specialties";
 
 function useAppointmentsPageLabels(targetLang: string) {
     const source = labels.appointmentsPage;
@@ -57,13 +41,23 @@ function useAppointmentsPageLabels(targetLang: string) {
     const { translated: patientSearchSubmit } = useTranslation({ text: source.patientSearch.submit, ...options });
     const { translated: patientSearchEmpty } = useTranslation({ text: source.patientSearch.empty, ...options });
     const { translated: patientSearchSelected } = useTranslation({ text: source.patientSearch.selected, ...options });
-    const { translated: specialistsLoading } = useTranslation({ text: source.specialist.loading, ...options });
-    const { translated: chooseSpecialist } = useTranslation({ text: source.specialist.choose, ...options });
-    const { translated: noSpecialist } = useTranslation({ text: source.specialist.none, ...options });
     const { translated: selectPatient } = useTranslation({ text: source.specialist.selectPatient, ...options });
-    const { translated: cliniquesLoading } = useTranslation({ text: source.clinique.loading, ...options });
-    const { translated: chooseClinique } = useTranslation({ text: source.clinique.choose, ...options });
-    const { translated: noClinique } = useTranslation({ text: source.clinique.none, ...options });
+    const { translated: specialtyChoose } = useTranslation({ text: source.specialist.specialtyChoose, ...options });
+    const { translated: recommendationLoading } = useTranslation({ text: source.specialist.recommendationLoading, ...options });
+    const { translated: recommendationNone } = useTranslation({ text: source.specialist.recommendationNone, ...options });
+    const { translated: recommendationTitle } = useTranslation({ text: source.specialist.recommendationTitle, ...options });
+    const { translated: recommendationClinic } = useTranslation({ text: source.specialist.recommendationClinic, ...options });
+    const { translated: recommendationSpecialist } = useTranslation({ text: source.specialist.recommendationSpecialist, ...options });
+    const { translated: recommendationSlot } = useTranslation({ text: source.specialist.recommendationSlot, ...options });
+    const { translated: recommendationUpdatedAfterConflict } = useTranslation({ text: source.specialist.recommendationUpdatedAfterConflict, ...options });
+    const { translated: manualAssignment } = useTranslation({ text: source.specialist.manualAssignment, ...options });
+    const { translated: manualOptionsLoading } = useTranslation({ text: source.specialist.manualOptionsLoading, ...options });
+    const { translated: manualClinicChoose } = useTranslation({ text: source.specialist.manualClinicChoose, ...options });
+    const { translated: manualSpecialistChoose } = useTranslation({ text: source.specialist.manualSpecialistChoose, ...options });
+    const { translated: manualScheduleChoose } = useTranslation({ text: source.specialist.manualScheduleChoose, ...options });
+    const { translated: manualDateLabel } = useTranslation({ text: source.specialist.manualDateLabel, ...options });
+    const { translated: manualSlotsEmpty } = useTranslation({ text: source.specialist.manualSlotsEmpty, ...options });
+    const { translated: manualOptionsNone } = useTranslation({ text: source.specialist.manualOptionsNone, ...options });
     const { translated: priorityLabel } = useTranslation({ text: source.priority.label, ...options });
     const { translated: normalPriority } = useTranslation({ text: source.priority.normal, ...options });
     const { translated: urgentPriority } = useTranslation({ text: source.priority.urgent, ...options });
@@ -90,13 +84,23 @@ function useAppointmentsPageLabels(targetLang: string) {
         patientSearchSubmit,
         patientSearchEmpty,
         patientSearchSelected,
-        specialistsLoading,
-        chooseSpecialist,
-        noSpecialist,
         selectPatient,
-        cliniquesLoading,
-        chooseClinique,
-        noClinique,
+        specialtyChoose,
+        recommendationLoading,
+        recommendationNone,
+        recommendationTitle,
+        recommendationClinic,
+        recommendationSpecialist,
+        recommendationSlot,
+        recommendationUpdatedAfterConflict,
+        manualAssignment,
+        manualOptionsLoading,
+        manualClinicChoose,
+        manualSpecialistChoose,
+        manualScheduleChoose,
+        manualDateLabel,
+        manualSlotsEmpty,
+        manualOptionsNone,
         priorityLabel,
         normalPriority,
         urgentPriority,
@@ -126,6 +130,7 @@ export function AppointmentsPage() {
     const [patientId, setPatientId] = useState("");
     const [selectedPatient, setSelectedPatient] =
         useState<Patient | null>(null);
+    const [specialty, setSpecialty] = useState("");
     const [clinique, setClinique] = useState("");
     const [specialist, setSpecialist] = useState("");
     const [date, setDate] = useState("");
@@ -155,15 +160,19 @@ export function AppointmentsPage() {
         useState(false);
     const [searchTimer, setSearchTimer] =
         useState<number | null>(null);
-    const [specialists, setSpecialists] = useState<Specialist[]>([]);
-    const [specialistsLoading, setSpecialistsLoading] =
+    const [recommendation, setRecommendation] =
+        useState<AppointmentRecommendation | null>(null);
+    const [recommendationLoading, setRecommendationLoading] =
         useState(false);
-    const [specialistsError, setSpecialistsError] =
+    const [recommendationError, setRecommendationError] =
         useState<ApiError | null>(null);
-    const [cliniques, setCliniques] = useState<Clinique[]>([]);
-    const [cliniquesLoading, setCliniquesLoading] = useState(false);
-    const [cliniquesError, setCliniquesError] =
+    const [manualMode, setManualMode] = useState(false);
+    const [manualOptions, setManualOptions] =
+        useState<ManualAppointmentOptions | null>(null);
+    const [manualOptionsLoading, setManualOptionsLoading] = useState(false);
+    const [manualOptionsError, setManualOptionsError] =
         useState<ApiError | null>(null);
+    const recommendationRequestId = useRef(0);
 
     /* ------------------------------------------------------------------ */
     /* Initialisation date                                                */
@@ -172,110 +181,6 @@ export function AppointmentsPage() {
     useEffect(() => {
         const today = new Date().toISOString().split("T")[0];
         setDate(today);
-    }, []);
-
-    /* ------------------------------------------------------------------ */
-    /* Chargement des spécialistes                                         */
-    /* ------------------------------------------------------------------ */
-
-    useEffect(() => {
-        let cancelled = false;
-
-        async function loadAllSpecialists() {
-            setSpecialistsLoading(true);
-            setSpecialistsError(null);
-            const pageSize = 50;
-            let currentPage = 1;
-            let totalPages = 1;
-            const all: Specialist[] = [];
-
-            while (currentPage <= totalPages) {
-                const response = await fetchSpecialistsPaginated({
-                    page: currentPage,
-                    limit: pageSize,
-                });
-
-                if ("error" in response) {
-                    if (!cancelled) {
-                        setSpecialistsError(response.error);
-                    }
-                    break;
-                }
-
-                all.push(...response.data.data);
-                totalPages = Math.max(
-                    response.data.meta.totalPages || 1,
-                    1
-                );
-                currentPage += 1;
-            }
-
-            if (!cancelled) {
-                setSpecialists(
-                    all.sort((a, b) => {
-                        const an = `${a.prenom} ${a.nom}`.trim();
-                        const bn = `${b.prenom} ${b.nom}`.trim();
-                        return an.localeCompare(bn, "fr");
-                    })
-                );
-                setSpecialistsLoading(false);
-            }
-        }
-
-        loadAllSpecialists();
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    /* ------------------------------------------------------------------ */
-    /* Chargement des cliniques                                            */
-    /* ------------------------------------------------------------------ */
-
-    useEffect(() => {
-        let cancelled = false;
-
-        async function loadAllCliniques() {
-            setCliniquesLoading(true);
-            setCliniquesError(null);
-            const pageSize = 50;
-            let currentPage = 1;
-            let totalPages = 1;
-            const all: Clinique[] = [];
-
-            while (currentPage <= totalPages) {
-                const response = await fetchCliniquesPaginated({
-                    page: currentPage,
-                    limit: pageSize,
-                });
-
-                if ("error" in response) {
-                    if (!cancelled) {
-                        setCliniquesError(response.error);
-                    }
-                    break;
-                }
-
-                all.push(...response.data.data);
-                totalPages = Math.max(
-                    response.data.meta.totalPages || 1,
-                    1
-                );
-                currentPage += 1;
-            }
-
-            if (!cancelled) {
-                setCliniques(all);
-                setCliniquesLoading(false);
-            }
-        }
-
-        loadAllCliniques();
-
-        return () => {
-            cancelled = true;
-        };
     }, []);
 
     /* ------------------------------------------------------------------ */
@@ -363,18 +268,6 @@ export function AppointmentsPage() {
         };
     }, [searchNom, searchPrenom, searchTelephone]);
 
-    const filteredSpecialists = useMemo(() => {
-        if (!clinique) return [];
-        return specialists.filter(
-            (sp) => sp.clinique_associer === clinique
-        );
-    }, [clinique, specialists]);
-
-    const sortedCliniques = useMemo(
-        () => sortByDistance(selectedPatient ?? {}, cliniques),
-        [cliniques, selectedPatient]
-    );
-
     function formatDistance(distance: number): string {
         return `${new Intl.NumberFormat(targetLang, {
             maximumFractionDigits: 1,
@@ -383,6 +276,7 @@ export function AppointmentsPage() {
 
     async function handlePatientSelection(patient: Patient) {
         setPatientsError(null);
+        recommendationRequestId.current += 1;
 
         const response = await fetchPatientById(patient._id);
         if ("error" in response) {
@@ -394,28 +288,116 @@ export function AppointmentsPage() {
         setPatientId(selected._id);
         setSelectedPatient(selected);
         setInsuranceNumber(selected.num_assurance_maladie);
+        setSpecialty("");
         setClinique("");
         setSpecialist("");
         setTime("");
         setAvailableSlots([]);
         setExistingAppointmentTimes([]);
         setMaximumAppointmentsReached(false);
+        setRecommendation(null);
+        setRecommendationLoading(false);
+        setRecommendationError(null);
+        setManualMode(false);
+        setManualOptions(null);
+        setManualOptionsError(null);
         setApiError(null);
     }
 
-    useEffect(() => {
-        if (!clinique || !specialist) return;
-        const stillValid = filteredSpecialists.some(
-            (sp) => sp._id === specialist
+    async function handleSpecialtyChange(nextSpecialty: string) {
+        const requestId = recommendationRequestId.current + 1;
+        recommendationRequestId.current = requestId;
+        setSpecialty(nextSpecialty);
+        setClinique("");
+        setSpecialist("");
+        setDate("");
+        setTime("");
+        setAvailableSlots([]);
+        setExistingAppointmentTimes([]);
+        setMaximumAppointmentsReached(false);
+        setRecommendation(null);
+        setRecommendationError(null);
+        setManualMode(false);
+        setManualOptions(null);
+        setManualOptionsError(null);
+
+        if (!patientId || !nextSpecialty) return;
+
+        setRecommendationLoading(true);
+        const response = await fetchAppointmentRecommendation(
+            patientId,
+            nextSpecialty
         );
-        if (!stillValid) {
-            setSpecialist("");
-            setAvailableSlots([]);
-            setExistingAppointmentTimes([]);
-            setMaximumAppointmentsReached(false);
-            setTime("");
+        if (recommendationRequestId.current !== requestId) return;
+
+        setRecommendationLoading(false);
+        if ("error" in response) {
+            setRecommendationError(response.error);
+            return;
         }
-    }, [clinique, filteredSpecialists, specialist]);
+
+        const result = response.data;
+        setRecommendation(result);
+        if (!result) return;
+
+        setClinique(result.clinique._id);
+        setSpecialist(result.specialist._id);
+        setDate(result.date);
+        setTime(result.time);
+        setAvailableSlots(result.availableSlots);
+        setExistingAppointmentTimes(result.existingAppointmentTimes);
+    }
+
+    const manualSpecialistsForClinique = useMemo(
+        () =>
+            manualOptions?.specialists.filter(
+                (item) => item.clinique_associer === clinique
+            ) ?? [],
+        [clinique, manualOptions]
+    );
+
+    async function enableManualAssignment() {
+        if (!specialty) return;
+
+        setManualMode(true);
+        setManualOptionsLoading(true);
+        setManualOptionsError(null);
+        setClinique("");
+        setSpecialist("");
+        setDate("");
+        setTime("");
+        setAvailableSlots([]);
+        setExistingAppointmentTimes([]);
+        setMaximumAppointmentsReached(false);
+
+        const response = await fetchManualAppointmentOptions(specialty);
+        setManualOptionsLoading(false);
+        if ("error" in response) {
+            setManualOptionsError(response.error);
+            return;
+        }
+
+        setManualOptions(response.data);
+    }
+
+    function handleManualCliniqueChange(cliniqueId: string) {
+        setClinique(cliniqueId);
+        setSpecialist("");
+        setDate("");
+        setTime("");
+        setAvailableSlots([]);
+        setExistingAppointmentTimes([]);
+        setMaximumAppointmentsReached(false);
+    }
+
+    function handleManualSpecialistChange(specialistId: string) {
+        setSpecialist(specialistId);
+        setDate("");
+        setTime("");
+        setAvailableSlots([]);
+        setExistingAppointmentTimes([]);
+        setMaximumAppointmentsReached(false);
+    }
 
     /* ------------------------------------------------------------------ */
     /* Chargement des créneaux                                            */
@@ -454,64 +436,6 @@ export function AppointmentsPage() {
         void refreshSlots();
     }, [specialist, date, patientId]);
 
-    async function handleSpecialistChange(specialistId: string) {
-        setSpecialist(specialistId);
-        setDate("");
-        setTime("");
-        setAvailableSlots([]);
-        setExistingAppointmentTimes([]);
-        setMaximumAppointmentsReached(false);
-
-        const selectedSpecialist = specialists.find(
-            (candidate) => candidate._id === specialistId
-        );
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const availableDates = Array.from(
-            new Set(
-                (selectedSpecialist?.disponibilites ?? [])
-                    .map(toLocalDateKey)
-                    .filter((candidate): candidate is string => {
-                        if (!candidate) return false;
-                        return new Date(`${candidate}T00:00:00`) >= today;
-                    })
-            )
-        ).sort();
-
-        for (const candidateDate of availableDates) {
-            const response = await fetchAvailableSlots(
-                specialistId,
-                candidateDate,
-                patientId || undefined
-            );
-            const schedule = "data" in response ? response.data : null;
-            const slots = schedule?.slots ?? [];
-
-            if (schedule?.maximumAppointmentsReached) {
-                setDate(candidateDate);
-                setAvailableSlots([]);
-                setExistingAppointmentTimes(
-                    schedule.existingAppointmentTimes
-                );
-                setMaximumAppointmentsReached(true);
-                return;
-            }
-
-            if (slots.length > 0) {
-                setDate(candidateDate);
-                setAvailableSlots(slots);
-                setExistingAppointmentTimes(
-                    schedule?.existingAppointmentTimes ?? []
-                );
-                setMaximumAppointmentsReached(
-                    schedule?.maximumAppointmentsReached ?? false
-                );
-                setTime(slots[0]);
-                return;
-            }
-        }
-    }
-
     /* ------------------------------------------------------------------ */
     /* Validation                                                         */
     /* ------------------------------------------------------------------ */
@@ -546,6 +470,25 @@ export function AppointmentsPage() {
         });
 
         if ("error" in response) {
+            const shouldRefreshRecommendation =
+                Boolean(specialty) &&
+                [
+                    "NO_AVAILABILITY",
+                    "SPECIALIST_ALREADY_BOOKED",
+                    "APPOINTMENT_CONFLICT",
+                ].includes(response.error.code);
+
+            if (shouldRefreshRecommendation) {
+                await handleSpecialtyChange(specialty);
+                setApiError({
+                    code: "APPOINTMENT_RECOMMENDATION_REFRESHED",
+                    message: ui.recommendationUpdatedAfterConflict,
+                    retryable: false,
+                });
+                setLoading(false);
+                return;
+            }
+
             setApiError(response.error);
             setLoading(false);
             return;
@@ -693,78 +636,172 @@ export function AppointmentsPage() {
 
                 <select
                     className="border rounded p-2"
-                    value={clinique}
-                    onChange={(e) => setClinique(e.target.value)}
-                    disabled={cliniquesLoading}
-                >
-                    <option value="">
-                        {cliniquesLoading
-                            ? ui.cliniquesLoading
-                            : ui.chooseClinique}
-                    </option>
-                    {sortedCliniques.map((item) => {
-                        const distance = selectedPatient
-                            ? calculateDistanceKm(selectedPatient, item)
-                            : null;
-                        return (
-                            <option key={item._id} value={item._id}>
-                                {distance === null
-                                    ? item.nom
-                                    : `${item.nom} — ${formatDistance(distance)}`}
-                            </option>
-                        );
-                    })}
-                </select>
-                {!cliniquesLoading && cliniques.length === 0 && (
-                    <div className="text-xs text-gray-500">
-                        {ui.noClinique}
-                    </div>
-                )}
-
-                <select
-                    className="border rounded p-2"
-                    value={specialist}
+                    value={specialty}
                     onChange={(e) => {
-                        void handleSpecialistChange(e.target.value);
+                        void handleSpecialtyChange(e.target.value);
                     }}
-                    disabled={
-                        !patientId ||
-                        cliniquesLoading ||
-                        !clinique
-                    }
+                    disabled={!patientId || recommendationLoading}
                 >
                     <option value="">
-                        {specialistsLoading
-                            ? ui.specialistsLoading
-                            : patientId && clinique
-                                ? ui.chooseSpecialist
-                                : patientId
-                                    ? ui.chooseClinique
-                                    : ui.selectPatient}
+                        {patientId ? ui.specialtyChoose : ui.selectPatient}
                     </option>
-                    {filteredSpecialists.map((sp) => (
-                        <option key={sp._id} value={sp._id}>
-                            {`${sp.prenom} ${sp.nom}${
-                                sp.specialite
-                                    ? ` — ${sp.specialite}`
-                                    : ""
-                            }`}
+                    {SPECIALTIES.map((item) => (
+                        <option key={item} value={item}>
+                            {item}
                         </option>
                     ))}
                 </select>
-                {specialistsError && (
-                    <div className="text-xs text-red-600">
-                        {specialistsError.message}
+                {recommendationLoading && (
+                    <div className="text-xs text-gray-400">
+                        {ui.recommendationLoading}
                     </div>
                 )}
-                {cliniquesError && (
+                {recommendationError && (
                     <div className="text-xs text-red-600">
-                        {cliniquesError.message}
+                        {recommendationError.message}
                     </div>
                 )}
-                {patientId && clinique && filteredSpecialists.length === 0 && (
+                {patientId && specialty && !recommendationLoading && !recommendation && !recommendationError && (
                     <div className="text-xs text-gray-500">
-                        {ui.noSpecialist}
+                        {ui.recommendationNone}
+                    </div>
+                )}
+                {recommendation && (
+                    <div className="rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950 space-y-1">
+                        <div className="font-medium">{ui.recommendationTitle}</div>
+                        <div>
+                            {ui.recommendationClinic}: {recommendation.clinique.nom} — {formatDistance(recommendation.clinique.distanceKm)}
+                        </div>
+                        <div>
+                            {ui.recommendationSpecialist}: {`${recommendation.specialist.prenom} ${recommendation.specialist.nom}`.trim()}
+                        </div>
+                        <div>
+                            {ui.recommendationSlot}: {recommendation.date} {recommendation.time}
+                        </div>
+                    </div>
+                )}
+                {patientId && specialty && !recommendationLoading && !recommendation && (
+                    <button
+                        type="button"
+                        className="w-fit border rounded px-3 py-2 text-sm"
+                        onClick={() => {
+                            void enableManualAssignment();
+                        }}
+                        disabled={manualOptionsLoading}
+                    >
+                        {ui.manualAssignment}
+                    </button>
+                )}
+                {manualMode && (
+                    <div className="rounded border bg-gray-50 p-3 space-y-3">
+                        {manualOptionsLoading && (
+                            <div className="text-xs text-gray-400">
+                                {ui.manualOptionsLoading}
+                            </div>
+                        )}
+                        {manualOptionsError && (
+                            <div className="text-xs text-red-600">
+                                {manualOptionsError.message}
+                            </div>
+                        )}
+                        {manualOptions && manualOptions.cliniques.length === 0 && (
+                            <div className="text-xs text-gray-500">
+                                {ui.manualOptionsNone}
+                            </div>
+                        )}
+                        {manualOptions && manualOptions.cliniques.length > 0 && (
+                            <>
+                                <select
+                                    className="border rounded p-2"
+                                    value={clinique}
+                                    onChange={(event) =>
+                                        handleManualCliniqueChange(event.target.value)
+                                    }
+                                >
+                                    <option value="">{ui.manualClinicChoose}</option>
+                                    {manualOptions.cliniques.map((item) => (
+                                        <option key={item._id} value={item._id}>
+                                            {item.nom}
+                                        </option>
+                                    ))}
+                                </select>
+                                <select
+                                    className="border rounded p-2"
+                                    value={specialist}
+                                    disabled={!clinique}
+                                    onChange={(event) =>
+                                        handleManualSpecialistChange(event.target.value)
+                                    }
+                                >
+                                    <option value="">{ui.manualSpecialistChoose}</option>
+                                    {manualSpecialistsForClinique.map((item) => (
+                                        <option key={item._id} value={item._id}>
+                                            {`${item.prenom} ${item.nom}`.trim()}
+                                        </option>
+                                    ))}
+                                </select>
+                                {specialist && (
+                                    <div className="space-y-2 border-t pt-3">
+                                        <div className="text-sm font-medium">
+                                            {ui.manualScheduleChoose}
+                                        </div>
+                                        <label className="flex flex-col gap-1 text-sm">
+                                            <span>{ui.manualDateLabel}</span>
+                                            <input
+                                                type="date"
+                                                className="border rounded p-2"
+                                                value={date}
+                                                onChange={(event) => {
+                                                    setDate(event.target.value);
+                                                    setTime("");
+                                                }}
+                                            />
+                                        </label>
+                                        {!date ? (
+                                            <div className="text-xs text-gray-500">
+                                                {ui.manualSlotsEmpty}
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {slotsLoading && (
+                                                    <div className="text-xs text-gray-400">
+                                                        {ui.slotsLoading}
+                                                    </div>
+                                                )}
+                                                {maximumAppointmentsReached ? (
+                                                    <div className="rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                                                        {ui.maximumPatientAppointments}
+                                                    </div>
+                                                ) : existingAppointmentTimes.length > 0 ? (
+                                                    <div className="rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">
+                                                        {ui.existingPatientAppointment.replace(
+                                                            "{times}",
+                                                            existingAppointmentTimes.join(", ")
+                                                        )}
+                                                    </div>
+                                                ) : null}
+                                                <div className="flex flex-wrap gap-2">
+                                                    {availableSlots.map((slot) => (
+                                                        <button
+                                                            key={slot}
+                                                            type="button"
+                                                            onClick={() => setTime(slot)}
+                                                            className={`px-2 py-1 text-xs border rounded ${
+                                                                slot === time
+                                                                    ? "bg-primary text-white"
+                                                                    : ""
+                                                            }`}
+                                                        >
+                                                            {slot}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </div>
                 )}
 
@@ -793,65 +830,68 @@ export function AppointmentsPage() {
                     </label>
                 </div>
 
-                <input
-                    type="date"
-                    className="border rounded p-2"
-                    value={date}
-                    onChange={(e) => {
-                        setDate(e.target.value);
-                        setTime("");
-                    }}
-                />
+                {!manualMode && (
+                    <>
+                        <input
+                            type="date"
+                            className="border rounded p-2"
+                            value={date}
+                            onChange={(e) => {
+                                setDate(e.target.value);
+                                setTime("");
+                            }}
+                        />
 
-                <input
-                    type="time"
-                    className="border-2 border-red-500 rounded p-2"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                />
+                        <input
+                            type="time"
+                            className="border-2 border-red-500 rounded p-2"
+                            value={time}
+                            onChange={(e) => setTime(e.target.value)}
+                        />
 
-                {/* Créneaux */}
-                <div>
-                    <div className="text-xs text-gray-500 mb-1">
-                        {ui.slotsLabel}
-                    </div>
+                        <div>
+                            <div className="text-xs text-gray-500 mb-1">
+                                {ui.slotsLabel}
+                            </div>
 
-                    {slotsLoading && (
-                        <div className="text-xs text-gray-400">
-                            {ui.slotsLoading}
-                        </div>
-                    )}
-
-                    {maximumAppointmentsReached ? (
-                        <div className="mb-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
-                            {ui.maximumPatientAppointments}
-                        </div>
-                    ) : existingAppointmentTimes.length > 0 ? (
-                        <div className="mb-2 rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">
-                            {ui.existingPatientAppointment.replace(
-                                "{times}",
-                                existingAppointmentTimes.join(", ")
+                            {slotsLoading && (
+                                <div className="text-xs text-gray-400">
+                                    {ui.slotsLoading}
+                                </div>
                             )}
-                        </div>
-                    ) : null}
 
-                    <div className="flex flex-wrap gap-2">
-                        {availableSlots.map((slot) => (
-                            <button
-                                key={slot}
-                                type="button"
-                                onClick={() => setTime(slot)}
-                                className={`px-2 py-1 text-xs border rounded ${
-                                    slot === time
-                                        ? "bg-primary text-white"
-                                        : ""
-                                }`}
-                            >
-                                {slot}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                            {maximumAppointmentsReached ? (
+                                <div className="mb-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                                    {ui.maximumPatientAppointments}
+                                </div>
+                            ) : existingAppointmentTimes.length > 0 ? (
+                                <div className="mb-2 rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">
+                                    {ui.existingPatientAppointment.replace(
+                                        "{times}",
+                                        existingAppointmentTimes.join(", ")
+                                    )}
+                                </div>
+                            ) : null}
+
+                            <div className="flex flex-wrap gap-2">
+                                {availableSlots.map((slot) => (
+                                    <button
+                                        key={slot}
+                                        type="button"
+                                        onClick={() => setTime(slot)}
+                                        className={`px-2 py-1 text-xs border rounded ${
+                                            slot === time
+                                                ? "bg-primary text-white"
+                                                : ""
+                                        }`}
+                                    >
+                                        {slot}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                )}
 
                 <textarea
                     className="border rounded p-2"

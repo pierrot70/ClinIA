@@ -10,7 +10,9 @@ const bookingGuardUpdateOne = vi.fn();
 const patientFindOne = vi.fn();
 const patientFind = vi.fn();
 const specialistFindById = vi.fn();
+const specialistFind = vi.fn();
 const cliniqueExists = vi.fn();
+const cliniqueFind = vi.fn();
 const recordWriteOperationAuditEvent = vi.fn();
 const transactionSession = {
     withTransaction: vi.fn(async (callback) => callback()),
@@ -42,11 +44,11 @@ vi.mock("../../models/Patient.js", () => ({
 }));
 
 vi.mock("../../models/Specialist.js", () => ({
-    Specialist: { findById: specialistFindById },
+    Specialist: { findById: specialistFindById, find: specialistFind },
 }));
 
 vi.mock("../../models/Clinique.js", () => ({
-    Clinique: { exists: cliniqueExists },
+    Clinique: { exists: cliniqueExists, find: cliniqueFind },
 }));
 
 vi.mock("../../audit/writeOperationAudit.js", () => ({
@@ -57,8 +59,10 @@ const {
     cancelAppointment,
     cancelAppointmentWithWriteVerification,
     createAppointment,
+    findNearestAvailableAppointment,
     getAvailableSlotSchedule,
     getAvailableSlots,
+    listManualAppointmentOptions,
     listAppointmentsPaginated,
     updateAppointmentSchedule,
     updateAppointmentStatus,
@@ -146,6 +150,111 @@ describe("appointments service", () => {
         await expect(
             getAvailableSlots(specialistId, "2099-01-01")
         ).resolves.toEqual(["12:00", "18:45"]);
+    });
+
+    it("recommends the nearest clinic that has a free specialty appointment", async () => {
+        const patientId = "507f1f77bcf86cd799439012";
+        const nearbyClinicId = "507f1f77bcf86cd799439021";
+        const fartherClinicId = "507f1f77bcf86cd799439022";
+        const nearbySpecialistId = "507f1f77bcf86cd799439031";
+        const fartherSpecialistId = "507f1f77bcf86cd799439032";
+
+        patientFindOne.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                _id: patientId,
+                lat: 45.5,
+                long: -73.5,
+            }),
+        });
+        specialistFind.mockReturnValue({
+            lean: vi.fn().mockResolvedValue([
+                {
+                    _id: nearbySpecialistId,
+                    nom: "Proche",
+                    prenom: "Sara",
+                    specialite: "Cardiologue",
+                    clinique_associer: nearbyClinicId,
+                    disponibilites: [new Date("2099-01-02T10:00:00")],
+                },
+                {
+                    _id: fartherSpecialistId,
+                    nom: "Loin",
+                    prenom: "Marc",
+                    specialite: "Cardiologue",
+                    clinique_associer: fartherClinicId,
+                    disponibilites: [new Date("2099-01-01T09:00:00")],
+                },
+            ]),
+        });
+        cliniqueFind.mockReturnValue({
+            lean: vi.fn().mockResolvedValue([
+                { _id: nearbyClinicId, nom: "Clinique proche", lat: 45.51, long: -73.5 },
+                { _id: fartherClinicId, nom: "Clinique loin", lat: 46.5, long: -73.5 },
+            ]),
+        });
+        specialistFindById.mockImplementation((id) => ({
+            lean: vi.fn().mockResolvedValue({
+                disponibilites:
+                    id === nearbySpecialistId
+                        ? [new Date("2099-01-02T10:00:00")]
+                        : [new Date("2099-01-01T09:00:00")],
+            }),
+        }));
+        find.mockReturnValue({ lean: vi.fn().mockResolvedValue([]) });
+
+        await expect(
+            findNearestAvailableAppointment(
+                { patientId, specialty: "Cardiologue" },
+                authUser
+            )
+        ).resolves.toMatchObject({
+            clinique: { _id: nearbyClinicId, nom: "Clinique proche" },
+            specialist: { _id: nearbySpecialistId },
+            date: "2099-01-02",
+            time: "10:00",
+            availableSlots: ["10:00"],
+        });
+    });
+
+    it("lists only clinics and specialists matching a manual specialty selection", async () => {
+        const clinicId = "507f1f77bcf86cd799439021";
+        const specialistId = "507f1f77bcf86cd799439031";
+        specialistFind.mockReturnValue({
+            lean: vi.fn().mockResolvedValue([
+                {
+                    _id: specialistId,
+                    nom: "Proche",
+                    prenom: "Sara",
+                    specialite: "Cardiologue",
+                    clinique_associer: clinicId,
+                },
+            ]),
+        });
+        cliniqueFind.mockReturnValue({
+            lean: vi.fn().mockResolvedValue([
+                { _id: clinicId, nom: "Clinique proche" },
+            ]),
+        });
+
+        await expect(
+            listManualAppointmentOptions({ specialty: "Cardiologue" })
+        ).resolves.toEqual({
+            cliniques: [{ _id: clinicId, nom: "Clinique proche" }],
+            specialists: [
+                {
+                    _id: specialistId,
+                    nom: "Proche",
+                    prenom: "Sara",
+                    specialite: "Cardiologue",
+                    clinique_associer: clinicId,
+                },
+            ],
+        });
+
+        expect(specialistFind).toHaveBeenCalledWith({
+            specialite: "Cardiologue",
+            clinique_associer: { $ne: null },
+        });
     });
 
     it("only exposes later slots for a patient's second same-day appointment", async () => {
@@ -484,6 +593,48 @@ describe("appointments service", () => {
             code: "PATIENT_ALREADY_BOOKED",
             message:
                 "Ce patient a déjà un rendez-vous planifié à cette date et cette heure.",
+        });
+    });
+
+    it("reports a concurrent same-specialist booking rejected by MongoDB", async () => {
+        const patientId = "507f1f77bcf86cd799439012";
+        const specialistId = "507f1f77bcf86cd799439021";
+        const clinicId = "507f1f77bcf86cd799439022";
+
+        patientFindOne.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                _id: patientId,
+                ownerUserId: authUser.userId,
+            }),
+        });
+        specialistFindById.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                clinique_associer: clinicId,
+                disponibilites: [new Date("2099-01-01T12:00:00")],
+            }),
+        });
+        cliniqueExists.mockResolvedValue(true);
+        find.mockReturnValue({ lean: vi.fn().mockResolvedValue([]) });
+        appointmentSave.mockRejectedValueOnce({
+            code: 11000,
+            keyPattern: { specialist: 1, date: 1, time: 1 },
+        });
+
+        await expect(
+            createAppointment(
+                {
+                    patient: patientId,
+                    specialist: specialistId,
+                    clinique: clinicId,
+                    date: "2099-01-01",
+                    time: "12:00",
+                    priority: "normal",
+                },
+                authUser
+            )
+        ).rejects.toEqual({
+            code: "SPECIALIST_ALREADY_BOOKED",
+            message: "Ce créneau est déjà réservé pour ce spécialiste.",
         });
     });
 

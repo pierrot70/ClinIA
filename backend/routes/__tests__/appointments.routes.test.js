@@ -2,12 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
     createAppointmentWithWriteVerification,
+    findNearestAvailableAppointment,
     getAvailableSlotSchedule,
+    listManualAppointmentOptions,
     listAppointmentsPaginated,
     updateAppointmentStatusWithWriteVerification,
 } = vi.hoisted(() => ({
     createAppointmentWithWriteVerification: vi.fn(),
+    findNearestAvailableAppointment: vi.fn(),
     getAvailableSlotSchedule: vi.fn(),
+    listManualAppointmentOptions: vi.fn(),
     listAppointmentsPaginated: vi.fn(),
     updateAppointmentStatusWithWriteVerification: vi.fn(),
 }));
@@ -22,7 +26,9 @@ const { getReplicaSetStatus } = vi.hoisted(() => ({
 
 vi.mock("../../services/appointments.js", () => ({
     createAppointmentWithWriteVerification,
+    findNearestAvailableAppointment,
     getAvailableSlotSchedule,
+    listManualAppointmentOptions,
     getAppointmentById: vi.fn(),
     cancelAppointmentWithWriteVerification: vi.fn(),
     updateAppointmentStatusWithWriteVerification,
@@ -114,6 +120,56 @@ describe("appointments routes write verification", () => {
                     existingAppointmentTimes: ["12:30"],
                 }),
             })
+        );
+    });
+
+    it("returns the nearest available appointment recommendation", async () => {
+        const handler = getRouteHandler("get", "/recommendation");
+        const req = {
+            query: { patient: "patient-1", specialty: "Cardiologue" },
+            auth: { userId: "doctor-1", role: "MEDECIN" },
+        };
+        const res = makeRes();
+        const recommendation = {
+            clinique: { _id: "clinic-1", nom: "Clinique proche", distanceKm: 1.2 },
+            specialist: { _id: "specialist-1", nom: "Proche", prenom: "Sara" },
+            date: "2026-08-03",
+            time: "09:00",
+            availableSlots: ["09:00"],
+            existingAppointmentTimes: [],
+        };
+        findNearestAvailableAppointment.mockResolvedValue(recommendation);
+
+        await handler(req, res);
+
+        expect(findNearestAvailableAppointment).toHaveBeenCalledWith(
+            { patientId: "patient-1", specialty: "Cardiologue" },
+            req.auth
+        );
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith(
+            expect.objectContaining({ data: recommendation })
+        );
+    });
+
+    it("returns specialty-filtered manual assignment options", async () => {
+        const handler = getRouteHandler("get", "/manual-options");
+        const req = { query: { specialty: "Cardiologue" } };
+        const res = makeRes();
+        const options = {
+            cliniques: [{ _id: "clinic-1", nom: "Clinique proche" }],
+            specialists: [{ _id: "specialist-1", nom: "Proche", prenom: "Sara" }],
+        };
+        listManualAppointmentOptions.mockResolvedValue(options);
+
+        await handler(req, res);
+
+        expect(listManualAppointmentOptions).toHaveBeenCalledWith({
+            specialty: "Cardiologue",
+        });
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith(
+            expect.objectContaining({ data: options })
         );
     });
 
@@ -257,6 +313,41 @@ describe("appointments routes write verification", () => {
                 code: "PATIENT_ALREADY_BOOKED",
                 message:
                     "Ce patient a déjà un rendez-vous planifié à cette date et cette heure.",
+                retryable: false,
+            },
+        });
+    });
+
+    it("returns a conflict when a specialist slot was just booked", async () => {
+        const handler = getRouteHandler("post", "/");
+        const dto = {
+            patient: "patient-2",
+            specialist: "specialist-2",
+            date: "2026-08-03",
+            time: "12:45",
+            priority: "normal",
+        };
+        toCreateAppointmentDTO.mockReturnValue(dto);
+        createAppointmentWithWriteVerification.mockRejectedValue({
+            code: "SPECIALIST_ALREADY_BOOKED",
+            message: "Ce créneau est déjà réservé pour ce spécialiste.",
+        });
+        const req = {
+            body: dto,
+            headers: {},
+            auth: { userId: "doctor-2", role: "MEDECIN" },
+            originalUrl: "/api/appointments",
+            requestContext: { requestId: "request-specialist-race", instanceId: "instance-a" },
+        };
+        const res = makeRes();
+
+        await handler(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "SPECIALIST_ALREADY_BOOKED",
+                message: "Ce créneau est déjà réservé pour ce spécialiste.",
                 retryable: false,
             },
         });

@@ -24,11 +24,26 @@ function isPatientDateTimeDuplicate(error) {
     );
 }
 
+function isSpecialistDateTimeDuplicate(error) {
+    const keyPattern = error?.keyPattern || {};
+    return error?.code === 11000 && (
+        (keyPattern.specialist === 1 && keyPattern.date === 1 && keyPattern.time === 1) ||
+        error?.message?.includes("specialist_date_time_unique")
+    );
+}
+
 function patientAlreadyBookedError() {
     return {
         code: "PATIENT_ALREADY_BOOKED",
         message:
             "Ce patient a déjà un rendez-vous planifié à cette date et cette heure.",
+    };
+}
+
+function specialistAlreadyBookedError() {
+    return {
+        code: "SPECIALIST_ALREADY_BOOKED",
+        message: "Ce créneau est déjà réservé pour ce spécialiste.",
     };
 }
 
@@ -217,6 +232,9 @@ export async function createAppointment(dto, authUser, { session = null } = {}) 
     } catch (error) {
         if (isPatientDateTimeDuplicate(error)) {
             throw patientAlreadyBookedError();
+        }
+        if (isSpecialistDateTimeDuplicate(error)) {
+            throw specialistAlreadyBookedError();
         }
         throw error;
     }
@@ -491,6 +509,9 @@ export async function updateAppointmentSchedule(id, { date, time }, authUser, { 
         if (isPatientDateTimeDuplicate(error)) {
             throw patientAlreadyBookedError();
         }
+        if (isSpecialistDateTimeDuplicate(error)) {
+            throw specialistAlreadyBookedError();
+        }
         throw error;
     }
     if (movesToAnotherDay) {
@@ -583,6 +604,211 @@ function formatTime(date) {
         .getMinutes()
         .toString()
         .padStart(2, "0")}`;
+}
+
+function toLocalDateKey(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+        date.getDate()
+    ).padStart(2, "0")}`;
+}
+
+function calculateDistanceKm(origin, destination) {
+    if (
+        !Number.isFinite(origin?.lat) ||
+        !Number.isFinite(origin?.long) ||
+        !Number.isFinite(destination?.lat) ||
+        !Number.isFinite(destination?.long)
+    ) {
+        return null;
+    }
+
+    const toRadians = (degrees) => (degrees * Math.PI) / 180;
+    const latitudeDelta = toRadians(destination.lat - origin.lat);
+    const longitudeDelta = toRadians(destination.long - origin.long);
+    const haversine =
+        Math.sin(latitudeDelta / 2) ** 2 +
+        Math.cos(toRadians(origin.lat)) *
+            Math.cos(toRadians(destination.lat)) *
+            Math.sin(longitudeDelta / 2) ** 2;
+
+    return 2 * 6371 * Math.asin(Math.sqrt(haversine));
+}
+
+async function findEarliestSpecialistSchedule(specialists, patientId) {
+    let earliest = null;
+
+    for (const specialist of specialists) {
+        const dates = Array.from(
+            new Set(
+                (specialist.disponibilites || [])
+                    .map(toLocalDateKey)
+                    .filter((date) => date && new Date(`${date}T00:00:00`) >= new Date(new Date().toDateString()))
+            )
+        ).sort();
+
+        for (const date of dates) {
+            const schedule = await getAvailableSlotSchedule(
+                String(specialist._id),
+                date,
+                { patient: patientId }
+            );
+            const time = schedule.slots[0];
+            if (!time) continue;
+
+            const candidate = { specialist, date, time, schedule };
+            if (
+                !earliest ||
+                `${candidate.date}T${candidate.time}` <
+                    `${earliest.date}T${earliest.time}`
+            ) {
+                earliest = candidate;
+            }
+        }
+    }
+
+    return earliest;
+}
+
+function normalizeAppointmentSpecialty(value) {
+    const specialty = typeof value === "string" ? value.trim() : "";
+    if (!specialty || specialty.length > 100) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Spécialité invalide.",
+        };
+    }
+
+    return specialty;
+}
+
+export async function listManualAppointmentOptions({ specialty }) {
+    const normalizedSpecialty = normalizeAppointmentSpecialty(specialty);
+    const specialists = await Specialist.find({
+        specialite: normalizedSpecialty,
+        clinique_associer: { $ne: null },
+    }).lean();
+    if (specialists.length === 0) {
+        return { cliniques: [], specialists: [] };
+    }
+
+    const clinicIds = [
+        ...new Set(specialists.map((item) => String(item.clinique_associer))),
+    ];
+    const clinics = await Clinique.find({ _id: { $in: clinicIds } }).lean();
+
+    return {
+        cliniques: clinics
+            .map((clinic) => ({ _id: String(clinic._id), nom: clinic.nom }))
+            .sort((left, right) => left.nom.localeCompare(right.nom, "fr")),
+        specialists: specialists
+            .map((specialist) => ({
+                _id: String(specialist._id),
+                nom: specialist.nom,
+                prenom: specialist.prenom,
+                clinique_associer: String(specialist.clinique_associer),
+                specialite: specialist.specialite,
+            }))
+            .sort((left, right) =>
+                `${left.prenom} ${left.nom}`.localeCompare(
+                    `${right.prenom} ${right.nom}`,
+                    "fr"
+                )
+            ),
+    };
+}
+
+/**
+ * Finds the closest clinic that can actually offer an appointment for the
+ * requested specialty. This is advisory only: createAppointment remains the
+ * authoritative, atomic availability check.
+ */
+export async function findNearestAvailableAppointment(
+    { patientId, specialty },
+    authUser
+) {
+    if (!mongoose.Types.ObjectId.isValid(patientId)) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Identifiant patient invalide.",
+        };
+    }
+
+    const normalizedSpecialty = normalizeAppointmentSpecialty(specialty);
+
+    const patient = await Patient.findOne({
+        _id: patientId,
+        ...buildOwnerScope(authUser),
+    }).lean();
+    if (!patient) {
+        throw {
+            code: "NOT_FOUND",
+            message: "Patient introuvable.",
+        };
+    }
+
+    if (!Number.isFinite(patient.lat) || !Number.isFinite(patient.long)) {
+        throw {
+            code: "MISSING_PATIENT_COORDINATES",
+            message:
+                "Les coordonnées du patient sont requises pour proposer la clinique la plus proche.",
+        };
+    }
+
+    const specialists = await Specialist.find({
+        specialite: normalizedSpecialty,
+        clinique_associer: { $ne: null },
+    }).lean();
+    if (specialists.length === 0) return null;
+
+    const clinicIds = [...new Set(specialists.map((item) => String(item.clinique_associer)))];
+    const clinics = await Clinique.find({ _id: { $in: clinicIds } }).lean();
+
+    const candidates = clinics
+        .map((clinic) => ({
+            clinic,
+            distanceKm: calculateDistanceKm(patient, clinic),
+            specialists: specialists.filter(
+                (item) => String(item.clinique_associer) === String(clinic._id)
+            ),
+        }))
+        .filter((candidate) => candidate.distanceKm !== null)
+        .sort(
+            (left, right) =>
+                left.distanceKm - right.distanceKm ||
+                left.clinic.nom.localeCompare(right.clinic.nom, "fr")
+        );
+
+    for (const candidate of candidates) {
+        const schedule = await findEarliestSpecialistSchedule(
+            candidate.specialists,
+            patientId
+        );
+        if (!schedule) continue;
+
+        return {
+            clinique: {
+                _id: String(candidate.clinic._id),
+                nom: candidate.clinic.nom,
+                distanceKm: candidate.distanceKm,
+            },
+            specialist: {
+                _id: String(schedule.specialist._id),
+                nom: schedule.specialist.nom,
+                prenom: schedule.specialist.prenom,
+                specialite: schedule.specialist.specialite,
+            },
+            date: schedule.date,
+            time: schedule.time,
+            availableSlots: schedule.schedule.slots,
+            existingAppointmentTimes:
+                schedule.schedule.existingAppointmentTimes,
+        };
+    }
+
+    return null;
 }
 
 function isQuarterHourTime(value) {

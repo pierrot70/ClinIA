@@ -1,7 +1,9 @@
 import express from "express";
 import {
     createAppointmentWithWriteVerification,
+    findNearestAvailableAppointment,
     getAvailableSlotSchedule,
+    listManualAppointmentOptions,
     getAppointmentById,
     cancelAppointmentWithWriteVerification,
     updateAppointmentStatusWithWriteVerification,
@@ -46,6 +48,92 @@ async function buildAppointmentWriteAudit(req, { changedFields = [] }) {
         replicaSet: await getReplicaSetStatus(),
     };
 }
+
+/* ------------------------------------------------------------------ */
+/* GET /api/appointments/manual-options                                */
+/* ------------------------------------------------------------------ */
+
+router.get("/manual-options", async (req, res) => {
+    try {
+        const options = await listManualAppointmentOptions({
+            specialty: req.query.specialty,
+        });
+
+        return res.status(200).json({
+            data: options,
+            meta: {
+                source: "real",
+                model: "computed",
+            },
+        });
+    } catch (err) {
+        if (err.code === "INVALID_INPUT") {
+            return res.status(400).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        logSafeError("APPOINTMENT_MANUAL_OPTIONS_FAILED", err);
+        return res.status(500).json({
+            error: {
+                code: "PERSISTENCE_FAILED",
+                message: "Impossible de récupérer les options d'attribution manuelle.",
+                retryable: true,
+            },
+        });
+    }
+});
+
+/* ------------------------------------------------------------------ */
+/* GET /api/appointments/recommendation                                */
+/* ------------------------------------------------------------------ */
+
+router.get("/recommendation", async (req, res) => {
+    try {
+        const recommendation = await findNearestAvailableAppointment(
+            {
+                patientId: req.query.patient,
+                specialty: req.query.specialty,
+            },
+            req.auth
+        );
+
+        return res.status(200).json({
+            data: recommendation,
+            meta: {
+                source: "real",
+                model: "computed",
+            },
+        });
+    } catch (err) {
+        if (
+            err.code === "INVALID_INPUT" ||
+            err.code === "NOT_FOUND" ||
+            err.code === "MISSING_PATIENT_COORDINATES"
+        ) {
+            return res.status(err.code === "NOT_FOUND" ? 404 : 400).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        logSafeError("APPOINTMENT_RECOMMENDATION_FAILED", err);
+        return res.status(500).json({
+            error: {
+                code: "PERSISTENCE_FAILED",
+                message: "Impossible de proposer un rendez-vous.",
+                retryable: true,
+            },
+        });
+    }
+});
 
 /* ------------------------------------------------------------------ */
 /* GET /api/appointments/slots                                         */

@@ -1121,7 +1121,7 @@ export const UI_LABELS_FR = {
             loading: "Recherche...",
             submit: "Rechercher",
             empty: "Aucun de vos patients ne correspond à cette recherche.",
-            selected: "Patient sélectionné : {name}. Choisissez ensuite une clinique.",
+            selected: "Patient sélectionné : {name}. Choisissez ensuite une spécialité.",
         },
         specialist: {
             loading: "Chargement des spécialistes...",
@@ -1133,6 +1133,25 @@ export const UI_LABELS_FR = {
                 "Aucun spécialiste disponible dans la clinique la plus proche.",
             missingCoordinates:
                 "Coordonnées manquantes pour déterminer la clinique la plus proche.",
+            specialtyChoose: "Choisir une spécialité *",
+            recommendationLoading: "Recherche de la meilleure option...",
+            recommendationNone:
+                "Aucune clinique avec un créneau disponible pour cette spécialité.",
+            recommendationTitle: "Rendez-vous proposé",
+            recommendationClinic: "Clinique",
+            recommendationSpecialist: "Spécialiste",
+            recommendationSlot: "Premier créneau disponible",
+            recommendationUpdatedAfterConflict:
+                "Ce créneau vient d'être réservé. Une nouvelle proposition est affichée.",
+            manualAssignment: "Attribuer manuellement un rendez-vous",
+            manualOptionsLoading: "Chargement des options manuelles...",
+            manualClinicChoose: "Choisir une clinique *",
+            manualSpecialistChoose: "Choisir un spécialiste *",
+            manualScheduleChoose: "Choisissez une date, puis un créneau disponible *",
+            manualDateLabel: "Date du rendez-vous *",
+            manualSlotsEmpty: "Choisissez une date pour voir les créneaux disponibles.",
+            manualOptionsNone:
+                "Aucune clinique ni spécialiste n'offre cette spécialité.",
         },
         clinique: {
             loading: "Chargement des cliniques...",
