@@ -1137,6 +1137,18 @@ export const UI_LABELS_FR = {
             recommendationLoading: "Recherche de la meilleure option...",
             recommendationNone:
                 "Aucune clinique avec un créneau disponible pour cette spécialité.",
+            recommendationNoSpecialists:
+                "Aucun spécialiste « {specialty} » n'est associé à une clinique.",
+            recommendationNoAvailability:
+                "Des spécialistes « {specialty} » existent, mais aucun créneau n'est actuellement disponible.",
+            coordinationRequestExplanation:
+                "Créez une demande de coordination afin d'assurer le suivi de la recherche d'un spécialiste.",
+            coordinationRequestAction: "Créer une demande de coordination",
+            coordinationRequestLoading: "Création de la demande de coordination...",
+            coordinationRequestCreated:
+                "Demande de coordination enregistrée. Elle est disponible pour suivi par l'équipe de coordination.",
+            coordinationRequestAlreadyOpen:
+                "Une demande de coordination est déjà ouverte pour ce patient et cette spécialité.",
             recommendationTitle: "Rendez-vous proposé",
             recommendationClinic: "Clinique",
             recommendationSpecialist: "Spécialiste",

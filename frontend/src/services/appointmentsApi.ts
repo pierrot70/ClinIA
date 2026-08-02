@@ -75,6 +75,18 @@ export interface AppointmentRecommendation {
     existingAppointmentTimes: string[];
 }
 
+export type AppointmentRecommendationStatus =
+    | "AVAILABLE"
+    | "NO_SPECIALISTS_FOR_SPECIALTY"
+    | "NO_AVAILABLE_SLOTS_FOR_SPECIALTY";
+
+export type AppointmentRecommendationResponse =
+    ApiResponse<AppointmentRecommendation | null> & {
+        meta?: {
+            recommendationStatus?: AppointmentRecommendationStatus;
+        };
+    };
+
 export interface ManualAppointmentOptions {
     cliniques: Array<{ _id: string; nom: string }>;
     specialists: Array<{
@@ -84,6 +96,17 @@ export interface ManualAppointmentOptions {
         clinique_associer: string;
         specialite: string;
     }>;
+}
+
+export interface AppointmentCoordinationRequestResult {
+    request: {
+        _id: string;
+        patient: string;
+        specialty: string;
+        status: "open" | "resolved" | "cancelled";
+        createdAt?: string;
+    };
+    alreadyOpen: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -232,7 +255,7 @@ export async function fetchAvailableSlots(
 export async function fetchAppointmentRecommendation(
     patient: string,
     specialty: string
-): Promise<ApiResponse<AppointmentRecommendation | null>> {
+): Promise<AppointmentRecommendationResponse> {
     return withSecurityIncidentGuard(
         (async () => {
             try {
@@ -240,7 +263,7 @@ export async function fetchAppointmentRecommendation(
                 const response = await authFetch(
                     `${API_URL}/api/appointments/recommendation?${query.toString()}`
                 );
-                return (await safeJson(response)) as ApiResponse<AppointmentRecommendation | null>;
+                return (await safeJson(response)) as AppointmentRecommendationResponse;
             } catch {
                 return {
                     error: {
@@ -271,6 +294,35 @@ export async function fetchManualAppointmentOptions(
                         code: "INTERNAL_ERROR",
                         message:
                             "Impossible de récupérer les options d'attribution manuelle.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
+}
+
+export async function createAppointmentCoordinationRequest(
+    patient: string,
+    specialty: string
+): Promise<ApiResponse<AppointmentCoordinationRequestResult>> {
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await authFetch(
+                    `${API_URL}/api/appointments/coordination-requests`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ patient, specialty }),
+                    }
+                );
+                return (await safeJson(response)) as ApiResponse<AppointmentCoordinationRequestResult>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible d'enregistrer la demande de coordination.",
                         retryable: true,
                     },
                 };

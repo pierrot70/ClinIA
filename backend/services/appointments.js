@@ -1,5 +1,6 @@
 import { Appointment } from "../models/Appointment.js";
 import { AppointmentBookingGuard } from "../models/AppointmentBookingGuard.js";
+import { AppointmentCoordinationRequest } from "../models/AppointmentCoordinationRequest.js";
 import { Specialist } from "../models/Specialist.js";
 import { Patient } from "../models/Patient.js";
 import { Clinique } from "../models/Clinique.js";
@@ -720,6 +721,64 @@ export async function listManualAppointmentOptions({ specialty }) {
     };
 }
 
+export async function createAppointmentCoordinationRequest(
+    { patientId, specialty },
+    authUser
+) {
+    if (!mongoose.Types.ObjectId.isValid(patientId)) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Identifiant patient invalide.",
+        };
+    }
+
+    const normalizedSpecialty = normalizeAppointmentSpecialty(specialty);
+    const patient = await Patient.findOne({
+        _id: patientId,
+        ...buildOwnerScope(authUser),
+    }).lean();
+    if (!patient) {
+        throw {
+            code: "NOT_FOUND",
+            message: "Patient introuvable.",
+        };
+    }
+
+    const openRequestQuery = {
+        patient: patient._id,
+        specialty: normalizedSpecialty,
+        status: "open",
+    };
+    const existing = await AppointmentCoordinationRequest.findOne(
+        openRequestQuery
+    ).lean();
+    if (existing) {
+        return { request: existing, alreadyOpen: true };
+    }
+
+    try {
+        const request = new AppointmentCoordinationRequest({
+            patient: patient._id,
+            ownerUserId: patient.ownerUserId || authUser.userId,
+            specialty: normalizedSpecialty,
+            status: "open",
+            requestedByUserId: authUser.userId,
+        });
+        await request.save(CLINICAL_WRITE_CONCERN);
+        return { request, alreadyOpen: false };
+    } catch (error) {
+        if (error?.code !== 11000) throw error;
+
+        const concurrentRequest = await AppointmentCoordinationRequest.findOne(
+            openRequestQuery
+        ).lean();
+        if (concurrentRequest) {
+            return { request: concurrentRequest, alreadyOpen: true };
+        }
+        throw error;
+    }
+}
+
 /**
  * Finds the closest clinic that can actually offer an appointment for the
  * requested specialty. This is advisory only: createAppointment remains the
@@ -761,7 +820,12 @@ export async function findNearestAvailableAppointment(
         specialite: normalizedSpecialty,
         clinique_associer: { $ne: null },
     }).lean();
-    if (specialists.length === 0) return null;
+    if (specialists.length === 0) {
+        return {
+            recommendation: null,
+            status: "NO_SPECIALISTS_FOR_SPECIALTY",
+        };
+    }
 
     const clinicIds = [...new Set(specialists.map((item) => String(item.clinique_associer)))];
     const clinics = await Clinique.find({ _id: { $in: clinicIds } }).lean();
@@ -789,26 +853,32 @@ export async function findNearestAvailableAppointment(
         if (!schedule) continue;
 
         return {
-            clinique: {
-                _id: String(candidate.clinic._id),
-                nom: candidate.clinic.nom,
-                distanceKm: candidate.distanceKm,
+            recommendation: {
+                clinique: {
+                    _id: String(candidate.clinic._id),
+                    nom: candidate.clinic.nom,
+                    distanceKm: candidate.distanceKm,
+                },
+                specialist: {
+                    _id: String(schedule.specialist._id),
+                    nom: schedule.specialist.nom,
+                    prenom: schedule.specialist.prenom,
+                    specialite: schedule.specialist.specialite,
+                },
+                date: schedule.date,
+                time: schedule.time,
+                availableSlots: schedule.schedule.slots,
+                existingAppointmentTimes:
+                    schedule.schedule.existingAppointmentTimes,
             },
-            specialist: {
-                _id: String(schedule.specialist._id),
-                nom: schedule.specialist.nom,
-                prenom: schedule.specialist.prenom,
-                specialite: schedule.specialist.specialite,
-            },
-            date: schedule.date,
-            time: schedule.time,
-            availableSlots: schedule.schedule.slots,
-            existingAppointmentTimes:
-                schedule.schedule.existingAppointmentTimes,
+            status: "AVAILABLE",
         };
     }
 
-    return null;
+    return {
+        recommendation: null,
+        status: "NO_AVAILABLE_SLOTS_FOR_SPECIALTY",
+    };
 }
 
 function isQuarterHourTime(value) {

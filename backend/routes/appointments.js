@@ -1,6 +1,7 @@
 import express from "express";
 import {
     createAppointmentWithWriteVerification,
+    createAppointmentCoordinationRequest,
     findNearestAvailableAppointment,
     getAvailableSlotSchedule,
     listManualAppointmentOptions,
@@ -21,6 +22,7 @@ import {
 } from "../audit/writeVerification.js";
 import { getSafeRequestPath, logSafeError } from "../utils/requestLogSafety.js";
 import { getTrustedRequestIp } from "../utils/requestIp.js";
+import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
 
 const router = express.Router();
 
@@ -89,12 +91,75 @@ router.get("/manual-options", async (req, res) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* POST /api/appointments/coordination-requests                       */
+/* ------------------------------------------------------------------ */
+
+router.post("/coordination-requests", async (req, res) => {
+    try {
+        const result = await createAppointmentCoordinationRequest(
+            {
+                patientId: req.body?.patient,
+                specialty: req.body?.specialty,
+            },
+            req.auth
+        );
+        const audit = await buildAppointmentWriteAudit(req, {
+            changedFields: result.alreadyOpen ? [] : ["specialty", "status"],
+        });
+        const writeAuditRecorded = await recordWriteOperationAuditEvent({
+            collectionName: "appointmentcoordinationrequests",
+            operation: result.alreadyOpen ? "READ" : "CREATE",
+            outcome: "SUCCESS",
+            resourceId: String(result.request._id),
+            patientId: String(result.request.patient),
+            ...audit,
+        });
+        const writeVerification = buildWriteVerificationMeta({
+            writeAuditRecorded,
+            verificationId: audit.verificationId,
+            clientMutationId: audit.clientMutationId,
+        });
+
+        return res.status(result.alreadyOpen ? 200 : 201).json({
+            data: {
+                request: result.request,
+                alreadyOpen: result.alreadyOpen,
+            },
+            meta: {
+                source: "real",
+                model: "mongo",
+                writeVerification,
+            },
+        });
+    } catch (err) {
+        if (err.code === "INVALID_INPUT" || err.code === "NOT_FOUND") {
+            return res.status(err.code === "NOT_FOUND" ? 404 : 400).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        logSafeError("APPOINTMENT_COORDINATION_REQUEST_FAILED", err);
+        return res.status(500).json({
+            error: {
+                code: "PERSISTENCE_FAILED",
+                message: "Impossible d'enregistrer la demande de coordination.",
+                retryable: true,
+            },
+        });
+    }
+});
+
+/* ------------------------------------------------------------------ */
 /* GET /api/appointments/recommendation                                */
 /* ------------------------------------------------------------------ */
 
 router.get("/recommendation", async (req, res) => {
     try {
-        const recommendation = await findNearestAvailableAppointment(
+        const result = await findNearestAvailableAppointment(
             {
                 patientId: req.query.patient,
                 specialty: req.query.specialty,
@@ -103,10 +168,11 @@ router.get("/recommendation", async (req, res) => {
         );
 
         return res.status(200).json({
-            data: recommendation,
+            data: result.recommendation,
             meta: {
                 source: "real",
                 model: "computed",
+                recommendationStatus: result.status,
             },
         });
     } catch (err) {

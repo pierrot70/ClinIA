@@ -4,6 +4,7 @@ import { AdminUser } from "../../models/AdminUser.js";
 import { AppSettings } from "../../models/AppSettings.js";
 import { Appointment } from "../../models/Appointment.js";
 import { AppointmentBookingGuard } from "../../models/AppointmentBookingGuard.js";
+import { AppointmentCoordinationRequest } from "../../models/AppointmentCoordinationRequest.js";
 import { AuthAuditLog } from "../../models/AuthAuditLog.js";
 import { ClinicianComment } from "../../models/ClinicianComment.js";
 import { Clinique } from "../../models/Clinique.js";
@@ -24,7 +25,7 @@ import { WriteOperationAuditLog } from "../../models/WriteOperationAuditLog.js";
 import { auditCollectionIndexes, hasIndexAuditErrors } from "./indexAudit.js";
 
 const MODELS = [
-    AdminUser, AppSettings, Appointment, AppointmentBookingGuard, AuthAuditLog, ClinicianComment,
+    AdminUser, AppSettings, Appointment, AppointmentBookingGuard, AppointmentCoordinationRequest, AuthAuditLog, ClinicianComment,
     Clinique, DiagnosisResult, MassDownloadWindow, LoginFailureThrottle, OpenAIRequestAuditLog,
     Patient, PatientAuditLog, PatientClinicalNoteVersion,
     PatientSecureRequestSnapshot, RateLimitWindow, RefreshTokenSession,

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
     createAppointmentWithWriteVerification,
+    createAppointmentCoordinationRequest,
     findNearestAvailableAppointment,
     getAvailableSlotSchedule,
     listManualAppointmentOptions,
@@ -9,6 +10,7 @@ const {
     updateAppointmentStatusWithWriteVerification,
 } = vi.hoisted(() => ({
     createAppointmentWithWriteVerification: vi.fn(),
+    createAppointmentCoordinationRequest: vi.fn(),
     findNearestAvailableAppointment: vi.fn(),
     getAvailableSlotSchedule: vi.fn(),
     listManualAppointmentOptions: vi.fn(),
@@ -24,8 +26,13 @@ const { getReplicaSetStatus } = vi.hoisted(() => ({
     getReplicaSetStatus: vi.fn(),
 }));
 
+const { recordWriteOperationAuditEvent } = vi.hoisted(() => ({
+    recordWriteOperationAuditEvent: vi.fn(),
+}));
+
 vi.mock("../../services/appointments.js", () => ({
     createAppointmentWithWriteVerification,
+    createAppointmentCoordinationRequest,
     findNearestAvailableAppointment,
     getAvailableSlotSchedule,
     listManualAppointmentOptions,
@@ -42,6 +49,10 @@ vi.mock("../../dto/appointment.dto.js", () => ({
 
 vi.mock("../../services/dbStatus.js", () => ({
     getReplicaSetStatus,
+}));
+
+vi.mock("../../audit/writeOperationAudit.js", () => ({
+    recordWriteOperationAuditEvent,
 }));
 
 import router from "../appointments.js";
@@ -82,6 +93,7 @@ describe("appointments routes write verification", () => {
                 laggingThresholdSeconds: 10,
             },
         });
+        recordWriteOperationAuditEvent.mockResolvedValue(true);
     });
 
     it("passes the authenticated patient context when listing available slots", async () => {
@@ -138,7 +150,10 @@ describe("appointments routes write verification", () => {
             availableSlots: ["09:00"],
             existingAppointmentTimes: [],
         };
-        findNearestAvailableAppointment.mockResolvedValue(recommendation);
+        findNearestAvailableAppointment.mockResolvedValue({
+            recommendation,
+            status: "AVAILABLE",
+        });
 
         await handler(req, res);
 
@@ -148,7 +163,89 @@ describe("appointments routes write verification", () => {
         );
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith(
-            expect.objectContaining({ data: recommendation })
+            expect.objectContaining({
+                data: recommendation,
+                meta: expect.objectContaining({ recommendationStatus: "AVAILABLE" }),
+            })
+        );
+    });
+
+    it("returns a no-specialists status when a specialty has no associated specialist", async () => {
+        const handler = getRouteHandler("get", "/recommendation");
+        const req = {
+            query: { patient: "patient-1", specialty: "Cardiologue" },
+            auth: { userId: "doctor-1", role: "MEDECIN" },
+        };
+        const res = makeRes();
+        findNearestAvailableAppointment.mockResolvedValue({
+            recommendation: null,
+            status: "NO_SPECIALISTS_FOR_SPECIALTY",
+        });
+
+        await handler(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: null,
+                meta: expect.objectContaining({
+                    recommendationStatus: "NO_SPECIALISTS_FOR_SPECIALTY",
+                }),
+            })
+        );
+    });
+
+    it("creates a coordination request when the selected specialty has no specialist", async () => {
+        const handler = getRouteHandler("post", "/coordination-requests");
+        const req = {
+            body: { patient: "patient-1", specialty: "Cardiologue" },
+            auth: { userId: "doctor-1", username: "doctor", role: "MEDECIN" },
+            headers: {},
+        };
+        const res = makeRes();
+        createAppointmentCoordinationRequest.mockResolvedValue({
+            request: { _id: "request-1", patient: "patient-1", specialty: "Cardiologue" },
+            alreadyOpen: false,
+        });
+
+        await handler(req, res);
+
+        expect(createAppointmentCoordinationRequest).toHaveBeenCalledWith(
+            { patientId: "patient-1", specialty: "Cardiologue" },
+            req.auth
+        );
+        expect(res.status).toHaveBeenCalledWith(201);
+        expect(res.json).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ alreadyOpen: false }),
+            })
+        );
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith(
+            expect.objectContaining({
+                collectionName: "appointmentcoordinationrequests",
+                operation: "CREATE",
+                changedFields: ["specialty", "status"],
+            })
+        );
+    });
+
+    it("does not audit an existing coordination request as a new creation", async () => {
+        const handler = getRouteHandler("post", "/coordination-requests");
+        const req = {
+            body: { patient: "patient-1", specialty: "Cardiologue" },
+            auth: { userId: "user-1", username: "doctor", role: "MEDECIN" },
+        };
+        const res = makeRes();
+        createAppointmentCoordinationRequest.mockResolvedValue({
+            request: { _id: "request-1", patient: "patient-1", specialty: "Cardiologue" },
+            alreadyOpen: true,
+        });
+
+        await handler(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith(
+            expect.objectContaining({ operation: "READ", changedFields: [] })
         );
     });
 

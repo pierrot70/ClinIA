@@ -30,6 +30,8 @@ import { migration as addPatientSpecialistDayAppointmentIndex }
     from "./20260731-add-patient-specialist-day-appointment-index.js";
 import { migration as backfillAppointmentBookingGuards }
     from "./20260731-backfill-appointment-booking-guards.js";
+import { migration as addAppointmentCoordinationRequestIndex }
+    from "./20260802-add-appointment-coordination-request-index.js";
 export const migrations = [
     registerMigrationFramework,
     addPatientLanguageDefault,
@@ -47,4 +49,5 @@ export const migrations = [
     addPatientDateTimeAppointmentIndex,
     addPatientSpecialistDayAppointmentIndex,
     backfillAppointmentBookingGuards,
+    addAppointmentCoordinationRequestIndex,
 ];

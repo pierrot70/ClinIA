@@ -5,10 +5,12 @@ import { labels } from "../i18n/uiLabels";
 import { useTranslation } from "../hooks/useTranslation";
 import {
     createAppointment,
+    createAppointmentCoordinationRequest,
     fetchAppointmentRecommendation,
     fetchAvailableSlots,
     fetchManualAppointmentOptions,
     type AppointmentRecommendation,
+    type AppointmentRecommendationStatus,
     type ManualAppointmentOptions,
 } from "../services/appointmentsApi";
 import {
@@ -45,6 +47,13 @@ function useAppointmentsPageLabels(targetLang: string) {
     const { translated: specialtyChoose } = useTranslation({ text: source.specialist.specialtyChoose, ...options });
     const { translated: recommendationLoading } = useTranslation({ text: source.specialist.recommendationLoading, ...options });
     const { translated: recommendationNone } = useTranslation({ text: source.specialist.recommendationNone, ...options });
+    const { translated: recommendationNoSpecialists } = useTranslation({ text: source.specialist.recommendationNoSpecialists, ...options });
+    const { translated: recommendationNoAvailability } = useTranslation({ text: source.specialist.recommendationNoAvailability, ...options });
+    const { translated: coordinationRequestExplanation } = useTranslation({ text: source.specialist.coordinationRequestExplanation, ...options });
+    const { translated: coordinationRequestAction } = useTranslation({ text: source.specialist.coordinationRequestAction, ...options });
+    const { translated: coordinationRequestLoading } = useTranslation({ text: source.specialist.coordinationRequestLoading, ...options });
+    const { translated: coordinationRequestCreated } = useTranslation({ text: source.specialist.coordinationRequestCreated, ...options });
+    const { translated: coordinationRequestAlreadyOpen } = useTranslation({ text: source.specialist.coordinationRequestAlreadyOpen, ...options });
     const { translated: recommendationTitle } = useTranslation({ text: source.specialist.recommendationTitle, ...options });
     const { translated: recommendationClinic } = useTranslation({ text: source.specialist.recommendationClinic, ...options });
     const { translated: recommendationSpecialist } = useTranslation({ text: source.specialist.recommendationSpecialist, ...options });
@@ -88,6 +97,13 @@ function useAppointmentsPageLabels(targetLang: string) {
         specialtyChoose,
         recommendationLoading,
         recommendationNone,
+        recommendationNoSpecialists,
+        recommendationNoAvailability,
+        coordinationRequestExplanation,
+        coordinationRequestAction,
+        coordinationRequestLoading,
+        coordinationRequestCreated,
+        coordinationRequestAlreadyOpen,
         recommendationTitle,
         recommendationClinic,
         recommendationSpecialist,
@@ -166,6 +182,14 @@ export function AppointmentsPage() {
         useState(false);
     const [recommendationError, setRecommendationError] =
         useState<ApiError | null>(null);
+    const [recommendationStatus, setRecommendationStatus] =
+        useState<AppointmentRecommendationStatus | null>(null);
+    const [coordinationRequestLoading, setCoordinationRequestLoading] =
+        useState(false);
+    const [coordinationRequestError, setCoordinationRequestError] =
+        useState<ApiError | null>(null);
+    const [coordinationRequestAlreadyOpen, setCoordinationRequestAlreadyOpen] =
+        useState<boolean | null>(null);
     const [manualMode, setManualMode] = useState(false);
     const [manualOptions, setManualOptions] =
         useState<ManualAppointmentOptions | null>(null);
@@ -298,6 +322,9 @@ export function AppointmentsPage() {
         setRecommendation(null);
         setRecommendationLoading(false);
         setRecommendationError(null);
+        setRecommendationStatus(null);
+        setCoordinationRequestError(null);
+        setCoordinationRequestAlreadyOpen(null);
         setManualMode(false);
         setManualOptions(null);
         setManualOptionsError(null);
@@ -317,6 +344,9 @@ export function AppointmentsPage() {
         setMaximumAppointmentsReached(false);
         setRecommendation(null);
         setRecommendationError(null);
+        setRecommendationStatus(null);
+        setCoordinationRequestError(null);
+        setCoordinationRequestAlreadyOpen(null);
         setManualMode(false);
         setManualOptions(null);
         setManualOptionsError(null);
@@ -338,6 +368,10 @@ export function AppointmentsPage() {
 
         const result = response.data;
         setRecommendation(result);
+        setRecommendationStatus(
+            response.meta?.recommendationStatus ??
+                (result ? "AVAILABLE" : "NO_AVAILABLE_SLOTS_FOR_SPECIALTY")
+        );
         if (!result) return;
 
         setClinique(result.clinique._id);
@@ -378,6 +412,24 @@ export function AppointmentsPage() {
         }
 
         setManualOptions(response.data);
+    }
+
+    async function handleCoordinationRequest() {
+        if (!patientId || !specialty) return;
+
+        setCoordinationRequestLoading(true);
+        setCoordinationRequestError(null);
+        const response = await createAppointmentCoordinationRequest(
+            patientId,
+            specialty
+        );
+        setCoordinationRequestLoading(false);
+        if ("error" in response) {
+            setCoordinationRequestError(response.error);
+            return;
+        }
+
+        setCoordinationRequestAlreadyOpen(response.data.alreadyOpen);
     }
 
     function handleManualCliniqueChange(cliniqueId: string) {
@@ -662,8 +714,50 @@ export function AppointmentsPage() {
                     </div>
                 )}
                 {patientId && specialty && !recommendationLoading && !recommendation && !recommendationError && (
-                    <div className="text-xs text-gray-500">
-                        {ui.recommendationNone}
+                    <div
+                        className={
+                            recommendationStatus === "NO_SPECIALISTS_FOR_SPECIALTY"
+                                ? "clinia-fade-in rounded-lg border-2 border-red-500 bg-red-50 px-4 py-3 text-base font-semibold text-red-900 shadow-lg"
+                                : "text-xs text-gray-500"
+                        }
+                        role={recommendationStatus === "NO_SPECIALISTS_FOR_SPECIALTY" ? "alert" : undefined}
+                    >
+                        {recommendationStatus === "NO_SPECIALISTS_FOR_SPECIALTY"
+                            ? ui.recommendationNoSpecialists.replace("{specialty}", specialty)
+                            : recommendationStatus === "NO_AVAILABLE_SLOTS_FOR_SPECIALTY"
+                                ? ui.recommendationNoAvailability.replace("{specialty}", specialty)
+                                : ui.recommendationNone}
+                    </div>
+                )}
+                {patientId && specialty &&
+                    recommendationStatus === "NO_SPECIALISTS_FOR_SPECIALTY" && (
+                    <div className="rounded-lg border-2 border-amber-500 bg-amber-50 p-4 text-sm text-amber-950 shadow-lg space-y-3">
+                        <div className="font-semibold text-base">{ui.coordinationRequestExplanation}</div>
+                        {coordinationRequestError && (
+                            <div className="text-xs text-red-700">
+                                {coordinationRequestError.message}
+                            </div>
+                        )}
+                        {coordinationRequestAlreadyOpen !== null ? (
+                            <div className="text-sm font-medium">
+                                {coordinationRequestAlreadyOpen
+                                    ? ui.coordinationRequestAlreadyOpen
+                                    : ui.coordinationRequestCreated}
+                            </div>
+                        ) : (
+                            <button
+                                type="button"
+                                className="w-full sm:w-fit rounded-lg bg-blue-700 px-5 py-3 text-base font-semibold text-white shadow-lg ring-2 ring-blue-300 transition hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                onClick={() => {
+                                    void handleCoordinationRequest();
+                                }}
+                                disabled={coordinationRequestLoading}
+                            >
+                                {coordinationRequestLoading
+                                    ? ui.coordinationRequestLoading
+                                    : ui.coordinationRequestAction}
+                            </button>
+                        )}
                     </div>
                 )}
                 {recommendation && (
@@ -680,7 +774,8 @@ export function AppointmentsPage() {
                         </div>
                     </div>
                 )}
-                {patientId && specialty && !recommendationLoading && !recommendation && (
+                {patientId && specialty && !recommendationLoading && !recommendation &&
+                    recommendationStatus !== "NO_SPECIALISTS_FOR_SPECIALTY" && (
                     <button
                         type="button"
                         className="w-fit border rounded px-3 py-2 text-sm"

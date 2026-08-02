@@ -26,6 +26,21 @@ body {
   }
 }
 
+.clinia-fade-in {
+  animation: cliniaFadeIn 0.45s ease-out both;
+}
+
+@keyframes cliniaFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .clinia-fade-feedback {
   animation: cliniaFadeInOut 3.2s ease-in-out forwards;
 }

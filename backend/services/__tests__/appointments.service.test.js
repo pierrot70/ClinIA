@@ -13,6 +13,8 @@ const specialistFindById = vi.fn();
 const specialistFind = vi.fn();
 const cliniqueExists = vi.fn();
 const cliniqueFind = vi.fn();
+const coordinationRequestFindOne = vi.fn();
+const coordinationRequestSave = vi.fn();
 const recordWriteOperationAuditEvent = vi.fn();
 const transactionSession = {
     withTransaction: vi.fn(async (callback) => callback()),
@@ -51,6 +53,17 @@ vi.mock("../../models/Clinique.js", () => ({
     Clinique: { exists: cliniqueExists, find: cliniqueFind },
 }));
 
+vi.mock("../../models/AppointmentCoordinationRequest.js", () => {
+    function AppointmentCoordinationRequest(payload) {
+        Object.assign(this, payload);
+        this.save = coordinationRequestSave;
+    }
+
+    AppointmentCoordinationRequest.findOne = coordinationRequestFindOne;
+
+    return { AppointmentCoordinationRequest };
+});
+
 vi.mock("../../audit/writeOperationAudit.js", () => ({
     recordWriteOperationAuditEvent,
 }));
@@ -59,6 +72,7 @@ const {
     cancelAppointment,
     cancelAppointmentWithWriteVerification,
     createAppointment,
+    createAppointmentCoordinationRequest,
     findNearestAvailableAppointment,
     getAvailableSlotSchedule,
     getAvailableSlots,
@@ -208,12 +222,140 @@ describe("appointments service", () => {
                 authUser
             )
         ).resolves.toMatchObject({
-            clinique: { _id: nearbyClinicId, nom: "Clinique proche" },
-            specialist: { _id: nearbySpecialistId },
-            date: "2099-01-02",
-            time: "10:00",
-            availableSlots: ["10:00"],
+            status: "AVAILABLE",
+            recommendation: {
+                clinique: { _id: nearbyClinicId, nom: "Clinique proche" },
+                specialist: { _id: nearbySpecialistId },
+                date: "2099-01-02",
+                time: "10:00",
+                availableSlots: ["10:00"],
+            },
         });
+    });
+
+    it("reports when no specialist is associated with the selected specialty", async () => {
+        const patientId = "507f1f77bcf86cd799439012";
+        patientFindOne.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                _id: patientId,
+                lat: 45.5,
+                long: -73.5,
+            }),
+        });
+        specialistFind.mockReturnValue({ lean: vi.fn().mockResolvedValue([]) });
+
+        await expect(
+            findNearestAvailableAppointment(
+                { patientId, specialty: "Cardiologue" },
+                authUser
+            )
+        ).resolves.toEqual({
+            recommendation: null,
+            status: "NO_SPECIALISTS_FOR_SPECIALTY",
+        });
+    });
+
+    it("reports when specialists exist but have no available slot", async () => {
+        const patientId = "507f1f77bcf86cd799439012";
+        const clinicId = "507f1f77bcf86cd799439021";
+        patientFindOne.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                _id: patientId,
+                lat: 45.5,
+                long: -73.5,
+            }),
+        });
+        specialistFind.mockReturnValue({
+            lean: vi.fn().mockResolvedValue([
+                {
+                    _id: "507f1f77bcf86cd799439031",
+                    nom: "Proche",
+                    prenom: "Sara",
+                    specialite: "Cardiologue",
+                    clinique_associer: clinicId,
+                    disponibilites: [],
+                },
+            ]),
+        });
+        cliniqueFind.mockReturnValue({
+            lean: vi.fn().mockResolvedValue([
+                { _id: clinicId, nom: "Clinique proche", lat: 45.51, long: -73.5 },
+            ]),
+        });
+
+        await expect(
+            findNearestAvailableAppointment(
+                { patientId, specialty: "Cardiologue" },
+                authUser
+            )
+        ).resolves.toEqual({
+            recommendation: null,
+            status: "NO_AVAILABLE_SLOTS_FOR_SPECIALTY",
+        });
+    });
+
+    it("creates one open coordination request when no specialist is registered", async () => {
+        const patientId = "507f1f77bcf86cd799439012";
+        patientFindOne.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                _id: patientId,
+                ownerUserId: authUser.userId,
+            }),
+        });
+        coordinationRequestFindOne.mockReturnValue({
+            lean: vi.fn().mockResolvedValue(null),
+        });
+        coordinationRequestSave.mockResolvedValue(undefined);
+
+        await expect(
+            createAppointmentCoordinationRequest(
+                { patientId, specialty: "Cardiologue" },
+                authUser
+            )
+        ).resolves.toMatchObject({ alreadyOpen: false });
+
+        expect(coordinationRequestSave).toHaveBeenCalledWith(
+            expect.objectContaining({
+                w: "majority",
+                j: true,
+            })
+        );
+        expect(coordinationRequestSave.mock.instances[0]).toMatchObject(
+            expect.objectContaining({
+                patient: patientId,
+                ownerUserId: authUser.userId,
+                specialty: "Cardiologue",
+                status: "open",
+                requestedByUserId: authUser.userId,
+            })
+        );
+    });
+
+    it("reuses an open coordination request instead of creating a duplicate", async () => {
+        const patientId = "507f1f77bcf86cd799439012";
+        patientFindOne.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                _id: patientId,
+                ownerUserId: authUser.userId,
+            }),
+        });
+        coordinationRequestFindOne.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                _id: "507f1f77bcf86cd799439041",
+                patient: patientId,
+                specialty: "Cardiologue",
+                status: "open",
+            }),
+        });
+
+        await expect(
+            createAppointmentCoordinationRequest(
+                { patientId, specialty: "Cardiologue" },
+                authUser
+            )
+        ).resolves.toMatchObject({ alreadyOpen: true });
+
+        expect(coordinationRequestSave).not.toHaveBeenCalled();
     });
 
     it("lists only clinics and specialists matching a manual specialty selection", async () => {
