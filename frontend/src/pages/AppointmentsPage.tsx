@@ -900,8 +900,10 @@ export function AppointmentsPage() {
                     </div>
                 )}
 
-                {/* Priorité */}
-                <div className="flex items-center gap-6">
+                {recommendationStatus !== "NO_SPECIALISTS_FOR_SPECIALTY" && (
+                    <>
+                        {/* Priorité */}
+                        <div className="flex items-center gap-6">
                     <span className="text-sm font-medium">
                         {ui.priorityLabel}
                     </span>
@@ -923,9 +925,9 @@ export function AppointmentsPage() {
                         />
                         {ui.urgentPriority}
                     </label>
-                </div>
+                        </div>
 
-                {!manualMode && (
+                        {!manualMode && (
                     <>
                         <input
                             type="date"
@@ -986,19 +988,22 @@ export function AppointmentsPage() {
                             </div>
                         </div>
                     </>
-                )}
+                        )}
 
-                <textarea
+                        <textarea
                     className="border rounded p-2"
                     placeholder={ui.reasonPlaceholder}
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
-                />
+                        />
+                    </>
+                )}
             </div>
 
             {/* ---------------- Action ---------------- */}
 
-            <div className="border rounded p-4 bg-gray-50 space-y-3">
+            {recommendationStatus !== "NO_SPECIALISTS_FOR_SPECIALTY" && (
+                <div className="border rounded p-4 bg-gray-50 space-y-3">
                 <button
                     onClick={handleCreateAppointment}
                     disabled={!isComplete || loading}
@@ -1029,7 +1034,8 @@ export function AppointmentsPage() {
                         />
                     </div>
                 )}
-            </div>
+                </div>
+            )}
         </div>
     );
 }
