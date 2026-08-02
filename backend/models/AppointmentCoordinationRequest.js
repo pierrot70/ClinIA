@@ -22,9 +22,22 @@ const AppointmentCoordinationRequestSchema = new mongoose.Schema(
         },
         status: {
             type: String,
-            enum: ["open", "resolved", "cancelled"],
+            enum: ["open", "ready_to_schedule", "resolved", "cancelled"],
             default: "open",
             index: true,
+        },
+        availabilityVerifiedAt: {
+            type: Date,
+            default: null,
+        },
+        resolvedAppointment: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Appointment",
+            default: null,
+        },
+        resolvedAt: {
+            type: Date,
+            default: null,
         },
         requestedByUserId: {
             type: mongoose.Schema.Types.ObjectId,
@@ -39,13 +52,15 @@ const AppointmentCoordinationRequestSchema = new mongoose.Schema(
 );
 
 // One active request per patient and specialty avoids duplicate coordination
-// work when a physician retries the action.
+// work while the request is waiting for follow-up or ready to be scheduled.
 AppointmentCoordinationRequestSchema.index(
     { patient: 1, specialty: 1 },
     {
         name: "patient_specialty_open_unique",
         unique: true,
-        partialFilterExpression: { status: "open" },
+        partialFilterExpression: {
+            status: { $in: ["open", "ready_to_schedule"] },
+        },
     }
 );
 

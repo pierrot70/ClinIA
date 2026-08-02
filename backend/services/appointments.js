@@ -169,6 +169,7 @@ export async function createAppointment(dto, authUser, { session = null } = {}) 
 
     const specialist = await Specialist.findById(dto.specialist, {
         clinique_associer: 1,
+        specialite: 1,
     }).lean();
     if (!specialist) {
         throw {
@@ -553,10 +554,58 @@ async function recordAppointmentWriteReceipt(appointment, audit, session) {
     });
 }
 
-async function executeAppointmentWriteWithReceipt(writeAppointment, audit) {
+async function resolveCoordinationRequestForAppointment(appointment, specialty, session) {
+    if (!specialty) return null;
+
+    return AppointmentCoordinationRequest.findOneAndUpdate(
+        {
+            patient: appointment.patient,
+            specialty,
+            status: { $in: ["open", "ready_to_schedule"] },
+        },
+        {
+            $set: {
+                status: "resolved",
+                resolvedAppointment: appointment._id,
+                resolvedAt: new Date(),
+            },
+        },
+        { new: true, ...getClinicalWriteOptions(session) }
+    ).lean();
+}
+
+async function recordCoordinationResolutionReceipt(request, audit, session) {
+    if (!request) return;
+
+    await recordWriteOperationAuditEvent({
+        ...audit,
+        collectionName: "appointmentcoordinationrequests",
+        operation: "UPDATE",
+        outcome: "SUCCESS",
+        resourceId: String(request._id),
+        patientId: request.patient ? String(request.patient) : null,
+        changedFields: ["resolvedAppointment", "resolvedAt", "status"],
+        session,
+        throwOnError: true,
+    });
+}
+
+async function executeAppointmentWriteWithReceipt(writeAppointment, audit, { resolveCoordination = false } = {}) {
     return runAppointmentWriteTransaction(async (session) => {
         const appointment = await writeAppointment(session);
+        const resolvedCoordinationRequest = resolveCoordination
+            ? await resolveCoordinationRequestForAppointment(
+                appointment,
+                (await Specialist.findById(appointment.specialist, { specialite: 1 }).lean())?.specialite,
+                session
+            )
+            : null;
         await recordAppointmentWriteReceipt(appointment, audit, session);
+        await recordCoordinationResolutionReceipt(
+            resolvedCoordinationRequest,
+            audit,
+            session
+        );
 
         return {
             appointment,
@@ -568,7 +617,8 @@ async function executeAppointmentWriteWithReceipt(writeAppointment, audit) {
 export function createAppointmentWithWriteVerification(dto, authUser, audit) {
     return executeAppointmentWriteWithReceipt(
         (session) => createAppointment(dto, authUser, { session }),
-        { ...audit, operation: "CREATE" }
+        { ...audit, operation: "CREATE" },
+        { resolveCoordination: true }
     );
 }
 
@@ -744,13 +794,13 @@ export async function createAppointmentCoordinationRequest(
         };
     }
 
-    const openRequestQuery = {
+    const activeRequestQuery = {
         patient: patient._id,
         specialty: normalizedSpecialty,
-        status: "open",
+        status: { $in: ["open", "ready_to_schedule"] },
     };
     const existing = await AppointmentCoordinationRequest.findOne(
-        openRequestQuery
+        activeRequestQuery
     ).lean();
     if (existing) {
         return { request: existing, alreadyOpen: true };
@@ -770,7 +820,7 @@ export async function createAppointmentCoordinationRequest(
         if (error?.code !== 11000) throw error;
 
         const concurrentRequest = await AppointmentCoordinationRequest.findOne(
-            openRequestQuery
+            activeRequestQuery
         ).lean();
         if (concurrentRequest) {
             return { request: concurrentRequest, alreadyOpen: true };

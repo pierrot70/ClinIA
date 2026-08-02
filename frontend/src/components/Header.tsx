@@ -81,6 +81,7 @@ const HEADER_TRANSLATION_KEYS: Record<string, string> = {
     "Graphiques Auth": "header.appManagement.authGraphs",
     "Nouveaux commentaires médecins": "header.appManagement.newComments",
     "Incidents sécurité": "header.appManagement.securityIncidents",
+    "Demandes de coordination": "header.appManagement.coordinationRequests",
     "x-y graph": "header.appManagement.xyGraph",
     "Pie graph": "header.appManagement.pieGraph",
     "Histogramme graph": "header.appManagement.histogramGraph",
@@ -1636,6 +1637,12 @@ const Header: React.FC = () => {
                                 >
                                     <HeaderLabel text={headerLabels.appManagement.securityIncidents} />
                                 </button>
+                                <Link
+                                    to="/admin/coordination-requests"
+                                    className="block w-full px-4 py-2 text-left text-sm text-violet-800 transition hover:bg-violet-50"
+                                >
+                                    <HeaderLabel text={headerLabels.appManagement.coordinationRequests} />
+                                </Link>
                                 <details className="group/graphs border-t border-gray-100">
                                     <summary className="cursor-pointer list-none px-4 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50">
                                         <HeaderLabel text={headerLabels.appManagement.authGraphs} />
@@ -1906,6 +1913,7 @@ const Header: React.FC = () => {
                                 <button type="button" onClick={() => { void openAuthLogsModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.appManagement.authLogs} /></button>
                                 <button type="button" onClick={() => { void openClinicianInboxModal(); }} className="block w-full rounded px-2 py-2 text-left text-sm text-amber-900 hover:bg-amber-50"><HeaderLabel text={headerLabels.appManagement.newComments} /></button>
                                 <button type="button" onClick={() => { void openSecurityIncidentsModal(); setIsMobileMenuOpen(false); }} className="block w-full rounded px-2 py-2 text-left text-sm text-red-700 hover:bg-red-50"><HeaderLabel text={headerLabels.appManagement.securityIncidents} /></button>
+                                <Link to="/admin/coordination-requests" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-violet-800 hover:bg-violet-50"><HeaderLabel text={headerLabels.appManagement.coordinationRequests} /></Link>
                                 <details>
                                     <summary className="cursor-pointer rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.appManagement.authGraphs} /></summary>
                                     <div className="mt-1 space-y-1 pl-2">

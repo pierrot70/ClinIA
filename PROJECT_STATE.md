@@ -1,5 +1,32 @@
 # État du projet ClinIA
 
+## Mise à jour de reprise — 2026-08-02
+
+Cette section remplace l'état opérationnel du 31 juillet ci-dessous, qui est
+conservé comme trace de reconstruction initiale. La branche active est
+`coolify`; le dernier commit validé est `4de35d4` (`Hide scheduling controls
+without specialists`). Il contient le parcours de rendez-vous par spécialité,
+la protection contre les courses de réservation, la demande de coordination
+créée depuis l'écran de rendez-vous et l'index Mongo correspondant.
+
+Travail en cours, non encore commit : une file administrateur « Demandes de
+coordination » est ajoutée sous « Gestion Application ». Elle liste les
+demandes avec filtre d'état (`open`, `ready_to_schedule`, `resolved`,
+`cancelled`). Un ADMIN ou SUPERADMIN peut vérifier les disponibilités réelles;
+une demande ne devient « prête à planifier » que si un spécialiste rattaché à
+une clinique a un créneau futur libre. Elle devient « résolue » automatiquement
+dans la transaction qui crée le rendez-vous et conserve son lien technique.
+L'API est protégée par RBAC et les audits ne journalisent que des identifiants
+techniques.
+
+Validation de ce chantier : les tests ciblés ajoutés passent; la suite backend
+complète passe (407 tests), la suite frontend complète passe (126 tests) et le
+build Vite de production réussit. Restent le commit, le push et la validation
+manuelle sur l'environnement choisi. La migration
+`20260802-add-appointment-coordination-request-index` doit être appliquée
+ainsi que `20260802-extend-active-coordination-request-index` avant un
+déploiement qui doit garantir l'unicité des demandes actives.
+
 Date de reconstruction : 2026-07-31 (heure locale America/Toronto).
 
 ## Sources examinées

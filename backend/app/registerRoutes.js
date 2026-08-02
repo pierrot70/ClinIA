@@ -12,6 +12,7 @@ import mocksRouter from "../routes/mocks.js";
 import healthRouter from "../routes/health.js";
 import dbStatusRouter from "../routes/dbStatus.js";
 import writeOperationAuditsRouter from "../routes/writeOperationAudits.js";
+import coordinationRequestsRouter from "../routes/coordinationRequests.js";
 
 import { verifyJWT } from "../middleware/verifyJWT.js";
 import { attachOptionalAuth } from "../middleware/attachOptionalAuth.js";
@@ -116,6 +117,13 @@ export function registerRoutes(app, deps) {
         requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
         loi25DataLeakGuard,
         dbStatusRouter
+    );
+    app.use(
+        "/api/coordination-requests",
+        verifyJWT,
+        requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+        loi25DataLeakGuard,
+        coordinationRequestsRouter
     );
     app.use(
         "/api/write-operation-audits",

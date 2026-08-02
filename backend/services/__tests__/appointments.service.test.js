@@ -14,6 +14,7 @@ const specialistFind = vi.fn();
 const cliniqueExists = vi.fn();
 const cliniqueFind = vi.fn();
 const coordinationRequestFindOne = vi.fn();
+const coordinationRequestFindOneAndUpdate = vi.fn();
 const coordinationRequestSave = vi.fn();
 const recordWriteOperationAuditEvent = vi.fn();
 const transactionSession = {
@@ -24,6 +25,7 @@ const transactionSession = {
 vi.mock("../../models/Appointment.js", () => {
     function Appointment(payload) {
         Object.assign(this, payload);
+        this._id ||= "507f1f77bcf86cd799439077";
         this.save = appointmentSave;
     }
 
@@ -60,6 +62,7 @@ vi.mock("../../models/AppointmentCoordinationRequest.js", () => {
     }
 
     AppointmentCoordinationRequest.findOne = coordinationRequestFindOne;
+    AppointmentCoordinationRequest.findOneAndUpdate = coordinationRequestFindOneAndUpdate;
 
     return { AppointmentCoordinationRequest };
 });
@@ -72,6 +75,7 @@ const {
     cancelAppointment,
     cancelAppointmentWithWriteVerification,
     createAppointment,
+    createAppointmentWithWriteVerification,
     createAppointmentCoordinationRequest,
     findNearestAvailableAppointment,
     getAvailableSlotSchedule,
@@ -100,7 +104,9 @@ beforeEach(() => {
     transactionSession.withTransaction.mockImplementation(async (callback) => callback());
     transactionSession.endSession.mockResolvedValue();
     recordWriteOperationAuditEvent.mockResolvedValue(true);
-    appointmentSave.mockResolvedValue(undefined);
+    appointmentSave.mockImplementation(function saveAppointmentMock() {
+        return Promise.resolve(this);
+    });
     bookingGuardFindOneAndUpdate.mockResolvedValue({ scheduledCount: 1 });
     bookingGuardUpdateOne.mockResolvedValue({ modifiedCount: 1 });
 });
@@ -536,6 +542,66 @@ describe("appointments service", () => {
             })
         );
         expect(transactionSession.endSession).toHaveBeenCalledTimes(1);
+    });
+
+    it("résout automatiquement la demande de coordination après un rendez-vous confirmé", async () => {
+        const patientId = "507f1f77bcf86cd799439012";
+        const specialistId = "507f1f77bcf86cd799439021";
+        const clinicId = "507f1f77bcf86cd799439022";
+        patientFindOne.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({ _id: patientId, ownerUserId: authUser.userId }),
+        });
+        specialistFindById.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                clinique_associer: clinicId,
+                specialite: "Cardiologue",
+                disponibilites: [new Date("2099-01-01T12:00:00")],
+            }),
+        });
+        cliniqueExists.mockResolvedValue(true);
+        find.mockReturnValue({ lean: vi.fn().mockResolvedValue([]) });
+        coordinationRequestFindOneAndUpdate.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                _id: "507f1f77bcf86cd799439088",
+                patient: patientId,
+                status: "resolved",
+            }),
+        });
+
+        await createAppointmentWithWriteVerification(
+            {
+                patient: patientId,
+                specialist: specialistId,
+                clinique: clinicId,
+                date: "2099-01-01",
+                time: "12:00",
+                priority: "normal",
+            },
+            authUser,
+            { verificationId: "WRV-COORDINATION", changedFields: ["patient", "specialist"] }
+        );
+
+        expect(coordinationRequestFindOneAndUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                patient: patientId,
+                specialty: "Cardiologue",
+                status: { $in: ["open", "ready_to_schedule"] },
+            }),
+            expect.objectContaining({
+                $set: expect.objectContaining({ status: "resolved" }),
+            }),
+            expect.objectContaining({ session: transactionSession })
+        );
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith(
+            expect.objectContaining({
+                collectionName: "appointmentcoordinationrequests",
+                operation: "UPDATE",
+                resourceId: "507f1f77bcf86cd799439088",
+                patientId,
+                changedFields: ["resolvedAppointment", "resolvedAt", "status"],
+                session: transactionSession,
+            })
+        );
     });
 
     it("marque un rendez-vous comme completed", async () => {
