@@ -6,7 +6,7 @@ import { CLINICAL_QUERY_WRITE_OPTIONS, CLINICAL_WRITE_CONCERN } from "../db/clin
 /* Specialist Service                                                  */
 /* ------------------------------------------------------------------ */
 
-function validateDisponibilites(disponibilites) {
+function validateDisponibilites(disponibilites, allowedPastSlots = new Set()) {
     if (disponibilites === undefined) return;
     if (disponibilites === "__invalid__") {
         throw {
@@ -57,7 +57,10 @@ function validateDisponibilites(disponibilites) {
 
     for (let i = 0; i < sorted.length; i += 1) {
         const current = sorted[i];
-        if (current.getTime() < now) {
+        if (
+            current.getTime() < now &&
+            !allowedPastSlots.has(current.toISOString())
+        ) {
             throw {
                 code: "INVALID_INPUT",
                 message:
@@ -87,6 +90,95 @@ function validateDisponibilites(disponibilites) {
     }
 }
 
+function validatePracticeLocations(practiceLocations, existingPastSlotsByClinic = new Map()) {
+    if (practiceLocations === undefined) return;
+    if (practiceLocations === "__invalid__" || !Array.isArray(practiceLocations)) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Les lieux de pratique fournis sont invalides.",
+        };
+    }
+    if (practiceLocations.length < 1 || practiceLocations.length > 2) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Un spécialiste doit avoir une ou deux cliniques de pratique.",
+        };
+    }
+
+    const clinicIds = new Set();
+    const slotInstants = new Set();
+    for (const location of practiceLocations) {
+        if (!mongoose.Types.ObjectId.isValid(location?.clinique)) {
+            throw {
+                code: "INVALID_INPUT",
+                message: "Clinique de pratique invalide.",
+            };
+        }
+        const clinicId = String(location.clinique);
+        if (clinicIds.has(clinicId)) {
+            throw {
+                code: "INVALID_INPUT",
+                message: "Une clinique ne peut être ajoutée qu'une seule fois.",
+            };
+        }
+        clinicIds.add(clinicId);
+        validateDisponibilites(
+            location.disponibilites,
+            existingPastSlotsByClinic.get(clinicId) ?? new Set()
+        );
+        for (const slot of location.disponibilites || []) {
+            const instant = new Date(slot).toISOString();
+            if (slotInstants.has(instant)) {
+                throw {
+                    code: "INVALID_INPUT",
+                    message: "Un spécialiste ne peut pas être disponible à deux cliniques au même créneau.",
+                };
+            }
+            slotInstants.add(instant);
+        }
+    }
+}
+
+function getExistingPastSlotsByClinic(specialist) {
+    const locations = Array.isArray(specialist?.practiceLocations) && specialist.practiceLocations.length
+        ? specialist.practiceLocations
+        : specialist?.clinique_associer
+          ? [{
+                clinique: specialist.clinique_associer,
+                disponibilites: specialist.disponibilites || [],
+            }]
+          : [];
+    const slotsByClinic = new Map();
+    const now = Date.now();
+
+    for (const location of locations) {
+        const clinicId = String(location.clinique);
+        const pastSlots = new Set();
+        for (const slot of location.disponibilites || []) {
+            const date = new Date(slot);
+            if (!Number.isNaN(date.getTime()) && date.getTime() < now) {
+                pastSlots.add(date.toISOString());
+            }
+        }
+        slotsByClinic.set(clinicId, pastSlots);
+    }
+
+    return slotsByClinic;
+}
+
+function applyPracticeLocationCompatibility(dto) {
+    if (!dto.practiceLocations) return dto;
+
+    const primary = dto.practiceLocations[0];
+    return {
+        ...dto,
+        // Retained temporarily so older clients continue to receive a primary
+        // clinic. Appointment scheduling reads practiceLocations instead.
+        clinique_associer: primary.clinique,
+        disponibilites: primary.disponibilites,
+    };
+}
+
 export async function createSpecialist(dto) {
     if (!dto.nom || !dto.prenom || !dto.numero_medecin) {
         throw {
@@ -97,8 +189,9 @@ export async function createSpecialist(dto) {
     }
 
     validateDisponibilites(dto.disponibilites);
+    validatePracticeLocations(dto.practiceLocations);
 
-    const specialist = new Specialist(dto);
+    const specialist = new Specialist(applyPracticeLocationCompatibility(dto));
     return specialist.save(CLINICAL_WRITE_CONCERN);
 }
 
@@ -131,7 +224,10 @@ export async function listSpecialists(filters = {}, opts = {}) {
     }
     if (filters.clinique_associer) {
         if (mongoose.Types.ObjectId.isValid(filters.clinique_associer)) {
-            query.clinique_associer = filters.clinique_associer;
+            query.$or = [
+                { "practiceLocations.clinique": filters.clinique_associer },
+                { clinique_associer: filters.clinique_associer },
+            ];
         }
     }
 
@@ -201,9 +297,26 @@ export async function updateSpecialist(id, updates) {
 
     validateDisponibilites(updates.disponibilites);
 
+    let existing = null;
+    if (updates.practiceLocations !== undefined) {
+        existing = await Specialist.findById(id).lean();
+        if (!existing) {
+            throw {
+                code: "NOT_FOUND",
+                message: "Spécialiste introuvable.",
+            };
+        }
+    }
+    validatePracticeLocations(
+        updates.practiceLocations,
+        getExistingPastSlotsByClinic(existing)
+    );
+
+    const compatibleUpdates = applyPracticeLocationCompatibility(updates);
+
     const specialist = await Specialist.findByIdAndUpdate(
         id,
-        { $set: updates },
+        { $set: compatibleUpdates },
         {
             new: true,
             runValidators: true,

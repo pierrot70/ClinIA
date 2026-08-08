@@ -21,6 +21,7 @@ import { SPECIALTIES } from "../data/specialties";
 type DisponibiliteForm = {
     date: string; // YYYY-MM-DD
     slots: string[];
+    clinique: string;
 };
 
 function padTime(value: number) {
@@ -53,6 +54,13 @@ function useSpecialistsPageLabels(targetLang: string) {
     const { translated: phonePlaceholder } = useTranslation({ text: source.form.phonePlaceholder, ...options });
     const { translated: emailPlaceholder } = useTranslation({ text: source.form.emailPlaceholder, ...options });
     const { translated: noClinic } = useTranslation({ text: source.form.noClinic, ...options });
+    const { translated: primaryClinic } = useTranslation({ text: source.form.primaryClinic, ...options });
+    const { translated: secondClinic } = useTranslation({ text: source.form.secondClinic, ...options });
+    const { translated: availabilityClinic } = useTranslation({ text: source.form.availabilityClinic, ...options });
+    const { translated: clinicRequired } = useTranslation({ text: source.form.clinicRequired, ...options });
+    const { translated: clinicRequiredForAvailability } = useTranslation({ text: source.form.clinicRequiredForAvailability, ...options });
+    const { translated: slotUnavailableAtAnotherClinic } = useTranslation({ text: source.form.slotUnavailableAtAnotherClinic, ...options });
+    const { translated: historicalAvailability } = useTranslation({ text: source.form.historicalAvailability, ...options });
     const { translated: noSpecialty } = useTranslation({ text: source.form.noSpecialty, ...options });
     const { translated: smsEnabled } = useTranslation({ text: source.form.smsEnabled, ...options });
     const { translated: availabilityTitle } = useTranslation({ text: source.form.availabilityTitle, ...options });
@@ -112,7 +120,8 @@ function useSpecialistsPageLabels(targetLang: string) {
         requiredIdentity, invalidAvailability, deleteConfirm, editTitle,
         createTitle, firstNamePlaceholder, lastNamePlaceholder,
         doctorNumberPlaceholder, phonePlaceholder, emailPlaceholder,
-        noClinic, noSpecialty, smsEnabled, availabilityTitle, targetMonth,
+        noClinic, primaryClinic, secondClinic, availabilityClinic, clinicRequired,
+        clinicRequiredForAvailability, slotUnavailableAtAnotherClinic, historicalAvailability, noSpecialty, smsEnabled, availabilityTitle, targetMonth,
         selectDaysHint, noDaySelected, chooseRangePrefix, slotHelp,
         multipleSlotsHint, noSlot, editSlot, removeDay, isoHint, save, create,
         cancel, searchTitle, searchLastNamePlaceholder,
@@ -176,6 +185,19 @@ function formatDisponibilites(disponibilites?: string[]) {
     });
 
     return formatted.filter(Boolean).join(" · ");
+}
+
+function specialistPracticeLocations(specialist: Specialist) {
+    if (specialist.practiceLocations?.length) {
+        return specialist.practiceLocations;
+    }
+    if (specialist.clinique_associer) {
+        return [{
+            clinique: String(specialist.clinique_associer),
+            disponibilites: specialist.disponibilites ?? [],
+        }];
+    }
+    return [];
 }
 
 function toLocalDateKey(date: Date) {
@@ -269,6 +291,7 @@ export function SpecialistsPage() {
         email: "",
         texto: false,
         clinique_associer: "",
+        secondaryClinique: "",
         specialite: "",
         disponibilites: [] as DisponibiliteForm[],
     });
@@ -279,6 +302,7 @@ export function SpecialistsPage() {
         ).padStart(2, "0")}`;
     });
     const [activeDay, setActiveDay] = useState<string | null>(null);
+    const [availabilityClinique, setAvailabilityClinique] = useState("");
     const [lastClickedSlot, setLastClickedSlot] = useState<string | null>(
         null
     );
@@ -392,6 +416,7 @@ export function SpecialistsPage() {
             email: "",
             texto: false,
             clinique_associer: "",
+            secondaryClinique: "",
             specialite: "",
             disponibilites: [],
         });
@@ -402,6 +427,7 @@ export function SpecialistsPage() {
             ).padStart(2, "0")}`
         );
         setActiveDay(null);
+        setAvailabilityClinique("");
     }
 
     function handleCliniqueSelection(value: string) {
@@ -412,20 +438,32 @@ export function SpecialistsPage() {
         setForm((prev) => ({
             ...prev,
             clinique_associer: value,
+            secondaryClinique:
+                prev.secondaryClinique === value ? "" : prev.secondaryClinique,
             telephone,
             email,
         }));
+        setAvailabilityClinique(value);
     }
 
     function toPayload(
         values: typeof form
     ): { payload?: SpecialistPayload; error?: string } {
         const now = new Date();
-        const slots: string[] = [];
+        const slotsByClinique = new Map<string, string[]>();
         const seen = new Set<string>();
 
+        if (!values.clinique_associer.trim()) {
+            return { error: pageLabels.clinicRequired };
+        }
+
         for (const slot of values.disponibilites) {
-            if (!slot.date || !slot.slots || slot.slots.length === 0) {
+            if (
+                !slot.date ||
+                !slot.clinique ||
+                !slot.slots ||
+                slot.slots.length === 0
+            ) {
                 return {
                     error: pageLabels.availabilityRequiresDateAndSlot,
                 };
@@ -470,7 +508,10 @@ export function SpecialistsPage() {
                         error: pageLabels.invalidAvailabilityDates,
                     };
                 }
-                if (start.getTime() < now.getTime()) {
+                // Existing schedules are retained when editing a specialist.
+                // The calendar does not allow creating past slots, and the API
+                // independently rejects any newly submitted past availability.
+                if (!editingId && start.getTime() < now.getTime()) {
                     return {
                         error: pageLabels.availabilityInPast,
                     };
@@ -482,24 +523,36 @@ export function SpecialistsPage() {
                     };
                 }
                 seen.add(iso);
-                slots.push(iso);
+                const locationSlots = slotsByClinique.get(slot.clinique) ?? [];
+                locationSlots.push(iso);
+                slotsByClinique.set(slot.clinique, locationSlots);
             }
         }
 
-        if (slots.length === 0 && values.disponibilites.length > 0) {
+        if (slotsByClinique.size === 0 && values.disponibilites.length > 0) {
             return {
                 error: pageLabels.availabilityRequiresSlot,
             };
         }
 
-        const ordered = slots.slice().sort();
+        const clinicIds = [
+            values.clinique_associer.trim(),
+            values.secondaryClinique.trim(),
+        ].filter(Boolean);
+        if (new Set(clinicIds).size !== clinicIds.length) {
+            return { error: pageLabels.clinicRequired };
+        }
+        const practiceLocations = clinicIds.map((clinique) => ({
+            clinique,
+            disponibilites: (slotsByClinique.get(clinique) ?? []).slice().sort(),
+        }));
 
         const payload: SpecialistPayload = {
             nom: values.nom.trim(),
             prenom: values.prenom.trim(),
             numero_medecin: values.numero_medecin.trim(),
             texto: values.texto,
-            disponibilites: ordered,
+            practiceLocations,
         };
 
         if (values.telephone.trim()) {
@@ -582,54 +635,59 @@ export function SpecialistsPage() {
         setViewMode("create");
         setExpandedSpecialistId(null);
         setEditingId(specialist._id);
-        // clinic_associer peut être string | null | undefined
-        let clinicId: string = "";
-        if (typeof specialist.clinique_associer === "string") {
-            clinicId = specialist.clinique_associer;
-        } else if (
-            specialist.clinique_associer !== null &&
-            specialist.clinique_associer !== undefined
-        ) {
-            clinicId = String(specialist.clinique_associer);
-        }
+        const practiceLocations =
+            specialist.practiceLocations?.length
+                ? specialist.practiceLocations
+                : specialist.clinique_associer
+                  ? [
+                        {
+                            clinique: String(specialist.clinique_associer),
+                            disponibilites: specialist.disponibilites ?? [],
+                        },
+                    ]
+                  : [];
+        const clinicId = practiceLocations[0]?.clinique ?? "";
+        const secondaryClinique = practiceLocations[1]?.clinique ?? "";
         const clinicContacts = getClinicContacts(clinicId || undefined);
         const telephoneValue =
             clinicContacts.telephone || specialist.telephone || "";
         const emailValue = clinicContacts.email || specialist.email || "";
-        const slots = (specialist.disponibilites ?? [])
-            .map((slot) => new Date(slot))
-            .filter((date) => !Number.isNaN(date.getTime()))
-            .sort((a, b) => a.getTime() - b.getTime());
+        const slots = practiceLocations.flatMap((location) =>
+            (location.disponibilites ?? [])
+                .map((slot) => ({ clinique: location.clinique, date: new Date(slot) }))
+                .filter((slot) => !Number.isNaN(slot.date.getTime()))
+        ).sort((left, right) => left.date.getTime() - right.date.getTime());
         const baseMonthKey =
             slots.length > 0
-                ? `${slots[0].getFullYear()}-${String(
-                      slots[0].getMonth() + 1
+                ? `${slots[0].date.getFullYear()}-${String(
+                      slots[0].date.getMonth() + 1
                   ).padStart(2, "0")}`
                 : monthKey;
-        const grouped: Record<string, Date[]> = {};
-        slots.forEach((date) => {
-            const key = `${date.getFullYear()}-${String(
-                date.getMonth() + 1
-            ).padStart(2, "0")}-${String(date.getDate()).padStart(
+        const grouped: Record<string, typeof slots> = {};
+        slots.forEach((slot) => {
+            const key = `${slot.clinique}:${slot.date.getFullYear()}-${String(
+                slot.date.getMonth() + 1
+            ).padStart(2, "0")}-${String(slot.date.getDate()).padStart(
                 2,
                 "0"
             )}`;
             if (!grouped[key]) grouped[key] = [];
-            grouped[key].push(date);
+            grouped[key].push(slot);
         });
         const disponibilites = Object.keys(grouped)
-            .filter((key) => key.startsWith(baseMonthKey))
             .sort()
             .map((key) => {
+                const [clinique, date] = key.split(":");
                 const daySlots = grouped[key].sort(
-                    (a, b) => a.getTime() - b.getTime()
+                    (a, b) => a.date.getTime() - b.date.getTime()
                 );
                 return {
-                    date: key,
+                    clinique,
+                    date,
                     slots: daySlots.map(
                         (slot) =>
-                            `${padTime(slot.getHours())}:${padTime(
-                                slot.getMinutes()
+                            `${padTime(slot.date.getHours())}:${padTime(
+                                slot.date.getMinutes()
                             )}`
                     ),
                 };
@@ -643,9 +701,12 @@ export function SpecialistsPage() {
             email: emailValue,
             texto: Boolean(specialist.texto),
             clinique_associer: clinicId,
+            secondaryClinique,
             specialite: specialist.specialite ?? "",
             disponibilites,
         });
+        setAvailabilityClinique(clinicId);
+        setActiveDay(null);
     }
 
     async function handleDelete(id: string) {
@@ -764,27 +825,54 @@ export function SpecialistsPage() {
                             value={form.email}
                             readOnly
                         />
-                        <select
-                            className="border rounded p-2"
-                            value={form.clinique_associer}
-                            onChange={(event) =>
-                                handleCliniqueSelection(
-                                    event.target.value
-                                )
-                            }
-                        >
-                            <option value="">{pageLabels.noClinic}</option>
-                            {cliniqueOptions.map((clinique) => (
-                                <option
-                                    key={clinique._id}
-                                    value={clinique._id}
-                                >
-                                    {clinique.nom}{" "}
-                                    {clinique.rue &&
-                                        `(${clinique.rue})`}
-                                </option>
-                            ))}
-                        </select>
+                        <label className="space-y-1 text-xs text-gray-600">
+                            <span>{pageLabels.primaryClinic}</span>
+                            <select
+                                className="border rounded p-2 w-full text-sm text-gray-900"
+                                value={form.clinique_associer}
+                                onChange={(event) =>
+                                    handleCliniqueSelection(event.target.value)
+                                }
+                            >
+                                <option value="">{pageLabels.noClinic}</option>
+                                {cliniqueOptions.map((clinique) => (
+                                    <option key={clinique._id} value={clinique._id}>
+                                        {clinique.nom}{" "}
+                                        {clinique.rue && `(${clinique.rue})`}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                        <label className="space-y-1 text-xs text-gray-600">
+                            <span>{pageLabels.secondClinic}</span>
+                            <select
+                                className="border rounded p-2 w-full text-sm text-gray-900"
+                                value={form.secondaryClinique}
+                                onChange={(event) => {
+                                    const value = event.target.value;
+                                    setForm((current) => ({
+                                        ...current,
+                                        secondaryClinique: value,
+                                    }));
+                                    if (
+                                        !availabilityClinique ||
+                                        availabilityClinique === form.secondaryClinique
+                                    ) {
+                                        setAvailabilityClinique(value || form.clinique_associer);
+                                    }
+                                }}
+                            >
+                                <option value="">{pageLabels.noClinic}</option>
+                                {cliniqueOptions
+                                    .filter((clinique) => clinique._id !== form.clinique_associer)
+                                    .map((clinique) => (
+                                        <option key={clinique._id} value={clinique._id}>
+                                            {clinique.nom}{" "}
+                                            {clinique.rue && `(${clinique.rue})`}
+                                        </option>
+                                    ))}
+                            </select>
+                        </label>
                         <select
                             className="border rounded p-2"
                             value={form.specialite}
@@ -825,6 +913,31 @@ export function SpecialistsPage() {
                         <div className="text-sm font-medium">
                             {pageLabels.availabilityTitle}
                         </div>
+                        <label className="block max-w-md space-y-1 text-xs text-gray-600">
+                            <span>{pageLabels.availabilityClinic}</span>
+                            <select
+                                className="w-full border rounded p-2 text-sm text-gray-900"
+                                value={availabilityClinique}
+                                onChange={(event) => {
+                                    setAvailabilityClinique(event.target.value);
+                                    setActiveDay(null);
+                                }}
+                            >
+                                <option value="">{pageLabels.noClinic}</option>
+                                {[form.clinique_associer, form.secondaryClinique]
+                                    .filter(Boolean)
+                                    .map((clinicId) => (
+                                        <option key={clinicId} value={clinicId}>
+                                            {cliniqueMap[clinicId]?.nom ?? clinicId}
+                                        </option>
+                                    ))}
+                            </select>
+                        </label>
+                        {!availabilityClinique && (
+                            <div className="text-xs text-amber-700">
+                                {pageLabels.clinicRequiredForAvailability}
+                            </div>
+                        )}
                         <div className="grid gap-3 md:grid-cols-[200px_1fr] items-start">
                             <div className="space-y-2">
                                 <label className="text-xs text-gray-600">
@@ -842,10 +955,6 @@ export function SpecialistsPage() {
                                             setMonthKey(
                                                 `${year}-${nextMonth}`
                                             );
-                                            setForm((p) => ({
-                                                ...p,
-                                                disponibilites: [],
-                                            }));
                                         }}
                                     >
                                         {pageLabels.monthOptions.map((option) => (
@@ -868,10 +977,6 @@ export function SpecialistsPage() {
                                             setMonthKey(
                                                 `${nextYear}-${month}`
                                             );
-                                            setForm((p) => ({
-                                                ...p,
-                                                disponibilites: [],
-                                            }));
                                         }}
                                     >
                                         {Array.from(
@@ -942,7 +1047,8 @@ export function SpecialistsPage() {
                                             const selected =
                                                 form.disponibilites.some(
                                                     (d) =>
-                                                        d.date === dateKey
+                                                        d.date === dateKey &&
+                                                        d.clinique === availabilityClinique
                                                 );
                                             return (
                                                 <button
@@ -957,14 +1063,16 @@ export function SpecialistsPage() {
                                                             ? "opacity-40 cursor-not-allowed"
                                                             : ""
                                                     }`}
-                                                    disabled={isPastDay}
+                                                    disabled={isPastDay || !availabilityClinique}
                                                     onClick={() => {
                                                         setForm((p) => {
                                                             const exists =
                                                                 p.disponibilites.some(
                                                                     (d) =>
                                                                         d.date ===
-                                                                        dateKey
+                                                                        dateKey &&
+                                                                        d.clinique ===
+                                                                            availabilityClinique
                                                                 );
                                                             setActiveDay(
                                                                 dateKey
@@ -977,13 +1085,16 @@ export function SpecialistsPage() {
                                                                               d
                                                                           ) =>
                                                                               d.date !==
-                                                                              dateKey
+                                                                              dateKey ||
+                                                                              d.clinique !==
+                                                                                  availabilityClinique
                                                                       )
                                                                     : [
                                                                           ...p.disponibilites,
                                                                           {
                                                                               date: dateKey,
                                                                               slots: [],
+                                                                              clinique: availabilityClinique,
                                                                           },
                                                                       ],
                                                             };
@@ -1006,7 +1117,9 @@ export function SpecialistsPage() {
                         )}
                         {activeDay &&
                             form.disponibilites.some(
-                                (d) => d.date === activeDay
+                                (d) =>
+                                    d.date === activeDay &&
+                                    d.clinique === availabilityClinique
                             ) && (
                                 <div className="border rounded p-3 bg-white space-y-2">
                                     <div className="text-sm font-medium">
@@ -1027,12 +1140,22 @@ export function SpecialistsPage() {
                                             const isPastSlot =
                                                 isToday &&
                                                 slot < minToday;
+                                            const isOccupiedAtAnotherClinic =
+                                                form.disponibilites.some(
+                                                    (availability) =>
+                                                        availability.date === activeDay &&
+                                                        availability.clinique !==
+                                                            availabilityClinique &&
+                                                        availability.slots.includes(slot)
+                                                );
                                             const isSelected =
                                                 form.disponibilites
                                                     .find(
                                                         (d) =>
                                                             d.date ===
-                                                            activeDay
+                                                            activeDay &&
+                                                            d.clinique ===
+                                                                availabilityClinique
                                                     )
                                                     ?.slots.includes(slot) ??
                                                 false;
@@ -1040,13 +1163,23 @@ export function SpecialistsPage() {
                                                 <button
                                                     key={slot}
                                                     type="button"
-                                                    disabled={isPastSlot}
+                                                    disabled={
+                                                        isPastSlot ||
+                                                        isOccupiedAtAnotherClinic
+                                                    }
+                                                    title={
+                                                        isOccupiedAtAnotherClinic
+                                                            ? pageLabels.slotUnavailableAtAnotherClinic
+                                                            : undefined
+                                                    }
                                                     className={`border rounded px-2 py-1 text-xs ${
                                                         isSelected
                                                             ? "bg-primary text-white border-primary"
+                                                            : isOccupiedAtAnotherClinic
+                                                              ? "bg-gray-100 text-gray-400 border-gray-200 line-through"
                                                             : "bg-white text-gray-700 border-gray-200"
                                                     } ${
-                                                        isPastSlot
+                                                        isPastSlot || isOccupiedAtAnotherClinic
                                                             ? "opacity-40 cursor-not-allowed"
                                                             : ""
                                                     }`}
@@ -1083,11 +1216,21 @@ export function SpecialistsPage() {
                                                                               startIndex,
                                                                               endIndex
                                                                           );
-                                                                      return TIME_SLOTS.slice(
-                                                                          from,
-                                                                          to +
-                                                                              1
-                                                                      );
+                                                                      return TIME_SLOTS
+                                                                          .slice(from, to + 1)
+                                                                          .filter(
+                                                                              (candidateSlot) =>
+                                                                                  !form.disponibilites.some(
+                                                                                      (availability) =>
+                                                                                          availability.date ===
+                                                                                              activeDay &&
+                                                                                          availability.clinique !==
+                                                                                              availabilityClinique &&
+                                                                                          availability.slots.includes(
+                                                                                              candidateSlot
+                                                                                          )
+                                                                                  )
+                                                                          );
                                                                   })()
                                                                 : null;
                                                         setForm((p) => ({
@@ -1098,7 +1241,9 @@ export function SpecialistsPage() {
                                                                         current
                                                                     ) =>
                                                                         current.date ===
-                                                                        activeDay
+                                                                        activeDay &&
+                                                                        current.clinique ===
+                                                                            availabilityClinique
                                                                             ? {
                                                                                   ...current,
                                                                                   slots: range
@@ -1148,13 +1293,25 @@ export function SpecialistsPage() {
                             .sort((a, b) =>
                                 a.date.localeCompare(b.date)
                             )
-                            .map((slot) => (
+                            .map((slot) => {
+                                const isHistorical =
+                                    slot.date < toLocalDateKey(new Date());
+                                return (
                                 <div
-                                    key={slot.date}
-                                    className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2 items-center"
+                                    key={`${slot.clinique}-${slot.date}`}
+                                    className={`grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2 items-center rounded px-2 py-1 ${
+                                        isHistorical
+                                            ? "bg-slate-100 text-slate-500"
+                                            : ""
+                                    }`}
                                 >
                                     <div className="text-sm font-medium">
-                                        {slot.date}
+                                        {slot.date} — {cliniqueMap[slot.clinique]?.nom ?? slot.clinique}
+                                        {isHistorical && (
+                                            <span className="ml-2 rounded bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
+                                                {pageLabels.historicalAvailability}
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="text-sm text-gray-700">
                                         {slot.slots.length > 0
@@ -1168,6 +1325,7 @@ export function SpecialistsPage() {
                                             className="ml-2 text-xs text-primary underline"
                                             onClick={() => {
                                                 setActiveDay(slot.date);
+                                                setAvailabilityClinique(slot.clinique);
                                             }}
                                         >
                                             {pageLabels.editSlot}
@@ -1183,7 +1341,9 @@ export function SpecialistsPage() {
                                                     p.disponibilites.filter(
                                                         (current) =>
                                                             current.date !==
-                                                            slot.date
+                                                            slot.date ||
+                                                            current.clinique !==
+                                                                slot.clinique
                                                     ),
                                             }))
                                         }
@@ -1191,7 +1351,8 @@ export function SpecialistsPage() {
                                         {pageLabels.removeDay}
                                     </button>
                                 </div>
-                            ))}
+                                );
+                            })}
                         <div className="text-xs text-gray-500">
                             {pageLabels.isoHint}
                         </div>
@@ -1289,14 +1450,25 @@ export function SpecialistsPage() {
                         {!loading &&
                             specialists.map((sp) => {
                                 const isExpanded = expandedSpecialistId === sp._id;
-                                const associatedClinique = sp.clinique_associer
-                                    ? cliniqueMap[sp.clinique_associer]
+                                const practiceLocations = specialistPracticeLocations(sp);
+                                const associatedClinique = practiceLocations[0]
+                                    ? cliniqueMap[practiceLocations[0].clinique]
                                     : undefined;
                                 const specialtyLabel = sp.specialite?.trim() || "—";
-                                const clinicLabel = associatedClinique?.nom || "—";
+                                const clinicLabel = practiceLocations
+                                    .map((location) =>
+                                        cliniqueMap[location.clinique]?.nom ?? location.clinique
+                                    )
+                                    .join(" · ") || "—";
                                 const clinicTelephone = associatedClinique?.telephone || "—";
                                 const clinicCourriel = associatedClinique?.courriel || "—";
-                                const disponibilitesLabel = formatDisponibilites(sp.disponibilites);
+                                const disponibilitesLabel = practiceLocations
+                                    .map((location) => {
+                                        const clinicName =
+                                            cliniqueMap[location.clinique]?.nom ?? location.clinique;
+                                        return `${clinicName}: ${formatDisponibilites(location.disponibilites)}`;
+                                    })
+                                    .join(" · ") || "—";
                                 const isRowHighlighted = highlightedId === sp._id;
 
                                 return (
@@ -1475,26 +1647,30 @@ export function SpecialistsPage() {
                                     specialists.map((sp) => {
                                         const isRowHighlighted =
                                             highlightedId === sp._id;
-                                        const associatedClinique = sp.clinique_associer
-                                            ? cliniqueMap[
-                                                  sp.clinique_associer
-                                              ]
+                                        const practiceLocations = specialistPracticeLocations(sp);
+                                        const associatedClinique = practiceLocations[0]
+                                            ? cliniqueMap[practiceLocations[0].clinique]
                                             : undefined;
                                         const specialtyLabel =
                                             sp.specialite?.trim() || "—";
-                                        const clinicLabel =
-                                            associatedClinique?.nom ||
-                                            "—";
+                                        const clinicLabel = practiceLocations
+                                            .map((location) =>
+                                                cliniqueMap[location.clinique]?.nom ?? location.clinique
+                                            )
+                                            .join(" · ") || "—";
                                         const clinicTelephone =
                                             associatedClinique?.telephone ||
                                             "—";
                                         const clinicCourriel =
                                             associatedClinique?.courriel ||
                                             "—";
-                                        const disponibilitesLabel =
-                                            formatDisponibilites(
-                                                sp.disponibilites
-                                            );
+                                        const disponibilitesLabel = practiceLocations
+                                            .map((location) => {
+                                                const clinicName =
+                                                    cliniqueMap[location.clinique]?.nom ?? location.clinique;
+                                                return `${clinicName}: ${formatDisponibilites(location.disponibilites)}`;
+                                            })
+                                            .join(" · ") || "—";
 
                                         return (
                                             <tr

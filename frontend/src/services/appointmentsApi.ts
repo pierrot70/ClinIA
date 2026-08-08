@@ -222,7 +222,8 @@ export async function createAppointment(
 export async function fetchAvailableSlots(
     specialist: string,
     date: string,
-    patient?: string
+    patient?: string,
+    clinique?: string
 ): Promise<ApiResponse<AvailableSlotSchedule>> {
     return withSecurityIncidentGuard(
         (async () => {
@@ -230,6 +231,9 @@ export async function fetchAvailableSlots(
                 const query = new URLSearchParams({ specialist, date });
                 if (patient) {
                     query.set("patient", patient);
+                }
+                if (clinique) {
+                    query.set("clinique", clinique);
                 }
                 const response = await authFetch(
                     `${API_URL}/api/appointments/slots?${query.toString()}`

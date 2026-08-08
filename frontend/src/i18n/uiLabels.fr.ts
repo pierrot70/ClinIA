@@ -1458,6 +1458,15 @@ export const UI_LABELS_FR = {
             phonePlaceholder: "Téléphone (automatique)",
             emailPlaceholder: "Courriel (automatique)",
             noClinic: "Aucune clinique",
+            primaryClinic: "Clinique principale *",
+            secondClinic: "Deuxième clinique (facultative)",
+            availabilityClinic: "Clinique pour ces disponibilités",
+            clinicRequired: "Sélectionnez une clinique principale.",
+            clinicRequiredForAvailability:
+                "Sélectionnez une clinique avant d'ajouter des disponibilités.",
+            slotUnavailableAtAnotherClinic:
+                "Indisponible : ce spécialiste est déjà prévu dans une autre clinique à ce créneau.",
+            historicalAvailability: "Historique",
             noSpecialty: "Aucune spécialité",
             smsEnabled: "SMS activé",
             availabilityTitle: "Disponibilités (jours du mois)",

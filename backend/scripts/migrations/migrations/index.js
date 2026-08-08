@@ -34,6 +34,8 @@ import { migration as addAppointmentCoordinationRequestIndex }
     from "./20260802-add-appointment-coordination-request-index.js";
 import { migration as extendActiveCoordinationRequestIndex }
     from "./20260802-extend-active-coordination-request-index.js";
+import { migration as addSpecialistPracticeLocations }
+    from "./20260808-add-specialist-practice-locations.js";
 export const migrations = [
     registerMigrationFramework,
     addPatientLanguageDefault,
@@ -53,4 +55,5 @@ export const migrations = [
     backfillAppointmentBookingGuards,
     addAppointmentCoordinationRequestIndex,
     extendActiveCoordinationRequestIndex,
+    addSpecialistPracticeLocations,
 ];

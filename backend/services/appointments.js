@@ -15,6 +15,30 @@ function getClinicalWriteOptions(session) {
         : CLINICAL_WRITE_CONCERN;
 }
 
+export function getPracticeLocations(specialist) {
+    if (Array.isArray(specialist?.practiceLocations) && specialist.practiceLocations.length > 0) {
+        return specialist.practiceLocations.map((location) => ({
+            clinique: String(location.clinique),
+            disponibilites: location.disponibilites || [],
+        }));
+    }
+
+    if (specialist?.clinique_associer) {
+        return [{
+            clinique: String(specialist.clinique_associer),
+            disponibilites: specialist.disponibilites || [],
+        }];
+    }
+
+    return [];
+}
+
+function hasPracticeLocation(specialist, clinique) {
+    return getPracticeLocations(specialist).some(
+        (location) => location.clinique === String(clinique)
+    );
+}
+
 const MAX_SAME_DAY_PATIENT_SPECIALIST_APPOINTMENTS = 2;
 
 function isPatientDateTimeDuplicate(error) {
@@ -170,6 +194,8 @@ export async function createAppointment(dto, authUser, { session = null } = {}) 
     const specialist = await Specialist.findById(dto.specialist, {
         clinique_associer: 1,
         specialite: 1,
+        disponibilites: 1,
+        practiceLocations: 1,
     }).lean();
     if (!specialist) {
         throw {
@@ -188,7 +214,7 @@ export async function createAppointment(dto, authUser, { session = null } = {}) 
             };
         }
 
-        if (String(specialist.clinique_associer || "") !== dto.clinique) {
+        if (!hasPracticeLocation(specialist, dto.clinique)) {
             throw {
                 code: "INVALID_INPUT",
                 message:
@@ -197,10 +223,17 @@ export async function createAppointment(dto, authUser, { session = null } = {}) 
         }
     }
 
+    if (!dto.clinique && getPracticeLocations(specialist).length > 1) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Une clinique doit être sélectionnée pour ce spécialiste.",
+        };
+    }
+
     const availableSlots = await getAvailableSlots(
         dto.specialist,
         dto.date,
-        { patient: dto.patient }
+        { patient: dto.patient, clinique: dto.clinique }
     );
     if (!availableSlots.includes(dto.time)) {
         throw {
@@ -463,6 +496,7 @@ export async function updateAppointmentSchedule(id, { date, time }, authUser, { 
         {
             patient: String(appointment.patient),
             excludeAppointmentId: String(appointment._id),
+            clinique: appointment.clinique ? String(appointment.clinique) : null,
         }
     );
     if (!availableSlots.includes(time)) {
@@ -688,13 +722,14 @@ function calculateDistanceKm(origin, destination) {
     return 2 * 6371 * Math.asin(Math.sqrt(haversine));
 }
 
-async function findEarliestSpecialistSchedule(specialists, patientId) {
+async function findEarliestSpecialistSchedule(specialistLocations, patientId) {
     let earliest = null;
 
-    for (const specialist of specialists) {
+    for (const candidateLocation of specialistLocations) {
+        const { specialist, clinique } = candidateLocation;
         const dates = Array.from(
             new Set(
-                (specialist.disponibilites || [])
+                (candidateLocation.disponibilites || [])
                     .map(toLocalDateKey)
                     .filter((date) => date && new Date(`${date}T00:00:00`) >= new Date(new Date().toDateString()))
             )
@@ -704,12 +739,12 @@ async function findEarliestSpecialistSchedule(specialists, patientId) {
             const schedule = await getAvailableSlotSchedule(
                 String(specialist._id),
                 date,
-                { patient: patientId }
+                { patient: patientId, clinique }
             );
             const time = schedule.slots[0];
             if (!time) continue;
 
-            const candidate = { specialist, date, time, schedule };
+            const candidate = { specialist, clinique, date, time, schedule };
             if (
                 !earliest ||
                 `${candidate.date}T${candidate.time}` <
@@ -741,12 +776,18 @@ export async function listManualAppointmentOptions({ specialty }) {
         specialite: normalizedSpecialty,
         clinique_associer: { $ne: null },
     }).lean();
-    if (specialists.length === 0) {
+    const specialistLocations = specialists.flatMap((specialist) =>
+        getPracticeLocations(specialist).map((location) => ({
+            specialist,
+            ...location,
+        }))
+    );
+    if (specialistLocations.length === 0) {
         return { cliniques: [], specialists: [] };
     }
 
     const clinicIds = [
-        ...new Set(specialists.map((item) => String(item.clinique_associer))),
+        ...new Set(specialistLocations.map((item) => item.clinique)),
     ];
     const clinics = await Clinique.find({ _id: { $in: clinicIds } }).lean();
 
@@ -754,12 +795,12 @@ export async function listManualAppointmentOptions({ specialty }) {
         cliniques: clinics
             .map((clinic) => ({ _id: String(clinic._id), nom: clinic.nom }))
             .sort((left, right) => left.nom.localeCompare(right.nom, "fr")),
-        specialists: specialists
-            .map((specialist) => ({
+        specialists: specialistLocations
+            .map(({ specialist, clinique }) => ({
                 _id: String(specialist._id),
                 nom: specialist.nom,
                 prenom: specialist.prenom,
-                clinique_associer: String(specialist.clinique_associer),
+                clinique_associer: clinique,
                 specialite: specialist.specialite,
             }))
             .sort((left, right) =>
@@ -870,22 +911,28 @@ export async function findNearestAvailableAppointment(
         specialite: normalizedSpecialty,
         clinique_associer: { $ne: null },
     }).lean();
-    if (specialists.length === 0) {
+    const specialistLocations = specialists.flatMap((specialist) =>
+        getPracticeLocations(specialist).map((location) => ({
+            specialist,
+            ...location,
+        }))
+    );
+    if (specialistLocations.length === 0) {
         return {
             recommendation: null,
             status: "NO_SPECIALISTS_FOR_SPECIALTY",
         };
     }
 
-    const clinicIds = [...new Set(specialists.map((item) => String(item.clinique_associer)))];
+    const clinicIds = [...new Set(specialistLocations.map((item) => item.clinique))];
     const clinics = await Clinique.find({ _id: { $in: clinicIds } }).lean();
 
     const candidates = clinics
         .map((clinic) => ({
             clinic,
             distanceKm: calculateDistanceKm(patient, clinic),
-            specialists: specialists.filter(
-                (item) => String(item.clinique_associer) === String(clinic._id)
+            specialists: specialistLocations.filter(
+                (item) => item.clinique === String(clinic._id)
             ),
         }))
         .filter((candidate) => candidate.distanceKm !== null)
@@ -935,7 +982,7 @@ function isQuarterHourTime(value) {
     return /^([01]\d|2[0-3]):(00|15|30|45)$/.test(value || "");
 }
 
-async function getSpecialistAvailableTimes(specialist, date) {
+async function getSpecialistAvailableTimes(specialist, date, clinique = null) {
     const startOfDay = new Date(`${date}T00:00`);
     const endOfDay = new Date(`${date}T23:59:59.999`);
 
@@ -945,16 +992,22 @@ async function getSpecialistAvailableTimes(specialist, date) {
 
     const specialistDoc = await Specialist.findById(
         specialist,
-        { disponibilites: 1 }
+        { disponibilites: 1, clinique_associer: 1, practiceLocations: 1 }
     ).lean();
 
     const availableTimes = new Set();
 
-    if (!specialistDoc || !Array.isArray(specialistDoc.disponibilites)) {
+    if (!specialistDoc) {
         return availableTimes;
     }
 
-    specialistDoc.disponibilites.forEach((slot) => {
+    const locations = getPracticeLocations(specialistDoc).filter(
+        (location) => !clinique || location.clinique === String(clinique)
+    );
+    const configuredSlots = locations.length
+        ? locations.flatMap((location) => location.disponibilites)
+        : specialistDoc.disponibilites || [];
+    configuredSlots.forEach((slot) => {
         const slotDate = new Date(slot);
         if (slotDate >= startOfDay && slotDate <= endOfDay) {
             availableTimes.add(formatTime(slotDate));
@@ -967,12 +1020,13 @@ async function getSpecialistAvailableTimes(specialist, date) {
 export async function getAvailableSlots(
     specialist,
     date,
-    { patient = null, excludeAppointmentId = null, authUser = null } = {}
+    { patient = null, excludeAppointmentId = null, authUser = null, clinique = null } = {}
 ) {
     const schedule = await getAvailableSlotSchedule(specialist, date, {
         patient,
         excludeAppointmentId,
         authUser,
+        clinique,
     });
 
     return schedule.slots;
@@ -981,7 +1035,7 @@ export async function getAvailableSlots(
 export async function getAvailableSlotSchedule(
     specialist,
     date,
-    { patient = null, excludeAppointmentId = null, authUser = null } = {}
+    { patient = null, excludeAppointmentId = null, authUser = null, clinique = null } = {}
 ) {
     if (!specialist || !date) {
         throw {
@@ -1076,7 +1130,8 @@ export async function getAvailableSlotSchedule(
 
     const specialistTimes = await getSpecialistAvailableTimes(
         specialist,
-        date
+        date,
+        clinique
     );
     if (specialistTimes.size === 0) {
         return {

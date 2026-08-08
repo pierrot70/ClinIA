@@ -53,6 +53,19 @@ function normalizeDisponibilites(value) {
     return parsed;
 }
 
+function normalizePracticeLocations(value) {
+    if (value === undefined) return undefined;
+    if (!Array.isArray(value)) return "__invalid__";
+
+    return value.map((location) => {
+        if (!location || typeof location !== "object") return null;
+        const clinique = normalizeCliniqueAssocier(location.clinique);
+        const disponibilites = normalizeDisponibilites(location.disponibilites);
+        if (!clinique || disponibilites === "__invalid__") return null;
+        return { clinique, disponibilites: disponibilites || [] };
+    });
+}
+
 export function toCreateSpecialistDTO(body) {
     const telephoneRaw = body.telephone?.trim();
 
@@ -71,6 +84,7 @@ export function toCreateSpecialistDTO(body) {
         ),
         specialite: normalizeSpecialite(body.specialite),
         disponibilites: normalizeDisponibilites(body.disponibilites),
+        practiceLocations: normalizePracticeLocations(body.practiceLocations),
     };
 }
 
@@ -100,6 +114,10 @@ export function toUpdateSpecialistDTO(body) {
     if (body.disponibilites !== undefined)
         dto.disponibilites = normalizeDisponibilites(
             body.disponibilites
+        );
+    if (body.practiceLocations !== undefined)
+        dto.practiceLocations = normalizePracticeLocations(
+            body.practiceLocations
         );
 
     return dto;

@@ -206,12 +206,13 @@ router.get("/recommendation", async (req, res) => {
 /* ------------------------------------------------------------------ */
 
 router.get("/slots", async (req, res) => {
-    const { specialist, date, patient } = req.query;
+    const { specialist, date, patient, clinique } = req.query;
 
     try {
         const schedule = await getAvailableSlotSchedule(specialist, date, {
             patient,
             authUser: req.auth,
+            clinique,
         });
 
         return res.status(200).json({

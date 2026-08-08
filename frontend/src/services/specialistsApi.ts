@@ -14,6 +14,10 @@ export interface Specialist {
     clinique_associer?: string | null;
     specialite?: string;
     disponibilites?: string[];
+    practiceLocations?: Array<{
+        clinique: string;
+        disponibilites: string[];
+    }>;
 }
 
 export interface PaginatedSpecialists {
@@ -38,6 +42,10 @@ export interface SpecialistPayload {
     clinique_associer?: string | null;
     specialite?: string;
     disponibilites?: string[];
+    practiceLocations?: Array<{
+        clinique: string;
+        disponibilites: string[];
+    }>;
 }
 
 async function safeJson(response: Response): Promise<any> {

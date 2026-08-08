@@ -172,6 +172,31 @@ describe("appointments service", () => {
         ).resolves.toEqual(["12:00", "18:45"]);
     });
 
+    it("scopes a two-clinic specialist's slots to the selected clinic", async () => {
+        const specialistId = "507f1f77bcf86cd799439021";
+        const clinicA = "507f1f77bcf86cd799439022";
+        const clinicB = "507f1f77bcf86cd799439023";
+        specialistFindById.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                practiceLocations: [
+                    {
+                        clinique: clinicA,
+                        disponibilites: [new Date("2099-01-01T10:00:00")],
+                    },
+                    {
+                        clinique: clinicB,
+                        disponibilites: [new Date("2099-01-01T11:00:00")],
+                    },
+                ],
+            }),
+        });
+        find.mockReturnValue({ lean: vi.fn().mockResolvedValue([]) });
+
+        await expect(
+            getAvailableSlots(specialistId, "2099-01-01", { clinique: clinicB })
+        ).resolves.toEqual(["11:00"]);
+    });
+
     it("recommends the nearest clinic that has a free specialty appointment", async () => {
         const patientId = "507f1f77bcf86cd799439012";
         const nearbyClinicId = "507f1f77bcf86cd799439021";
@@ -402,6 +427,56 @@ describe("appointments service", () => {
         expect(specialistFind).toHaveBeenCalledWith({
             specialite: "Cardiologue",
             clinique_associer: { $ne: null },
+        });
+    });
+
+    it("lists each practice location for a specialist who works at two clinics", async () => {
+        const clinicA = "507f1f77bcf86cd799439021";
+        const clinicB = "507f1f77bcf86cd799439022";
+        const specialistId = "507f1f77bcf86cd799439031";
+        specialistFind.mockReturnValue({
+            lean: vi.fn().mockResolvedValue([{
+                _id: specialistId,
+                nom: "Morgan",
+                prenom: "Dexter",
+                specialite: "Cardiologue",
+                clinique_associer: clinicA,
+                practiceLocations: [
+                    { clinique: clinicA, disponibilites: [] },
+                    { clinique: clinicB, disponibilites: [] },
+                ],
+            }]),
+        });
+        cliniqueFind.mockReturnValue({
+            lean: vi.fn().mockResolvedValue([
+                { _id: clinicA, nom: "Clinique A" },
+                { _id: clinicB, nom: "Clinique B" },
+            ]),
+        });
+
+        await expect(
+            listManualAppointmentOptions({ specialty: "Cardiologue" })
+        ).resolves.toEqual({
+            cliniques: [
+                { _id: clinicA, nom: "Clinique A" },
+                { _id: clinicB, nom: "Clinique B" },
+            ],
+            specialists: [
+                {
+                    _id: specialistId,
+                    nom: "Morgan",
+                    prenom: "Dexter",
+                    specialite: "Cardiologue",
+                    clinique_associer: clinicA,
+                },
+                {
+                    _id: specialistId,
+                    nom: "Morgan",
+                    prenom: "Dexter",
+                    specialite: "Cardiologue",
+                    clinique_associer: clinicB,
+                },
+            ],
         });
     });
 

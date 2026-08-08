@@ -468,7 +468,8 @@ export function AppointmentsPage() {
             const response = await fetchAvailableSlots(
                 specialist,
                 date,
-                patientId || undefined
+                patientId || undefined,
+                clinique || undefined
             );
             const schedule = "data" in response ? response.data : null;
             const slots = schedule?.slots ?? [];
@@ -486,7 +487,7 @@ export function AppointmentsPage() {
 
     useEffect(() => {
         void refreshSlots();
-    }, [specialist, date, patientId]);
+    }, [specialist, date, patientId, clinique]);
 
     /* ------------------------------------------------------------------ */
     /* Validation                                                         */

@@ -1,5 +1,17 @@
 import mongoose from "mongoose";
 
+const PracticeLocationSchema = new mongoose.Schema(
+    {
+        clinique: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Clinique",
+            required: true,
+        },
+        disponibilites: [{ type: Date }],
+    },
+    { _id: false }
+);
+
 /* ------------------------------------------------------------------ */
 /* Specialist Schema                                                   */
 /* ------------------------------------------------------------------ */
@@ -52,6 +64,12 @@ const SpecialistSchema = new mongoose.Schema(
                 type: Date,
             },
         ],
+        // New scheduling source of truth. Legacy fields above remain during
+        // the compatibility window for existing API consumers and data.
+        practiceLocations: {
+            type: [PracticeLocationSchema],
+            default: undefined,
+        },
     },
     {
         timestamps: true,

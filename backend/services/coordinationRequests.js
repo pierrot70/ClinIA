@@ -5,7 +5,9 @@ import { AdminUser } from "../models/AdminUser.js";
 import { Specialist } from "../models/Specialist.js";
 import { Clinique } from "../models/Clinique.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
-import { getAvailableSlotSchedule } from "./appointments.js";
+import {
+    getAvailableSlotSchedule,
+} from "./appointments.js";
 
 const DEFAULT_PAGE_LIMIT = 20;
 const MAX_PAGE_LIMIT = 100;
@@ -129,12 +131,34 @@ function localDateKey(value) {
     ).padStart(2, "0")}`;
 }
 
+function getPracticeLocations(specialist) {
+    if (Array.isArray(specialist?.practiceLocations) && specialist.practiceLocations.length) {
+        return specialist.practiceLocations.map((location) => ({
+            clinique: String(location.clinique),
+            disponibilites: location.disponibilites || [],
+        }));
+    }
+    if (specialist?.clinique_associer) {
+        return [{
+            clinique: String(specialist.clinique_associer),
+            disponibilites: specialist.disponibilites || [],
+        }];
+    }
+    return [];
+}
+
 async function findEarliestAvailabilityForRequest(request) {
     const specialists = await Specialist.find({
         specialite: request.specialty,
         clinique_associer: { $ne: null },
     }).lean();
-    if (specialists.length === 0) {
+    const specialistLocations = specialists.flatMap((specialist) =>
+        getPracticeLocations(specialist).map((location) => ({
+            specialist,
+            ...location,
+        }))
+    );
+    if (specialistLocations.length === 0) {
         throw coordinationError(
             "NO_SPECIALISTS_FOR_SPECIALTY",
             "Aucun spécialiste associé à une clinique n'est disponible pour cette spécialité."
@@ -142,18 +166,19 @@ async function findEarliestAvailabilityForRequest(request) {
     }
 
     const clinicIds = [
-        ...new Set(specialists.map((specialist) => String(specialist.clinique_associer))),
+        ...new Set(specialistLocations.map((location) => location.clinique)),
     ];
     const clinics = await Clinique.find({ _id: { $in: clinicIds } }).lean();
     const clinicsById = toIdMap(clinics);
     let earliest = null;
 
-    for (const specialist of specialists) {
-        const clinic = clinicsById.get(String(specialist.clinique_associer));
-        if (!clinic || !Array.isArray(specialist.disponibilites)) continue;
+    for (const candidateLocation of specialistLocations) {
+        const { specialist, clinique, disponibilites } = candidateLocation;
+        const clinic = clinicsById.get(clinique);
+        if (!clinic || !Array.isArray(disponibilites)) continue;
 
         const futureDates = [...new Set(
-            specialist.disponibilites
+            disponibilites
                 .filter((slot) => new Date(slot).getTime() > Date.now())
                 .map(localDateKey)
                 .filter(Boolean)
@@ -163,7 +188,7 @@ async function findEarliestAvailabilityForRequest(request) {
             const schedule = await getAvailableSlotSchedule(
                 String(specialist._id),
                 date,
-                { patient: String(request.patient) }
+                { patient: String(request.patient), clinique }
             );
             const time = schedule.slots[0];
             if (!time) continue;
