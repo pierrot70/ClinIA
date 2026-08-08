@@ -206,13 +206,14 @@ router.get("/recommendation", async (req, res) => {
 /* ------------------------------------------------------------------ */
 
 router.get("/slots", async (req, res) => {
-    const { specialist, date, patient, clinique } = req.query;
+    const { specialist, date, patient, clinique, excludeAppointmentId } = req.query;
 
     try {
         const schedule = await getAvailableSlotSchedule(specialist, date, {
             patient,
             authUser: req.auth,
             clinique,
+            excludeAppointmentId,
         });
 
         return res.status(200).json({
@@ -638,7 +639,7 @@ router.patch("/:id/status", async (req, res) => {
 /* ------------------------------------------------------------------ */
 
 router.patch("/:id/schedule", async (req, res) => {
-    const { date, time } = req.body;
+    const { date, time, clinique } = req.body;
 
     if (!date || !time) {
         return res.status(400).json({
@@ -652,12 +653,12 @@ router.patch("/:id/schedule", async (req, res) => {
 
     try {
         const audit = await buildAppointmentWriteAudit(req, {
-            changedFields: ["date", "time"],
+            changedFields: ["date", "time", ...(clinique !== undefined ? ["clinique"] : [])],
         });
         const { appointment, writeAuditRecorded } =
             await updateAppointmentScheduleWithWriteVerification(
                 req.params.id,
-                { date, time },
+                { date, time, clinique },
                 req.auth,
                 audit
             );
@@ -699,6 +700,7 @@ router.patch("/:id/schedule", async (req, res) => {
                 "SPECIALIST_ALREADY_BOOKED",
                 "PATIENT_ALREADY_BOOKED",
                 "MAXIMUM_APPOINTMENTS_REACHED",
+                "NO_AVAILABILITY",
             ].includes(err.code)
         ) {
             return res.status(409).json({

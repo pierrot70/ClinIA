@@ -8,6 +8,7 @@ const {
     listManualAppointmentOptions,
     listAppointmentsPaginated,
     updateAppointmentStatusWithWriteVerification,
+    updateAppointmentScheduleWithWriteVerification,
 } = vi.hoisted(() => ({
     createAppointmentWithWriteVerification: vi.fn(),
     createAppointmentCoordinationRequest: vi.fn(),
@@ -16,6 +17,7 @@ const {
     listManualAppointmentOptions: vi.fn(),
     listAppointmentsPaginated: vi.fn(),
     updateAppointmentStatusWithWriteVerification: vi.fn(),
+    updateAppointmentScheduleWithWriteVerification: vi.fn(),
 }));
 
 const { toCreateAppointmentDTO } = vi.hoisted(() => ({
@@ -39,7 +41,7 @@ vi.mock("../../services/appointments.js", () => ({
     getAppointmentById: vi.fn(),
     cancelAppointmentWithWriteVerification: vi.fn(),
     updateAppointmentStatusWithWriteVerification,
-    updateAppointmentScheduleWithWriteVerification: vi.fn(),
+    updateAppointmentScheduleWithWriteVerification,
     listAppointmentsPaginated,
 }));
 
@@ -103,6 +105,8 @@ describe("appointments routes write verification", () => {
                 specialist: "specialist-1",
                 date: "2026-08-03",
                 patient: "patient-1",
+                clinique: "clinic-1",
+                excludeAppointmentId: "appointment-1",
             },
             auth: {
                 userId: "doctor-1",
@@ -122,7 +126,12 @@ describe("appointments routes write verification", () => {
         expect(getAvailableSlotSchedule).toHaveBeenCalledWith(
             "specialist-1",
             "2026-08-03",
-            { patient: "patient-1", authUser: req.auth }
+            {
+                patient: "patient-1",
+                authUser: req.auth,
+                clinique: "clinic-1",
+                excludeAppointmentId: "appointment-1",
+            }
         );
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith(
@@ -448,6 +457,71 @@ describe("appointments routes write verification", () => {
                 retryable: false,
             },
         });
+    });
+
+    it("returns a conflict when a selected schedule slot is no longer available", async () => {
+        const handler = getRouteHandler("patch", "/:id/schedule");
+        const req = {
+            params: { id: "appointment-1" },
+            body: { date: "2026-08-09", time: "12:30" },
+            headers: {},
+            auth: { userId: "doctor-1", role: "MEDECIN" },
+            originalUrl: "/api/appointments/appointment-1/schedule",
+            requestContext: { requestId: "request-schedule", instanceId: "instance-a" },
+        };
+        const res = makeRes();
+        updateAppointmentScheduleWithWriteVerification.mockRejectedValue({
+            code: "NO_AVAILABILITY",
+            message: "Aucun créneau disponible pour ce spécialiste.",
+        });
+
+        await handler(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "NO_AVAILABILITY",
+                message: "Aucun créneau disponible pour ce spécialiste.",
+                retryable: false,
+            },
+        });
+    });
+
+    it("forwards the selected clinic when moving an appointment", async () => {
+        const handler = getRouteHandler("patch", "/:id/schedule");
+        const req = {
+            params: { id: "appointment-1" },
+            body: {
+                date: "2026-08-09",
+                time: "08:30",
+                clinique: "clinic-2",
+            },
+            headers: {},
+            auth: { userId: "doctor-1", role: "MEDECIN" },
+            originalUrl: "/api/appointments/appointment-1/schedule",
+            requestContext: { requestId: "request-schedule-clinic", instanceId: "instance-a" },
+        };
+        const res = makeRes();
+        updateAppointmentScheduleWithWriteVerification.mockResolvedValue({
+            appointment: { _id: "appointment-1" },
+            writeAuditRecorded: true,
+        });
+
+        await handler(req, res);
+
+        expect(updateAppointmentScheduleWithWriteVerification).toHaveBeenCalledWith(
+            "appointment-1",
+            {
+                date: "2026-08-09",
+                time: "08:30",
+                clinique: "clinic-2",
+            },
+            req.auth,
+            expect.objectContaining({
+                changedFields: ["date", "time", "clinique"],
+            })
+        );
+        expect(res.status).toHaveBeenCalledWith(200);
     });
 
     it("returns a write verification receipt on appointment status update", async () => {

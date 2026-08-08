@@ -223,7 +223,8 @@ export async function fetchAvailableSlots(
     specialist: string,
     date: string,
     patient?: string,
-    clinique?: string
+    clinique?: string,
+    excludeAppointmentId?: string
 ): Promise<ApiResponse<AvailableSlotSchedule>> {
     return withSecurityIncidentGuard(
         (async () => {
@@ -234,6 +235,9 @@ export async function fetchAvailableSlots(
                 }
                 if (clinique) {
                     query.set("clinique", clinique);
+                }
+                if (excludeAppointmentId) {
+                    query.set("excludeAppointmentId", excludeAppointmentId);
                 }
                 const response = await authFetch(
                     `${API_URL}/api/appointments/slots?${query.toString()}`
@@ -402,7 +406,7 @@ export async function updateAppointmentStatus(
 
 export async function updateAppointmentSchedule(
     id: string,
-    payload: { date: string; time: string }
+    payload: { date: string; time: string; clinique?: string }
 ): Promise<ApiResponse<Appointment>> {
     return withSecurityIncidentGuard(
         (async () => {

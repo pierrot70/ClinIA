@@ -506,6 +506,25 @@ describe("appointments service", () => {
         ).resolves.toEqual(["12:45"]);
     });
 
+    it("returns availability in the Quebec scheduling time zone", async () => {
+        const specialistId = "507f1f77bcf86cd799439021";
+        specialistFindById.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                practiceLocations: [{
+                    clinique: "clinic-1",
+                    disponibilites: [new Date("2099-01-01T13:00:00.000Z")],
+                }],
+            }),
+        });
+        find.mockReturnValue({ lean: vi.fn().mockResolvedValue([]) });
+
+        await expect(
+            getAvailableSlots(specialistId, "2099-01-01", {
+                clinique: "clinic-1",
+            })
+        ).resolves.toEqual(["08:00"]);
+    });
+
     it("reports the existing patient appointment without exposing another patient's details", async () => {
         const specialistId = "507f1f77bcf86cd799439021";
         const patientId = "507f1f77bcf86cd799439012";
@@ -697,6 +716,7 @@ describe("appointments service", () => {
     it("modifie l'horaire d'un rendez-vous", async () => {
         const appointment = buildAppointment({
             specialist: "507f1f77bcf86cd799439021",
+            clinique: "507f1f77bcf86cd799439031",
             date: "2099-01-01",
             time: "10:00",
         });
@@ -705,7 +725,10 @@ describe("appointments service", () => {
         });
         specialistFindById.mockReturnValue({
             lean: vi.fn().mockResolvedValue({
-                disponibilites: [new Date("2099-01-02T11:15:00")],
+                practiceLocations: [{
+                    clinique: "507f1f77bcf86cd799439032",
+                    disponibilites: [new Date("2099-01-02T11:15:00")],
+                }],
             }),
         });
         find.mockReturnValue({ lean: vi.fn().mockResolvedValue([]) });
@@ -715,12 +738,14 @@ describe("appointments service", () => {
             {
                 date: "2099-01-02",
                 time: "11:15",
+                clinique: "507f1f77bcf86cd799439032",
             },
             authUser
         );
 
         expect(result.date).toBe("2099-01-02");
         expect(result.time).toBe("11:15");
+        expect(result.clinique).toBe("507f1f77bcf86cd799439032");
         expect(appointment.save).toHaveBeenCalledTimes(1);
         expect(bookingGuardUpdateOne).toHaveBeenCalledWith(
             expect.objectContaining({ date: "2099-01-01" }),

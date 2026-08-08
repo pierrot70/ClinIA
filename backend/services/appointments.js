@@ -8,6 +8,12 @@ import mongoose from "mongoose";
 import { buildOwnerScope } from "../auth/resourceAccess.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
+import {
+    isSchedulingDatePast,
+    isSchedulingDateTimePast,
+    toSchedulingDateKey,
+    toSchedulingTime,
+} from "../utils/schedulingTime.js";
 
 function getClinicalWriteOptions(session) {
     return session
@@ -151,8 +157,7 @@ export async function createAppointment(dto, authUser, { session = null } = {}) 
     }
 
     // Date passée
-    const appointmentDate = new Date(`${dto.date}T${dto.time}`);
-    if (appointmentDate < new Date()) {
+    if (isSchedulingDateTimePast(dto.date, dto.time)) {
         throw {
             code: "INVALID_DATE",
             message: "Impossible de créer un rendez-vous dans le passé.",
@@ -440,7 +445,7 @@ export async function updateAppointmentStatus(id, newStatus, authUser, { session
 /* Update appointment schedule (date/time)                             */
 /* ------------------------------------------------------------------ */
 
-export async function updateAppointmentSchedule(id, { date, time }, authUser, { session = null } = {}) {
+export async function updateAppointmentSchedule(id, { date, time, clinique }, authUser, { session = null } = {}) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
             code: "INVALID_ID",
@@ -462,8 +467,7 @@ export async function updateAppointmentSchedule(id, { date, time }, authUser, { 
         };
     }
 
-    const appointmentDate = new Date(`${date}T${time}`);
-    if (appointmentDate < new Date()) {
+    if (isSchedulingDateTimePast(date, time)) {
         throw {
             code: "INVALID_DATE",
             message: "Impossible de déplacer un rendez-vous dans le passé.",
@@ -490,39 +494,52 @@ export async function updateAppointmentSchedule(id, { date, time }, authUser, { 
         };
     }
 
+    const targetClinique = clinique === undefined
+        ? appointment.clinique
+        : clinique || null;
+    if (
+        clinique !== undefined &&
+        (!targetClinique || !mongoose.Types.ObjectId.isValid(targetClinique))
+    ) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Une clinique valide est requise pour déplacer ce rendez-vous.",
+        };
+    }
+
+    const findScheduleConflict = async () => {
+        const conflictQuery = Appointment.findOne({
+            _id: { $ne: appointment._id },
+            specialist: appointment.specialist,
+            date,
+            time,
+            status: "scheduled",
+        });
+        return typeof conflictQuery?.lean === "function"
+            ? conflictQuery.lean()
+            : conflictQuery;
+    };
+
+    if (await findScheduleConflict()) {
+        throw specialistAlreadyBookedError();
+    }
+
     const availableSlots = await getAvailableSlots(
         String(appointment.specialist),
         date,
         {
             patient: String(appointment.patient),
             excludeAppointmentId: String(appointment._id),
-            clinique: appointment.clinique ? String(appointment.clinique) : null,
+            clinique: targetClinique ? String(targetClinique) : null,
         }
     );
     if (!availableSlots.includes(time)) {
+        if (await findScheduleConflict()) {
+            throw specialistAlreadyBookedError();
+        }
         throw {
             code: "NO_AVAILABILITY",
             message: "Aucun créneau disponible pour ce spécialiste.",
-        };
-    }
-
-    const conflictQuery = Appointment.findOne({
-        _id: { $ne: appointment._id },
-        specialist: appointment.specialist,
-        date,
-        time,
-        status: "scheduled",
-    });
-    const conflict =
-        typeof conflictQuery?.lean === "function"
-            ? await conflictQuery.lean()
-            : await conflictQuery;
-
-    if (conflict) {
-        throw {
-            code: "SPECIALIST_ALREADY_BOOKED",
-            message:
-                "Ce créneau est déjà réservé pour ce spécialiste.",
         };
     }
 
@@ -539,6 +556,7 @@ export async function updateAppointmentSchedule(id, { date, time }, authUser, { 
 
     appointment.date = date;
     appointment.time = time;
+    appointment.clinique = targetClinique;
     try {
         await appointment.save(getClinicalWriteOptions(session));
     } catch (error) {
@@ -682,22 +700,11 @@ export function updateAppointmentScheduleWithWriteVerification(id, schedule, aut
 /* ------------------------------------------------------------------ */
 
 function formatTime(date) {
-    return `${date
-        .getHours()
-        .toString()
-        .padStart(2, "0")}:${date
-        .getMinutes()
-        .toString()
-        .padStart(2, "0")}`;
+    return toSchedulingTime(date);
 }
 
 function toLocalDateKey(value) {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return null;
-
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-        date.getDate()
-    ).padStart(2, "0")}`;
+    return toSchedulingDateKey(value);
 }
 
 function calculateDistanceKm(origin, destination) {
@@ -731,7 +738,7 @@ async function findEarliestSpecialistSchedule(specialistLocations, patientId) {
             new Set(
                 (candidateLocation.disponibilites || [])
                     .map(toLocalDateKey)
-                    .filter((date) => date && new Date(`${date}T00:00:00`) >= new Date(new Date().toDateString()))
+                    .filter((date) => date && !isSchedulingDatePast(date))
             )
         ).sort();
 
@@ -983,9 +990,6 @@ function isQuarterHourTime(value) {
 }
 
 async function getSpecialistAvailableTimes(specialist, date, clinique = null) {
-    const startOfDay = new Date(`${date}T00:00`);
-    const endOfDay = new Date(`${date}T23:59:59.999`);
-
     if (!mongoose.Types.ObjectId.isValid(specialist)) {
         return new Set();
     }
@@ -1009,7 +1013,7 @@ async function getSpecialistAvailableTimes(specialist, date, clinique = null) {
         : specialistDoc.disponibilites || [];
     configuredSlots.forEach((slot) => {
         const slotDate = new Date(slot);
-        if (slotDate >= startOfDay && slotDate <= endOfDay) {
+        if (toSchedulingDateKey(slotDate) === date) {
             availableTimes.add(formatTime(slotDate));
         }
     });
@@ -1052,10 +1056,7 @@ export async function getAvailableSlotSchedule(
         };
     }
 
-    const today = new Date();
-    const targetDate = new Date(`${date}T00:00`);
-
-    if (targetDate < new Date(today.toDateString())) {
+    if (isSchedulingDatePast(date)) {
         return {
             slots: [],
             existingAppointmentTimes: [],
@@ -1158,9 +1159,8 @@ export async function getAvailableSlotSchedule(
 
         if (latestPatientTime && slot <= latestPatientTime) return false;
 
-        if (targetDate.toDateString() === now.toDateString()) {
-            const slotDate = new Date(`${date}T${slot}`);
-            if (slotDate <= now) return false;
+        if (isSchedulingDateTimePast(date, slot, now)) {
+            return false;
         }
 
         return true;

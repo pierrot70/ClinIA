@@ -83,11 +83,14 @@ export function AppointmentsListPage() {
     const [editDate, setEditDate] = useState("");
     const [editTime, setEditTime] = useState("");
     const [editSpecialist, setEditSpecialist] = useState("");
+    const [editClinique, setEditClinique] = useState("");
+    const [editOriginalClinique, setEditOriginalClinique] = useState("");
     const [editPatientId, setEditPatientId] = useState("");
     const [editOriginalDate, setEditOriginalDate] = useState("");
     const [editOriginalTime, setEditOriginalTime] = useState("");
     const [editSlots, setEditSlots] = useState<string[]>([]);
     const [editSlotsLoading, setEditSlotsLoading] = useState(false);
+    const [editSlotsRefreshKey, setEditSlotsRefreshKey] = useState(0);
     const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(
         null
     );
@@ -242,7 +245,9 @@ export function AppointmentsListPage() {
             const response = await fetchAvailableSlots(
                 editSpecialist,
                 editDate,
-                editPatientId
+                editPatientId,
+                editClinique || undefined,
+                editingId
             );
 
             if (!cancelled && "data" in response) {
@@ -259,7 +264,14 @@ export function AppointmentsListPage() {
         return () => {
             cancelled = true;
         };
-    }, [editingId, editSpecialist, editDate, editPatientId]);
+    }, [
+        editingId,
+        editSpecialist,
+        editDate,
+        editPatientId,
+        editClinique,
+        editSlotsRefreshKey,
+    ]);
 
     async function loadAppointments() {
         setLoading(true);
@@ -410,6 +422,8 @@ export function AppointmentsListPage() {
         options?: {
             confirmMessage?: string;
             successMessage?: string;
+            errorMessage?: (error: ApiError) => string;
+            onError?: (error: ApiError) => void;
         }
     ): Promise<boolean> {
         if (options?.confirmMessage) {
@@ -426,7 +440,11 @@ export function AppointmentsListPage() {
 
         if ("error" in response) {
             setError(response.error);
-            showToast("error", response.error.message);
+            options?.onError?.(response.error);
+            showToast(
+                "error",
+                options?.errorMessage?.(response.error) ?? response.error.message
+            );
             setBusyIds((p) => ({ ...p, [id]: false }));
             return false;
         }
@@ -448,6 +466,8 @@ export function AppointmentsListPage() {
         setEditDate(appointment.date);
         setEditTime(appointment.time);
         setEditSpecialist(appointment.specialist);
+        setEditClinique(appointment.clinique ?? "");
+        setEditOriginalClinique(appointment.clinique ?? "");
         setEditPatientId(appointment.patient ?? "");
         setEditOriginalDate(appointment.date);
         setEditOriginalTime(appointment.time);
@@ -459,6 +479,8 @@ export function AppointmentsListPage() {
         setEditDate("");
         setEditTime("");
         setEditSpecialist("");
+        setEditClinique("");
+        setEditOriginalClinique("");
         setEditPatientId("");
         setEditOriginalDate("");
         setEditOriginalTime("");
@@ -470,7 +492,8 @@ export function AppointmentsListPage() {
 
         if (
             editDate === editOriginalDate &&
-            editTime === editOriginalTime
+            editTime === editOriginalTime &&
+            editClinique === editOriginalClinique
         ) {
             showToast(
                 "info",
@@ -485,11 +508,28 @@ export function AppointmentsListPage() {
                 updateAppointmentSchedule(id, {
                     date: editDate,
                     time: editTime,
+                    clinique: editClinique || undefined,
                 }),
             {
                 confirmMessage: `Confirmer le déplacement du rendez-vous au ${editDate} à ${editTime} ?`,
                 successMessage:
                     "Horaire du rendez-vous mis à jour.",
+                errorMessage: (error) =>
+                    ["SPECIALIST_ALREADY_BOOKED", "APPOINTMENT_CONFLICT"].includes(
+                        error.code
+                    )
+                        ? labels.appointmentsList.edit.slotJustBooked
+                        : error.message,
+                onError: (error) => {
+                    if (
+                        ["SPECIALIST_ALREADY_BOOKED", "APPOINTMENT_CONFLICT"].includes(
+                            error.code
+                        )
+                    ) {
+                        setEditTime("");
+                        setEditSlotsRefreshKey((value) => value + 1);
+                    }
+                },
             }
         );
 
@@ -511,7 +551,9 @@ export function AppointmentsListPage() {
 
     const isEditFormComplete = Boolean(editDate && editTime);
     const isEditTimeSameAsOriginal =
-        editDate === editOriginalDate && editTime === editOriginalTime;
+        editDate === editOriginalDate &&
+        editTime === editOriginalTime &&
+        editClinique === editOriginalClinique;
     const isEditTimeAllowed =
         isEditTimeSameAsOriginal || editSlots.includes(editTime);
 
@@ -698,7 +740,34 @@ export function AppointmentsListPage() {
                                     )}
                                 </td>
                                 <td className="p-2">
-                                    {formatCliniqueName(a)}
+                                    {editingId === a._id ? (
+                                        <select
+                                            className="border rounded p-1"
+                                            value={editClinique}
+                                            aria-label={labels.appointmentsList.edit.clinicLabel}
+                                            onChange={(event) => {
+                                                setEditClinique(event.target.value);
+                                                setEditTime("");
+                                            }}
+                                        >
+                                            {(resolvedSpecialist?.practiceLocations?.length
+                                                ? resolvedSpecialist.practiceLocations.map(
+                                                      (location) => location.clinique
+                                                  )
+                                                : resolvedSpecialist?.clinique_associer
+                                                  ? [resolvedSpecialist.clinique_associer]
+                                                  : [editClinique]
+                                            )
+                                                .filter(Boolean)
+                                                .map((clinicId) => (
+                                                    <option key={clinicId} value={clinicId}>
+                                                        {cliniqueLookup.get(clinicId) || "—"}
+                                                    </option>
+                                                ))}
+                                        </select>
+                                    ) : (
+                                        formatCliniqueName(a)
+                                    )}
                                 </td>
                                 <td className="p-2">
                                     {editingId === a._id ? (
@@ -730,7 +799,7 @@ export function AppointmentsListPage() {
                                                 }
                                             />
                                             <div className="text-xs text-gray-500">
-                                                Créneaux disponibles
+                                                {labels.appointmentsList.edit.availableSlots}
                                             </div>
                                             {editSlotsLoading && (
                                                 <div className="text-xs text-gray-400">
@@ -883,7 +952,7 @@ export function AppointmentsListPage() {
                                                     startEditing(a)
                                                 }
                                             >
-                                                Modifier l’heure
+                                                {labels.appointmentsList.edit.modifySchedule}
                                             </button>
                                         </>
                                     )}

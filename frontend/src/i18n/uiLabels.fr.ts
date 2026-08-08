@@ -1225,6 +1225,13 @@ export const UI_LABELS_FR = {
         filters: {
             allClinics: "Toutes les cliniques",
         },
+        edit: {
+            clinicLabel: "Clinique",
+            availableSlots: "Créneaux disponibles",
+            modifySchedule: "Modifier l’horaire et la clinique",
+            slotJustBooked:
+                "Ce créneau vient d’être réservé. Choisissez un autre créneau disponible.",
+        },
         table: {
             clinic: "Clinique",
             sortDateAscending: "Trier par date et heure : du plus tôt au plus tard",
