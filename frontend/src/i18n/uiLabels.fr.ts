@@ -1184,6 +1184,7 @@ export const UI_LABELS_FR = {
             recommendationSlot: "Premier créneau disponible",
             recommendationUpdatedAfterConflict:
                 "Ce créneau vient d'être réservé. Une nouvelle proposition est affichée.",
+            changeClinic: "Choisir une autre clinique",
             manualAssignment: "Attribuer manuellement un rendez-vous",
             manualOptionsLoading: "Chargement des options manuelles...",
             manualClinicChoose: "Choisir une clinique *",

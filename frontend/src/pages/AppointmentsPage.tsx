@@ -59,6 +59,7 @@ function useAppointmentsPageLabels(targetLang: string) {
     const { translated: recommendationSpecialist } = useTranslation({ text: source.specialist.recommendationSpecialist, ...options });
     const { translated: recommendationSlot } = useTranslation({ text: source.specialist.recommendationSlot, ...options });
     const { translated: recommendationUpdatedAfterConflict } = useTranslation({ text: source.specialist.recommendationUpdatedAfterConflict, ...options });
+    const { translated: changeClinic } = useTranslation({ text: source.specialist.changeClinic, ...options });
     const { translated: manualAssignment } = useTranslation({ text: source.specialist.manualAssignment, ...options });
     const { translated: manualOptionsLoading } = useTranslation({ text: source.specialist.manualOptionsLoading, ...options });
     const { translated: manualClinicChoose } = useTranslation({ text: source.specialist.manualClinicChoose, ...options });
@@ -109,6 +110,7 @@ function useAppointmentsPageLabels(targetLang: string) {
         recommendationSpecialist,
         recommendationSlot,
         recommendationUpdatedAfterConflict,
+        changeClinic,
         manualAssignment,
         manualOptionsLoading,
         manualClinicChoose,
@@ -773,6 +775,16 @@ export function AppointmentsPage() {
                         <div>
                             {ui.recommendationSlot}: {recommendation.date} {recommendation.time}
                         </div>
+                        <button
+                            type="button"
+                            className="mt-2 rounded border border-blue-500 bg-white px-3 py-2 text-sm font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() => {
+                                void enableManualAssignment();
+                            }}
+                            disabled={manualOptionsLoading}
+                        >
+                            {ui.changeClinic}
+                        </button>
                     </div>
                 )}
                 {patientId && specialty && !recommendationLoading && !recommendation &&
