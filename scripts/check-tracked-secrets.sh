@@ -5,6 +5,11 @@ cd "$(git rev-parse --show-toplevel)"
 
 failures=""
 
+tracked_cookie_jars="$(git ls-files | grep -E '(^|/)cookies\.txt$' || true)"
+if [[ -n "$tracked_cookie_jars" ]]; then
+  failures+=$'\nTracked cookie jar detected.\n'"$tracked_cookie_jars"$'\n'
+fi
+
 check_pattern() {
   local description="$1"
   local pattern="$2"

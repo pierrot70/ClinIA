@@ -10,6 +10,7 @@ build/
 .env.local
 .env.development
 .env.production
+cookies.txt
 
 # Ignore logs
 npm-debug.log*
