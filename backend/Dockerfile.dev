@@ -2,14 +2,12 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY . .
 
-# nodemon pour reload backend
-RUN npm install -g nodemon
-
 EXPOSE 4000
 
-CMD ["nodemon", "-L", "index.js"]
+# Nodemon est une devDependency verrouillée; aucune installation globale n'est requise.
+CMD ["npx", "--no-install", "nodemon", "-L", "index.js"]

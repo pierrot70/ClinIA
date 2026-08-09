@@ -14,7 +14,7 @@
     "lucide-react": "0.469.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "react-router-dom": "7.18.1",
+    "react-router-dom": "7.18.2",
     "recharts": "2.12.7"
   },
   "devDependencies": {
@@ -27,7 +27,7 @@
     "@vitejs/plugin-react-swc": "4.3.1",
     "autoprefixer": "10.4.20",
     "jsdom": "29.0.1",
-    "postcss": "8.5.19",
+    "postcss": "8.5.26",
     "tailwindcss": "3.4.7",
     "typescript": "5.6.3",
     "vite": "6.4.3",
