@@ -1591,6 +1591,26 @@ const Header: React.FC = () => {
                                 </div>
                             </div>
 
+                            {showAdminHeaderNav && !showSuperAdminHeaderNav && (
+                        <div className="relative group">
+                            <button
+                                type="button"
+                                className="flex items-center gap-1 rounded px-3 py-1 text-sm text-gray-600 transition hover:text-primary"
+                            >
+                                <HeaderLabel text={headerLabels.nav.appManagement} />
+                                <span className="text-xs">▾</span>
+                            </button>
+                            <div className="absolute right-0 top-full z-10 mt-2 hidden min-w-[220px] rounded-lg border border-gray-200 bg-white shadow-lg transition group-hover:block group-focus-within:block">
+                                <Link
+                                    to="/admin/coordination-requests"
+                                    className="block w-full px-4 py-2 text-left text-sm text-violet-800 transition hover:bg-violet-50"
+                                >
+                                    <HeaderLabel text={headerLabels.appManagement.coordinationRequests} />
+                                </Link>
+                            </div>
+                        </div>
+                            )}
+
                             {showSuperAdminHeaderNav && (
                         <div className="relative group">
                             <button
@@ -1905,6 +1925,13 @@ const Header: React.FC = () => {
                             <Link to="/quick" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.quickMode} /></Link>
                             <Link to="/patient-summary" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.patientSummary} /></Link>
                         </div>
+
+                        {showAdminHeaderNav && !showSuperAdminHeaderNav && (
+                            <div className="space-y-1 border-t border-gray-100 pt-2">
+                                <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500"><HeaderLabel text={headerLabels.nav.appManagement} /></div>
+                                <Link to="/admin/coordination-requests" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-violet-800 hover:bg-violet-50"><HeaderLabel text={headerLabels.appManagement.coordinationRequests} /></Link>
+                            </div>
+                        )}
 
                         {showSuperAdminHeaderNav && (
                             <div className="space-y-1 border-t border-gray-100 pt-2">
