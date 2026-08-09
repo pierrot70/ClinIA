@@ -281,6 +281,22 @@ describe("patients service audit logs", () => {
         );
     });
 
+    it("does not let an operational admin query another doctor's patients", async () => {
+        patientCountDocuments.mockResolvedValue(0);
+        patientFind.mockReturnValue(patientListQuery());
+
+        await listPatients(
+            {},
+            {},
+            { userId: "507f1f77bcf86cd799439099", role: "ADMIN" }
+        );
+
+        expect(patientFind).toHaveBeenCalledWith({
+            ownerUserId: "507f1f77bcf86cd799439099",
+            archivedAt: null,
+        });
+    });
+
     it("lists archived dossiers only when explicitly requested", async () => {
         patientCountDocuments.mockResolvedValue(0);
         patientFind.mockReturnValue(patientListQuery());

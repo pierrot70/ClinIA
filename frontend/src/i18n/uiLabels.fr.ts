@@ -1121,6 +1121,7 @@ export const UI_LABELS_FR = {
         empty: "Aucune demande de coordination pour ce filtre.",
         createdAt: "Créée le",
         patient: "Patient",
+        patientAnonymized: "Patient anonymisé",
         specialty: "Spécialité",
         requestedBy: "Demandée par",
         action: "Action",

@@ -49,7 +49,12 @@ function toIdMap(rows = []) {
     return new Map(rows.map((row) => [String(row._id), row]));
 }
 
-function serializeRequest(request, patientsById, usersById) {
+function serializeRequest(
+    request,
+    patientsById,
+    usersById,
+    { includePatientIdentity }
+) {
     const patient = patientsById.get(String(request.patient));
     const requestedBy = usersById.get(String(request.requestedByUserId));
 
@@ -64,13 +69,16 @@ function serializeRequest(request, patientsById, usersById) {
             ? String(request.resolvedAppointment)
             : null,
         resolvedAt: request.resolvedAt || null,
-        patient: patient
+        patient: includePatientIdentity && patient
             ? {
+                anonymized: false,
                 id: String(patient._id),
                 nom: patient.nom,
                 prenom: patient.prenom,
             }
-            : null,
+            : includePatientIdentity
+                ? null
+                : { anonymized: true },
         requestedBy: requestedBy
             ? { id: String(requestedBy._id), username: requestedBy.username }
             : null,
@@ -79,6 +87,7 @@ function serializeRequest(request, patientsById, usersById) {
 
 export async function listCoordinationRequests({ authUser, page, limit, status }) {
     assertCoordinationAccess(authUser);
+    const includePatientIdentity = authUser.role === "SUPERADMIN";
     const pagination = parsePagination(page, limit);
     const normalizedStatus = normalizeStatus(status);
     const query = normalizedStatus ? { status: normalizedStatus } : {};
@@ -98,7 +107,7 @@ export async function listCoordinationRequests({ authUser, page, limit, status }
         ...new Set(requests.map((request) => String(request.requestedByUserId))),
     ];
     const [patients, users] = await Promise.all([
-        patientIds.length
+        includePatientIdentity && patientIds.length
             ? Patient.find({ _id: { $in: patientIds } }, { nom: 1, prenom: 1 }).lean()
             : [],
         requesterIds.length
@@ -112,7 +121,9 @@ export async function listCoordinationRequests({ authUser, page, limit, status }
 
     return {
         requests: requests.map((request) =>
-            serializeRequest(request, patientsById, usersById)
+            serializeRequest(request, patientsById, usersById, {
+                includePatientIdentity,
+            })
         ),
         pagination: {
             page: pagination.page,

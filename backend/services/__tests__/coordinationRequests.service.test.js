@@ -37,7 +37,7 @@ describe("coordinationRequests service", () => {
         vi.clearAllMocks();
     });
 
-    it("lists only the selected status with minimal related records", async () => {
+    it("anonymizes patients for operational admins", async () => {
         const request = {
             _id: "66c000000000000000000001",
             patient: "66c000000000000000000002",
@@ -53,7 +53,6 @@ describe("coordinationRequests service", () => {
         const sortMock = vi.fn(() => ({ skip: skipMock }));
         findMock.mockReturnValue({ sort: sortMock });
         countDocumentsMock.mockResolvedValue(1);
-        patientFindMock.mockReturnValue(resolvedLean([{ _id: request.patient, nom: "Durand", prenom: "Alex" }]));
         adminUserFindMock.mockReturnValue(resolvedLean([{ _id: request.requestedByUserId, username: "medecin.1" }]));
 
         const { listCoordinationRequests } = await import("../coordinationRequests.js");
@@ -65,15 +64,55 @@ describe("coordinationRequests service", () => {
         });
 
         expect(countDocumentsMock).toHaveBeenCalledWith({ status: "open" });
+        expect(patientFindMock).not.toHaveBeenCalled();
+        expect(result.requests).toEqual([expect.objectContaining({
+            id: request._id,
+            patient: { anonymized: true },
+            requestedBy: { id: request.requestedByUserId, username: "medecin.1" },
+        })]);
+    });
+
+    it("keeps patient identity available to superadmins", async () => {
+        const request = {
+            _id: "66c000000000000000000001",
+            patient: "66c000000000000000000002",
+            requestedByUserId: "66c000000000000000000003",
+            specialty: "Cardiologue",
+            status: "open",
+            createdAt: "2026-08-02T10:00:00.000Z",
+            updatedAt: "2026-08-02T10:00:00.000Z",
+        };
+        const leanMock = vi.fn().mockResolvedValue([request]);
+        const limitMock = vi.fn(() => ({ lean: leanMock }));
+        const skipMock = vi.fn(() => ({ limit: limitMock }));
+        const sortMock = vi.fn(() => ({ skip: skipMock }));
+        findMock.mockReturnValue({ sort: sortMock });
+        countDocumentsMock.mockResolvedValue(1);
+        patientFindMock.mockReturnValue(resolvedLean([
+            { _id: request.patient, nom: "Durand", prenom: "Alex" },
+        ]));
+        adminUserFindMock.mockReturnValue(resolvedLean([
+            { _id: request.requestedByUserId, username: "medecin.1" },
+        ]));
+
+        const { listCoordinationRequests } = await import("../coordinationRequests.js");
+        const result = await listCoordinationRequests({
+            authUser: { role: "SUPERADMIN" },
+            page: "1",
+            limit: "20",
+            status: "open",
+        });
+
         expect(patientFindMock).toHaveBeenCalledWith(
             { _id: { $in: [request.patient] } },
             { nom: 1, prenom: 1 }
         );
-        expect(result.requests).toEqual([expect.objectContaining({
-            id: request._id,
-            patient: { id: request.patient, nom: "Durand", prenom: "Alex" },
-            requestedBy: { id: request.requestedByUserId, username: "medecin.1" },
-        })]);
+        expect(result.requests[0].patient).toEqual({
+            anonymized: false,
+            id: request.patient,
+            nom: "Durand",
+            prenom: "Alex",
+        });
     });
 
     it("does not allow a physician to list the coordination queue", async () => {

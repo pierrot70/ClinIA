@@ -788,7 +788,7 @@ describe("appointments service", () => {
         });
     });
 
-    it("allows admins to access appointments without an owner filter", async () => {
+    it("scopes operational-admin appointment lookups by owner", async () => {
         const appointment = buildAppointment();
         findOne.mockResolvedValue(appointment);
 
@@ -799,6 +799,7 @@ describe("appointments service", () => {
 
         expect(findOne).toHaveBeenCalledWith({
             _id: appointment._id,
+            ownerUserId: authUser.userId,
         });
     });
 

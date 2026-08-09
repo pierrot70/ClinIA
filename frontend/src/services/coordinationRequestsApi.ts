@@ -17,7 +17,10 @@ export type CoordinationRequestEntry = {
     availabilityVerifiedAt: string | null;
     resolvedAppointment: string | null;
     resolvedAt: string | null;
-    patient: { id: string; nom: string; prenom: string } | null;
+    patient:
+        | { anonymized: true }
+        | { anonymized: false; id: string; nom: string; prenom: string }
+        | null;
     requestedBy: { id: string; username: string } | null;
 };
 

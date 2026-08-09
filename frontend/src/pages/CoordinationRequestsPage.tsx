@@ -34,6 +34,7 @@ function useCoordinationRequestsLabels(targetLang: string) {
     const empty = useTranslation({ text: pageLabels.empty, targetLang, translationKey: "coordinationRequestsPage.empty" });
     const createdAt = useTranslation({ text: pageLabels.createdAt, targetLang, translationKey: "coordinationRequestsPage.createdAt" });
     const patient = useTranslation({ text: pageLabels.patient, targetLang, translationKey: "coordinationRequestsPage.patient" });
+    const patientAnonymized = useTranslation({ text: pageLabels.patientAnonymized, targetLang, translationKey: "coordinationRequestsPage.patientAnonymized" });
     const specialty = useTranslation({ text: pageLabels.specialty, targetLang, translationKey: "coordinationRequestsPage.specialty" });
     const requestedBy = useTranslation({ text: pageLabels.requestedBy, targetLang, translationKey: "coordinationRequestsPage.requestedBy" });
     const action = useTranslation({ text: pageLabels.action, targetLang, translationKey: "coordinationRequestsPage.action" });
@@ -51,6 +52,7 @@ function useCoordinationRequestsLabels(targetLang: string) {
         status: status.translated, allStatuses: allStatuses.translated, open: open.translated,
         readyToSchedule: readyToSchedule.translated, resolved: resolved.translated, cancelled: cancelled.translated, loading: loading.translated,
         empty: empty.translated, createdAt: createdAt.translated, patient: patient.translated,
+        patientAnonymized: patientAnonymized.translated,
         specialty: specialty.translated, requestedBy: requestedBy.translated, action: action.translated,
         verifyAvailability: verifyAvailability.translated, verifying: verifying.translated,
         availabilityVerified: availabilityVerified.translated,
@@ -162,7 +164,13 @@ export function CoordinationRequestsPage() {
                             {entries.map((entry) => (
                                 <tr key={entry.id}>
                                     <td className="whitespace-nowrap px-4 py-3 text-gray-700">{formatDate(entry.createdAt, targetLang)}</td>
-                                    <td className="whitespace-nowrap px-4 py-3 text-gray-900">{entry.patient ? `${entry.patient.prenom} ${entry.patient.nom}` : text.patientUnavailable}</td>
+                                    <td className="whitespace-nowrap px-4 py-3 text-gray-900">{
+                                        entry.patient?.anonymized
+                                            ? text.patientAnonymized
+                                            : entry.patient
+                                                ? `${entry.patient.prenom} ${entry.patient.nom}`
+                                                : text.patientUnavailable
+                                    }</td>
                                     <td className="px-4 py-3 text-gray-900">{entry.specialty}</td>
                                     <td className="px-4 py-3 text-gray-700">{entry.requestedBy?.username || text.requesterUnavailable}</td>
                                     <td className="px-4 py-3"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{statusLabel(entry.status)}</span></td>
