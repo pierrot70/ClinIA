@@ -1172,6 +1172,8 @@ export const UI_LABELS_FR = {
                 "Des spécialistes « {specialty} » existent, mais aucun créneau n'est actuellement disponible.",
             coordinationRequestExplanation:
                 "Créez une demande de coordination afin d'assurer le suivi de la recherche d'un spécialiste.",
+            coordinationRequestNoAvailabilityExplanation:
+                "Créez une demande de coordination afin que l'équipe trouve ou ouvre un créneau pour cette spécialité.",
             coordinationRequestAction: "Créer une demande de coordination",
             coordinationRequestLoading: "Création de la demande de coordination...",
             coordinationRequestCreated:

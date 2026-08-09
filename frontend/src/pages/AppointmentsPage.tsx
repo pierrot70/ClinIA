@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { labels } from "../i18n/uiLabels";
 import { useTranslation } from "../hooks/useTranslation";
@@ -50,6 +50,7 @@ function useAppointmentsPageLabels(targetLang: string) {
     const { translated: recommendationNoSpecialists } = useTranslation({ text: source.specialist.recommendationNoSpecialists, ...options });
     const { translated: recommendationNoAvailability } = useTranslation({ text: source.specialist.recommendationNoAvailability, ...options });
     const { translated: coordinationRequestExplanation } = useTranslation({ text: source.specialist.coordinationRequestExplanation, ...options });
+    const { translated: coordinationRequestNoAvailabilityExplanation } = useTranslation({ text: source.specialist.coordinationRequestNoAvailabilityExplanation, ...options });
     const { translated: coordinationRequestAction } = useTranslation({ text: source.specialist.coordinationRequestAction, ...options });
     const { translated: coordinationRequestLoading } = useTranslation({ text: source.specialist.coordinationRequestLoading, ...options });
     const { translated: coordinationRequestCreated } = useTranslation({ text: source.specialist.coordinationRequestCreated, ...options });
@@ -101,6 +102,7 @@ function useAppointmentsPageLabels(targetLang: string) {
         recommendationNoSpecialists,
         recommendationNoAvailability,
         coordinationRequestExplanation,
+        coordinationRequestNoAvailabilityExplanation,
         coordinationRequestAction,
         coordinationRequestLoading,
         coordinationRequestCreated,
@@ -143,6 +145,7 @@ export function AppointmentsPage() {
     const targetLang = i18n.locale;
     const ui = useAppointmentsPageLabels(targetLang);
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams] = useSearchParams();
     const [insuranceNumber, setInsuranceNumber] = useState("");
     const [patientId, setPatientId] = useState("");
@@ -199,6 +202,9 @@ export function AppointmentsPage() {
     const [manualOptionsError, setManualOptionsError] =
         useState<ApiError | null>(null);
     const recommendationRequestId = useRef(0);
+    const appointmentSchedulingUnavailable =
+        recommendationStatus === "NO_SPECIALISTS_FOR_SPECIALTY" ||
+        recommendationStatus === "NO_AVAILABLE_SLOTS_FOR_SPECIALTY";
 
     /* ------------------------------------------------------------------ */
     /* Initialisation date                                                */
@@ -300,17 +306,24 @@ export function AppointmentsPage() {
         }).format(distance)} km`;
     }
 
-    async function handlePatientSelection(patient: Patient) {
+    async function handlePatientSelection(
+        patient: Patient,
+        { prefillSearch = false }: { prefillSearch?: boolean } = {}
+    ): Promise<boolean> {
         setPatientsError(null);
         recommendationRequestId.current += 1;
 
         const response = await fetchPatientById(patient._id);
         if ("error" in response) {
             setPatientsError(response.error);
-            return;
+            return false;
         }
 
         const selected = response.data;
+        if (prefillSearch) {
+            setSearchNom(selected.nom);
+            setSearchPrenom(selected.prenom);
+        }
         setPatientId(selected._id);
         setSelectedPatient(selected);
         setInsuranceNumber(selected.num_assurance_maladie);
@@ -331,7 +344,35 @@ export function AppointmentsPage() {
         setManualOptions(null);
         setManualOptionsError(null);
         setApiError(null);
+        return true;
     }
+
+    useEffect(() => {
+        const selectedPatientId = (
+            location.state as { patientId?: unknown } | null
+        )?.patientId;
+        if (typeof selectedPatientId !== "string" || !selectedPatientId) {
+            return;
+        }
+
+        let cancelled = false;
+
+        async function selectIncomingPatient() {
+            await handlePatientSelection(
+                { _id: selectedPatientId } as Patient,
+                { prefillSearch: true }
+            );
+            if (!cancelled) {
+                navigate("/appointments", { replace: true, state: null });
+            }
+        }
+
+        void selectIncomingPatient();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [location.state, navigate]);
 
     async function handleSpecialtyChange(nextSpecialty: string) {
         const requestId = recommendationRequestId.current + 1;
@@ -719,11 +760,17 @@ export function AppointmentsPage() {
                 {patientId && specialty && !recommendationLoading && !recommendation && !recommendationError && (
                     <div
                         className={
-                            recommendationStatus === "NO_SPECIALISTS_FOR_SPECIALTY"
+                            recommendationStatus === "NO_SPECIALISTS_FOR_SPECIALTY" ||
+                            recommendationStatus === "NO_AVAILABLE_SLOTS_FOR_SPECIALTY"
                                 ? "clinia-fade-in rounded-lg border-2 border-red-500 bg-red-50 px-4 py-3 text-base font-semibold text-red-900 shadow-lg"
                                 : "text-xs text-gray-500"
                         }
-                        role={recommendationStatus === "NO_SPECIALISTS_FOR_SPECIALTY" ? "alert" : undefined}
+                        role={
+                            recommendationStatus === "NO_SPECIALISTS_FOR_SPECIALTY" ||
+                            recommendationStatus === "NO_AVAILABLE_SLOTS_FOR_SPECIALTY"
+                                ? "alert"
+                                : undefined
+                        }
                     >
                         {recommendationStatus === "NO_SPECIALISTS_FOR_SPECIALTY"
                             ? ui.recommendationNoSpecialists.replace("{specialty}", specialty)
@@ -733,9 +780,14 @@ export function AppointmentsPage() {
                     </div>
                 )}
                 {patientId && specialty &&
-                    recommendationStatus === "NO_SPECIALISTS_FOR_SPECIALTY" && (
+                    (recommendationStatus === "NO_SPECIALISTS_FOR_SPECIALTY" ||
+                        recommendationStatus === "NO_AVAILABLE_SLOTS_FOR_SPECIALTY") && (
                     <div className="rounded-lg border-2 border-amber-500 bg-amber-50 p-4 text-sm text-amber-950 shadow-lg space-y-3">
-                        <div className="font-semibold text-base">{ui.coordinationRequestExplanation}</div>
+                        <div className="font-semibold text-base">
+                            {recommendationStatus === "NO_AVAILABLE_SLOTS_FOR_SPECIALTY"
+                                ? ui.coordinationRequestNoAvailabilityExplanation
+                                : ui.coordinationRequestExplanation}
+                        </div>
                         {coordinationRequestError && (
                             <div className="text-xs text-red-700">
                                 {coordinationRequestError.message}
@@ -788,7 +840,7 @@ export function AppointmentsPage() {
                     </div>
                 )}
                 {patientId && specialty && !recommendationLoading && !recommendation &&
-                    recommendationStatus !== "NO_SPECIALISTS_FOR_SPECIALTY" && (
+                    !appointmentSchedulingUnavailable && (
                     <button
                         type="button"
                         className="w-fit border rounded px-3 py-2 text-sm"
@@ -913,7 +965,7 @@ export function AppointmentsPage() {
                     </div>
                 )}
 
-                {recommendationStatus !== "NO_SPECIALISTS_FOR_SPECIALTY" && (
+                {!appointmentSchedulingUnavailable && (
                     <>
                         {/* Priorité */}
                         <div className="flex items-center gap-6">
@@ -1015,7 +1067,7 @@ export function AppointmentsPage() {
 
             {/* ---------------- Action ---------------- */}
 
-            {recommendationStatus !== "NO_SPECIALISTS_FOR_SPECIALTY" && (
+            {!appointmentSchedulingUnavailable && (
                 <div className="border rounded p-4 bg-gray-50 space-y-3">
                 <button
                     onClick={handleCreateAppointment}

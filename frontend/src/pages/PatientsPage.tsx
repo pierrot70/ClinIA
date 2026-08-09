@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { labels } from "../i18n/uiLabels";
 import { useTranslation } from "../hooks/useTranslation";
@@ -181,6 +181,7 @@ function usePatientsPageLabels(targetLang: string) {
 /* ------------------------------------------------------------------ */
 
 export function PatientsPage() {
+    const navigate = useNavigate();
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
     const ui = usePatientsPageLabels(targetLang);
@@ -1132,14 +1133,17 @@ export function PatientsPage() {
                                                     </>
                                                 ) : (
                                                     <>
-                                                <Link
+                                                <button
+                                                    type="button"
                                                     className="px-2 py-1 border rounded"
-                                                    to={`/appointments?ramq=${encodeURIComponent(
-                                                        p.num_assurance_maladie
-                                                    )}`}
+                                                    onClick={() =>
+                                                        navigate("/appointments", {
+                                                            state: { patientId: p._id },
+                                                        })
+                                                    }
                                                 >
                                                     {ui.createAppointment}
-                                                </Link>
+                                                </button>
                                                 <button
                                                     className="px-2 py-1 border rounded"
                                                     onClick={() =>
