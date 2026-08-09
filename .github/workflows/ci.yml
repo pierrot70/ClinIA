@@ -11,6 +11,11 @@ jobs:
   backend:
     name: Backend tests and audit
     runs-on: ubuntu-latest
+    env:
+      # Les créneaux sont présentés dans le fuseau clinique québécois.
+      # Les dates Mongo restent des instants UTC; cette valeur stabilise
+      # uniquement l'interprétation des fixtures de test.
+      TZ: America/Toronto
     defaults:
       run:
         working-directory: backend
