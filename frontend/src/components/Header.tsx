@@ -1326,7 +1326,7 @@ const Header: React.FC = () => {
     ]);
 
     return (
-        <header className="border-b border-gray-200 bg-white">
+        <header className="z-40 shrink-0 border-b border-gray-200 bg-white">
             <div className="mx-auto max-w-6xl px-4 pb-3 pt-[max(env(safe-area-inset-top),1.5rem)] lg:py-3">
                 <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 lg:hidden">
                     <Link to="/" className="justify-self-start text-lg font-semibold leading-tight text-gray-900">
