@@ -258,7 +258,7 @@ const App: React.FC = () => {
     }, []);
 
     return (
-        <div className="flex h-[100dvh] flex-col overflow-hidden bg-background lg:min-h-screen lg:h-auto lg:overflow-visible">
+        <div className="fixed inset-0 flex h-[100dvh] flex-col overflow-hidden bg-background lg:static lg:min-h-screen lg:h-auto lg:overflow-visible">
             <Header />
             {blockingIncident && (
                 <SecurityBlockingAlert
