@@ -1,6 +1,9 @@
 import { useEffect, useState, useRef } from "react";
 import { translateText } from "../services/translationApi";
 import { enFallback } from "../i18n/enFallback";
+import { esFallback } from "../i18n/esFallback";
+import { heFallback } from "../i18n/heFallback";
+import { getPatientPageFallback } from "../i18n/patientPageFallbacks";
 
 // Fallbacks locaux pour les labels critiques (clé = texte source)
 const criticalLabelFallbacks: Record<string, Record<string, string>> = {
@@ -106,6 +109,20 @@ function shouldTranslateText(text: unknown) {
   return typeof text === "string" && /[\p{L}\p{N}]/u.test(text.trim());
 }
 
+function getVersionedLocalFallback(text: string, targetLang: string): string | null {
+  const targetBase = baseLocale(targetLang);
+  if (targetBase === "es") return esFallback[text] || null;
+  if (targetBase === "he") return heFallback[text] || null;
+  const patientPageFallback = getPatientPageFallback(text, targetBase);
+  if (patientPageFallback) return patientPageFallback;
+  if (targetBase === "en") return enFallback[text] || null;
+  return null;
+}
+
+function getMissingTranslationFallback(text: string, targetLang: string): string {
+  return getVersionedLocalFallback(text, targetLang) || enFallback[text] || text;
+}
+
 export function useTranslation({ text, targetLang, namespace = "clinical-demo", sourceLocale = "fr", openaiModel, translationKey }: {
   text: string;
   targetLang: string;
@@ -130,6 +147,12 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
       setLoading(false);
       return;
     }
+    const versionedLocalFallback = getVersionedLocalFallback(text, targetLang);
+    if (versionedLocalFallback) {
+      setTranslated(versionedLocalFallback);
+      setLoading(false);
+      return;
+    }
     // Fallback local prioritaire pour les labels critiques, même si la langue source et la langue cible sont identiques
     const fallback =
       criticalLabelFallbacks[text]?.[targetLang] ||
@@ -146,7 +169,7 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
       return;
     }
     if (!translationKey) {
-      setTranslated(enFallback[text] || text);
+      setTranslated(getMissingTranslationFallback(text, targetLang));
       setLoading(false);
       return;
     }
@@ -187,8 +210,8 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
             criticalLabelFallbacks[text]?.["default"];
           if (fallback) {
             setTranslated(fallback);
-          } else if (enFallback[text]) {
-            setTranslated(enFallback[text]);
+          } else if (getMissingTranslationFallback(text, targetLang)) {
+            setTranslated(getMissingTranslationFallback(text, targetLang));
           } else {
             setTranslated(text);
           }

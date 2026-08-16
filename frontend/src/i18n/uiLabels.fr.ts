@@ -233,6 +233,9 @@ export const UI_LABELS_FR = {
         },
         nav: {
             home: "Accueil",
+            more: "Plus",
+            collaboration: "Collaboration",
+            tools: "Outils",
             clinicalAnalysis: "Analyse clinique",
             comments: "Commentaires",
             clinicManagement: "Gestion clinique",

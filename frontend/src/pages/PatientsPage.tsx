@@ -104,6 +104,7 @@ function usePatientsPageLabels(targetLang: string) {
     const { translated: supportRequestPending } = useTranslation({ text: source.table.supportRequestPending, ...options });
     const { translated: supportRequested } = useTranslation({ text: source.table.supportRequested, ...options });
     const { translated: supportRequestFailed } = useTranslation({ text: source.table.supportRequestFailed, ...options });
+    const { translated: clinicalNotesOpen } = useTranslation({ text: labels.patientClinicalNotes.open, ...options });
     const { translated: previous } = useTranslation({ text: source.pagination.previous, ...options });
     const { translated: next } = useTranslation({ text: source.pagination.next, ...options });
     const { translated: pagePrefix } = useTranslation({ text: source.pagination.pagePrefix, ...options });
@@ -182,6 +183,7 @@ function usePatientsPageLabels(targetLang: string) {
         supportRequestPending,
         supportRequested,
         supportRequestFailed,
+        clinicalNotesOpen,
         previous,
         next,
         pagePrefix,
@@ -1193,7 +1195,7 @@ export function PatientsPage() {
                                                         handleOpenClinicalNotes(p._id)
                                                     }
                                                 >
-                                                    {labels.patientClinicalNotes.open}
+                                                    {ui.clinicalNotesOpen}
                                                 </button>
                                                 {user?.role === "MEDECIN" && (
                                                     <button

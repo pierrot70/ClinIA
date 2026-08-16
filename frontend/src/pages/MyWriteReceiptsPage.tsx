@@ -152,7 +152,7 @@ export function MyWriteReceiptsPage() {
     };
 
     return (
-        <main className="mx-auto max-w-7xl space-y-5 px-4 py-8">
+        <main className="mx-auto max-w-7xl space-y-5 px-4 py-8 pb-28 lg:pb-8">
             <header className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <h1 className="flex items-center gap-2 text-2xl font-semibold text-gray-950">
@@ -212,7 +212,39 @@ export function MyWriteReceiptsPage() {
                 </div>
             </section>
 
-            <section className="overflow-x-auto border border-gray-200 bg-white shadow-sm">
+            <section className="border border-gray-200 bg-white shadow-sm md:hidden">
+                {error && <p className="m-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+                {loading ? <p className="p-6 text-sm text-gray-600">{pageLabels.status.loading}</p> : receipts.length === 0 ? <p className="p-6 text-sm text-gray-600">{pageLabels.status.empty}</p> : (
+                    <div className="divide-y divide-gray-100">
+                        {receipts.map((receipt, index) => {
+                            const status = receiptStatus(receipt);
+                            const patientName = receipt.patientId ? patientNames.get(receipt.patientId) : null;
+                            const receiptKey = `${receipt.verificationId || "receipt"}-${receipt.timestamp}-${index}`;
+                            const expanded = selectedReceiptId === receiptKey;
+                            return <article key={receiptKey} className="space-y-2 p-4 text-sm">
+                                <div className="flex items-start justify-between gap-3">
+                                    <time className="text-xs text-gray-600">{formatTimestamp(receipt.timestamp)}</time>
+                                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${receiptStatusClass(status)}`}>{status}</span>
+                                </div>
+                                <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
+                                    <div><dt className="text-xs uppercase text-gray-500">{pageLabels.table.patient}</dt><dd className="mt-0.5 font-medium text-gray-900">{patientName || (receipt.patientId ? pageLabels.unavailablePatient : pageLabels.noPatient)}</dd></div>
+                                    <div><dt className="text-xs uppercase text-gray-500">{pageLabels.table.collection}</dt><dd className="mt-0.5 break-words text-gray-800">{receipt.collectionName}</dd></div>
+                                    <div><dt className="text-xs uppercase text-gray-500">{pageLabels.table.operation}</dt><dd className="mt-0.5 text-gray-800">{receipt.operation}</dd></div>
+                                    <div><dt className="text-xs uppercase text-gray-500">{pageLabels.table.replica}</dt><dd className="mt-0.5 text-gray-800">{receipt.replicaSet?.healthyCount ?? "-"}/{receipt.replicaSet?.memberCount ?? "-"} {pageLabels.healthy}</dd></div>
+                                </dl>
+                                <button type="button" onClick={() => setSelectedReceiptId(expanded ? "" : receiptKey)} className="rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{expanded ? pageLabels.actions.hideDetails : pageLabels.actions.showDetails}</button>
+                                {expanded && <div className="rounded bg-slate-50 p-3 text-xs text-gray-700"><div><span className="font-medium">{pageLabels.details.verification}: </span><code className="break-all">{receipt.verificationId || "-"}</code></div><div className="mt-2"><span className="font-medium">{pageLabels.details.fields}: </span>{receipt.changedFields.length ? receipt.changedFields.join(", ") : "-"}</div></div>}
+                            </article>;
+                        })}
+                    </div>
+                )}
+                <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 text-sm text-gray-600">
+                    <span>{page} / {totalPages}</span>
+                    <div className="flex gap-2"><button type="button" disabled={page <= 1 || loading} onClick={() => void loadReceipts(page - 1)} className="rounded border border-gray-300 px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50">{pageLabels.actions.previous}</button><button type="button" disabled={page >= totalPages || loading} onClick={() => void loadReceipts(page + 1)} className="rounded border border-gray-300 px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50">{pageLabels.actions.next}</button></div>
+                </div>
+            </section>
+
+            <section className="hidden overflow-x-auto border border-gray-200 bg-white shadow-sm md:block">
                 {error && <p className="m-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
                 {loading ? <p className="p-6 text-sm text-gray-600">{pageLabels.status.loading}</p> : receipts.length === 0 ? <p className="p-6 text-sm text-gray-600">{pageLabels.status.empty}</p> : (
                     <table className="min-w-full text-left text-sm">
