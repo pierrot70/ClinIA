@@ -274,7 +274,7 @@ const App: React.FC = () => {
                 </div>
             )}
             <DevRouteIndicator />
-            <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[calc(5rem+env(safe-area-inset-bottom))] lg:overflow-visible lg:pb-0">
+            <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[calc(5rem+env(safe-area-inset-bottom)+var(--clinia-mobile-browser-inset,0px))] lg:overflow-visible lg:pb-0">
                 <Routes>
                     <Route
                         path="/"
