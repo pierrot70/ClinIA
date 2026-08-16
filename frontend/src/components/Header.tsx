@@ -310,6 +310,7 @@ const Header: React.FC = () => {
     const showAdminHeaderNav = canAccessAdmin;
     const showSuperAdminHeaderNav = user?.role === "SUPERADMIN";
     const isPhysicianMobileNav = isAuthenticated && user?.role === "MEDECIN";
+    const hasMobileBottomNav = isAuthenticated;
     const hostname = window.location.hostname;
     const isLocalRuntime =
         hostname === "localhost" ||
@@ -1334,7 +1335,7 @@ const Header: React.FC = () => {
                                 )}
                             </div>
 
-                            {isPhysicianMobileNav ? (
+                            {hasMobileBottomNav ? (
                                 <button
                                     type="button"
                                     onClick={logout}
@@ -1894,7 +1895,7 @@ const Header: React.FC = () => {
                 </nav>
 
                 {showFullHeaderNav && isMobileMenuOpen && (
-                    <div className={isPhysicianMobileNav
+                    <div className={hasMobileBottomNav
                         ? "fixed inset-x-3 bottom-20 z-40 max-h-[70vh] space-y-3 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl lg:hidden"
                         : "mt-3 space-y-3 rounded-xl border border-gray-200 bg-white p-3 lg:hidden"}>
                         <div className="flex items-center justify-between gap-2">
@@ -2067,7 +2068,7 @@ const Header: React.FC = () => {
                     </div>
                 )}
             </div>
-            {isPhysicianMobileNav && (
+            {hasMobileBottomNav && (
                 <nav className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-slate-200 bg-white px-2 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-6px_20px_rgba(15,23,42,0.12)] lg:hidden">
                     <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className={`flex min-h-14 flex-col items-center justify-center rounded-lg text-xs ${location.pathname === "/" || location.pathname === "/clinical-demo" ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-600"}`}>
                         <span className="text-base" aria-hidden="true">⌂</span>
@@ -2077,10 +2078,22 @@ const Header: React.FC = () => {
                         <span className="text-base" aria-hidden="true">✦</span>
                         <HeaderLabel text={headerLabels.nav.clinicalAnalysis} />
                     </Link>
-                    <Link to="/patients" onClick={() => setIsMobileMenuOpen(false)} className={`flex min-h-14 flex-col items-center justify-center rounded-lg text-xs ${location.pathname === "/patients" ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-600"}`}>
-                        <span className="text-base" aria-hidden="true">◉</span>
-                        <HeaderLabel text={headerLabels.nav.patients} />
-                    </Link>
+                    {isPhysicianMobileNav ? (
+                        <Link to="/patients" onClick={() => setIsMobileMenuOpen(false)} className={`flex min-h-14 flex-col items-center justify-center rounded-lg text-xs ${location.pathname === "/patients" ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-600"}`}>
+                            <span className="text-base" aria-hidden="true">◉</span>
+                            <HeaderLabel text={headerLabels.nav.patients} />
+                        </Link>
+                    ) : user?.role === "SUPERADMIN" ? (
+                        <Link to="/clinical-support-access/patients" onClick={() => setIsMobileMenuOpen(false)} className={`flex min-h-14 flex-col items-center justify-center rounded-lg text-center text-xs ${location.pathname === "/clinical-support-access/patients" ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-600"}`}>
+                            <span className="text-base" aria-hidden="true">◉</span>
+                            <HeaderLabel text={headerLabels.nav.delegatedPatients} />
+                        </Link>
+                    ) : (
+                        <Link to="/my-write-receipts" onClick={() => setIsMobileMenuOpen(false)} className={`flex min-h-14 flex-col items-center justify-center rounded-lg text-center text-xs ${location.pathname === "/my-write-receipts" ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-600"}`}>
+                            <span className="text-base" aria-hidden="true">◉</span>
+                            <HeaderLabel text={headerLabels.nav.myWriteReceipts} />
+                        </Link>
+                    )}
                     <button type="button" onClick={() => setIsMobileMenuOpen((prev) => !prev)} className={`flex min-h-14 flex-col items-center justify-center rounded-lg text-xs ${isMobileMenuOpen ? "bg-slate-900 font-semibold text-white" : "text-slate-600"}`} aria-expanded={isMobileMenuOpen}>
                         <span className="text-base" aria-hidden="true">•••</span>
                         <HeaderLabel text={headerLabels.nav.more} />
