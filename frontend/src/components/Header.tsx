@@ -1301,110 +1301,20 @@ const Header: React.FC = () => {
     ]);
 
     return (
-        <header className="contents bg-white lg:block lg:border-b lg:border-gray-200">
-            <div className="order-1 relative z-40 mx-auto w-full max-w-6xl shrink-0 border-b border-gray-200 bg-white px-4 pb-3 pt-[max(env(safe-area-inset-top),0.75rem)] lg:border-0 lg:py-3">
-                <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 lg:hidden">
-                    <Link to="/" className="justify-self-start text-lg font-semibold leading-tight text-gray-900">
-                        ClinIA
-                    </Link>
-
-                    {showFullHeaderNav ? (
-                        <>
-                            <div className="justify-self-center">
-                                {canAccessAdmin ? (
-                                    <VoiceNavButton />
-                                ) : (
-                                    <label className="flex items-center gap-2 text-gray-600">
-                                        <span className="sr-only">
-                                            <HeaderLabel text={headerLabels.controls.language} />
-                                        </span>
-                                        <select
-                                            className="w-32 rounded border border-gray-300 bg-white px-2 py-1 text-xs"
-                                            value={locale}
-                                            onChange={onLanguageChange}
-                                            disabled={isTranslating}
-                                            aria-label={headerLabels.controls.language}
-                                        >
-                                            {languageOptions.map((option) => (
-                                                <option key={option.value} value={option.value}>
-                                                    {option.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </label>
-                                )}
-                            </div>
-
-                            {hasMobileBottomNav ? (
-                                <button
-                                    type="button"
-                                    onClick={logout}
-                                    className="justify-self-end whitespace-nowrap text-xs text-red-600 hover:text-red-700"
-                                >
-                                    <HeaderLabel text={headerLabels.nav.logout} />
-                                </button>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-                                    className="justify-self-end rounded border border-gray-300 px-3 py-1 text-sm text-gray-700"
-                                    aria-label={headerLabels.controls.openMenu}
-                                >
-                                    <HeaderLabel text={isMobileMenuOpen ? headerLabels.controls.close : headerLabels.controls.menu} />
-                                </button>
-                            )}
-                        </>
-                    ) : (
-                        <>
-                            <div className="relative justify-self-center">
-                                {showPublicLanguageTip && (
-                                    <div className="absolute left-1/2 top-full z-[100] mt-3 w-72 -translate-x-1/2 rounded-xl border border-cyan-500 bg-cyan-50 p-4 text-sm text-cyan-950 shadow-2xl">
-                                        <span className="absolute bottom-full left-1/2 h-3 w-3 -translate-x-1/2 translate-y-1/2 rotate-45 border-l border-t border-cyan-500 bg-cyan-50" aria-hidden="true" />
-                                        <div className="mb-2 text-base font-semibold">
-                                            <HeaderLabel text={headerLabels.controls.language} />
-                                        </div>
-                                        <p><HeaderLabel text={headerLabels.publicHome.languageTooltip} /></p>
-                                        <button
-                                            type="button"
-                                            onClick={completePublicLanguageTip}
-                                            className="mt-3 rounded bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
-                                        >
-                                            <HeaderLabel text={headerLabels.publicHome.tooltipOk} />
-                                        </button>
-                                    </div>
-                                )}
-                            <label className="flex items-center gap-2 text-gray-600">
-                                <span className="hidden text-xs min-[400px]:inline"><HeaderLabel text={headerLabels.controls.language} /></span>
-                                <select
-                                    className={
-                                        "rounded border bg-white px-2 py-1 text-xs transition " +
-                                        (showPublicLanguageTip
-                                            ? "border-emerald-500 ring-2 ring-emerald-200"
-                                            : "border-gray-300")
-                                    }
-                                    value={locale}
-                                    onChange={onLanguageChange}
-                                    disabled={isTranslating}
-                                    aria-label={headerLabels.controls.language}
-                                >
-                                    {languageOptions.map((option) => (
-                                        <option key={option.value} value={option.value}>
-                                            {option.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-2 justify-self-end text-sm text-gray-700">
-                                <Link to="/" className="hidden">
-                                    <HeaderLabel text={headerLabels.nav.home} />
-                                </Link>
-                                <Link to="/login">
-                                    <HeaderLabel text={headerLabels.nav.login} />
-                                </Link>
-                            </div>
-                        </>
-                    )}
+        <header className="sticky top-0 z-50 border-b border-gray-200 bg-white">
+            <div className="mx-auto max-w-6xl px-4 py-3">
+                <div className="space-y-2 lg:hidden">
+                    <div className="relative flex h-9 items-center justify-between">
+                        <button type="button" onClick={() => setIsMobileMenuOpen(true)} className="rounded p-2 text-xl text-slate-700" aria-label={headerLabels.controls.openMenu}>☰</button>
+                        <Link to="/" className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold text-gray-900">ClinIA</Link>
+                        {isAuthenticated ? <span title="Connecté" className="flex h-9 w-9 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600">●</span> : <Link to="/login" className="rounded p-2 text-slate-700" aria-label={headerLabels.nav.login}>◯</Link>}
+                    </div>
+                    <label className="flex justify-center">
+                        <span className="sr-only"><HeaderLabel text={headerLabels.controls.language} /></span>
+                        <select className="w-40 rounded border border-gray-300 bg-white px-2 py-1 text-xs" value={locale} onChange={onLanguageChange} disabled={isTranslating} aria-label={headerLabels.controls.language}>
+                            {languageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                        </select>
+                    </label>
                 </div>
 
                 <div className="hidden items-center justify-between gap-3 lg:flex">
@@ -1894,10 +1804,16 @@ const Header: React.FC = () => {
                     )}
                 </nav>
 
-                {showFullHeaderNav && isMobileMenuOpen && (
-                    <div className={hasMobileBottomNav
-                        ? "absolute inset-x-3 bottom-20 z-40 max-h-[70vh] space-y-3 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl lg:hidden"
-                        : "mt-3 space-y-3 rounded-xl border border-gray-200 bg-white p-3 lg:hidden"}>
+                {isMobileMenuOpen && (
+                    <div className="fixed inset-y-0 left-0 z-[60] w-[86vw] max-w-sm space-y-3 overflow-y-auto border-r border-slate-200 bg-white p-4 text-gray-900 shadow-2xl lg:hidden">
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                            <span className="text-lg font-semibold">ClinIA</span>
+                            <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="rounded p-2 text-2xl leading-none" aria-label={headerLabels.controls.close}>×</button>
+                        </div>
+                        <label className="block">
+                            <span className="sr-only">Rechercher dans le menu</span>
+                            <input type="search" placeholder="Rechercher dans le menu" className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-slate-400" />
+                        </label>
                         <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
                                 {isDev && (
@@ -2068,7 +1984,7 @@ const Header: React.FC = () => {
                     </div>
                 )}
             </div>
-            {hasMobileBottomNav && (
+            {false && hasMobileBottomNav && (
                 <nav className="order-3 z-50 grid shrink-0 grid-cols-4 border-t border-slate-200 bg-white px-2 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-6px_20px_rgba(15,23,42,0.12)] lg:hidden">
                     <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className={`flex min-h-14 flex-col items-center justify-center rounded-lg text-xs ${location.pathname === "/" || location.pathname === "/clinical-demo" ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-600"}`}>
                         <span className="text-base" aria-hidden="true">⌂</span>

@@ -7,14 +7,6 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-@media (max-width: 1023px) {
-  html,
-  body,
-  #root {
-    height: 100%;
-    overflow: hidden;
-  }
-}
 
 @keyframes cliniaFadeInOut {
   0% {

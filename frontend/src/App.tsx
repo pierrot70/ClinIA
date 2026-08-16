@@ -258,7 +258,7 @@ const App: React.FC = () => {
     }, []);
 
     return (
-        <div className="relative isolate flex h-[100svh] flex-col overflow-hidden bg-background lg:min-h-screen lg:h-auto lg:overflow-visible">
+        <div className="min-h-screen bg-background">
             <Header />
             {blockingIncident && (
                 <SecurityBlockingAlert
@@ -274,7 +274,7 @@ const App: React.FC = () => {
                 </div>
             )}
             <DevRouteIndicator />
-            <main className="order-2 relative z-0 min-h-0 flex-1 overflow-y-auto overscroll-contain lg:overflow-visible">
+            <main>
                 <Routes>
                     <Route
                         path="/"
@@ -444,13 +444,8 @@ const App: React.FC = () => {
 
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
-                <div className="lg:hidden">
-                    <Footer />
-                </div>
             </main>
-            <div className="hidden lg:block">
-                <Footer />
-            </div>
+            <Footer />
         </div>
     );
 };
