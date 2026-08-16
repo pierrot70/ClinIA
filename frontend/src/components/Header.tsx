@@ -403,31 +403,6 @@ const Header: React.FC = () => {
     const [forceReal, setForceReal] = useState(false);
 
     useEffect(() => {
-        const root = document.documentElement;
-        const viewport = window.visualViewport;
-
-        const updateMobileBrowserInset = () => {
-            const layoutHeight = Math.max(window.innerHeight, root.clientHeight);
-            const visibleHeight = viewport?.height ?? layoutHeight;
-            const visibleTop = viewport?.offsetTop ?? 0;
-            const inset = Math.max(0, Math.round(layoutHeight - visibleHeight - visibleTop));
-            root.style.setProperty("--clinia-mobile-browser-inset", `${inset}px`);
-        };
-
-        updateMobileBrowserInset();
-        viewport?.addEventListener("resize", updateMobileBrowserInset);
-        viewport?.addEventListener("scroll", updateMobileBrowserInset);
-        window.addEventListener("resize", updateMobileBrowserInset);
-
-        return () => {
-            viewport?.removeEventListener("resize", updateMobileBrowserInset);
-            viewport?.removeEventListener("scroll", updateMobileBrowserInset);
-            window.removeEventListener("resize", updateMobileBrowserInset);
-            root.style.removeProperty("--clinia-mobile-browser-inset");
-        };
-    }, []);
-
-    useEffect(() => {
         const stored = localStorage.getItem(FORCE_REAL_STORAGE_KEY);
         setForceReal(stored === "true");
 
@@ -1326,8 +1301,8 @@ const Header: React.FC = () => {
     ]);
 
     return (
-        <header className="relative z-40 shrink-0 border-b border-gray-200 bg-white">
-            <div className="mx-auto max-w-6xl px-4 pb-3 pt-[max(env(safe-area-inset-top),1.5rem)] lg:py-3">
+        <header className="contents bg-white lg:block lg:border-b lg:border-gray-200">
+            <div className="order-1 relative z-40 mx-auto w-full max-w-6xl shrink-0 border-b border-gray-200 bg-white px-4 pb-3 pt-[max(env(safe-area-inset-top),0.75rem)] lg:border-0 lg:py-3">
                 <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 lg:hidden">
                     <Link to="/" className="justify-self-start text-lg font-semibold leading-tight text-gray-900">
                         ClinIA
@@ -1344,7 +1319,7 @@ const Header: React.FC = () => {
                                             <HeaderLabel text={headerLabels.controls.language} />
                                         </span>
                                         <select
-                                            className="max-w-[9rem] rounded border border-gray-300 bg-white px-2 py-1 text-xs"
+                                            className="w-32 rounded border border-gray-300 bg-white px-2 py-1 text-xs"
                                             value={locale}
                                             onChange={onLanguageChange}
                                             disabled={isTranslating}
@@ -1364,7 +1339,7 @@ const Header: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={logout}
-                                    className="justify-self-end whitespace-nowrap text-sm text-red-600 hover:text-red-700"
+                                    className="justify-self-end whitespace-nowrap text-xs text-red-600 hover:text-red-700"
                                 >
                                     <HeaderLabel text={headerLabels.nav.logout} />
                                 </button>
@@ -1921,7 +1896,7 @@ const Header: React.FC = () => {
 
                 {showFullHeaderNav && isMobileMenuOpen && (
                     <div className={hasMobileBottomNav
-                        ? "fixed inset-x-3 bottom-[calc(5rem+var(--clinia-mobile-browser-inset,0px))] z-40 max-h-[70vh] space-y-3 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl lg:hidden"
+                        ? "absolute inset-x-3 bottom-20 z-40 max-h-[70vh] space-y-3 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl lg:hidden"
                         : "mt-3 space-y-3 rounded-xl border border-gray-200 bg-white p-3 lg:hidden"}>
                         <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
@@ -2094,7 +2069,7 @@ const Header: React.FC = () => {
                 )}
             </div>
             {hasMobileBottomNav && (
-                <nav className="fixed inset-x-0 bottom-[var(--clinia-mobile-browser-inset,0px)] z-50 grid grid-cols-4 border-t border-slate-200 bg-white px-2 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-6px_20px_rgba(15,23,42,0.12)] lg:hidden">
+                <nav className="order-3 z-50 grid shrink-0 grid-cols-4 border-t border-slate-200 bg-white px-2 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-6px_20px_rgba(15,23,42,0.12)] lg:hidden">
                     <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className={`flex min-h-14 flex-col items-center justify-center rounded-lg text-xs ${location.pathname === "/" || location.pathname === "/clinical-demo" ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-600"}`}>
                         <span className="text-base" aria-hidden="true">⌂</span>
                         <HeaderLabel text={headerLabels.nav.home} />
