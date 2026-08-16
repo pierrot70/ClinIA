@@ -7,6 +7,7 @@ const services = vi.hoisted(() => ({
     archivePatientWithWriteVerification: vi.fn(),
     restorePatientWithWriteVerification: vi.fn(),
     getPatientById: vi.fn(),
+    listPatients: vi.fn(),
     listPatientAuditLogs: vi.fn(),
 }));
 
@@ -23,7 +24,7 @@ const { getReplicaSetStatus } = vi.hoisted(() => ({
 
 vi.mock("../../services/patients.js", () => ({
     ...services,
-    listPatients: vi.fn(),
+    listPatients: services.listPatients,
     listPatientSecureRequestDocuments: vi.fn(),
     listPatientClinicalNoteVersions: vi.fn(),
     restorePatientClinicalNoteVersion: vi.fn(),
@@ -50,6 +51,7 @@ function request(overrides = {}) {
     return {
         body: {},
         headers: {},
+        query: {},
         params: {},
         auth: { userId: "user-1", username: "doctor.one", role: "MEDECIN" },
         ip: "10.0.0.10",
@@ -143,6 +145,29 @@ describe("patient routes atomic write receipts", () => {
 
         expect(res.status).toHaveBeenCalledWith(400);
         expect(services.createPatientWithWriteVerification).not.toHaveBeenCalled();
+    });
+
+    it("returns the delegated-access requirement to a superadmin without listing patients", async () => {
+        const handler = getRouteHandler("get", "/");
+        const res = makeRes();
+        services.listPatients.mockRejectedValue({
+            code: "CLINICAL_ACCESS_REQUIRED",
+            message: "Une autorisation clinique déléguée en lecture est requise.",
+        });
+
+        await handler(
+            request({ auth: { userId: "superadmin-1", role: "SUPERADMIN" } }),
+            res
+        );
+
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: "CLINICAL_ACCESS_REQUIRED",
+                message: "Une autorisation clinique déléguée en lecture est requise.",
+                retryable: false,
+            },
+        });
     });
 
     it("returns invalid demographic DTO input as a client error before creating a patient", async () => {

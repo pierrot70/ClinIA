@@ -32,8 +32,22 @@ import {
 } from "../utils/requestSafety.js";
 import { minimizePatientAuditContext } from "../audit/auditDataMinimization.js";
 import { getTrustedRequestIp } from "../utils/requestIp.js";
+import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
 
 const router = express.Router();
+
+function sendClinicalAccessRequired(res, err) {
+    if (err?.code !== "CLINICAL_ACCESS_REQUIRED") return false;
+
+    res.status(403).json({
+        error: {
+            code: err.code,
+            message: err.message,
+            retryable: false,
+        },
+    });
+    return true;
+}
 
 function getRequestIp(req) {
     return getTrustedRequestIp(req);
@@ -345,6 +359,8 @@ router.get("/", async (req, res) => {
             },
         });
     } catch (err) {
+        if (sendClinicalAccessRequired(res, err)) return;
+
         logSafeError("PATIENT_LIST_FAILED", err);
 
         return res.status(500).json({
@@ -546,6 +562,25 @@ router.get("/:id", async (req, res) => {
     try {
         const patient = await getPatientById(req.params.id, req.auth);
 
+        if (req.auth?.role === AUTH_ROLES.SUPERADMIN) {
+            const requestContext = getRequestContext(req);
+            await recordWriteOperationAuditEvent({
+                collectionName: "patients",
+                operation: "READ",
+                outcome: "SUCCESS",
+                actorUserId: req.auth.userId,
+                actorUsername: req.auth.username,
+                actorRole: req.auth.role,
+                ip: getRequestIp(req),
+                requestId: requestContext.requestId,
+                instanceId: requestContext.instanceId,
+                resourceId: String(patient._id),
+                patientId: String(patient._id),
+                changedFields: ["delegated_support_access"],
+                requestPath: getSafeRequestPath(req),
+            });
+        }
+
         return res.status(200).json({
             data: patient,
             meta: {
@@ -554,6 +589,12 @@ router.get("/:id", async (req, res) => {
             },
         });
     } catch (err) {
+        if (err.code === "CLINICAL_ACCESS_REQUIRED") {
+            return res.status(403).json({
+                error: { code: err.code, message: err.message, retryable: false },
+            });
+        }
+
         if (err.code === "INVALID_ID") {
             return res.status(400).json({
                 error: {

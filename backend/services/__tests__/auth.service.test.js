@@ -260,8 +260,33 @@ describe("auth service", () => {
         );
     });
 
-    it("requires MFA enrollment before replacing an active optional-MFA session", async () => {
+    it("does not enroll a non-MFA user when another session is active", async () => {
         const user = buildUser({ mfaEnabled: false, mfaRequired: false });
+        mockFindOne.mockResolvedValue(user);
+        compare.mockResolvedValue(true);
+        hasActiveRefreshTokenSessionsForUser.mockResolvedValue(true);
+        sign.mockReturnValue("access-token");
+
+        const result = await login({
+            email: "admin@example.com",
+            password: "password123",
+            req: { headers: {}, ip: "127.0.0.1" },
+        });
+
+        expect(result).toMatchObject({
+            accessToken: "access-token",
+            user: { id: String(user._id) },
+        });
+        expect(user.mfaChallengePurpose).toBeNull();
+        expect(revokeRefreshTokenFamiliesForUser).not.toHaveBeenCalled();
+    });
+
+    it("always requires an MFA challenge when MFA is enabled", async () => {
+        const user = buildUser({
+            mfaEnabled: true,
+            mfaRequired: false,
+            mfaSecretEncrypted: "encrypted:mfa-secret",
+        });
         mockFindOne.mockResolvedValue(user);
         compare.mockResolvedValue(true);
         hasActiveRefreshTokenSessionsForUser.mockResolvedValue(true);
@@ -275,11 +300,10 @@ describe("auth service", () => {
 
         expect(result).toMatchObject({
             mfaRequired: true,
-            mfaEnrollmentRequired: true,
+            mfaEnrollmentRequired: false,
             mfaChallenge: "mfa-challenge-token",
         });
-        expect(user.mfaChallengePurpose).toBe("mfa-concurrent-enroll");
-        expect(revokeRefreshTokenFamiliesForUser).not.toHaveBeenCalled();
+        expect(user.mfaChallengePurpose).toBe("mfa-login");
     });
 
     it("logs in with username and rotates refresh token", async () => {

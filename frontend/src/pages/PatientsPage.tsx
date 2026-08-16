@@ -25,6 +25,11 @@ import {
     WriteVerificationReceipt,
 } from "../components/system/WriteVerificationReceipt";
 import { PatientClinicalNotesModal } from "../components/clinical/PatientClinicalNotesModal";
+import { useAuth } from "../hooks/useAuth";
+import {
+    createPhysicianClinicalSupportRequest,
+    listPhysicianClinicalSupportRequestStatuses,
+} from "../services/clinicalSupportAccessApi";
 
 function usePatientsPageLabels(targetLang: string) {
     const source = labels.patientsPage;
@@ -95,6 +100,10 @@ function usePatientsPageLabels(targetLang: string) {
     const { translated: restoreLabel } = useTranslation({ text: source.table.restore, ...options });
     const { translated: archivedLabel } = useTranslation({ text: source.table.archived, ...options });
     const { translated: archivedAt } = useTranslation({ text: source.table.archivedAt, ...options });
+    const { translated: requestSupport } = useTranslation({ text: source.table.requestSupport, ...options });
+    const { translated: supportRequestPending } = useTranslation({ text: source.table.supportRequestPending, ...options });
+    const { translated: supportRequested } = useTranslation({ text: source.table.supportRequested, ...options });
+    const { translated: supportRequestFailed } = useTranslation({ text: source.table.supportRequestFailed, ...options });
     const { translated: previous } = useTranslation({ text: source.pagination.previous, ...options });
     const { translated: next } = useTranslation({ text: source.pagination.next, ...options });
     const { translated: pagePrefix } = useTranslation({ text: source.pagination.pagePrefix, ...options });
@@ -169,6 +178,10 @@ function usePatientsPageLabels(targetLang: string) {
         restoreLabel,
         archivedLabel,
         archivedAt,
+        requestSupport,
+        supportRequestPending,
+        supportRequested,
+        supportRequestFailed,
         previous,
         next,
         pagePrefix,
@@ -182,10 +195,12 @@ function usePatientsPageLabels(targetLang: string) {
 
 export function PatientsPage() {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
     const ui = usePatientsPageLabels(targetLang);
     const [patients, setPatients] = useState<Patient[]>([]);
+    const [supportRequestPatientIds, setSupportRequestPatientIds] = useState<Set<string>>(() => new Set());
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const [busyIds, setBusyIds] = useState<Record<string, boolean>>({});
@@ -339,6 +354,16 @@ export function PatientsPage() {
 
         setPatients(data);
         setTotalPages(totalPages);
+
+        if (user?.role === "MEDECIN") {
+            const supportStatuses = await listPhysicianClinicalSupportRequestStatuses();
+            if (!("error" in supportStatuses)) {
+                setSupportRequestPatientIds(new Set(supportStatuses.data.map((request) => request.patientId)));
+            }
+        } else {
+            setSupportRequestPatientIds(new Set());
+        }
+
         setLoading(false);
     }
 
@@ -560,6 +585,16 @@ export function PatientsPage() {
         }
 
         setNotesPatient(response.data);
+    }
+
+    async function handleRequestSupport(patient: Patient) {
+        const response = await createPhysicianClinicalSupportRequest({ patientId: patient._id, reasonCode: "TECHNICAL_SUPPORT" });
+        if ("error" in response) {
+            setSaveFeedback({ type: "error", message: response.error.message || ui.supportRequestFailed });
+            return;
+        }
+        setSaveFeedback({ type: "success", message: ui.supportRequested });
+        setSupportRequestPatientIds((current) => new Set(current).add(patient._id));
     }
 
     async function handleArchive(id: string) {
@@ -1160,6 +1195,18 @@ export function PatientsPage() {
                                                 >
                                                     {labels.patientClinicalNotes.open}
                                                 </button>
+                                                {user?.role === "MEDECIN" && (
+                                                    <button
+                                                        type="button"
+                                                        className="px-2 py-1 border rounded text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                        disabled={supportRequestPatientIds.has(p._id)}
+                                                        onClick={() => void handleRequestSupport(p)}
+                                                    >
+                                                        {supportRequestPatientIds.has(p._id)
+                                                            ? ui.supportRequestPending
+                                                            : ui.requestSupport}
+                                                    </button>
+                                                )}
                                                 <button
                                                     className="px-2 py-1 border rounded text-amber-700"
                                                     disabled={

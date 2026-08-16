@@ -7,6 +7,7 @@ import { PatientSecureRequestSnapshot } from "../models/PatientSecureRequestSnap
 import { recordPatientAuditEvent } from "../audit/patientAudit.js";
 import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
 import { buildOwnerScope } from "../auth/resourceAccess.js";
+import { getActiveDelegatedPatientAccess } from "./clinicalSupportAccess.js";
 import {
     buildPatientSearchKeys,
     normalizeHealthInsuranceJurisdiction,
@@ -450,10 +451,21 @@ export async function getPatientById(id, authUser) {
         };
     }
 
-    const patient = await Patient.findOne({
-        _id: id,
-        ...buildOwnerScope(authUser),
-    }).lean();
+    let query;
+    if (authUser?.role === "SUPERADMIN") {
+        const delegatedAccess = await getActiveDelegatedPatientAccess(id, authUser);
+        if (!delegatedAccess) {
+            throw createPatientError(
+                "CLINICAL_ACCESS_REQUIRED",
+                "Une autorisation clinique déléguée active est requise pour ce dossier."
+            );
+        }
+        query = { _id: id, ownerUserId: delegatedAccess.physicianUserId };
+    } else {
+        query = { _id: id, ...buildOwnerScope(authUser) };
+    }
+
+    const patient = await Patient.findOne(query).lean();
 
     if (!patient) {
         throw {

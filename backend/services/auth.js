@@ -129,7 +129,8 @@ function isPrivilegedMfaEnforced() {
 function requiresMfa(user) {
     return (
         (isPrivilegedMfaEnforced() && isPrivilegedRole(user?.role)) ||
-        user?.mfaRequired === true
+        user?.mfaRequired === true ||
+        user?.mfaEnabled === true
     );
 }
 
@@ -858,7 +859,11 @@ export async function login({ username, email, password, req }) {
     const replacesExistingSession =
         await hasActiveRefreshTokenSessionsForUser(user._id);
 
-    if (!requiresMfa(user) && !replacesExistingSession) {
+    // A previously active session is not an MFA signal.  In particular, a
+    // clinician without MFA must not be enrolled into MFA just because they
+    // sign in again from another tab or device.  Accounts for which MFA is
+    // enabled or required still continue through the MFA challenge below.
+    if (!requiresMfa(user)) {
         return completeAuthenticatedSession(user, ip);
     }
 

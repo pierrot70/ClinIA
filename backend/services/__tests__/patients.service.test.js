@@ -16,6 +16,7 @@ const transactionSession = {
 const startSession = vi.fn(async () => transactionSession);
 const recordPatientAuditEvent = vi.fn();
 const recordWriteOperationAuditEvent = vi.fn();
+const getActiveDelegatedPatientAccess = vi.fn();
 
 function patientListQuery(rows = []) {
     return {
@@ -74,6 +75,7 @@ vi.mock("../../models/PatientSecureRequestSnapshot.js", () => ({
 
 vi.mock("../../audit/patientAudit.js", () => ({ recordPatientAuditEvent }));
 vi.mock("../../audit/writeOperationAudit.js", () => ({ recordWriteOperationAuditEvent }));
+vi.mock("../clinicalSupportAccess.js", () => ({ getActiveDelegatedPatientAccess }));
 
 const {
     createPatient,

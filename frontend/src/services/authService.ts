@@ -3,6 +3,10 @@ import { API_URL } from "./config";
 
 const ACCESS_TOKEN_REFRESH_SKEW_MS = 30_000;
 const AUTH_SECURITY_NOTICE_STORAGE_KEY = "clinia.auth.security_notice";
+// sessionStorage is scoped to one browser tab.  Unlike the refresh cookie,
+// it therefore lets a tab refuse an identity that was established by a
+// different login in the same browser profile.
+const EXPECTED_SESSION_USER_ID_STORAGE_KEY = "clinia.auth.expected_session_user_id";
 
 export interface AuthUser {
     id?: string;
@@ -226,10 +230,48 @@ function applySession(session: AuthSession): void {
     inMemoryUser = session.user;
 }
 
-function clearSession({ clearDiagnosticToken = false } = {}): void {
+function getExpectedSessionUserId(): string | null {
+    try {
+        const userId = window.sessionStorage.getItem(EXPECTED_SESSION_USER_ID_STORAGE_KEY);
+        return userId?.trim() || null;
+    } catch {
+        return null;
+    }
+}
+
+function setExpectedSessionUser(session: AuthSession): void {
+    if (!session.user.id) {
+        return;
+    }
+
+    try {
+        window.sessionStorage.setItem(EXPECTED_SESSION_USER_ID_STORAGE_KEY, session.user.id);
+    } catch {
+        // Ignore storage errors to avoid blocking authentication.
+    }
+}
+
+function clearExpectedSessionUser(): void {
+    try {
+        window.sessionStorage.removeItem(EXPECTED_SESSION_USER_ID_STORAGE_KEY);
+    } catch {
+        // Ignore storage errors to avoid blocking logout.
+    }
+}
+
+function isUnexpectedSessionUser(session: AuthSession): boolean {
+    const expectedUserId = getExpectedSessionUserId();
+    return Boolean(expectedUserId && session.user.id && expectedUserId !== session.user.id);
+}
+
+function clearSession({ clearDiagnosticToken = false, clearExpectedUser = true } = {}): void {
     inMemoryAccessToken = null;
     inMemoryUser = null;
     refreshPromise = null;
+
+    if (clearExpectedUser) {
+        clearExpectedSessionUser();
+    }
 
     if (clearDiagnosticToken) {
         diagnosticAccessTokenSnapshot = null;
@@ -402,12 +444,14 @@ export async function completeMfaLogin(challenge: MfaChallenge, code: string): P
     const payload = getResponsePayload(data);
     const session = normalizeSessionFromResponse(data);
     applySession(session);
+    setExpectedSessionUser(session);
     return { session, recoveryCodes: Array.isArray(payload.recoveryCodes) ? payload.recoveryCodes.filter((value): value is string => typeof value === "string") : [] };
 }
 
 export async function login(credentials: LoginCredentials): Promise<AuthSession> {
     const session = await loginWithAuthApi(credentials);
     applySession(session);
+    setExpectedSessionUser(session);
     return session;
 }
 
@@ -425,6 +469,7 @@ export async function registerSelf(credentials: LoginCredentials): Promise<AuthS
 
     const session = await loginWithAuthApi(credentials);
     applySession(session);
+    setExpectedSessionUser(session);
     return session;
 }
 
@@ -556,7 +601,20 @@ export async function refreshAccessToken(): Promise<string | null> {
             const session = normalizeSessionFromResponse({
                 ...payload,
             });
+
+            if (isUnexpectedSessionUser(session)) {
+                clearSession({ clearExpectedUser: false });
+                persistAuthSecurityNotice({
+                    code: "SESSION_REPLACED",
+                    message: "La session de cet onglet ne correspond plus au compte attendu.",
+                });
+                return null;
+            }
+
             applySession(session);
+            if (!getExpectedSessionUserId()) {
+                setExpectedSessionUser(session);
+            }
             return session.accessToken;
         } catch {
             const previousUser = inMemoryUser;

@@ -29,6 +29,9 @@ import { OpenAILogsPage } from "./pages/OpenAILogsPage";
 import { DbStatusPage } from "./pages/DbStatusPage";
 import { WriteOperationAuditsPage } from "./pages/WriteOperationAuditsPage";
 import { CoordinationRequestsPage } from "./pages/CoordinationRequestsPage";
+import { ClinicalSupportAccessInboxPage } from "./pages/ClinicalSupportAccessInboxPage";
+import { DelegatedPatientAccessPage } from "./pages/DelegatedPatientAccessPage";
+import { ClinicalSupportAccessRequestPage } from "./pages/ClinicalSupportAccessRequestPage";
 import { MyWriteReceiptsPage } from "./pages/MyWriteReceiptsPage";
 import { CliniquesPage } from "./pages/CliniquesPage";
 import { SpecialistsPage } from "./pages/SpecialistsPage";
@@ -324,6 +327,30 @@ const App: React.FC = () => {
                         element={
                             <ProtectedRoute allowedRoles={[...CLINICAL_ROLES]}>
                                 <PatientsPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/clinical-support-access/inbox"
+                        element={
+                            <ProtectedRoute allowedRoles={["MEDECIN"]}>
+                                <ClinicalSupportAccessInboxPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/clinical-support-access/patients"
+                        element={
+                            <ProtectedRoute allowedRoles={["SUPERADMIN"]}>
+                                <DelegatedPatientAccessPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/clinical-support-access/request"
+                        element={
+                            <ProtectedRoute allowedRoles={["SUPERADMIN"]}>
+                                <ClinicalSupportAccessRequestPage />
                             </ProtectedRoute>
                         }
                     />

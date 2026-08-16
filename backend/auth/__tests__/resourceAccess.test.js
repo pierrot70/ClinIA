@@ -28,14 +28,27 @@ describe("resource access", () => {
         expect(isPrivilegedUser({ role: "ADMIN" })).toBe(false);
     });
 
-    it("keeps global clinical access restricted to superadmins", () => {
-        expect(
+    it("denies superadmins clinical access by default", () => {
+        expect(() =>
             buildOwnerScope({
                 userId: "507f1f77bcf86cd799439011",
                 role: "SUPERADMIN",
             })
-        ).toEqual({});
-        expect(isPrivilegedUser({ role: "SUPERADMIN" })).toBe(true);
+        ).toThrow();
+
+        try {
+            buildOwnerScope({
+                userId: "507f1f77bcf86cd799439011",
+                role: "SUPERADMIN",
+            });
+        } catch (error) {
+            expect(error).toEqual({
+                code: "CLINICAL_ACCESS_REQUIRED",
+                message:
+                    "Une autorisation clinique déléguée en lecture est requise.",
+            });
+        }
+        expect(isPrivilegedUser({ role: "SUPERADMIN" })).toBe(false);
     });
 
     it("fails closed when authentication context is absent", () => {
