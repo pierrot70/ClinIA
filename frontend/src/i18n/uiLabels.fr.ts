@@ -1109,6 +1109,7 @@ export const UI_LABELS_FR = {
         save: "Sauvegarder la note",
         saving: "Sauvegarde...",
         discard: "Ignorer les changements",
+        back: "Retour",
         saved: "Note clinique sauvegardée.",
         close: "Fermer",
         error: "Impossible de sauvegarder la note clinique.",

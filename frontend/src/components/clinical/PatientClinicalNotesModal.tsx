@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Save, X } from "lucide-react";
+import { ArrowLeft, Save, X } from "lucide-react";
 import { labels } from "../../i18n/uiLabels";
 import { WriteVerificationReceipt } from "../system/WriteVerificationReceipt";
 import { updatePatient, type Patient } from "../../services/patientsApi";
@@ -40,10 +40,12 @@ export function PatientClinicalNotesModal({ patient, onClose, onSaved }: Patient
         setMessage("");
         setWriteVerification(null);
 
-        requestAnimationFrame(() => {
-            noteInputRef.current?.focus();
-            noteInputRef.current?.setSelectionRange(nextNote.length, nextNote.length);
-        });
+        if (window.matchMedia("(min-width: 768px)").matches) {
+            requestAnimationFrame(() => {
+                noteInputRef.current?.focus();
+                noteInputRef.current?.setSelectionRange(nextNote.length, nextNote.length);
+            });
+        }
     }, [patient?._id]);
 
     if (!patient) return null;
@@ -69,11 +71,11 @@ export function PatientClinicalNotesModal({ patient, onClose, onSaved }: Patient
         setSaving(false);
     };
 
-    return <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-label={copy.title}>
+    return <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-label={copy.title}>
         <section className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
             <header className="flex items-start justify-between border-b border-gray-200 px-5 py-4">
                 <div><h2 className="text-lg font-semibold text-gray-950">{copy.title}</h2><p className="mt-1 text-sm text-gray-600">{patient.prenom} {patient.nom}</p></div>
-                <button type="button" onClick={onClose} className="rounded p-2 text-gray-600 hover:bg-gray-100" title={copy.close}><X className="h-5 w-5" /><span className="sr-only">{copy.close}</span></button>
+                <button type="button" onClick={onClose} className="inline-flex shrink-0 items-center gap-1 rounded px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100" title={copy.close}><ArrowLeft className="h-5 w-5" />{copy.back}</button>
             </header>
             <div className="space-y-4 overflow-y-auto p-5">
                 <p className="text-sm text-gray-600">{copy.description}</p>
