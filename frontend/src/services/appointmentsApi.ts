@@ -75,6 +75,11 @@ export interface AppointmentRecommendation {
     existingAppointmentTimes: string[];
 }
 
+export interface ReferringClinic {
+    _id: string;
+    nom: string;
+}
+
 export type AppointmentRecommendationStatus =
     | "AVAILABLE"
     | "NO_SPECIALISTS_FOR_SPECIALTY"
@@ -262,12 +267,13 @@ export async function fetchAvailableSlots(
 
 export async function fetchAppointmentRecommendation(
     patient: string,
-    specialty: string
+    specialty: string,
+    originClinique: string
 ): Promise<AppointmentRecommendationResponse> {
     return withSecurityIncidentGuard(
         (async () => {
             try {
-                const query = new URLSearchParams({ patient, specialty });
+                const query = new URLSearchParams({ patient, specialty, originClinique });
                 const response = await authFetch(
                     `${API_URL}/api/appointments/recommendation?${query.toString()}`
                 );
@@ -277,6 +283,25 @@ export async function fetchAppointmentRecommendation(
                     error: {
                         code: "INTERNAL_ERROR",
                         message: "Impossible de proposer un rendez-vous.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
+}
+
+export async function fetchReferringClinics(): Promise<ApiResponse<ReferringClinic[]>> {
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await authFetch(`${API_URL}/api/appointments/referring-clinics`);
+                return (await safeJson(response)) as ApiResponse<ReferringClinic[]>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de charger les cliniques de référence.",
                         retryable: true,
                     },
                 };

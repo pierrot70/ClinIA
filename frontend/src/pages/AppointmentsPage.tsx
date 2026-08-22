@@ -7,11 +7,13 @@ import {
     createAppointment,
     createAppointmentCoordinationRequest,
     fetchAppointmentRecommendation,
+    fetchReferringClinics,
     fetchAvailableSlots,
     fetchManualAppointmentOptions,
     type AppointmentRecommendation,
     type AppointmentRecommendationStatus,
     type ManualAppointmentOptions,
+    type ReferringClinic,
 } from "../services/appointmentsApi";
 import {
     fetchPatientById,
@@ -45,6 +47,10 @@ function useAppointmentsPageLabels(targetLang: string) {
     const { translated: patientSearchSelected } = useTranslation({ text: source.patientSearch.selected, ...options });
     const { translated: selectPatient } = useTranslation({ text: source.specialist.selectPatient, ...options });
     const { translated: specialtyChoose } = useTranslation({ text: source.specialist.specialtyChoose, ...options });
+    const { translated: referenceClinicLabel } = useTranslation({ text: source.specialist.referenceClinicLabel, ...options });
+    const { translated: referenceClinicChoose } = useTranslation({ text: source.specialist.referenceClinicChoose, ...options });
+    const { translated: referenceClinicLoading } = useTranslation({ text: source.specialist.referenceClinicLoading, ...options });
+    const { translated: referenceClinicRequired } = useTranslation({ text: source.specialist.referenceClinicRequired, ...options });
     const { translated: recommendationLoading } = useTranslation({ text: source.specialist.recommendationLoading, ...options });
     const { translated: recommendationNone } = useTranslation({ text: source.specialist.recommendationNone, ...options });
     const { translated: recommendationNoSpecialists } = useTranslation({ text: source.specialist.recommendationNoSpecialists, ...options });
@@ -97,6 +103,10 @@ function useAppointmentsPageLabels(targetLang: string) {
         patientSearchSelected,
         selectPatient,
         specialtyChoose,
+        referenceClinicLabel,
+        referenceClinicChoose,
+        referenceClinicLoading,
+        referenceClinicRequired,
         recommendationLoading,
         recommendationNone,
         recommendationNoSpecialists,
@@ -152,6 +162,10 @@ export function AppointmentsPage() {
     const [selectedPatient, setSelectedPatient] =
         useState<Patient | null>(null);
     const [specialty, setSpecialty] = useState("");
+    const [referenceClinique, setReferenceClinique] = useState("");
+    const [referenceClinics, setReferenceClinics] = useState<ReferringClinic[]>([]);
+    const [referenceClinicsLoading, setReferenceClinicsLoading] = useState(false);
+    const [referenceClinicsError, setReferenceClinicsError] = useState<ApiError | null>(null);
     const [clinique, setClinique] = useState("");
     const [specialist, setSpecialist] = useState("");
     const [date, setDate] = useState("");
@@ -225,6 +239,24 @@ export function AppointmentsPage() {
             setInsuranceNumber(ramq);
         }
     }, [searchParams]);
+
+    useEffect(() => {
+        let cancelled = false;
+        async function loadReferenceClinics() {
+            setReferenceClinicsLoading(true);
+            const response = await fetchReferringClinics();
+            if (cancelled) return;
+            setReferenceClinicsLoading(false);
+            if ("error" in response) {
+                setReferenceClinicsError(response.error);
+                return;
+            }
+            setReferenceClinics(response.data);
+            if (response.data.length === 1) setReferenceClinique(response.data[0]._id);
+        }
+        void loadReferenceClinics();
+        return () => { cancelled = true; };
+    }, []);
 
     /* ------------------------------------------------------------------ */
     /* Recherche patients                                                 */
@@ -395,11 +427,20 @@ export function AppointmentsPage() {
         setManualOptionsError(null);
 
         if (!patientId || !nextSpecialty) return;
+        if (!referenceClinique) {
+            setRecommendationError({
+                code: "REFERENCE_CLINIC_REQUIRED",
+                message: ui.referenceClinicRequired,
+                retryable: false,
+            });
+            return;
+        }
 
         setRecommendationLoading(true);
         const response = await fetchAppointmentRecommendation(
             patientId,
-            nextSpecialty
+            nextSpecialty,
+            referenceClinique
         );
         if (recommendationRequestId.current !== requestId) return;
 
@@ -730,13 +771,38 @@ export function AppointmentsPage() {
                     )}
                 </div>
 
+                <label className="flex flex-col gap-1 text-sm">
+                    <span>{ui.referenceClinicLabel}</span>
+                    <select
+                        className="border rounded p-2"
+                        value={referenceClinique}
+                        onChange={(event) => {
+                            setReferenceClinique(event.target.value);
+                            setSpecialty("");
+                            setRecommendation(null);
+                            setRecommendationError(null);
+                        }}
+                        disabled={referenceClinicsLoading || referenceClinics.length === 0}
+                    >
+                        <option value="">
+                            {referenceClinicsLoading ? ui.referenceClinicLoading : ui.referenceClinicChoose}
+                        </option>
+                        {referenceClinics.map((item) => (
+                            <option key={item._id} value={item._id}>{item.nom}</option>
+                        ))}
+                    </select>
+                    {referenceClinicsError && (
+                        <span className="text-xs text-red-600">{referenceClinicsError.message}</span>
+                    )}
+                </label>
+
                 <select
                     className="border rounded p-2"
                     value={specialty}
                     onChange={(e) => {
                         void handleSpecialtyChange(e.target.value);
                     }}
-                    disabled={!patientId || recommendationLoading}
+                    disabled={!patientId || !referenceClinique || recommendationLoading}
                 >
                     <option value="">
                         {patientId ? ui.specialtyChoose : ui.selectPatient}

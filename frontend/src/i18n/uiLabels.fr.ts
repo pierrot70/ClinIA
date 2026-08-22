@@ -1250,6 +1250,10 @@ export const UI_LABELS_FR = {
             missingCoordinates:
                 "Coordonnées manquantes pour déterminer la clinique la plus proche.",
             specialtyChoose: "Choisir une spécialité *",
+            referenceClinicLabel: "Clinique de référence du médecin demandeur *",
+            referenceClinicChoose: "Choisir votre clinique de pratique *",
+            referenceClinicLoading: "Chargement de vos cliniques de pratique...",
+            referenceClinicRequired: "Choisissez votre clinique de pratique avant de rechercher un spécialiste.",
             recommendationLoading: "Recherche de la meilleure option...",
             recommendationNone:
                 "Aucune clinique avec un créneau disponible pour cette spécialité.",
@@ -1565,6 +1569,8 @@ export const UI_LABELS_FR = {
             doctorNumberPlaceholder: "Numéro de médecin *",
             phonePlaceholder: "Téléphone (automatique)",
             emailPlaceholder: "Courriel (automatique)",
+            clinicianAccount: "Compte ClinIA du médecin (optionnel)",
+            noClinicianAccount: "Aucun compte ClinIA associé",
             noClinic: "Aucune clinique",
             primaryClinic: "Clinique principale *",
             secondClinic: "Deuxième clinique (facultative)",

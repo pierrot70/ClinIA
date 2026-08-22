@@ -5,7 +5,10 @@ import {
     getSpecialistById,
     updateSpecialist,
     deleteSpecialist,
+    listEligibleClinicianAccounts,
 } from "../services/specialists.js";
+import { requireRole } from "../middleware/requireRole.js";
+import { AUTH_ROLES } from "../auth/constants.js";
 import {
     toCreateSpecialistDTO,
     toUpdateSpecialistDTO,
@@ -21,6 +24,22 @@ const router = express.Router();
 
 function getRequestIp(req) {
     return getTrustedRequestIp(req);
+}
+
+function specialistConflictError(err) {
+    const keyPattern = err?.keyPattern || {};
+    if (keyPattern.accountUserId || err?.message?.includes("accountUserId")) {
+        return {
+            code: "CLINICIAN_ACCOUNT_ALREADY_LINKED",
+            message:
+                "Ce compte ClinIA est déjà associé à une autre fiche spécialiste. Retirez d'abord cette association.",
+        };
+    }
+
+    return {
+        code: "SPECIALIST_CONFLICT",
+        message: "Ce numéro de médecin existe déjà.",
+    };
 }
 
 async function recordSpecialistWriteAudit(req, {
@@ -47,6 +66,32 @@ async function recordSpecialistWriteAudit(req, {
         replicaSet: await getReplicaSetStatus(),
     });
 }
+
+/* ------------------------------------------------------------------ */
+/* GET /api/specialists/clinician-accounts                             */
+/* ------------------------------------------------------------------ */
+
+router.get(
+    "/clinician-accounts",
+    requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+    async (_req, res) => {
+        try {
+            return res.status(200).json({
+                data: await listEligibleClinicianAccounts(),
+                meta: { source: "real", model: "mongo" },
+            });
+        } catch (err) {
+            logSafeError("SPECIALIST_CLINICIAN_ACCOUNTS_FAILED", err);
+            return res.status(500).json({
+                error: {
+                    code: "PERSISTENCE_FAILED",
+                    message: "Impossible de charger les comptes médecins.",
+                    retryable: true,
+                },
+            });
+        }
+    }
+);
 
 /* ------------------------------------------------------------------ */
 /* POST /api/specialists                                               */
@@ -83,11 +128,10 @@ router.post("/", async (req, res) => {
         });
     } catch (err) {
         if (err.code === 11000) {
+            const conflict = specialistConflictError(err);
             return res.status(409).json({
                 error: {
-                    code: "SPECIALIST_CONFLICT",
-                    message:
-                        "Ce numéro de médecin existe déjà.",
+                    ...conflict,
                     retryable: false,
                 },
             });
@@ -273,11 +317,10 @@ router.patch("/:id", async (req, res) => {
         }
 
         if (err.code === 11000) {
+            const conflict = specialistConflictError(err);
             return res.status(409).json({
                 error: {
-                    code: "SPECIALIST_CONFLICT",
-                    message:
-                        "Ce numéro de médecin existe déjà.",
+                    ...conflict,
                     retryable: false,
                 },
             });

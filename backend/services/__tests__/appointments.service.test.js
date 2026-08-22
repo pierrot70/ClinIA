@@ -11,6 +11,7 @@ const patientFindOne = vi.fn();
 const patientFind = vi.fn();
 const specialistFindById = vi.fn();
 const specialistFind = vi.fn();
+const specialistFindOne = vi.fn();
 const cliniqueExists = vi.fn();
 const cliniqueFind = vi.fn();
 const coordinationRequestFindOne = vi.fn();
@@ -48,7 +49,7 @@ vi.mock("../../models/Patient.js", () => ({
 }));
 
 vi.mock("../../models/Specialist.js", () => ({
-    Specialist: { findById: specialistFindById, find: specialistFind },
+    Specialist: { findById: specialistFindById, find: specialistFind, findOne: specialistFindOne },
 }));
 
 vi.mock("../../models/Clinique.js", () => ({
@@ -211,6 +212,8 @@ describe("appointments service", () => {
                 long: -73.5,
             }),
         });
+        const referenceClinicId = "507f1f77bcf86cd799439041";
+        specialistFindOne.mockReturnValue({ lean: vi.fn().mockResolvedValue({ clinique_associer: referenceClinicId }) });
         specialistFind.mockReturnValue({
             lean: vi.fn().mockResolvedValue([
                 {
@@ -231,7 +234,9 @@ describe("appointments service", () => {
                 },
             ]),
         });
-        cliniqueFind.mockReturnValue({
+        cliniqueFind.mockReturnValueOnce({ lean: vi.fn().mockResolvedValue([
+            { _id: referenceClinicId, nom: "Clinique demandeuse", lat: 45.5, long: -73.5 },
+        ]) }).mockReturnValueOnce({
             lean: vi.fn().mockResolvedValue([
                 { _id: nearbyClinicId, nom: "Clinique proche", lat: 45.51, long: -73.5 },
                 { _id: fartherClinicId, nom: "Clinique loin", lat: 46.5, long: -73.5 },
@@ -249,7 +254,7 @@ describe("appointments service", () => {
 
         await expect(
             findNearestAvailableAppointment(
-                { patientId, specialty: "Cardiologue" },
+                { patientId, specialty: "Cardiologue", originClinique: referenceClinicId },
                 authUser
             )
         ).resolves.toMatchObject({
@@ -273,11 +278,16 @@ describe("appointments service", () => {
                 long: -73.5,
             }),
         });
+        const referenceClinicId = "507f1f77bcf86cd799439041";
+        specialistFindOne.mockReturnValue({ lean: vi.fn().mockResolvedValue({ clinique_associer: referenceClinicId }) });
+        cliniqueFind.mockReturnValue({ lean: vi.fn().mockResolvedValue([
+            { _id: referenceClinicId, nom: "Clinique demandeuse", lat: 45.5, long: -73.5 },
+        ]) });
         specialistFind.mockReturnValue({ lean: vi.fn().mockResolvedValue([]) });
 
         await expect(
             findNearestAvailableAppointment(
-                { patientId, specialty: "Cardiologue" },
+                { patientId, specialty: "Cardiologue", originClinique: referenceClinicId },
                 authUser
             )
         ).resolves.toEqual({
@@ -289,6 +299,7 @@ describe("appointments service", () => {
     it("reports when specialists exist but have no available slot", async () => {
         const patientId = "507f1f77bcf86cd799439012";
         const clinicId = "507f1f77bcf86cd799439021";
+        const referenceClinicId = "507f1f77bcf86cd799439041";
         patientFindOne.mockReturnValue({
             lean: vi.fn().mockResolvedValue({
                 _id: patientId,
@@ -296,6 +307,7 @@ describe("appointments service", () => {
                 long: -73.5,
             }),
         });
+        specialistFindOne.mockReturnValue({ lean: vi.fn().mockResolvedValue({ clinique_associer: referenceClinicId }) });
         specialistFind.mockReturnValue({
             lean: vi.fn().mockResolvedValue([
                 {
@@ -308,7 +320,9 @@ describe("appointments service", () => {
                 },
             ]),
         });
-        cliniqueFind.mockReturnValue({
+        cliniqueFind.mockReturnValueOnce({ lean: vi.fn().mockResolvedValue([
+            { _id: referenceClinicId, nom: "Clinique demandeuse", lat: 45.5, long: -73.5 },
+        ]) }).mockReturnValueOnce({
             lean: vi.fn().mockResolvedValue([
                 { _id: clinicId, nom: "Clinique proche", lat: 45.51, long: -73.5 },
             ]),
@@ -316,7 +330,7 @@ describe("appointments service", () => {
 
         await expect(
             findNearestAvailableAppointment(
-                { patientId, specialty: "Cardiologue" },
+                { patientId, specialty: "Cardiologue", originClinique: referenceClinicId },
                 authUser
             )
         ).resolves.toEqual({

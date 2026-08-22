@@ -10,6 +10,7 @@ export interface Specialist {
     numero_medecin: string;
     telephone?: string;
     email?: string;
+    accountUserId?: string | null;
     texto?: boolean;
     clinique_associer?: string | null;
     specialite?: string;
@@ -38,6 +39,7 @@ export interface SpecialistPayload {
     numero_medecin: string;
     telephone?: string;
     email?: string;
+    accountUserId?: string | null;
     texto?: boolean;
     clinique_associer?: string | null;
     specialite?: string;
@@ -46,6 +48,12 @@ export interface SpecialistPayload {
         clinique: string;
         disponibilites: string[];
     }>;
+}
+
+export interface ClinicianAccount {
+    id: string;
+    username: string;
+    email: string | null;
 }
 
 async function safeJson(response: Response): Promise<any> {
@@ -100,6 +108,25 @@ export async function fetchSpecialistsPaginated(
                     error: {
                         code: "INTERNAL_ERROR",
                         message: "Impossible de récupérer les spécialistes.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
+}
+
+export async function fetchEligibleClinicianAccounts(): Promise<ApiResponse<ClinicianAccount[]>> {
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await authFetch(`/api/specialists/clinician-accounts`);
+                return (await safeJson(response)) as ApiResponse<ClinicianAccount[]>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de récupérer les comptes médecins.",
                         retryable: true,
                     },
                 };

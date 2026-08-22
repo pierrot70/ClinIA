@@ -4,6 +4,7 @@ const {
     createAppointmentWithWriteVerification,
     createAppointmentCoordinationRequest,
     findNearestAvailableAppointment,
+    listRequestingPhysicianPracticeClinics,
     getAvailableSlotSchedule,
     listManualAppointmentOptions,
     listAppointmentsPaginated,
@@ -13,6 +14,7 @@ const {
     createAppointmentWithWriteVerification: vi.fn(),
     createAppointmentCoordinationRequest: vi.fn(),
     findNearestAvailableAppointment: vi.fn(),
+    listRequestingPhysicianPracticeClinics: vi.fn(),
     getAvailableSlotSchedule: vi.fn(),
     listManualAppointmentOptions: vi.fn(),
     listAppointmentsPaginated: vi.fn(),
@@ -147,7 +149,7 @@ describe("appointments routes write verification", () => {
     it("returns the nearest available appointment recommendation", async () => {
         const handler = getRouteHandler("get", "/recommendation");
         const req = {
-            query: { patient: "patient-1", specialty: "Cardiologue" },
+            query: { patient: "patient-1", specialty: "Cardiologue", originClinique: "clinic-0" },
             auth: { userId: "doctor-1", role: "MEDECIN" },
         };
         const res = makeRes();
@@ -167,7 +169,7 @@ describe("appointments routes write verification", () => {
         await handler(req, res);
 
         expect(findNearestAvailableAppointment).toHaveBeenCalledWith(
-            { patientId: "patient-1", specialty: "Cardiologue" },
+            { patientId: "patient-1", specialty: "Cardiologue", originClinique: "clinic-0" },
             req.auth
         );
         expect(res.status).toHaveBeenCalledWith(200);

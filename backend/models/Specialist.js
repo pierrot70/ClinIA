@@ -51,6 +51,15 @@ const SpecialistSchema = new mongoose.Schema(
             lowercase: true,
             default: "",
         },
+        // Links a ClinIA clinician account to this professional directory
+        // record. Practice locations remain defined only on this specialist.
+        accountUserId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "AdminUser",
+            unique: true,
+            sparse: true,
+            default: undefined,
+        },
         texto: {
             type: Boolean,
             default: false,

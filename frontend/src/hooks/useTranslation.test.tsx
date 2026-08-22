@@ -212,7 +212,7 @@ describe("useTranslation", () => {
         expect(translateTextMock).not.toHaveBeenCalled();
     });
 
-    it("uses the approved translation key and falls back to English when the cache misses", async () => {
+    it("uses the approved local English fallback without a translation request", async () => {
         translateTextMock.mockRejectedValue(new Error("Translation API error"));
 
         const { result } = renderHook(() =>
@@ -228,14 +228,11 @@ describe("useTranslation", () => {
         });
 
         expect(result.current.translated).toBe("Doctor sign-in");
-        expect(result.current.error).toBe("Translation API error");
-        expect(translateTextMock).toHaveBeenCalledWith({
-            translationKey: "app.landing.doctorLoginTitle",
-            targetLang: "en-CA",
-        });
+        expect(result.current.error).toBeNull();
+        expect(translateTextMock).not.toHaveBeenCalled();
     });
 
-    it("keeps the cached-analysis notice in English when its approved cache entry is unavailable", async () => {
+    it("uses the approved local English cached-analysis notice without a translation request", async () => {
         translateTextMock.mockRejectedValue(new Error("Translation cache miss"));
 
         const { result } = renderHook(() =>
@@ -251,10 +248,7 @@ describe("useTranslation", () => {
         });
 
         expect(result.current.translated).toBe("Equivalent analysis already available");
-        expect(translateTextMock).toHaveBeenCalledWith({
-            translationKey: "clinicalDemo.cachedResultNotice.title",
-            targetLang: "en-CA",
-        });
+        expect(translateTextMock).not.toHaveBeenCalled();
     });
 
     it("does not send an unapproved dynamic label to the backend", async () => {

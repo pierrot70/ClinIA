@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { Specialist } from "../models/Specialist.js";
+import { AdminUser } from "../models/AdminUser.js";
 import { CLINICAL_QUERY_WRITE_OPTIONS, CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 
 /* ------------------------------------------------------------------ */
@@ -179,6 +180,47 @@ function applyPracticeLocationCompatibility(dto) {
     };
 }
 
+async function validateAccountUserLink(accountUserId) {
+    if (accountUserId === undefined || accountUserId === null) return;
+    if (
+        accountUserId === "__invalid__" ||
+        !mongoose.Types.ObjectId.isValid(accountUserId)
+    ) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Compte ClinIA associé invalide.",
+        };
+    }
+
+    const clinicianAccount = await AdminUser.findOne({
+        _id: accountUserId,
+        role: "MEDECIN",
+        isActive: true,
+    }).lean();
+    if (!clinicianAccount) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Le compte ClinIA associé doit être un médecin actif.",
+        };
+    }
+}
+
+export async function listEligibleClinicianAccounts() {
+    const users = await AdminUser.find({
+        role: "MEDECIN",
+        isActive: true,
+    })
+        .select("username email")
+        .sort({ username: 1 })
+        .lean();
+
+    return users.map((user) => ({
+        id: String(user._id),
+        username: user.username,
+        email: user.email || null,
+    }));
+}
+
 export async function createSpecialist(dto) {
     if (!dto.nom || !dto.prenom || !dto.numero_medecin) {
         throw {
@@ -190,8 +232,13 @@ export async function createSpecialist(dto) {
 
     validateDisponibilites(dto.disponibilites);
     validatePracticeLocations(dto.practiceLocations);
+    await validateAccountUserLink(dto.accountUserId);
 
-    const specialist = new Specialist(applyPracticeLocationCompatibility(dto));
+    const specialistPayload = applyPracticeLocationCompatibility(dto);
+    if (specialistPayload.accountUserId === null) {
+        delete specialistPayload.accountUserId;
+    }
+    const specialist = new Specialist(specialistPayload);
     return specialist.save(CLINICAL_WRITE_CONCERN);
 }
 
@@ -296,6 +343,7 @@ export async function updateSpecialist(id, updates) {
     }
 
     validateDisponibilites(updates.disponibilites);
+    await validateAccountUserLink(updates.accountUserId);
 
     let existing = null;
     if (updates.practiceLocations !== undefined) {
@@ -313,10 +361,20 @@ export async function updateSpecialist(id, updates) {
     );
 
     const compatibleUpdates = applyPracticeLocationCompatibility(updates);
+    const unset = {};
+    if (compatibleUpdates.accountUserId === null) {
+        delete compatibleUpdates.accountUserId;
+        unset.accountUserId = 1;
+    }
 
     const specialist = await Specialist.findByIdAndUpdate(
         id,
-        { $set: compatibleUpdates },
+        {
+            ...(Object.keys(compatibleUpdates).length > 0
+                ? { $set: compatibleUpdates }
+                : {}),
+            ...(Object.keys(unset).length > 0 ? { $unset: unset } : {}),
+        },
         {
             new: true,
             runValidators: true,

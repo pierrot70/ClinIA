@@ -3,6 +3,7 @@ import {
     createAppointmentWithWriteVerification,
     createAppointmentCoordinationRequest,
     findNearestAvailableAppointment,
+    listRequestingPhysicianPracticeClinics,
     getAvailableSlotSchedule,
     listManualAppointmentOptions,
     getAppointmentById,
@@ -91,6 +92,39 @@ router.get("/manual-options", async (req, res) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* GET /api/appointments/referring-clinics                             */
+/* ------------------------------------------------------------------ */
+
+router.get("/referring-clinics", async (req, res) => {
+    try {
+        const clinics = await listRequestingPhysicianPracticeClinics(req.auth);
+        return res.status(200).json({
+            data: clinics,
+            meta: { source: "real", model: "mongo" },
+        });
+    } catch (err) {
+        if (
+            err.code === "INVALID_INPUT" ||
+            err.code === "REQUESTING_PHYSICIAN_NOT_LINKED" ||
+            err.code === "REQUESTING_PHYSICIAN_NO_CLINIC"
+        ) {
+            return res.status(400).json({
+                error: { code: err.code, message: err.message, retryable: false },
+            });
+        }
+
+        logSafeError("APPOINTMENT_REFERRING_CLINICS_FAILED", err);
+        return res.status(500).json({
+            error: {
+                code: "PERSISTENCE_FAILED",
+                message: "Impossible de charger les cliniques de référence.",
+                retryable: true,
+            },
+        });
+    }
+});
+
+/* ------------------------------------------------------------------ */
 /* POST /api/appointments/coordination-requests                       */
 /* ------------------------------------------------------------------ */
 
@@ -163,6 +197,7 @@ router.get("/recommendation", async (req, res) => {
             {
                 patientId: req.query.patient,
                 specialty: req.query.specialty,
+                originClinique: req.query.originClinique,
             },
             req.auth
         );
@@ -179,7 +214,9 @@ router.get("/recommendation", async (req, res) => {
         if (
             err.code === "INVALID_INPUT" ||
             err.code === "NOT_FOUND" ||
-            err.code === "MISSING_PATIENT_COORDINATES"
+            err.code === "REQUESTING_PHYSICIAN_NOT_LINKED" ||
+            err.code === "REQUESTING_PHYSICIAN_NO_CLINIC" ||
+            err.code === "MISSING_REFERENCE_CLINIC_COORDINATES"
         ) {
             return res.status(err.code === "NOT_FOUND" ? 404 : 400).json({
                 error: {

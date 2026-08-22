@@ -877,13 +877,58 @@ export async function createAppointmentCoordinationRequest(
     }
 }
 
+async function getRequestingSpecialistPracticeClinics(authUser) {
+    if (!mongoose.Types.ObjectId.isValid(authUser?.userId)) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Compte médecin invalide.",
+        };
+    }
+
+    const requester = await Specialist.findOne({
+        accountUserId: authUser.userId,
+    }).lean();
+    if (!requester) {
+        throw {
+            code: "REQUESTING_PHYSICIAN_NOT_LINKED",
+            message: "Votre compte ClinIA doit être associé à votre fiche spécialiste avant de proposer un rendez-vous.",
+        };
+    }
+
+    const clinicIds = getPracticeLocations(requester).map(
+        (location) => location.clinique
+    );
+    if (clinicIds.length === 0) {
+        throw {
+            code: "REQUESTING_PHYSICIAN_NO_CLINIC",
+            message: "Votre fiche spécialiste ne contient aucune clinique de pratique.",
+        };
+    }
+
+    const clinics = await Clinique.find({
+        _id: { $in: clinicIds },
+    }).lean();
+    const clinicsById = new Map(clinics.map((clinic) => [String(clinic._id), clinic]));
+
+    return clinicIds
+        .map((clinicId) => clinicsById.get(clinicId))
+        .filter(Boolean);
+}
+
+export async function listRequestingPhysicianPracticeClinics(authUser) {
+    const clinics = await getRequestingSpecialistPracticeClinics(authUser);
+    return clinics
+        .map((clinic) => ({ _id: String(clinic._id), nom: clinic.nom }))
+        .sort((left, right) => left.nom.localeCompare(right.nom, "fr"));
+}
+
 /**
  * Finds the closest clinic that can actually offer an appointment for the
  * requested specialty. This is advisory only: createAppointment remains the
  * authoritative, atomic availability check.
  */
 export async function findNearestAvailableAppointment(
-    { patientId, specialty },
+    { patientId, specialty, originClinique },
     authUser
 ) {
     if (!mongoose.Types.ObjectId.isValid(patientId)) {
@@ -906,11 +951,29 @@ export async function findNearestAvailableAppointment(
         };
     }
 
-    if (!Number.isFinite(patient.lat) || !Number.isFinite(patient.long)) {
+    if (!mongoose.Types.ObjectId.isValid(originClinique)) {
         throw {
-            code: "MISSING_PATIENT_COORDINATES",
+            code: "INVALID_INPUT",
             message:
-                "Les coordonnées du patient sont requises pour proposer la clinique la plus proche.",
+                "Une clinique de référence valide est requise.",
+        };
+    }
+
+    const requesterClinics = await getRequestingSpecialistPracticeClinics(authUser);
+    const referenceClinic = requesterClinics.find(
+        (clinic) => String(clinic._id) === String(originClinique)
+    );
+    if (!referenceClinic) {
+        throw {
+            code: "REFERENCE_CLINIC_FORBIDDEN",
+            message: "La clinique de référence doit faire partie de vos lieux de pratique.",
+        };
+    }
+
+    if (!Number.isFinite(referenceClinic.lat) || !Number.isFinite(referenceClinic.long)) {
+        throw {
+            code: "MISSING_REFERENCE_CLINIC_COORDINATES",
+            message: "Les coordonnées de la clinique de référence sont requises pour proposer la clinique la plus proche.",
         };
     }
 
@@ -937,7 +1000,7 @@ export async function findNearestAvailableAppointment(
     const candidates = clinics
         .map((clinic) => ({
             clinic,
-            distanceKm: calculateDistanceKm(patient, clinic),
+            distanceKm: calculateDistanceKm(referenceClinic, clinic),
             specialists: specialistLocations.filter(
                 (item) => item.clinique === String(clinic._id)
             ),

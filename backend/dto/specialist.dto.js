@@ -31,6 +31,14 @@ function normalizeSpecialite(value) {
     return undefined;
 }
 
+function normalizeAccountUserId(value) {
+    if (value === null) return null;
+    if (value === undefined) return undefined;
+    if (typeof value !== "string") return "__invalid__";
+    const trimmed = value.trim();
+    return trimmed || null;
+}
+
 function normalizeDisponibilites(value) {
     if (value === null) return [];
     if (value === undefined) return undefined;
@@ -78,6 +86,7 @@ export function toCreateSpecialistDTO(body) {
                 ? telephoneRaw
                 : undefined,
         email: body.email?.trim() ?? "",
+        accountUserId: normalizeAccountUserId(body.accountUserId),
         texto: normalizeBoolean(body.texto),
         clinique_associer: normalizeCliniqueAssocier(
             body.clinique_associer
@@ -103,6 +112,8 @@ export function toUpdateSpecialistDTO(body) {
     }
     if (body.email !== undefined)
         dto.email = body.email?.trim() ?? "";
+    if (body.accountUserId !== undefined)
+        dto.accountUserId = normalizeAccountUserId(body.accountUserId);
     if (body.texto !== undefined)
         dto.texto = normalizeBoolean(body.texto);
     if (body.clinique_associer !== undefined)

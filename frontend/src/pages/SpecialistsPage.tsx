@@ -6,10 +6,13 @@ import {
     createSpecialist,
     deleteSpecialist,
     fetchSpecialistsPaginated,
+    fetchEligibleClinicianAccounts,
     updateSpecialist,
     type Specialist,
     type SpecialistPayload,
+    type ClinicianAccount,
 } from "../services/specialistsApi";
+import { useAuth } from "../hooks/useAuth";
 import type { ApiError } from "../types/api";
 import { useDebounce } from "../hooks/useDebounce";
 import {
@@ -53,6 +56,8 @@ function useSpecialistsPageLabels(targetLang: string) {
     const { translated: doctorNumberPlaceholder } = useTranslation({ text: source.form.doctorNumberPlaceholder, ...options });
     const { translated: phonePlaceholder } = useTranslation({ text: source.form.phonePlaceholder, ...options });
     const { translated: emailPlaceholder } = useTranslation({ text: source.form.emailPlaceholder, ...options });
+    const { translated: clinicianAccount } = useTranslation({ text: source.form.clinicianAccount, ...options });
+    const { translated: noClinicianAccount } = useTranslation({ text: source.form.noClinicianAccount, ...options });
     const { translated: noClinic } = useTranslation({ text: source.form.noClinic, ...options });
     const { translated: primaryClinic } = useTranslation({ text: source.form.primaryClinic, ...options });
     const { translated: secondClinic } = useTranslation({ text: source.form.secondClinic, ...options });
@@ -119,7 +124,7 @@ function useSpecialistsPageLabels(targetLang: string) {
         availabilityInPast, overlappingAvailability, availabilityRequiresSlot,
         requiredIdentity, invalidAvailability, deleteConfirm, editTitle,
         createTitle, firstNamePlaceholder, lastNamePlaceholder,
-        doctorNumberPlaceholder, phonePlaceholder, emailPlaceholder,
+        doctorNumberPlaceholder, phonePlaceholder, emailPlaceholder, clinicianAccount, noClinicianAccount,
         noClinic, primaryClinic, secondClinic, availabilityClinic, clinicRequired,
         clinicRequiredForAvailability, slotUnavailableAtAnotherClinic, historicalAvailability, noSpecialty, smsEnabled, availabilityTitle, targetMonth,
         selectDaysHint, noDaySelected, chooseRangePrefix, slotHelp,
@@ -235,6 +240,7 @@ function buildTimeSlots() {
 const TIME_SLOTS = buildTimeSlots();
 
 export function SpecialistsPage() {
+    const { user } = useAuth();
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const pageLabels = useSpecialistsPageLabels(i18n.locale);
     const [specialists, setSpecialists] = useState<Specialist[]>([]);
@@ -289,12 +295,14 @@ export function SpecialistsPage() {
         numero_medecin: "",
         telephone: "",
         email: "",
+        accountUserId: "",
         texto: false,
         clinique_associer: "",
         secondaryClinique: "",
         specialite: "",
         disponibilites: [] as DisponibiliteForm[],
     });
+    const [clinicianAccounts, setClinicianAccounts] = useState<ClinicianAccount[]>([]);
     const [monthKey, setMonthKey] = useState(() => {
         const now = new Date();
         return `${now.getFullYear()}-${String(
@@ -321,6 +329,14 @@ export function SpecialistsPage() {
     useEffect(() => {
         void loadCliniqueOptions();
     }, []);
+
+    useEffect(() => {
+        if (user?.role !== "ADMIN" && user?.role !== "SUPERADMIN") return;
+        void (async () => {
+            const response = await fetchEligibleClinicianAccounts();
+            if ("data" in response) setClinicianAccounts(response.data);
+        })();
+    }, [user?.role]);
 
     function getClinicContacts(clinicId?: string) {
         const clinic = clinicId ? cliniqueMap[clinicId] : undefined;
@@ -414,6 +430,7 @@ export function SpecialistsPage() {
             numero_medecin: "",
             telephone: "",
             email: "",
+            accountUserId: "",
             texto: false,
             clinique_associer: "",
             secondaryClinique: "",
@@ -552,6 +569,7 @@ export function SpecialistsPage() {
             prenom: values.prenom.trim(),
             numero_medecin: values.numero_medecin.trim(),
             texto: values.texto,
+            accountUserId: values.accountUserId || null,
             practiceLocations,
         };
 
@@ -699,6 +717,7 @@ export function SpecialistsPage() {
             numero_medecin: specialist.numero_medecin ?? "",
             telephone: telephoneValue,
             email: emailValue,
+            accountUserId: specialist.accountUserId ?? "",
             texto: Boolean(specialist.texto),
             clinique_associer: clinicId,
             secondaryClinique,
@@ -825,6 +844,26 @@ export function SpecialistsPage() {
                             value={form.email}
                             readOnly
                         />
+                        <label className="space-y-1 text-xs text-gray-600">
+                            <span>{pageLabels.clinicianAccount}</span>
+                            <select
+                                className="border rounded p-2 w-full text-sm text-gray-900"
+                                value={form.accountUserId}
+                                onChange={(event) =>
+                                    setForm((current) => ({
+                                        ...current,
+                                        accountUserId: event.target.value,
+                                    }))
+                                }
+                            >
+                                <option value="">{pageLabels.noClinicianAccount}</option>
+                                {clinicianAccounts.map((account) => (
+                                    <option key={account.id} value={account.id}>
+                                        {account.username}{account.email ? ` — ${account.email}` : ""}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
                         <label className="space-y-1 text-xs text-gray-600">
                             <span>{pageLabels.primaryClinic}</span>
                             <select
