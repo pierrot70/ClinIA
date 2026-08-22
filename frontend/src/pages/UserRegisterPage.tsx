@@ -7,6 +7,7 @@ import { labels } from "../i18n/uiLabels";
 
 const ROLE_OPTIONS = ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
 const USER_ROLE_FILTER_OPTIONS = ["ALL", ...ROLE_OPTIONS] as const;
+const PASSWORD_MIN_LENGTH = 12;
 
 type NewUserRole = (typeof ROLE_OPTIONS)[number];
 type UserRoleFilter = (typeof USER_ROLE_FILTER_OPTIONS)[number];
@@ -108,6 +109,8 @@ const UserRegisterPage: React.FC = () => {
     const effectiveMfaRequired = isMfaLockedForRole(role) || mfaRequired;
     const effectiveEditMfaRequired =
         isMfaLockedForRole(editRole) || editMfaRequired;
+    const resetPasswordTooShort =
+        resetPassword.length > 0 && resetPassword.length < PASSWORD_MIN_LENGTH;
 
     const ensureSensitiveAccess = async () => {
         return requestSensitiveReauth();
@@ -377,6 +380,14 @@ const UserRegisterPage: React.FC = () => {
             return;
         }
 
+        if (resetPasswordTooShort) {
+            const message = labels.auth.userManagement.passwordMinLength;
+            setEditSaveStatus("error");
+            setEditSaveMessage(message);
+            setError(message);
+            return;
+        }
+
         setSaving(true);
         setEditSaveStatus("saving");
         setEditSaveMessage("Reinitialisation du mot de passe en cours...");
@@ -427,7 +438,7 @@ const UserRegisterPage: React.FC = () => {
                 setEditSaveMessage(successMessage);
                 setSuccess(successMessage);
             } else {
-                const successMessage = "Mot de passe reinitialise.";
+                const successMessage = labels.auth.userManagement.passwordResetCompleted;
                 setEditSaveStatus("success");
                 setEditSaveMessage(successMessage);
                 setSuccess(successMessage);
@@ -948,9 +959,17 @@ const UserRegisterPage: React.FC = () => {
                         Sauvegarder les modifications
                     </button>
 
-                    <div>
-                        <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="reset-password">
-                            Nouveau mot de passe
+                    <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                        <div>
+                            <h3 className="text-sm font-semibold text-amber-950">
+                                {labels.auth.userManagement.passwordSectionTitle}
+                            </h3>
+                            <p className="mt-1 text-xs text-amber-900">
+                                {labels.auth.userManagement.passwordSectionHelp}
+                            </p>
+                        </div>
+                        <label className="block text-xs font-semibold text-gray-700" htmlFor="reset-password">
+                            {labels.auth.userManagement.passwordLabel}
                         </label>
                         <input
                             id="reset-password"
@@ -958,11 +977,32 @@ const UserRegisterPage: React.FC = () => {
                             value={resetPassword}
                             onChange={(event) => setResetPassword(event.target.value)}
                             className="w-full rounded-lg border px-3 py-2 text-sm"
-                            placeholder="Laisser vide pour generer un mot de passe temporaire"
+                            minLength={PASSWORD_MIN_LENGTH}
+                            maxLength={128}
+                            aria-describedby="reset-password-help"
+                            placeholder={labels.auth.userManagement.passwordPlaceholder}
                         />
-                        <p className="mt-1 text-xs text-gray-500">
-                            Laissez vide pour generer un mot de passe temporaire et forcer l'utilisateur a en choisir un nouveau a sa premiere connexion.
-                        </p>
+                        {resetPasswordTooShort ? (
+                            <p className="text-xs font-medium text-red-700" id="reset-password-help">
+                                {labels.auth.userManagement.passwordMinLength}
+                            </p>
+                        ) : (
+                            <p className="text-xs text-amber-900" id="reset-password-help">
+                                {labels.auth.userManagement.passwordTemporaryHelp}
+                            </p>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                void applyResetPassword();
+                            }}
+                            disabled={saving || resetPasswordTooShort}
+                            className="w-full rounded-lg bg-amber-600 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {resetPassword
+                                ? labels.auth.userManagement.passwordSetAction
+                                : labels.auth.userManagement.passwordGenerateAction}
+                        </button>
                     </div>
 
                     {temporaryPasswordResult && (
@@ -977,16 +1017,6 @@ const UserRegisterPage: React.FC = () => {
                         </div>
                     )}
 
-                    <button
-                        type="button"
-                        onClick={() => {
-                            void applyResetPassword();
-                        }}
-                        disabled={saving}
-                        className="w-full rounded-lg bg-amber-600 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
-                    >
-                        Reinitialiser le mot de passe
-                    </button>
                 </div>
             )}
         </div>

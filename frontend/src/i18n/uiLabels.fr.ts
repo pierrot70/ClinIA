@@ -14,6 +14,19 @@ export const UI_LABELS_FR = {
             mfaStatusEnabled: "MFA configuree",
             mfaStatusRequired: "MFA requise a la prochaine connexion",
             mfaStatusDisabled: "MFA non requise",
+            passwordSectionTitle: "Mot de passe",
+            passwordSectionHelp:
+                "Action distincte : sauvegardez d'abord les changements du compte, puis définissez le mot de passe ci-dessous.",
+            passwordLabel: "Nouveau mot de passe",
+            passwordPlaceholder:
+                "Au moins 12 caractères, ou laisser vide pour en générer un",
+            passwordMinLength: "Au moins 12 caractères sont requis.",
+            passwordTemporaryHelp:
+                "Laissez ce champ vide pour générer un mot de passe temporaire et obliger l'utilisateur à le remplacer à sa première connexion.",
+            passwordSetAction: "Définir ce nouveau mot de passe",
+            passwordGenerateAction: "Générer un mot de passe temporaire",
+            passwordResetCompleted:
+                "Mot de passe réinitialisé. Aucun clic sur « Sauvegarder les modifications » n'est nécessaire.",
         },
         session: {
             warningTitle: "Fin de session imminente",
@@ -1439,6 +1452,11 @@ export const UI_LABELS_FR = {
             next: "Suivant",
             pagePrefix: "Page",
             pageSeparator: "/",
+            resultsPerPage: "Résultats par page",
+        },
+        cards: {
+            expand: "Afficher les actions",
+            collapse: "Masquer les actions",
         },
     },
     // CliniquesPage.tsx - page /cliniques, création et recherche d'établissements.

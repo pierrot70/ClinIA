@@ -109,6 +109,9 @@ function usePatientsPageLabels(targetLang: string) {
     const { translated: next } = useTranslation({ text: source.pagination.next, ...options });
     const { translated: pagePrefix } = useTranslation({ text: source.pagination.pagePrefix, ...options });
     const { translated: pageSeparator } = useTranslation({ text: source.pagination.pageSeparator, ...options });
+    const { translated: resultsPerPage } = useTranslation({ text: source.pagination.resultsPerPage, ...options });
+    const { translated: expandCard } = useTranslation({ text: source.cards.expand, ...options });
+    const { translated: collapseCard } = useTranslation({ text: source.cards.collapse, ...options });
 
     return {
         title,
@@ -188,6 +191,9 @@ function usePatientsPageLabels(targetLang: string) {
         next,
         pagePrefix,
         pageSeparator,
+        resultsPerPage,
+        expandCard,
+        collapseCard,
     };
 }
 
@@ -215,8 +221,32 @@ export function PatientsPage() {
         useState<WriteVerificationMeta | null>(null);
 
     const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(() => window.innerWidth < 768 ? 3 : 10);
     const [totalPages, setTotalPages] = useState(1);
-    const limit = 10;
+
+    useEffect(() => {
+        const mobileQuery = window.matchMedia("(max-width: 767px)");
+
+        const normalizePageLimit = () => {
+            setLimit((currentLimit) => {
+                const nextLimit = mobileQuery.matches
+                    ? (currentLimit === 2 ? 2 : 3)
+                    : ([2, 5, 10, 15, 25, 100].includes(currentLimit)
+                        ? currentLimit
+                        : 10);
+
+                if (nextLimit !== currentLimit) {
+                    setPage(1);
+                }
+
+                return nextLimit;
+            });
+        };
+
+        normalizePageLimit();
+        mobileQuery.addEventListener("change", normalizePageLimit);
+        return () => mobileQuery.removeEventListener("change", normalizePageLimit);
+    }, []);
 
     const [filterNom, setFilterNom] = useState("");
     const [filterPrenom, setFilterPrenom] = useState("");
@@ -264,6 +294,7 @@ export function PatientsPage() {
 
     const [editingId, setEditingId] = useState<string | null>(null);
     const [notesPatient, setNotesPatient] = useState<Patient | null>(null);
+    const [expandedPatientId, setExpandedPatientId] = useState<string | null>(null);
     const [form, setForm] = useState({
         nom: "",
         prenom: "",
@@ -282,7 +313,7 @@ export function PatientsPage() {
     useEffect(() => {
         loadPatients();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filters, page, viewMode]);
+    }, [filters, limit, page, viewMode]);
 
     async function loadPatients() {
         setLoading(true);
@@ -719,7 +750,7 @@ export function PatientsPage() {
     }
 
     return (
-        <div className="max-w-6xl mx-auto p-6 space-y-6">
+        <div className="max-w-6xl mx-auto space-y-6 p-6 pb-28 md:pb-6">
             <h1 className="text-2xl font-semibold">{ui.title}</h1>
 
             <div className="flex flex-wrap gap-2">
@@ -1044,7 +1075,40 @@ export function PatientsPage() {
                         </div>
                     </div>
 
-                    <div className="border rounded overflow-hidden">
+                    <div className="space-y-3 md:hidden">
+                        {loading && <p className="rounded border bg-white p-4 text-sm text-gray-500">{ui.tableLoading}</p>}
+                        {!loading && patients.length === 0 && <p className="rounded border bg-white p-4 text-sm text-gray-500">{ui.empty}</p>}
+                        {!loading && patients.map((p) => (
+                            <article key={p._id} className="rounded border bg-white p-3 shadow-sm">
+                                <div className="flex items-start justify-between gap-3">
+                                    <h2 className="font-semibold text-gray-900">{p.prenom} {p.nom}</h2>
+                                    {viewMode === "archived" && <span className="text-xs text-amber-800">{ui.archivedLabel}</span>}
+                                </div>
+                                <button type="button" className="mt-3 flex w-full items-center justify-between rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800" aria-expanded={expandedPatientId === p._id} onClick={() => setExpandedPatientId((current) => current === p._id ? null : p._id)}>
+                                    <span>{expandedPatientId === p._id ? ui.collapseCard : ui.expandCard}</span><span aria-hidden="true">{expandedPatientId === p._id ? "⌃" : "⌄"}</span>
+                                </button>
+                                {expandedPatientId === p._id && <>
+                                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-gray-600">
+                                    <div><dt>{ui.tableAddress}</dt><dd className="text-gray-900">{p.addresse || "—"}</dd></div>
+                                    <div><dt>{ui.tablePhone}</dt><dd className="text-gray-900">{p.telephone || "—"}</dd></div>
+                                </dl>
+                                <div className="mt-3 grid grid-cols-2 gap-2">
+                                    {viewMode === "archived" ? (
+                                        <button className="col-span-2 min-h-11 rounded border border-emerald-600 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 shadow-sm" disabled={busyIds[p._id]} onClick={() => handleRestore(p._id)}>{ui.restoreLabel}</button>
+                                    ) : (<>
+                                        <button type="button" className="col-span-2 min-h-11 rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700" onClick={() => navigate("/appointments", { state: { patientId: p._id } })}>{ui.createAppointment}</button>
+                                        <button className="min-h-11 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50" onClick={() => handleEdit(p)}>{ui.edit}</button>
+                                        <button className="min-h-11 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50" onClick={() => handleOpenClinicalNotes(p._id)}>{ui.clinicalNotesOpen}</button>
+                                        {user?.role === "MEDECIN" && <button type="button" className="col-span-2 min-h-11 rounded border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 shadow-sm disabled:opacity-60" disabled={supportRequestPatientIds.has(p._id)} onClick={() => void handleRequestSupport(p)}>{supportRequestPatientIds.has(p._id) ? ui.supportRequestPending : ui.requestSupport}</button>}
+                                        <button className="col-span-2 min-h-11 rounded border border-amber-400 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 shadow-sm" disabled={busyIds[p._id]} onClick={() => handleArchive(p._id)}>{ui.archiveLabel}</button>
+                                    </>)}
+                                </div>
+                                </>}
+                            </article>
+                        ))}
+                    </div>
+
+                    <div className="hidden overflow-hidden rounded border md:block">
                         <table className="w-full text-sm">
                             <thead className="bg-gray-100 text-gray-700">
                                 <tr>
@@ -1239,9 +1303,9 @@ export function PatientsPage() {
                         }}
                     />
 
-                    <div className="flex items-center gap-3">
+                    <div className="fixed inset-x-0 bottom-0 z-30 flex flex-wrap items-center gap-3 border-t border-slate-200 bg-white p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(15,23,42,0.12)] md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none">
                         <button
-                            className="px-3 py-1 border rounded"
+                            className="rounded border px-3 py-1 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
                             disabled={page <= 1}
                             onClick={() =>
                                 setPage((p) => Math.max(p - 1, 1))
@@ -1253,7 +1317,7 @@ export function PatientsPage() {
                             {ui.pagePrefix} {page} {ui.pageSeparator} {totalPages}
                         </span>
                         <button
-                            className="px-3 py-1 border rounded"
+                            className="rounded border px-3 py-1 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
                             disabled={page >= totalPages}
                             onClick={() =>
                                 setPage((p) =>
@@ -1263,6 +1327,18 @@ export function PatientsPage() {
                         >
                             {ui.next}
                         </button>
+                        <label className="flex items-center gap-2 text-sm text-gray-600 md:hidden">
+                            {ui.resultsPerPage}
+                            <select className="rounded border px-2 py-1" value={limit} onChange={(event) => { setPage(1); setLimit(Number(event.target.value)); }}>
+                                {[2, 3].map((value) => <option key={value} value={value}>{value}</option>)}
+                            </select>
+                        </label>
+                        <label className="hidden items-center gap-2 text-sm text-gray-600 md:flex">
+                            {ui.resultsPerPage}
+                            <select className="rounded border px-2 py-1" value={limit} onChange={(event) => { setPage(1); setLimit(Number(event.target.value)); }}>
+                                {[2, 5, 10, 15, 25, 100].map((value) => <option key={value} value={value}>{value}</option>)}
+                            </select>
+                        </label>
                     </div>
                 </>
             )}
