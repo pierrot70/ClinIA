@@ -1421,6 +1421,8 @@ export const UI_LABELS_FR = {
         },
         search: {
             title: "Recherche",
+            resultSingular: "patient trouvé",
+            resultPlural: "patients trouvés",
             lastNamePlaceholder: "Nom",
             firstNamePlaceholder: "Prénom",
             addressPlaceholder: "Adresse",

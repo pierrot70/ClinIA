@@ -81,6 +81,8 @@ function usePatientsPageLabels(targetLang: string) {
     const { translated: statusRestored } = useTranslation({ text: source.status.restored, ...options });
     const { translated: statusFailed } = useTranslation({ text: source.status.failed, ...options });
     const { translated: searchTitle } = useTranslation({ text: source.search.title, ...options });
+    const { translated: resultSingular } = useTranslation({ text: source.search.resultSingular, ...options });
+    const { translated: resultPlural } = useTranslation({ text: source.search.resultPlural, ...options });
     const { translated: filterLastNamePlaceholder } = useTranslation({ text: source.search.lastNamePlaceholder, ...options });
     const { translated: filterFirstNamePlaceholder } = useTranslation({ text: source.search.firstNamePlaceholder, ...options });
     const { translated: filterAddressPlaceholder } = useTranslation({ text: source.search.addressPlaceholder, ...options });
@@ -163,6 +165,8 @@ function usePatientsPageLabels(targetLang: string) {
         statusRestored,
         statusFailed,
         searchTitle,
+        resultSingular,
+        resultPlural,
         filterLastNamePlaceholder,
         filterFirstNamePlaceholder,
         filterAddressPlaceholder,
@@ -223,6 +227,7 @@ export function PatientsPage() {
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(() => window.innerWidth < 768 ? 3 : 10);
     const [totalPages, setTotalPages] = useState(1);
+    const [totalPatients, setTotalPatients] = useState(0);
 
     useEffect(() => {
         const mobileQuery = window.matchMedia("(max-width: 767px)");
@@ -364,6 +369,7 @@ export function PatientsPage() {
 
         let data = response.data.data;
         let totalPages = response.data.meta.totalPages;
+        let totalPatients = response.data.meta.total;
 
         if (
             telFilter &&
@@ -383,10 +389,12 @@ export function PatientsPage() {
 
             data = refined.data.data;
             totalPages = refined.data.meta.totalPages;
+            totalPatients = refined.data.meta.total;
         }
 
         setPatients(data);
         setTotalPages(totalPages);
+        setTotalPatients(totalPatients);
 
         if (user?.role === "MEDECIN") {
             const supportStatuses = await listPhysicianClinicalSupportRequestStatuses();
@@ -1023,8 +1031,13 @@ export function PatientsPage() {
             {(viewMode === "list" || viewMode === "archived") && (
                 <>
                     <div className="border rounded p-4 space-y-3">
-                        <div className="text-sm font-medium">
-                            {ui.searchTitle}
+                        <div className="flex items-center justify-between gap-3 text-sm font-medium">
+                            <span>{ui.searchTitle}</span>
+                            <span className="text-xs font-normal text-slate-600" aria-live="polite">
+                                {loading
+                                    ? ui.tableLoading
+                                    : `${totalPatients} ${totalPatients === 1 ? ui.resultSingular : ui.resultPlural}`}
+                            </span>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                             <input
