@@ -74,9 +74,28 @@ const AppointmentSchema = new mongoose.Schema(
         /** Statut du rendez-vous */
         status: {
             type: String,
-            enum: ["scheduled", "cancelled", "completed"],
+            enum: ["scheduled", "cancelled", "completed", "no_show", "rescheduled"],
             default: "scheduled",
             index: true,
+        },
+
+        /** Motif d'annulation documenté sans détail clinique libre */
+        cancellationReason: {
+            type: String,
+            enum: ["patient", "clinic_emergency"],
+            default: undefined,
+        },
+
+        /** Chaînage auditable lorsqu'un rendez-vous est reporté */
+        rescheduledTo: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Appointment",
+            default: undefined,
+        },
+        rescheduledFrom: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Appointment",
+            default: undefined,
         },
 
         priority: {

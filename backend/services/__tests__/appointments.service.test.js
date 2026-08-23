@@ -727,6 +727,73 @@ describe("appointments service", () => {
         expect(bookingGuardUpdateOne).toHaveBeenCalledTimes(1);
     });
 
+    it("enregistre explicitement l'absence du patient", async () => {
+        const appointment = buildAppointment({ status: "scheduled" });
+        findOne.mockResolvedValue(appointment);
+
+        const result = await updateAppointmentStatus(
+            appointment._id,
+            "no_show",
+            authUser
+        );
+
+        expect(result.status).toBe("no_show");
+        expect(bookingGuardUpdateOne).toHaveBeenCalledTimes(1);
+    });
+
+    it("exige un motif précis pour une annulation", async () => {
+        await expect(
+            updateAppointmentStatus(
+                "507f1f77bcf86cd799439011",
+                "cancelled",
+                authUser
+            )
+        ).rejects.toEqual({
+            code: "CANCELLATION_REASON_REQUIRED",
+            message: "Un motif d'annulation est requis.",
+        });
+    });
+
+    it("marque les rendez-vous planifiés dépassés comme à confirmer dans la liste", async () => {
+        const appointment = {
+            _id: "appointment-past",
+            patient: "507f1f77bcf86cd799439012",
+            date: "2000-01-01",
+            time: "08:00",
+            status: "scheduled",
+        };
+        const appointmentQuery = {
+            sort: vi.fn().mockReturnThis(),
+            skip: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockReturnThis(),
+            lean: vi.fn().mockResolvedValue([appointment]),
+        };
+        find.mockReturnValue(appointmentQuery);
+        countDocuments.mockResolvedValue(1);
+        patientFind.mockReturnValue({
+            select: vi.fn().mockReturnValue({
+                lean: vi.fn().mockResolvedValue([]),
+            }),
+        });
+
+        await expect(listAppointmentsPaginated({
+            page: 1,
+            limit: 10,
+            status: "awaiting_confirmation",
+            authUser,
+        })).resolves.toMatchObject({
+            data: [{
+                _id: "appointment-past",
+                status: "awaiting_confirmation",
+                requiresConfirmation: true,
+            }],
+        });
+        expect(countDocuments).toHaveBeenCalledWith(expect.objectContaining({
+            status: "scheduled",
+            $or: expect.any(Array),
+        }));
+    });
+
     it("modifie l'horaire d'un rendez-vous", async () => {
         const appointment = buildAppointment({
             specialist: "507f1f77bcf86cd799439021",

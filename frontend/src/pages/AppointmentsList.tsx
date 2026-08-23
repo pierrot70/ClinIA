@@ -2,8 +2,13 @@ import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
     fetchAppointmentsPaginated,
-    cancelAppointment,
     fetchAvailableSlots,
+    fetchRescheduleRecommendation,
+    rescheduleAppointment,
+    requestSpecialistAvailability,
+    fetchSpecialistAvailabilityRequests,
+    resolveSpecialistAvailabilityRequest,
+    type SpecialistAvailabilityRequest,
     updateAppointmentSchedule,
     updateAppointmentStatus,
     type Appointment,
@@ -28,6 +33,7 @@ import { labels } from "../i18n/uiLabels";
 import { logSafeClientError } from "../utils/safeClientLog";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { useTranslation } from "../hooks/useTranslation";
+import { useAuth } from "../hooks/useAuth";
 
 /* ------------------------------------------------------------------ */
 /* Hook debounce                                                       */
@@ -49,6 +55,7 @@ function useDebounce<T>(value: T, delay = 300): T {
 /* ------------------------------------------------------------------ */
 
 export function AppointmentsListPage() {
+    const { user } = useAuth();
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const translationOptions = {
         targetLang: i18n.locale,
@@ -76,10 +83,14 @@ export function AppointmentsListPage() {
     const [busyIds, setBusyIds] = useState<Record<string, boolean>>({});
     const [specialists, setSpecialists] = useState<Specialist[]>([]);
     const [cliniques, setCliniques] = useState<Clinique[]>([]);
+    const [availabilityRequests, setAvailabilityRequests] = useState<SpecialistAvailabilityRequest[]>([]);
+    const [availabilityRequestsError, setAvailabilityRequestsError] = useState("");
+    const [resolvingAvailabilityRequestId, setResolvingAvailabilityRequestId] = useState<string | null>(null);
 
     /* ---------------- Edition horaire ---------------- */
 
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [editingPurpose, setEditingPurpose] = useState<"update" | "reschedule">("update");
     const [editDate, setEditDate] = useState("");
     const [editTime, setEditTime] = useState("");
     const [editSpecialist, setEditSpecialist] = useState("");
@@ -112,6 +123,39 @@ export function AppointmentsListPage() {
             }
         };
     }, []);
+
+    async function loadAvailabilityRequests() {
+        if (user?.role !== "ADMIN" && user?.role !== "SUPERADMIN") return;
+        const response = await fetchSpecialistAvailabilityRequests();
+        if ("data" in response) {
+            setAvailabilityRequests(response.data);
+            setAvailabilityRequestsError("");
+        } else {
+            setAvailabilityRequestsError(response.error.message);
+        }
+    }
+
+    useEffect(() => {
+        void loadAvailabilityRequests();
+    }, [user?.role]);
+
+    async function handleResolveAvailabilityRequest(requestId: string) {
+        setResolvingAvailabilityRequestId(requestId);
+        setAvailabilityRequestsError("");
+
+        const response = await resolveSpecialistAvailabilityRequest(requestId);
+        if ("error" in response) {
+            setAvailabilityRequestsError(response.error.message);
+            setResolvingAvailabilityRequestId(null);
+            return;
+        }
+
+        setAvailabilityRequests((current) =>
+            current.filter((request) => request.id !== requestId)
+        );
+        showToast("success", "Demande de disponibilités marquée traitée.");
+        setResolvingAvailabilityRequestId(null);
+    }
 
     /* ---------------- Pagination ---------------- */
 
@@ -462,6 +506,7 @@ export function AppointmentsListPage() {
     }
 
     function startEditing(appointment: Appointment) {
+        setEditingPurpose("update");
         setEditingId(appointment._id);
         setEditDate(appointment.date);
         setEditTime(appointment.time);
@@ -472,6 +517,26 @@ export function AppointmentsListPage() {
         setEditOriginalDate(appointment.date);
         setEditOriginalTime(appointment.time);
         setEditSlots([]);
+    }
+
+    async function startRescheduling(appointment: Appointment) {
+        startEditing(appointment);
+        setEditingPurpose("reschedule");
+        setEditTime("");
+
+        const response = await fetchRescheduleRecommendation(appointment._id);
+        if ("error" in response) {
+            showToast("error", response.error.message);
+            return;
+        }
+
+        if (!response.data) {
+            return;
+        }
+
+        setEditDate(response.data.date);
+        setEditClinique(response.data.clinique);
+        setEditSlots(response.data.availableSlots);
     }
 
     function stopEditing() {
@@ -485,6 +550,7 @@ export function AppointmentsListPage() {
         setEditOriginalDate("");
         setEditOriginalTime("");
         setEditSlots([]);
+        setEditingPurpose("update");
     }
 
     async function handleSaveSchedule(id: string) {
@@ -504,16 +570,26 @@ export function AppointmentsListPage() {
 
         const ok = await handleAction(
             id,
-            () =>
-                updateAppointmentSchedule(id, {
+            () => editingPurpose === "reschedule"
+                ? rescheduleAppointment(id, {
+                    date: editDate,
+                    time: editTime,
+                    clinique: editClinique || undefined,
+                })
+                : updateAppointmentSchedule(id, {
                     date: editDate,
                     time: editTime,
                     clinique: editClinique || undefined,
                 }),
             {
-                confirmMessage: `Confirmer le déplacement du rendez-vous au ${editDate} à ${editTime} ?`,
-                successMessage:
-                    "Horaire du rendez-vous mis à jour.",
+                confirmMessage: editingPurpose === "reschedule"
+                    ? appointmentLabels.feedback.confirmRescheduled
+                        .replace("{date}", editDate)
+                        .replace("{time}", editTime)
+                    : `Confirmer le déplacement du rendez-vous au ${editDate} à ${editTime} ?`,
+                successMessage: editingPurpose === "reschedule"
+                    ? appointmentLabels.feedback.rescheduled
+                    : "Horaire du rendez-vous mis à jour.",
                 errorMessage: (error) =>
                     ["SPECIALIST_ALREADY_BOOKED", "APPOINTMENT_CONFLICT"].includes(
                         error.code
@@ -556,6 +632,20 @@ export function AppointmentsListPage() {
         editClinique === editOriginalClinique;
     const isEditTimeAllowed =
         isEditTimeSameAsOriginal || editSlots.includes(editTime);
+    const appointmentLabels = labels.appointmentsList;
+    const canManageSpecialistAvailability =
+        user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+
+    function statusLabel(appointment: Appointment) {
+        if (appointment.status === "awaiting_confirmation") return appointmentLabels.statuses.awaitingConfirmation;
+        if (appointment.status === "scheduled") return appointmentLabels.statuses.scheduled;
+        if (appointment.status === "completed") return appointmentLabels.statuses.completed;
+        if (appointment.status === "no_show") return appointmentLabels.statuses.noShow;
+        if (appointment.status === "rescheduled") return appointmentLabels.statuses.rescheduled;
+        return appointment.cancellationReason === "clinic_emergency"
+            ? appointmentLabels.statuses.cancelledClinicEmergency
+            : appointmentLabels.statuses.cancelledPatient;
+    }
 
     return (
         <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -596,6 +686,31 @@ export function AppointmentsListPage() {
                     Créer un rendez-vous
                 </Link>
             </div>
+
+            {canManageSpecialistAvailability && (
+                <section className="rounded border border-violet-300 bg-violet-50 p-4">
+                    <h2 className="font-semibold text-violet-950">Demandes de disponibilités</h2>
+                    <p className="mt-1 text-sm text-violet-900">Aucune donnée patient n’est incluse dans ces demandes.</p>
+                    {availabilityRequestsError && <p className="mt-2 text-sm text-red-700">{availabilityRequestsError}</p>}
+                    {!availabilityRequestsError && availabilityRequests.length === 0 && <p className="mt-2 text-sm text-violet-900">Aucune demande en attente.</p>}
+                    <div className="mt-3 space-y-2">
+                        {availabilityRequests.map((request) => (
+                            <div key={request.id} className="flex flex-wrap items-center justify-between gap-3 rounded bg-white p-3 text-sm">
+                                <span><strong>{request.specialist}</strong> — {request.clinique}</span>
+                                <button
+                                    className="rounded bg-violet-700 px-2 py-1 text-xs font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                    disabled={resolvingAvailabilityRequestId === request.id}
+                                    onClick={() => void handleResolveAvailabilityRequest(request.id)}
+                                >
+                                    {resolvingAvailabilityRequestId === request.id
+                                        ? "Traitement…"
+                                        : "Marquer traitée"}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            )}
 
             {/* ---------------- Filtres ---------------- */}
 
@@ -655,9 +770,12 @@ export function AppointmentsListPage() {
                     }}
                 >
                     <option value="">Tous les statuts</option>
-                    <option value="scheduled">Planifié</option>
+                    <option value="scheduled">{appointmentLabels.statuses.scheduled}</option>
+                    <option value="awaiting_confirmation">{appointmentLabels.statuses.awaitingConfirmation}</option>
                     <option value="cancelled">Annulé</option>
-                    <option value="completed">Complété</option>
+                    <option value="completed">{appointmentLabels.statuses.completed}</option>
+                    <option value="no_show">{appointmentLabels.statuses.noShow}</option>
+                    <option value="rescheduled">{appointmentLabels.statuses.rescheduled}</option>
                 </select>
             </div>
 
@@ -713,12 +831,15 @@ export function AppointmentsListPage() {
                             const resolvedSpecialist = resolveSpecialist(
                                 a.specialist
                             );
+                            const canResolve = ["scheduled", "awaiting_confirmation"].includes(a.status);
 
                             return (
                             <tr
                                 key={a._id}
                                 className={`border-t ${
-                                    a.status === "scheduled"
+                                    a.status === "awaiting_confirmation"
+                                        ? "bg-amber-100"
+                                        : a.status === "scheduled"
                                         ? "bg-green-50"
                                         : a.status === "cancelled"
                                             ? "bg-red-50"
@@ -829,9 +950,46 @@ export function AppointmentsListPage() {
                                             </div>
                                             {!editSlotsLoading &&
                                                 editSlots.length === 0 && (
-                                                    <div className="text-xs text-gray-400">
-                                                        Aucun créneau disponible
-                                                        pour cette date.
+                                                    <div className="rounded border border-amber-300 bg-amber-50 p-2 text-xs font-medium text-amber-950">
+                                                        {editingPurpose === "reschedule" ? (
+                                                            <>
+                                                                <span>
+                                                                    {appointmentLabels.feedback.noAvailableRescheduleSlot
+                                                                        .replace("{specialist}", formatSpecialistName(resolvedSpecialist))}
+                                                                </span>
+                                                                {canManageSpecialistAvailability ? (
+                                                                    <Link
+                                                                        to="/specialists"
+                                                                        className="mt-2 inline-flex rounded border border-amber-600 bg-white px-2 py-1 text-xs font-semibold text-amber-950 hover:bg-amber-100"
+                                                                    >
+                                                                        {appointmentLabels.feedback.manageAvailability
+                                                                            .replace("{specialist}", formatSpecialistName(resolvedSpecialist))}
+                                                                    </Link>
+                                                                ) : (
+                                                                    <div className="mt-2">
+                                                                        <span className="block">{appointmentLabels.feedback.requestAvailability}</span>
+                                                                        <button
+                                                                            type="button"
+                                                                            disabled={busyIds[a._id]}
+                                                                            className="mt-2 rounded bg-violet-700 px-2 py-1 text-xs font-semibold text-white hover:bg-violet-800 disabled:opacity-50"
+                                                                            onClick={() => {
+                                                                                void handleAction(
+                                                                                    a._id,
+                                                                                    () => requestSpecialistAvailability(a._id),
+                                                                                    { successMessage: appointmentLabels.feedback.availabilityRequestSent }
+                                                                                ).then((sent) => {
+                                                                                    if (sent) stopEditing();
+                                                                                });
+                                                                            }}
+                                                                        >
+                                                                            {appointmentLabels.feedback.sendAvailabilityRequest}
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            <span>Aucun créneau disponible pour cette date.</span>
+                                                        )}
                                                     </div>
                                                 )}
                                             {!isEditFormComplete && (
@@ -859,20 +1017,24 @@ export function AppointmentsListPage() {
                                         </span>
                                     )}
                                 </td>
-                                <td className="p-2">{a.status}</td>
-                                <td
-                                    className={`p-2 flex gap-2 ${
-                                        a.status === "cancelled"
-                                            ? "hidden"
-                                            : ""
-                                    }`}
-                                >
+                                <td className="p-2">
+                                    <span
+                                        className={
+                                            a.status === "awaiting_confirmation"
+                                                ? "inline-flex rounded-full border border-amber-500 bg-amber-200 px-2 py-1 text-xs font-semibold text-amber-950"
+                                                : "inline-flex rounded-full px-2 py-1 text-xs font-medium text-gray-800"
+                                        }
+                                    >
+                                        {statusLabel(a)}
+                                    </span>
+                                </td>
+                                <td className="p-2 flex flex-wrap gap-2">
                                     {editingId === a._id ? (
                                         <>
                                             <button
                                                 disabled={
                                                     busyIds[a._id] ||
-                                                    a.status !== "scheduled" ||
+                                                    (a.status !== "scheduled" && a.status !== "awaiting_confirmation") ||
                                                     editSlotsLoading ||
                                                     !isEditFormComplete ||
                                                     !isEditTimeAllowed
@@ -884,7 +1046,9 @@ export function AppointmentsListPage() {
                                                 }
                                                 className="bg-lime-400 text-black px-2 py-1 rounded"
                                             >
-                                                Enregistrer
+                                                {editingPurpose === "reschedule"
+                                                    ? appointmentLabels.actions.createRescheduled
+                                                    : "Enregistrer"}
                                             </button>
                                             <button
                                                 onClick={stopEditing}
@@ -892,62 +1056,70 @@ export function AppointmentsListPage() {
                                                 Annuler
                                             </button>
                                         </>
-                                    ) : (
+                                    ) : canResolve ? (
                                         <>
                                             <button
-                                                disabled={
-                                                    busyIds[a._id] ||
-                                                    a.status !== "scheduled"
-                                                }
+                                                disabled={busyIds[a._id] || !canResolve}
+                                                className="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-45"
                                                 onClick={() =>
                                                     handleAction(
                                                         a._id,
                                                         () =>
-                                                            cancelAppointment(
-                                                                a._id
-                                                            ),
+                                                            updateAppointmentStatus(a._id, "completed"),
                                                         {
-                                                            confirmMessage:
-                                                                "Confirmer l’annulation de ce rendez-vous ?",
-                                                            successMessage:
-                                                                "Rendez-vous annulé.",
+                                                            confirmMessage: appointmentLabels.feedback.confirmCompleted,
+                                                            successMessage: appointmentLabels.feedback.completed,
                                                         }
                                                     )
                                                 }
                                             >
-                                                Annuler
+                                                {appointmentLabels.actions.markCompleted}
                                             </button>
 
                                             <button
-                                                disabled={
-                                                    busyIds[a._id] ||
-                                                    a.status !== "scheduled"
-                                                }
-                                                onClick={() =>
-                                                    handleAction(
-                                                        a._id,
-                                                        () =>
-                                                            updateAppointmentStatus(
-                                                                a._id,
-                                                                "completed"
-                                                            ),
-                                                        {
-                                                            confirmMessage:
-                                                                "Confirmer le passage à “Complété” ?",
-                                                            successMessage:
-                                                                "Rendez-vous complété.",
-                                                        }
-                                                    )
-                                                }
+                                                disabled={busyIds[a._id] || !canResolve}
+                                                className="rounded bg-amber-500 px-2 py-1 text-xs font-semibold text-amber-950 hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-45"
+                                                onClick={() => handleAction(a._id, () => updateAppointmentStatus(a._id, "no_show"), {
+                                                    confirmMessage: appointmentLabels.feedback.confirmNoShow,
+                                                    successMessage: appointmentLabels.feedback.noShow,
+                                                })}
                                             >
-                                                Compléter
+                                                {appointmentLabels.actions.markNoShow}
                                             </button>
 
                                             <button
-                                                disabled={
-                                                    busyIds[a._id] ||
-                                                    a.status !== "scheduled"
-                                                }
+                                                disabled={busyIds[a._id] || !canResolve}
+                                                className="rounded border border-red-400 bg-red-50 px-2 py-1 text-xs font-semibold text-red-800 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-45"
+                                                onClick={() => handleAction(a._id, () => updateAppointmentStatus(a._id, "cancelled", "patient"), {
+                                                    confirmMessage: appointmentLabels.feedback.confirmCancelledPatient,
+                                                    successMessage: appointmentLabels.feedback.cancelledPatient,
+                                                })}
+                                            >
+                                                {appointmentLabels.actions.cancelPatient}
+                                            </button>
+
+                                            <button
+                                                disabled={busyIds[a._id] || !canResolve}
+                                                className="rounded bg-red-700 px-2 py-1 text-xs font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-45"
+                                                onClick={() => handleAction(a._id, () => updateAppointmentStatus(a._id, "cancelled", "clinic_emergency"), {
+                                                    confirmMessage: appointmentLabels.feedback.confirmCancelledClinicEmergency,
+                                                    successMessage: appointmentLabels.feedback.cancelledClinicEmergency,
+                                                })}
+                                            >
+                                                {appointmentLabels.actions.cancelClinicEmergency}
+                                            </button>
+
+                                            <button
+                                                disabled={busyIds[a._id] || a.status !== "awaiting_confirmation"}
+                                                className="rounded bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-45"
+                                                onClick={() => void startRescheduling(a)}
+                                            >
+                                                {appointmentLabels.actions.reschedule}
+                                            </button>
+
+                                            <button
+                                                disabled={busyIds[a._id] || a.status !== "scheduled"}
+                                                className="rounded border border-blue-500 bg-white px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-45"
                                                 onClick={() =>
                                                     startEditing(a)
                                                 }
@@ -955,6 +1127,8 @@ export function AppointmentsListPage() {
                                                 {labels.appointmentsList.edit.modifySchedule}
                                             </button>
                                         </>
+                                    ) : (
+                                        <span className="text-xs text-gray-500">—</span>
                                     )}
                                 </td>
                             </tr>

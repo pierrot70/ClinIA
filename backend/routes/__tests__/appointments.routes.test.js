@@ -4,22 +4,26 @@ const {
     createAppointmentWithWriteVerification,
     createAppointmentCoordinationRequest,
     findNearestAvailableAppointment,
+    findNextAvailableRescheduleSlot,
     listRequestingPhysicianPracticeClinics,
     getAvailableSlotSchedule,
     listManualAppointmentOptions,
     listAppointmentsPaginated,
     updateAppointmentStatusWithWriteVerification,
     updateAppointmentScheduleWithWriteVerification,
+    rescheduleAppointmentWithWriteVerification,
 } = vi.hoisted(() => ({
     createAppointmentWithWriteVerification: vi.fn(),
     createAppointmentCoordinationRequest: vi.fn(),
     findNearestAvailableAppointment: vi.fn(),
+    findNextAvailableRescheduleSlot: vi.fn(),
     listRequestingPhysicianPracticeClinics: vi.fn(),
     getAvailableSlotSchedule: vi.fn(),
     listManualAppointmentOptions: vi.fn(),
     listAppointmentsPaginated: vi.fn(),
     updateAppointmentStatusWithWriteVerification: vi.fn(),
     updateAppointmentScheduleWithWriteVerification: vi.fn(),
+    rescheduleAppointmentWithWriteVerification: vi.fn(),
 }));
 
 const { toCreateAppointmentDTO } = vi.hoisted(() => ({
@@ -38,12 +42,14 @@ vi.mock("../../services/appointments.js", () => ({
     createAppointmentWithWriteVerification,
     createAppointmentCoordinationRequest,
     findNearestAvailableAppointment,
+    findNextAvailableRescheduleSlot,
     getAvailableSlotSchedule,
     listManualAppointmentOptions,
     getAppointmentById: vi.fn(),
     cancelAppointmentWithWriteVerification: vi.fn(),
     updateAppointmentStatusWithWriteVerification,
     updateAppointmentScheduleWithWriteVerification,
+    rescheduleAppointmentWithWriteVerification,
     listAppointmentsPaginated,
 }));
 
@@ -98,6 +104,19 @@ describe("appointments routes write verification", () => {
             },
         });
         recordWriteOperationAuditEvent.mockResolvedValue(true);
+    });
+
+    it("registers the availability-request inbox before the generic appointment route", () => {
+        const availabilityRequestsIndex = router.stack.findIndex(
+            (entry) => entry.route?.path === "/availability-requests"
+        );
+        const genericAppointmentIndex = router.stack.findIndex(
+            (entry) => entry.route?.path === "/:id"
+        );
+
+        expect(availabilityRequestsIndex).toBeGreaterThanOrEqual(0);
+        expect(genericAppointmentIndex).toBeGreaterThanOrEqual(0);
+        expect(availabilityRequestsIndex).toBeLessThan(genericAppointmentIndex);
     });
 
     it("passes the authenticated patient context when listing available slots", async () => {
@@ -178,6 +197,33 @@ describe("appointments routes write verification", () => {
                 data: recommendation,
                 meta: expect.objectContaining({ recommendationStatus: "AVAILABLE" }),
             })
+        );
+    });
+
+    it("returns the next slot for the same specialist when rescheduling", async () => {
+        const handler = getRouteHandler("get", "/reschedule-recommendation");
+        const req = {
+            query: { appointmentId: "appointment-1" },
+            auth: { userId: "doctor-1", role: "MEDECIN" },
+        };
+        const res = makeRes();
+        const recommendation = {
+            date: "2026-08-29",
+            time: "08:00",
+            clinique: "clinic-1",
+            availableSlots: ["08:00", "08:15"],
+        };
+        findNextAvailableRescheduleSlot.mockResolvedValue(recommendation);
+
+        await handler(req, res);
+
+        expect(findNextAvailableRescheduleSlot).toHaveBeenCalledWith(
+            "appointment-1",
+            req.auth
+        );
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith(
+            expect.objectContaining({ data: recommendation })
         );
     });
 
@@ -585,5 +631,34 @@ describe("appointments routes write verification", () => {
                 },
             },
         });
+    });
+
+    it("audits the replacement appointment when rescheduling", async () => {
+        const handler = getRouteHandler("post", "/:id/reschedule");
+        rescheduleAppointmentWithWriteVerification.mockResolvedValue({
+            appointment: { _id: "appointment-replacement", status: "scheduled" },
+            writeAuditRecorded: true,
+        });
+        const req = {
+            params: { id: "appointment-original" },
+            body: { date: "2026-09-01", time: "10:15", clinique: "clinic-2" },
+            headers: {},
+            auth: { userId: "doctor-1", username: "doctor.one", role: "MEDECIN" },
+            originalUrl: "/api/appointments/appointment-original/reschedule",
+            requestContext: { requestId: "request-reschedule", instanceId: "instance-a" },
+        };
+        const res = makeRes();
+
+        await handler(req, res);
+
+        expect(rescheduleAppointmentWithWriteVerification).toHaveBeenCalledWith(
+            "appointment-original",
+            { date: "2026-09-01", time: "10:15", clinique: "clinic-2" },
+            req.auth,
+            expect.objectContaining({
+                changedFields: ["status", "rescheduledTo", "date", "time", "clinique", "rescheduledFrom"],
+            })
+        );
+        expect(res.status).toHaveBeenCalledWith(201);
     });
 });

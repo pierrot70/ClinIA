@@ -3,12 +3,14 @@ import {
     createAppointmentWithWriteVerification,
     createAppointmentCoordinationRequest,
     findNearestAvailableAppointment,
+    findNextAvailableRescheduleSlot,
     listRequestingPhysicianPracticeClinics,
     getAvailableSlotSchedule,
     listManualAppointmentOptions,
     getAppointmentById,
     cancelAppointmentWithWriteVerification,
     updateAppointmentStatusWithWriteVerification,
+    rescheduleAppointmentWithWriteVerification,
     updateAppointmentScheduleWithWriteVerification,
     listAppointmentsPaginated,
 } from "../services/appointments.js";
@@ -24,6 +26,7 @@ import {
 import { getSafeRequestPath, logSafeError } from "../utils/requestLogSafety.js";
 import { getTrustedRequestIp } from "../utils/requestIp.js";
 import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
+import { SpecialistAvailabilityRequest } from "../models/SpecialistAvailabilityRequest.js";
 
 const router = express.Router();
 
@@ -424,6 +427,22 @@ router.get("/", async (req, res) => {
         filters.clinique = req.query.clinique;
     }
     if (req.query.status) {
+        if (![
+            "scheduled",
+            "awaiting_confirmation",
+            "cancelled",
+            "completed",
+            "no_show",
+            "rescheduled",
+        ].includes(req.query.status)) {
+            return res.status(400).json({
+                error: {
+                    code: "INVALID_INPUT",
+                    message: "Statut de rendez-vous invalide.",
+                    retryable: false,
+                },
+            });
+        }
         filters.status = req.query.status;
     }
     if (req.query.patientInsuranceNumber !== undefined) {
@@ -472,6 +491,159 @@ router.get("/", async (req, res) => {
                 code: "PERSISTENCE_FAILED",
                 message:
                     "Impossible de récupérer les rendez-vous.",
+                retryable: true,
+            },
+        });
+    }
+});
+
+/* ------------------------------------------------------------------ */
+/* GET /api/appointments/availability-requests                        */
+/*                                                                    */
+/* These fixed paths must be registered before GET /:id.              */
+/* ------------------------------------------------------------------ */
+
+router.get("/availability-requests", async (req, res) => {
+    if (!["ADMIN", "SUPERADMIN"].includes(req.auth?.role)) {
+        return res.status(403).json({
+            error: {
+                code: "FORBIDDEN",
+                message: "Action réservée aux administrateurs.",
+                retryable: false,
+            },
+        });
+    }
+
+    try {
+        const requests = await SpecialistAvailabilityRequest.find({ status: "open" })
+            .sort({ createdAt: -1 })
+            .populate("specialist", "prenom nom")
+            .populate("clinique", "nom")
+            .lean();
+
+        return res.status(200).json({
+            data: requests.map((request) => ({
+                id: String(request._id),
+                specialist: request.specialist
+                    ? `${request.specialist.prenom || ""} ${request.specialist.nom || ""}`.trim()
+                    : "—",
+                clinique: request.clinique?.nom || "—",
+                createdAt: request.createdAt,
+            })),
+            meta: { source: "real", model: "mongo" },
+        });
+    } catch (err) {
+        logSafeError("SPECIALIST_AVAILABILITY_REQUEST_LIST_FAILED", err);
+        return res.status(500).json({
+            error: {
+                code: "PERSISTENCE_FAILED",
+                message: "Impossible de récupérer les demandes de disponibilités.",
+                retryable: true,
+            },
+        });
+    }
+});
+
+/* ------------------------------------------------------------------ */
+/* GET /api/appointments/reschedule-recommendation                    */
+/* ------------------------------------------------------------------ */
+
+router.get("/reschedule-recommendation", async (req, res) => {
+    try {
+        const recommendation = await findNextAvailableRescheduleSlot(
+            req.query.appointmentId,
+            req.auth
+        );
+
+        return res.status(200).json({
+            data: recommendation,
+            meta: { source: "real", model: "computed" },
+        });
+    } catch (err) {
+        if (["INVALID_ID", "NOT_FOUND", "STATUS_IMMUTABLE"].includes(err.code)) {
+            return res.status(err.code === "NOT_FOUND" ? 404 : 400).json({
+                error: {
+                    code: err.code,
+                    message: err.message,
+                    retryable: false,
+                },
+            });
+        }
+
+        logSafeError("APPOINTMENT_RESCHEDULE_RECOMMENDATION_FAILED", err);
+        return res.status(500).json({
+            error: {
+                code: "PERSISTENCE_FAILED",
+                message: "Impossible de rechercher le prochain créneau disponible.",
+                retryable: true,
+            },
+        });
+    }
+});
+
+router.patch("/availability-requests/:id/resolve", async (req, res) => {
+    if (!["ADMIN", "SUPERADMIN"].includes(req.auth?.role)) {
+        return res.status(403).json({
+            error: {
+                code: "FORBIDDEN",
+                message: "Action réservée aux administrateurs.",
+                retryable: false,
+            },
+        });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({
+            error: {
+                code: "INVALID_ID",
+                message: "Identifiant de demande invalide.",
+                retryable: false,
+            },
+        });
+    }
+
+    try {
+        const request = await SpecialistAvailabilityRequest.findOneAndUpdate(
+            { _id: req.params.id, status: "open" },
+            { $set: { status: "resolved" } },
+            { new: true }
+        );
+        if (!request) {
+            return res.status(404).json({
+                error: {
+                    code: "NOT_FOUND",
+                    message: "Demande introuvable.",
+                    retryable: false,
+                },
+            });
+        }
+
+        const context = getRequestContext(req);
+        await recordWriteOperationAuditEvent({
+            collectionName: "specialistavailabilityrequests",
+            operation: "UPDATE",
+            outcome: "SUCCESS",
+            actorUserId: req.auth.userId,
+            actorUsername: req.auth.username,
+            actorRole: req.auth.role,
+            ip: getRequestIp(req),
+            requestId: context.requestId,
+            instanceId: context.instanceId,
+            resourceId: String(request._id),
+            patientId: null,
+            changedFields: ["status"],
+        });
+
+        return res.status(200).json({
+            data: { id: String(request._id), status: request.status },
+            meta: { source: "real", model: "mongo" },
+        });
+    } catch (err) {
+        logSafeError("SPECIALIST_AVAILABILITY_REQUEST_RESOLVE_FAILED", err);
+        return res.status(500).json({
+            error: {
+                code: "PERSISTENCE_FAILED",
+                message: "Impossible de traiter la demande de disponibilités.",
                 retryable: true,
             },
         });
@@ -555,7 +727,8 @@ router.delete("/:id", async (req, res) => {
     } catch (err) {
         if (
             err.code === "INVALID_ID" ||
-            err.code === "ALREADY_CANCELLED"
+            err.code === "ALREADY_CANCELLED" ||
+            err.code === "STATUS_IMMUTABLE"
         ) {
             return res.status(400).json({
                 error: {
@@ -594,7 +767,7 @@ router.delete("/:id", async (req, res) => {
 /* ------------------------------------------------------------------ */
 
 router.patch("/:id/status", async (req, res) => {
-    const { status } = req.body;
+    const { status, cancellationReason } = req.body;
 
     if (!status) {
         return res.status(400).json({
@@ -608,8 +781,9 @@ router.patch("/:id/status", async (req, res) => {
 
     try {
         const audit = await buildAppointmentWriteAudit(req, {
-            changedFields: ["status"],
+            changedFields: cancellationReason ? ["status", "cancellationReason"] : ["status"],
         });
+        audit.cancellationReason = cancellationReason;
         const { appointment, writeAuditRecorded } =
             await updateAppointmentStatusWithWriteVerification(
                 req.params.id,
@@ -637,6 +811,8 @@ router.patch("/:id/status", async (req, res) => {
                 "INVALID_ID",
                 "INVALID_STATUS",
                 "STATUS_IMMUTABLE",
+                "INVALID_CANCELLATION_REASON",
+                "CANCELLATION_REASON_REQUIRED",
             ].includes(err.code)
         ) {
             return res.status(400).json({
@@ -668,6 +844,92 @@ router.patch("/:id/status", async (req, res) => {
                 retryable: true,
             },
         });
+    }
+});
+
+/* ------------------------------------------------------------------ */
+/* POST /api/appointments/:id/reschedule                               */
+/* ------------------------------------------------------------------ */
+
+router.post("/:id/reschedule", async (req, res) => {
+    try {
+        const audit = await buildAppointmentWriteAudit(req, {
+            changedFields: ["status", "rescheduledTo", "date", "time", "clinique", "rescheduledFrom"],
+        });
+        const { appointment, writeAuditRecorded } =
+            await rescheduleAppointmentWithWriteVerification(
+                req.params.id,
+                {
+                    date: req.body?.date,
+                    time: req.body?.time,
+                    clinique: req.body?.clinique,
+                },
+                req.auth,
+                audit
+            );
+        const writeVerification = buildWriteVerificationMeta({
+            writeAuditRecorded,
+            verificationId: audit.verificationId,
+            clientMutationId: audit.clientMutationId,
+        });
+        return res.status(201).json({
+            data: appointment,
+            meta: { source: "real", model: "mongo", writeVerification },
+        });
+    } catch (err) {
+        if ([
+            "INVALID_ID",
+            "INVALID_INPUT",
+            "INVALID_TIME",
+            "INVALID_DATE",
+            "NO_AVAILABILITY",
+            "STATUS_IMMUTABLE",
+        ].includes(err.code)) {
+            return res.status(400).json({
+                error: { code: err.code, message: err.message, retryable: false },
+            });
+        }
+        if (["SPECIALIST_ALREADY_BOOKED", "PATIENT_ALREADY_BOOKED", "MAXIMUM_APPOINTMENTS_REACHED"].includes(err.code)) {
+            return res.status(409).json({
+                error: { code: err.code, message: err.message, retryable: false },
+            });
+        }
+        if (err.code === "NOT_FOUND") {
+            return res.status(404).json({
+                error: { code: err.code, message: err.message, retryable: false },
+            });
+        }
+        logSafeError("APPOINTMENT_RESCHEDULE_FAILED", err);
+        return res.status(500).json({
+            error: {
+                code: "PERSISTENCE_FAILED",
+                message: "Impossible de reporter le rendez-vous.",
+                retryable: true,
+            },
+        });
+    }
+});
+
+router.post("/:id/availability-request", async (req, res) => {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ error: { code: "INVALID_ID", message: "Identifiant de rendez-vous invalide.", retryable: false } });
+    }
+    try {
+        const appointment = await getAppointmentById(req.params.id, req.auth);
+        if (appointment.status !== "scheduled") {
+            return res.status(400).json({ error: { code: "INVALID_STATE", message: "Une demande de disponibilité exige un rendez-vous planifié.", retryable: false } });
+        }
+        const request = await SpecialistAvailabilityRequest.findOneAndUpdate(
+            { specialist: appointment.specialist, clinique: appointment.clinique || null, status: "open" },
+            { $setOnInsert: { specialist: appointment.specialist, clinique: appointment.clinique || null, requestedByUserId: req.auth.userId, status: "open" } },
+            { new: true, upsert: true }
+        );
+        const context = getRequestContext(req);
+        await recordWriteOperationAuditEvent({ collectionName: "specialistavailabilityrequests", operation: "CREATE", outcome: "SUCCESS", actorUserId: req.auth.userId, actorUsername: req.auth.username, actorRole: req.auth.role, ip: getRequestIp(req), requestId: context.requestId, instanceId: context.instanceId, resourceId: String(request._id), patientId: null, changedFields: ["specialist", "clinique", "status"] });
+        return res.status(201).json({ data: { id: String(request._id), status: request.status }, meta: { source: "real", model: "mongo" } });
+    } catch (err) {
+        logSafeError("APPOINTMENT_AVAILABILITY_REQUEST_FAILED", err);
+        return res.status(500).json({ error: { code: "PERSISTENCE_FAILED", message: "Impossible d'aviser la gestion clinique.", retryable: true } });
     }
 });
 

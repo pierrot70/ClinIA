@@ -355,6 +355,12 @@ export async function cancelAppointment(id, authUser, { session = null } = {}) {
             message: "Ce rendez-vous est déjà annulé.",
         };
     }
+    if (appointment.status !== "scheduled") {
+        throw {
+            code: "STATUS_IMMUTABLE",
+            message: "Un rendez-vous clôturé ne peut pas être annulé.",
+        };
+    }
 
     const releasesDailyCapacity = appointment.status === "scheduled";
     appointment.status = "cancelled";
@@ -375,9 +381,10 @@ export async function cancelAppointment(id, authUser, { session = null } = {}) {
 /* Update appointment status                                           */
 /* ------------------------------------------------------------------ */
 
-const ALLOWED_STATUSES = ["scheduled", "cancelled", "completed"];
+const ALLOWED_STATUSES = ["scheduled", "cancelled", "completed", "no_show"];
+const CANCELLATION_REASONS = ["patient", "clinic_emergency"];
 
-export async function updateAppointmentStatus(id, newStatus, authUser, { session = null } = {}) {
+export async function updateAppointmentStatus(id, newStatus, authUser, { session = null, cancellationReason } = {}) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
             code: "INVALID_ID",
@@ -389,8 +396,15 @@ export async function updateAppointmentStatus(id, newStatus, authUser, { session
         throw {
             code: "INVALID_STATUS",
             message:
-                "Statut invalide. Valeurs autorisées : scheduled, cancelled, completed.",
+                "Statut invalide. Valeurs autorisées : scheduled, cancelled, completed, no_show.",
         };
+    }
+
+    if (cancellationReason !== undefined && !CANCELLATION_REASONS.includes(cancellationReason)) {
+        throw { code: "INVALID_CANCELLATION_REASON", message: "Motif d'annulation invalide." };
+    }
+    if (newStatus === "cancelled" && !cancellationReason) {
+        throw { code: "CANCELLATION_REASON_REQUIRED", message: "Un motif d'annulation est requis." };
     }
 
     const appointment = await Appointment.findOne({
@@ -405,22 +419,10 @@ export async function updateAppointmentStatus(id, newStatus, authUser, { session
         };
     }
 
-    if (appointment.status === "cancelled") {
+    if (["cancelled", "completed", "no_show", "rescheduled"].includes(appointment.status)) {
         throw {
             code: "STATUS_IMMUTABLE",
-            message:
-                "Un rendez-vous annulé ne peut pas être modifié.",
-        };
-    }
-
-    if (
-        appointment.status === "completed" &&
-        newStatus !== "completed"
-    ) {
-        throw {
-            code: "STATUS_IMMUTABLE",
-            message:
-                "Un rendez-vous complété ne peut pas être modifié.",
+            message: "Un rendez-vous clôturé ne peut pas être modifié.",
         };
     }
 
@@ -428,6 +430,9 @@ export async function updateAppointmentStatus(id, newStatus, authUser, { session
         appointment.status === "scheduled" && newStatus !== "scheduled";
 
     appointment.status = newStatus;
+    appointment.cancellationReason = newStatus === "cancelled"
+        ? cancellationReason
+        : undefined;
     await appointment.save(getClinicalWriteOptions(session));
     if (releasesDailyCapacity) {
         await releaseDailyAppointmentCapacity({
@@ -439,6 +444,71 @@ export async function updateAppointmentStatus(id, newStatus, authUser, { session
     }
 
     return appointment;
+}
+
+/* ------------------------------------------------------------------ */
+/* Reschedule while retaining the original appointment as an audit trail */
+/* ------------------------------------------------------------------ */
+
+export async function rescheduleAppointment(id, schedule, authUser, { session = null } = {}) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw { code: "INVALID_ID", message: "Identifiant de rendez-vous invalide." };
+    }
+
+    const appointment = await Appointment.findOne({
+        _id: id,
+        ...buildOwnerScope(authUser),
+    });
+    if (!appointment) {
+        throw { code: "NOT_FOUND", message: "Rendez-vous introuvable." };
+    }
+    if (appointment.status !== "scheduled") {
+        throw {
+            code: "STATUS_IMMUTABLE",
+            message: "Seul un rendez-vous planifié peut être reporté.",
+        };
+    }
+
+    const { date, time, clinique } = schedule;
+    if (!date || !time) {
+        throw { code: "INVALID_INPUT", message: "Les champs 'date' et 'time' sont requis." };
+    }
+    const targetClinique = clinique || (appointment.clinique ? String(appointment.clinique) : undefined);
+    if (
+        date === appointment.date &&
+        time === appointment.time &&
+        (targetClinique || null) === (appointment.clinique ? String(appointment.clinique) : null)
+    ) {
+        throw { code: "INVALID_INPUT", message: "Le nouvel horaire doit être différent." };
+    }
+
+    // The transaction makes this all-or-nothing: removing the previous slot,
+    // reserving the new slot, and linking the two records.
+    appointment.status = "rescheduled";
+    await appointment.save(getClinicalWriteOptions(session));
+    await releaseDailyAppointmentCapacity({
+        patient: appointment.patient,
+        specialist: appointment.specialist,
+        date: appointment.date,
+        session,
+    });
+
+    const replacement = await createAppointment({
+        patient: String(appointment.patient),
+        specialist: String(appointment.specialist),
+        clinique: targetClinique,
+        date,
+        time,
+        reason: appointment.reason,
+        priority: appointment.priority,
+    }, authUser, { session });
+
+    replacement.rescheduledFrom = appointment._id;
+    await replacement.save(getClinicalWriteOptions(session));
+    appointment.rescheduledTo = replacement._id;
+    await appointment.save(getClinicalWriteOptions(session));
+
+    return { previousAppointment: appointment, appointment: replacement };
 }
 
 /* ------------------------------------------------------------------ */
@@ -683,9 +753,29 @@ export function cancelAppointmentWithWriteVerification(id, authUser, audit) {
 
 export function updateAppointmentStatusWithWriteVerification(id, status, authUser, audit) {
     return executeAppointmentWriteWithReceipt(
-        (session) => updateAppointmentStatus(id, status, authUser, { session }),
+        (session) => updateAppointmentStatus(id, status, authUser, {
+            session,
+            cancellationReason: audit.cancellationReason,
+        }),
         { ...audit, operation: "UPDATE" }
     );
+}
+
+export async function rescheduleAppointmentWithWriteVerification(id, schedule, authUser, audit) {
+    return runAppointmentWriteTransaction(async (session) => {
+        const result = await rescheduleAppointment(id, schedule, authUser, { session });
+        await recordAppointmentWriteReceipt(result.previousAppointment, {
+            ...audit,
+            operation: "UPDATE",
+            changedFields: ["status", "rescheduledTo"],
+        }, session);
+        await recordAppointmentWriteReceipt(result.appointment, {
+            ...audit,
+            operation: "CREATE",
+            changedFields: ["date", "time", "clinique", "rescheduledFrom"],
+        }, session);
+        return { ...result, writeAuditRecorded: true };
+    });
 }
 
 export function updateAppointmentScheduleWithWriteVerification(id, schedule, authUser, audit) {
@@ -1048,6 +1138,78 @@ export async function findNearestAvailableAppointment(
     };
 }
 
+/**
+ * Finds the next bookable slot for the specialist already assigned to an
+ * appointment being rescheduled. It intentionally does not substitute a
+ * different specialist: continuity of care is preserved unless a clinician
+ * explicitly creates a new referral.
+ */
+export async function findNextAvailableRescheduleSlot(id, authUser) {
+    const appointment = await getAppointmentById(id, authUser);
+
+    if (appointment.status !== "scheduled") {
+        throw {
+            code: "STATUS_IMMUTABLE",
+            message: "Seul un rendez-vous planifié peut être reporté.",
+        };
+    }
+
+    const specialist = await Specialist.findById(appointment.specialist, {
+        clinique_associer: 1,
+        disponibilites: 1,
+        practiceLocations: 1,
+    }).lean();
+
+    if (!specialist) {
+        throw {
+            code: "NOT_FOUND",
+            message: "Spécialiste introuvable.",
+        };
+    }
+
+    let earliest = null;
+    for (const location of getPracticeLocations(specialist)) {
+        const dates = Array.from(
+            new Set(
+                (location.disponibilites || [])
+                    .map(toLocalDateKey)
+                    .filter((date) => date && !isSchedulingDatePast(date))
+            )
+        ).sort();
+
+        for (const date of dates) {
+            const schedule = await getAvailableSlotSchedule(
+                String(specialist._id),
+                date,
+                {
+                    patient: String(appointment.patient),
+                    authUser,
+                    clinique: location.clinique,
+                    excludeAppointmentId: String(appointment._id),
+                }
+            );
+            const time = schedule.slots[0];
+            if (!time) continue;
+
+            const candidate = {
+                date,
+                time,
+                clinique: location.clinique,
+                availableSlots: schedule.slots,
+            };
+            if (
+                !earliest ||
+                `${candidate.date}T${candidate.time}` <
+                    `${earliest.date}T${earliest.time}`
+            ) {
+                earliest = candidate;
+            }
+        }
+    }
+
+    return earliest;
+}
+
 function isQuarterHourTime(value) {
     return /^([01]\d|2[0-3]):(00|15|30|45)$/.test(value || "");
 }
@@ -1250,7 +1412,18 @@ export async function listAppointmentsPaginated({
 
     if (specialist) query.specialist = specialist;
     if (clinique) query.clinique = clinique;
-    if (status) query.status = status;
+    if (status === "awaiting_confirmation") {
+        const now = new Date();
+        const today = toSchedulingDateKey(now);
+        const currentTime = toSchedulingTime(now);
+        query.status = "scheduled";
+        if (today && currentTime) {
+            query.$or = [
+                { date: { $lt: today } },
+                { date: today, time: { $lte: currentTime } },
+            ];
+        }
+    } else if (status) query.status = status;
     if (patientInsuranceNumber)
         query.patientInsuranceNumber = patientInsuranceNumber;
 
@@ -1291,10 +1464,17 @@ export async function listAppointmentsPaginated({
     );
 
     return {
-        data: data.map((appointment) => ({
-            ...appointment,
-            patientName: patientNames.get(String(appointment.patient)) || null,
-        })),
+        data: data.map((appointment) => {
+            const requiresConfirmation =
+                appointment.status === "scheduled" &&
+                isSchedulingDateTimePast(appointment.date, appointment.time);
+            return {
+                ...appointment,
+                status: requiresConfirmation ? "awaiting_confirmation" : appointment.status,
+                requiresConfirmation,
+                patientName: patientNames.get(String(appointment.patient)) || null,
+            };
+        }),
         meta: {
             page,
             limit,

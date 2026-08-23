@@ -18,14 +18,19 @@ export interface Appointment {
     time: string;
     reason?: string;
     priority?: "normal" | "urgent";
-    status: "scheduled" | "cancelled" | "completed";
+    status: AppointmentStatus;
+    cancellationReason?: "patient" | "clinic_emergency";
+    requiresConfirmation?: boolean;
     createdAt: string;
 }
 
 export type AppointmentStatus =
     | "scheduled"
+    | "awaiting_confirmation"
     | "cancelled"
-    | "completed";
+    | "completed"
+    | "no_show"
+    | "rescheduled";
 
 export type AppointmentSortDirection = "asc" | "desc";
 
@@ -55,6 +60,13 @@ export interface AvailableSlotSchedule {
     slots: string[];
     existingAppointmentTimes: string[];
     maximumAppointmentsReached: boolean;
+}
+
+export interface RescheduleRecommendation {
+    date: string;
+    time: string;
+    clinique: string;
+    availableSlots: string[];
 }
 
 export interface AppointmentRecommendation {
@@ -261,6 +273,31 @@ export async function fetchAvailableSlots(
     );
 }
 
+export async function fetchRescheduleRecommendation(
+    appointmentId: string
+): Promise<ApiResponse<RescheduleRecommendation | null>> {
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await authFetch(
+                    `${API_URL}/api/appointments/reschedule-recommendation?appointmentId=${encodeURIComponent(appointmentId)}`
+                );
+                return (await safeJson(response)) as ApiResponse<
+                    RescheduleRecommendation | null
+                >;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de rechercher le prochain créneau disponible.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
+}
+
 /* ------------------------------------------------------------------ */
 /* FETCH nearest available appointment recommendation                  */
 /* ------------------------------------------------------------------ */
@@ -398,7 +435,8 @@ export async function cancelAppointment(
 
 export async function updateAppointmentStatus(
     id: string,
-    status: AppointmentStatus
+    status: Exclude<AppointmentStatus, "awaiting_confirmation" | "rescheduled">,
+    cancellationReason?: "patient" | "clinic_emergency"
 ): Promise<ApiResponse<Appointment>> {
     return withSecurityIncidentGuard(
         (async () => {
@@ -408,7 +446,7 @@ export async function updateAppointmentStatus(
                     {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ status }),
+                        body: JSON.stringify({ status, cancellationReason }),
                     }
                 );
                 return (await safeJson(response)) as ApiResponse<Appointment>;
@@ -422,6 +460,68 @@ export async function updateAppointmentStatus(
                 };
             }
         })()
+    );
+}
+
+export async function rescheduleAppointment(
+    id: string,
+    payload: { date: string; time: string; clinique?: string }
+): Promise<ApiResponse<Appointment>> {
+    return withSecurityIncidentGuard(
+        (async () => {
+            try {
+                const response = await authFetch(
+                    `${API_URL}/api/appointments/${id}/reschedule`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload),
+                    }
+                );
+                return (await safeJson(response)) as ApiResponse<Appointment>;
+            } catch {
+                return {
+                    error: {
+                        code: "INTERNAL_ERROR",
+                        message: "Impossible de reporter le rendez-vous.",
+                        retryable: true,
+                    },
+                };
+            }
+        })()
+    );
+}
+
+export async function requestSpecialistAvailability(id: string): Promise<ApiResponse<{ id: string; status: string }>> {
+    return withSecurityIncidentGuard((async () => {
+        try {
+            const response = await authFetch(`${API_URL}/api/appointments/${id}/availability-request`, { method: "POST" });
+            return (await safeJson(response)) as ApiResponse<{ id: string; status: string }>;
+        } catch {
+            return { error: { code: "INTERNAL_ERROR", message: "Impossible d'aviser la gestion clinique.", retryable: true } };
+        }
+    })());
+}
+
+export type SpecialistAvailabilityRequest = { id: string; specialist: string; clinique: string; createdAt: string };
+export async function fetchSpecialistAvailabilityRequests(): Promise<ApiResponse<SpecialistAvailabilityRequest[]>> {
+    return withSecurityIncidentGuard((async () => {
+        try {
+            return (await safeJson(await authFetch(`${API_URL}/api/appointments/availability-requests`))) as ApiResponse<SpecialistAvailabilityRequest[]>;
+        } catch {
+            return { error: { code: "INTERNAL_ERROR", message: "Impossible de charger les demandes de disponibilités.", retryable: true } };
+        }
+    })());
+}
+export async function resolveSpecialistAvailabilityRequest(id: string): Promise<ApiResponse<{ id: string; status: string }>> {
+    return withSecurityIncidentGuard(
+        (async () =>
+            (await safeJson(
+                await authFetch(
+                    `${API_URL}/api/appointments/availability-requests/${id}/resolve`,
+                    { method: "PATCH" }
+                )
+            )) as ApiResponse<{ id: string; status: string }>)()
     );
 }
 
