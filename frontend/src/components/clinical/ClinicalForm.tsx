@@ -219,6 +219,40 @@ function formatList(values: string[] | undefined) {
     return Array.isArray(values) ? values.join(", ") : "";
 }
 
+function InfoTip({ label, children }: { label: string; children: string }) {
+    const [isOpen, setIsOpen] = useState(false);
+
+    return (
+        <span
+            className="relative inline-block align-middle"
+            onPointerEnter={(event) => {
+                if (event.pointerType === "mouse") setIsOpen(true);
+            }}
+            onPointerLeave={(event) => {
+                if (event.pointerType === "mouse") setIsOpen(false);
+            }}
+        >
+            <button
+                type="button"
+                className="ml-1 inline-flex h-5 w-5 cursor-pointer list-none items-center justify-center rounded-full border border-sky-300 bg-sky-50 text-xs font-bold text-sky-800 hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                aria-label={label}
+                aria-expanded={isOpen}
+                onClick={() => setIsOpen((current) => !current)}
+            >
+                ?
+            </button>
+            {isOpen ? (
+                <span
+                    role="tooltip"
+                    className="clinical-info-tip absolute left-0 top-7 z-30 w-72 rounded-lg border border-sky-200 bg-white p-3 text-left text-xs font-normal leading-5 text-slate-700 shadow-lg"
+                >
+                    {children}
+                </span>
+            ) : null}
+        </span>
+    );
+}
+
 function splitProfileList(value: string | undefined) {
     return String(value || "")
         .split(",")
@@ -856,6 +890,30 @@ export function ClinicalForm({
     const clinicalFormLabels = labels.clinicalDemo.form;
     const commentLabels = labels.clinicalDemo.comments;
     const reviewedStrings = getClinicalFormReviewedStrings(targetLang);
+    const { translated: helpButtonLabel } = useTranslation({
+        text: clinicalFormLabels.help.button,
+        targetLang,
+    });
+    const { translated: inputModeHelpLabel } = useTranslation({
+        text: clinicalFormLabels.help.inputMode,
+        targetLang,
+    });
+    const { translated: patientSearchHelpLabel } = useTranslation({
+        text: clinicalFormLabels.help.patientSearch,
+        targetLang,
+    });
+    const { translated: clinicalFieldHelpTipLabel } = useTranslation({
+        text: clinicalFormLabels.help.clinicalField,
+        targetLang,
+    });
+    const { translated: diagnosisHelpTipLabel } = useTranslation({
+        text: clinicalFormLabels.help.diagnosis,
+        targetLang,
+    });
+    const { translated: analyzeHelpLabel } = useTranslation({
+        text: clinicalFormLabels.help.analyze,
+        targetLang,
+    });
 
 
     // Traductions dynamiques
@@ -1300,6 +1358,7 @@ export function ClinicalForm({
             <div className="flex flex-col items-center justify-center gap-2 text-center">
                 <h2 className="text-lg font-semibold text-gray-900">
                     {clinicalParametersTitleLabel}
+                    <InfoTip label={helpButtonLabel}>{analyzeHelpLabel}</InfoTip>
                 </h2>
                 <p className="max-w-2xl text-sm leading-6 text-gray-600">
                     {clinicalParametersHelpLabel}
@@ -1320,6 +1379,7 @@ export function ClinicalForm({
             {isAuthenticated && (
                 <div className="rounded border border-slate-200 bg-slate-50 p-4">
                     <div className="flex flex-wrap gap-2" role="group" aria-label={patientSelectionLabels.selected}>
+                        <InfoTip label={helpButtonLabel}>{inputModeHelpLabel}</InfoTip>
                         <button
                             type="button"
                             onClick={returnToManualInput}
@@ -1361,6 +1421,7 @@ export function ClinicalForm({
                                     <label htmlFor="clinical-patient-search" className="text-sm font-medium text-gray-700">
                                         {patientSelectionLabels.searchLabel}
                                     </label>
+                                    <InfoTip label={helpButtonLabel}>{patientSearchHelpLabel}</InfoTip>
                                     <input
                                         id="clinical-patient-search"
                                         className="input w-full"
@@ -1406,6 +1467,7 @@ export function ClinicalForm({
                             <label htmlFor="clinical-field" className="text-sm font-medium text-gray-700">
                                 {reviewedStrings.clinicalFieldLabel}
                             </label>
+                            <InfoTip label={helpButtonLabel}>{clinicalFieldHelpTipLabel}</InfoTip>
                             <p className="text-xs text-gray-500">
                                 {reviewedStrings.clinicalFieldHelp}
                             </p>
@@ -1745,6 +1807,7 @@ export function ClinicalForm({
                     <label htmlFor="clinical-diagnosis" className="text-sm font-medium text-gray-700">
                         {diagnosisLabel}
                     </label>
+                    <InfoTip label={helpButtonLabel}>{diagnosisHelpTipLabel}</InfoTip>
                     <p className="text-xs text-gray-500">
                         {diagnosisHelpLabel}
                     </p>

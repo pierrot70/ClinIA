@@ -1,5 +1,11 @@
 // Fallback anglais pour les textes statiques cliniques
 export const enFallback: Record<string, string> = {
+  "Aide pour ce champ": "Help for this field",
+  "Choisissez « Patient existant » pour réutiliser les paramètres structurés déjà autorisés dans un dossier. Choisissez « Saisie manuelle » pour analyser un cas sans charger de dossier patient.": "Choose Existing patient to reuse structured parameters already authorized in a record. Choose Manual entry to analyze a case without loading a patient record.",
+  "Recherchez uniquement un de vos patients. Les notes cliniques libres ne sont jamais ajoutées automatiquement à la demande d'analyse.": "Search only your own patients. Free-text clinical notes are never automatically added to the analysis request.",
+  "Choisissez le domaine clinique avant le cas exemple. Cela prépare les options pertinentes du formulaire.": "Choose the clinical field before the example case. This prepares the relevant form options.",
+  "Saisissez un diagnostic confirmé ou le motif clinique principal. N'ajoutez aucun renseignement permettant d'identifier le patient.": "Enter a confirmed diagnosis or the main clinical reason. Do not add any information that could identify the patient.",
+  "ClinIA propose des options et des références à vérifier. Elle ne pose pas de diagnostic final et ne prescrit pas; la décision reste au médecin.": "ClinIA offers options and references to verify. It does not make a final diagnosis or prescribe; the decision remains with the physician.",
   "Entrez une valeur numerique, exemple: 92": "Enter a numeric value, example: 92",
   "Entrez une valeur numerique, exemple: 175": "Enter a numeric value, example: 175",
     "Separez chaque symptome par une virgule, exemple: fatigue, polydipsie": "Separate each symptom with a comma, for example: fatigue, polydipsia.",

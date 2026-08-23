@@ -662,6 +662,14 @@ export const UI_LABELS_FR = {
             },
         },
         form: {
+            help: {
+                button: "Aide pour ce champ",
+                inputMode: "Choisissez « Patient existant » pour réutiliser les paramètres structurés déjà autorisés dans un dossier. Choisissez « Saisie manuelle » pour analyser un cas sans charger de dossier patient.",
+                patientSearch: "Recherchez uniquement un de vos patients. Les notes cliniques libres ne sont jamais ajoutées automatiquement à la demande d'analyse.",
+                clinicalField: "Choisissez le domaine clinique avant le cas exemple. Cela prépare les options pertinentes du formulaire.",
+                diagnosis: "Saisissez un diagnostic confirmé ou le motif clinique principal. N'ajoutez aucun renseignement permettant d'identifier le patient.",
+                analyze: "ClinIA propose des options et des références à vérifier. Elle ne pose pas de diagnostic final et ne prescrit pas; la décision reste au médecin.",
+            },
             openAiModelLabel: "Modèle OpenAI",
             simulationMode: "Mode simulation",
             clinicalParametersTitle:

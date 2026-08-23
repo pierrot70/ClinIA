@@ -1,6 +1,12 @@
 // Traductions espagnoles locales pour les libellés UI courants. Elles sont
 // versionnées avec la source française et ne contiennent aucune donnée clinique.
 export const esFallback: Record<string, string> = {
+    "Aide pour ce champ": "Ayuda para este campo",
+    "Choisissez « Patient existant » pour réutiliser les paramètres structurés déjà autorisés dans un dossier. Choisissez « Saisie manuelle » pour analyser un cas sans charger de dossier patient.": "Elija Paciente existente para reutilizar parámetros estructurados ya autorizados en un expediente. Elija Entrada manual para analizar un caso sin cargar un expediente del paciente.",
+    "Recherchez uniquement un de vos patients. Les notes cliniques libres ne sont jamais ajoutées automatiquement à la demande d'analyse.": "Busque únicamente entre sus propios pacientes. Las notas clínicas de texto libre nunca se añaden automáticamente a la solicitud de análisis.",
+    "Choisissez le domaine clinique avant le cas exemple. Cela prépare les options pertinentes du formulaire.": "Elija el área clínica antes del caso de ejemplo. Esto prepara las opciones pertinentes del formulario.",
+    "Saisissez un diagnostic confirmé ou le motif clinique principal. N'ajoutez aucun renseignement permettant d'identifier le patient.": "Introduzca un diagnóstico confirmado o el motivo clínico principal. No añada información que pueda identificar al paciente.",
+    "ClinIA propose des options et des références à vérifier. Elle ne pose pas de diagnostic final et ne prescrit pas; la décision reste au médecin.": "ClinIA propone opciones y referencias que debe verificar. No establece un diagnóstico final ni prescribe; la decisión corresponde al médico.",
     "Accueil": "Inicio",
     "Plus": "Más",
     "Analyse clinique": "Análisis clínico",
