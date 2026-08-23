@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Save, X } from "lucide-react";
+import { HomeI18nContext } from "../../contexts/HomeI18nContext";
+import { useTranslation } from "../../hooks/useTranslation";
 import { labels } from "../../i18n/uiLabels";
 import { WriteVerificationReceipt } from "../system/WriteVerificationReceipt";
 import { updatePatient, type Patient } from "../../services/patientsApi";
 import type { WriteVerificationMeta } from "../../types/api";
 import { ClinicalNoteHistory } from "./ClinicalNoteHistory";
+import { InfoTooltip } from "../system/InfoTooltip";
 
 type PatientClinicalNotesModalProps = {
     patient: Patient | null;
@@ -25,6 +28,23 @@ function withTimestampedEntry(note: string) {
 
 export function PatientClinicalNotesModal({ patient, onClose, onSaved }: PatientClinicalNotesModalProps) {
     const copy = labels.patientClinicalNotes;
+    const i18n = useContext(HomeI18nContext) || { locale: "fr" };
+    const { translated: helpButtonLabel } = useTranslation({
+        text: copy.help.button,
+        targetLang: i18n.locale,
+    });
+    const { translated: backHelpLabel } = useTranslation({
+        text: copy.help.back,
+        targetLang: i18n.locale,
+    });
+    const { translated: editorHelpLabel } = useTranslation({
+        text: copy.help.editor,
+        targetLang: i18n.locale,
+    });
+    const { translated: saveHelpLabel } = useTranslation({
+        text: copy.help.save,
+        targetLang: i18n.locale,
+    });
     const [note, setNote] = useState("");
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
@@ -75,13 +95,20 @@ export function PatientClinicalNotesModal({ patient, onClose, onSaved }: Patient
         <section className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
             <header className="flex items-start justify-between border-b border-gray-200 px-5 py-4">
                 <div><h2 className="text-lg font-semibold text-gray-950">{copy.title}</h2><p className="mt-1 text-sm text-gray-600">{patient.prenom} {patient.nom}</p></div>
-                <button type="button" onClick={onClose} className="inline-flex shrink-0 items-center gap-1 rounded px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100" title={copy.close}><ArrowLeft className="h-5 w-5" />{copy.back}</button>
+                <div className="flex shrink-0 items-center">
+                    <InfoTooltip label={helpButtonLabel}>{backHelpLabel}</InfoTooltip>
+                    <button type="button" onClick={onClose} className="inline-flex items-center gap-1 rounded px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100" title={copy.close}><ArrowLeft className="h-5 w-5" />{copy.back}</button>
+                </div>
             </header>
             <div className="space-y-4 overflow-y-auto p-5">
                 <p className="text-sm text-gray-600">{copy.description}</p>
-                <label className="block text-sm font-medium text-gray-800">{copy.currentNote}
-                    <textarea ref={noteInputRef} value={note} maxLength={10000} onChange={(event) => setNote(event.target.value)} placeholder={copy.placeholder} rows={12} className="mt-2 block w-full resize-y rounded border border-gray-300 px-3 py-2 text-sm leading-6 text-gray-900" />
-                </label>
+                <div className="flex items-center">
+                    <label htmlFor="patient-clinical-note" className="text-sm font-medium text-gray-800">{copy.currentNote}</label>
+                    <InfoTooltip label={helpButtonLabel}>{editorHelpLabel}</InfoTooltip>
+                </div>
+                <div>
+                    <textarea id="patient-clinical-note" ref={noteInputRef} value={note} maxLength={10000} onChange={(event) => setNote(event.target.value)} placeholder={copy.placeholder} rows={12} className="mt-2 block w-full resize-y rounded border border-gray-300 px-3 py-2 text-sm leading-6 text-gray-900" />
+                </div>
                 {message && <p className={`rounded border p-3 text-sm ${message === copy.saved ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`}>{message}</p>}
                 <WriteVerificationReceipt
                     verification={writeVerification}
@@ -91,7 +118,10 @@ export function PatientClinicalNotesModal({ patient, onClose, onSaved }: Patient
                     <ClinicalNoteHistory patient={patient} onRestored={(restoredPatient) => { onSaved(restoredPatient); setNote(restoredPatient.secure_request_profile?.clinicalNotes || ""); }} />
                     <div className="flex flex-wrap gap-2">
                         <button type="button" disabled={saving} onClick={onClose} className="inline-flex items-center gap-2 rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"><X className="h-4 w-4" />{copy.discard}</button>
-                        <button type="button" disabled={saving} onClick={() => void save()} className="inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"><Save className="h-4 w-4" />{saving ? copy.saving : copy.save}</button>
+                        <div className="flex items-center">
+                            <InfoTooltip label={helpButtonLabel}>{saveHelpLabel}</InfoTooltip>
+                            <button type="button" disabled={saving} onClick={() => void save()} className="inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"><Save className="h-4 w-4" />{saving ? copy.saving : copy.save}</button>
+                        </div>
                     </div>
                 </div>
             </div>

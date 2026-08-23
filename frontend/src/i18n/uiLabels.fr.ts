@@ -1121,6 +1121,13 @@ export const UI_LABELS_FR = {
         saved: "Note clinique sauvegardée.",
         close: "Fermer",
         error: "Impossible de sauvegarder la note clinique.",
+        help: {
+            button: "Aide pour cette action",
+            back: "Retournez à la liste des patients sans modifier la note.",
+            editor: "Cette note est conservée dans le dossier local du patient. Elle n'est jamais envoyée automatiquement à OpenAI.",
+            save: "Chaque sauvegarde crée une version. L'historique permet de relire ou de restaurer une version antérieure.",
+            history: "L'historique affiche les versions de cette note. Restaurer une version remplace la note courante et crée une nouvelle trace.",
+        },
     },
     clinicalPatientSelection: {
         manual: "Saisie manuelle",

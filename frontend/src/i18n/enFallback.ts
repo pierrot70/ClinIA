@@ -1,5 +1,10 @@
 // Fallback anglais pour les textes statiques cliniques
 export const enFallback: Record<string, string> = {
+  "Aide pour cette action": "Help for this action",
+  "Retournez à la liste des patients sans modifier la note.": "Return to the patient list without changing the note.",
+  "Cette note est conservée dans le dossier local du patient. Elle n'est jamais envoyée automatiquement à OpenAI.": "This note is kept in the patient's local record. It is never automatically sent to OpenAI.",
+  "Chaque sauvegarde crée une version. L'historique permet de relire ou de restaurer une version antérieure.": "Each save creates a version. The history lets you review or restore an earlier version.",
+  "L'historique affiche les versions de cette note. Restaurer une version remplace la note courante et crée une nouvelle trace.": "The history shows this note's versions. Restoring a version replaces the current note and creates a new record.",
   "Aide pour ce champ": "Help for this field",
   "Choisissez « Patient existant » pour réutiliser les paramètres structurés déjà autorisés dans un dossier. Choisissez « Saisie manuelle » pour analyser un cas sans charger de dossier patient.": "Choose Existing patient to reuse structured parameters already authorized in a record. Choose Manual entry to analyze a case without loading a patient record.",
   "Recherchez uniquement un de vos patients. Les notes cliniques libres ne sont jamais ajoutées automatiquement à la demande d'analyse.": "Search only your own patients. Free-text clinical notes are never automatically added to the analysis request.",

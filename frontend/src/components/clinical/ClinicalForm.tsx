@@ -11,6 +11,7 @@ import {
 import { HomeI18nContext } from "../../contexts/HomeI18nContext";
 import { labels } from "../../i18n/uiLabels";
 import { getClinicalFormReviewedStrings } from "../../i18n/clinicalFormStrings";
+import { InfoTooltip } from "../system/InfoTooltip";
 import type {
     ClinicalPayload,
     DiabetesClinicalContext,
@@ -217,40 +218,6 @@ function normalize(value: string | undefined) {
 
 function formatList(values: string[] | undefined) {
     return Array.isArray(values) ? values.join(", ") : "";
-}
-
-function InfoTip({ label, children }: { label: string; children: string }) {
-    const [isOpen, setIsOpen] = useState(false);
-
-    return (
-        <span
-            className="relative inline-block align-middle"
-            onPointerEnter={(event) => {
-                if (event.pointerType === "mouse") setIsOpen(true);
-            }}
-            onPointerLeave={(event) => {
-                if (event.pointerType === "mouse") setIsOpen(false);
-            }}
-        >
-            <button
-                type="button"
-                className="ml-1 inline-flex h-5 w-5 cursor-pointer list-none items-center justify-center rounded-full border border-sky-300 bg-sky-50 text-xs font-bold text-sky-800 hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-sky-400"
-                aria-label={label}
-                aria-expanded={isOpen}
-                onClick={() => setIsOpen((current) => !current)}
-            >
-                ?
-            </button>
-            {isOpen ? (
-                <span
-                    role="tooltip"
-                    className="clinical-info-tip absolute left-0 top-7 z-30 w-72 rounded-lg border border-sky-200 bg-white p-3 text-left text-xs font-normal leading-5 text-slate-700 shadow-lg"
-                >
-                    {children}
-                </span>
-            ) : null}
-        </span>
-    );
 }
 
 function splitProfileList(value: string | undefined) {
@@ -1358,7 +1325,7 @@ export function ClinicalForm({
             <div className="flex flex-col items-center justify-center gap-2 text-center">
                 <h2 className="text-lg font-semibold text-gray-900">
                     {clinicalParametersTitleLabel}
-                    <InfoTip label={helpButtonLabel}>{analyzeHelpLabel}</InfoTip>
+                    <InfoTooltip label={helpButtonLabel}>{analyzeHelpLabel}</InfoTooltip>
                 </h2>
                 <p className="max-w-2xl text-sm leading-6 text-gray-600">
                     {clinicalParametersHelpLabel}
@@ -1379,7 +1346,7 @@ export function ClinicalForm({
             {isAuthenticated && (
                 <div className="rounded border border-slate-200 bg-slate-50 p-4">
                     <div className="flex flex-wrap gap-2" role="group" aria-label={patientSelectionLabels.selected}>
-                        <InfoTip label={helpButtonLabel}>{inputModeHelpLabel}</InfoTip>
+                        <InfoTooltip label={helpButtonLabel}>{inputModeHelpLabel}</InfoTooltip>
                         <button
                             type="button"
                             onClick={returnToManualInput}
@@ -1421,7 +1388,7 @@ export function ClinicalForm({
                                     <label htmlFor="clinical-patient-search" className="text-sm font-medium text-gray-700">
                                         {patientSelectionLabels.searchLabel}
                                     </label>
-                                    <InfoTip label={helpButtonLabel}>{patientSearchHelpLabel}</InfoTip>
+                                    <InfoTooltip label={helpButtonLabel}>{patientSearchHelpLabel}</InfoTooltip>
                                     <input
                                         id="clinical-patient-search"
                                         className="input w-full"
@@ -1467,7 +1434,7 @@ export function ClinicalForm({
                             <label htmlFor="clinical-field" className="text-sm font-medium text-gray-700">
                                 {reviewedStrings.clinicalFieldLabel}
                             </label>
-                            <InfoTip label={helpButtonLabel}>{clinicalFieldHelpTipLabel}</InfoTip>
+                            <InfoTooltip label={helpButtonLabel}>{clinicalFieldHelpTipLabel}</InfoTooltip>
                             <p className="text-xs text-gray-500">
                                 {reviewedStrings.clinicalFieldHelp}
                             </p>
@@ -1807,7 +1774,7 @@ export function ClinicalForm({
                     <label htmlFor="clinical-diagnosis" className="text-sm font-medium text-gray-700">
                         {diagnosisLabel}
                     </label>
-                    <InfoTip label={helpButtonLabel}>{diagnosisHelpTipLabel}</InfoTip>
+                    <InfoTooltip label={helpButtonLabel}>{diagnosisHelpTipLabel}</InfoTooltip>
                     <p className="text-xs text-gray-500">
                         {diagnosisHelpLabel}
                     </p>

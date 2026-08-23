@@ -1,6 +1,11 @@
 // Traductions espagnoles locales pour les libellés UI courants. Elles sont
 // versionnées avec la source française et ne contiennent aucune donnée clinique.
 export const esFallback: Record<string, string> = {
+    "Aide pour cette action": "Ayuda para esta acción",
+    "Retournez à la liste des patients sans modifier la note.": "Vuelva a la lista de pacientes sin modificar la nota.",
+    "Cette note est conservée dans le dossier local du patient. Elle n'est jamais envoyée automatiquement à OpenAI.": "Esta nota se conserva en el expediente local del paciente. Nunca se envía automáticamente a OpenAI.",
+    "Chaque sauvegarde crée une version. L'historique permet de relire ou de restaurer une version antérieure.": "Cada guardado crea una versión. El historial permite revisar o restaurar una versión anterior.",
+    "L'historique affiche les versions de cette note. Restaurer une version remplace la note courante et crée une nouvelle trace.": "El historial muestra las versiones de esta nota. Restaurar una versión reemplaza la nota actual y crea un nuevo registro.",
     "Aide pour ce champ": "Ayuda para este campo",
     "Choisissez « Patient existant » pour réutiliser les paramètres structurés déjà autorisés dans un dossier. Choisissez « Saisie manuelle » pour analyser un cas sans charger de dossier patient.": "Elija Paciente existente para reutilizar parámetros estructurados ya autorizados en un expediente. Elija Entrada manual para analizar un caso sin cargar un expediente del paciente.",
     "Recherchez uniquement un de vos patients. Les notes cliniques libres ne sont jamais ajoutées automatiquement à la demande d'analyse.": "Busque únicamente entre sus propios pacientes. Las notas clínicas de texto libre nunca se añaden automáticamente a la solicitud de análisis.",

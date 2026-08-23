@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { History, RotateCcw, X } from "lucide-react";
+import { HomeI18nContext } from "../../contexts/HomeI18nContext";
+import { useTranslation } from "../../hooks/useTranslation";
 import { labels } from "../../i18n/uiLabels";
 import {
     fetchPatientClinicalNoteVersions,
@@ -7,6 +9,7 @@ import {
     type Patient,
     type PatientClinicalNoteVersion,
 } from "../../services/patientsApi";
+import { InfoTooltip } from "../system/InfoTooltip";
 
 type ClinicalNoteHistoryProps = {
     patient: Patient;
@@ -27,6 +30,16 @@ function changeTypeLabel(version: PatientClinicalNoteVersion) {
 
 export function ClinicalNoteHistory({ patient, onRestored }: ClinicalNoteHistoryProps) {
     const copy = labels.clinicalNoteHistory;
+    const i18n = useContext(HomeI18nContext) || { locale: "fr" };
+    const notesCopy = labels.patientClinicalNotes;
+    const { translated: helpButtonLabel } = useTranslation({
+        text: notesCopy.help.button,
+        targetLang: i18n.locale,
+    });
+    const { translated: historyHelpLabel } = useTranslation({
+        text: notesCopy.help.history,
+        targetLang: i18n.locale,
+    });
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [restoringId, setRestoringId] = useState("");
@@ -65,10 +78,13 @@ export function ClinicalNoteHistory({ patient, onRestored }: ClinicalNoteHistory
     };
 
     return <>
-        <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-            <History className="h-4 w-4" />
-            {copy.open}
-        </button>
+        <div className="inline-flex items-center">
+            <InfoTooltip label={helpButtonLabel}>{historyHelpLabel}</InfoTooltip>
+            <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                <History className="h-4 w-4" />
+                {copy.open}
+            </button>
+        </div>
         {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-label={copy.title}>
             <section className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
                 <header className="flex items-start justify-between border-b border-gray-200 px-5 py-4">
