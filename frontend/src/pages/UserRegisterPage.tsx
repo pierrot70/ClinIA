@@ -4,8 +4,12 @@ import { useAuth } from "../hooks/useAuth";
 import { useSensitiveReauthDialog } from "../hooks/useSensitiveReauthDialog";
 import { SessionExpiredError } from "../services/authService";
 import { labels } from "../i18n/uiLabels";
+import {
+    fetchCliniquesPaginated,
+    type Clinique,
+} from "../services/cliniqueApi";
 
-const ROLE_OPTIONS = ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
+const ROLE_OPTIONS = ["USER", "RECEPTION", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
 const USER_ROLE_FILTER_OPTIONS = ["ALL", ...ROLE_OPTIONS] as const;
 const PASSWORD_MIN_LENGTH = 12;
 
@@ -24,6 +28,7 @@ type RegisterResponse = {
             username?: string;
             email?: string | null;
             role?: NewUserRole;
+            assignedClinics?: string[];
             mfaRequired?: boolean;
         };
         temporaryPassword?: string | null;
@@ -47,6 +52,7 @@ type ManagedUser = {
     lastLoginAt?: string | null;
     mfaRequired?: boolean;
     mfaEnabled?: boolean;
+    assignedClinics?: string[];
 };
 
 type UsersListResponse = {
@@ -78,6 +84,7 @@ const UserRegisterPage: React.FC = () => {
     const [password, setPassword] = useState("");
     const [role, setRole] = useState<NewUserRole>("MEDECIN");
     const [mfaRequired, setMfaRequired] = useState(false);
+    const [assignedClinics, setAssignedClinics] = useState<string[]>([]);
     const [privilegedMfaRequired, setPrivilegedMfaRequired] = useState(false);
     const [saving, setSaving] = useState(false);
     const [users, setUsers] = useState<ManagedUser[]>([]);
@@ -94,6 +101,8 @@ const UserRegisterPage: React.FC = () => {
     const [editEmail, setEditEmail] = useState("");
     const [editRole, setEditRole] = useState<NewUserRole>("MEDECIN");
     const [editMfaRequired, setEditMfaRequired] = useState(false);
+    const [editAssignedClinics, setEditAssignedClinics] = useState<string[]>([]);
+    const [clinics, setClinics] = useState<Clinique[]>([]);
     const [resetPassword, setResetPassword] = useState("");
     const [temporaryPasswordResult, setTemporaryPasswordResult] = useState<string | null>(null);
     const [editSaveStatus, setEditSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
@@ -111,6 +120,18 @@ const UserRegisterPage: React.FC = () => {
         isMfaLockedForRole(editRole) || editMfaRequired;
     const resetPasswordTooShort =
         resetPassword.length > 0 && resetPassword.length < PASSWORD_MIN_LENGTH;
+
+    const toggleClinic = (
+        clinicId: string,
+        current: string[],
+        update: (next: string[]) => void
+    ) => {
+        if (current.includes(clinicId)) {
+            update(current.filter((value) => value !== clinicId));
+            return;
+        }
+        if (current.length < 2) update([...current, clinicId]);
+    };
 
     const ensureSensitiveAccess = async () => {
         return requestSensitiveReauth();
@@ -178,6 +199,13 @@ const UserRegisterPage: React.FC = () => {
     useEffect(() => {
         void loadUsers(usersPage);
     }, [usersPage]);
+
+    useEffect(() => {
+        void (async () => {
+            const response = await fetchCliniquesPaginated({ limit: 50 });
+            if (response.data) setClinics(response.data.data);
+        })();
+    }, []);
 
     const applyUsersFilters = () => {
         setSelectedUserId(null);
@@ -256,6 +284,7 @@ const UserRegisterPage: React.FC = () => {
         setEditEmail(managedUser.email || "");
         setEditRole(managedUser.role);
         setEditMfaRequired(managedUser.mfaRequired === true);
+        setEditAssignedClinics(managedUser.assignedClinics || []);
         setResetPassword("");
         setTemporaryPasswordResult(null);
         setEditSaveStatus("idle");
@@ -266,6 +295,12 @@ const UserRegisterPage: React.FC = () => {
 
     const saveEdit = async () => {
         if (!selectedUserId) {
+            return;
+        }
+
+        if (editRole === "RECEPTION" && editAssignedClinics.length === 0) {
+            setEditSaveStatus("error");
+            setEditSaveMessage(labels.auth.userManagement.receptionClinicsRequired);
             return;
         }
 
@@ -294,6 +329,7 @@ const UserRegisterPage: React.FC = () => {
                     username: editUsername,
                     email: editEmail.trim() || null,
                     role: editRole,
+                    assignedClinics: editRole === "RECEPTION" ? editAssignedClinics : [],
                     mfaRequired: effectiveEditMfaRequired,
                 }),
             });
@@ -316,6 +352,7 @@ const UserRegisterPage: React.FC = () => {
             setEditEmail("");
             setEditRole("MEDECIN");
             setEditMfaRequired(false);
+            setEditAssignedClinics([]);
             await loadUsers(usersPage);
         } catch (err) {
             if (err instanceof SessionExpiredError) {
@@ -501,6 +538,10 @@ const UserRegisterPage: React.FC = () => {
 
     const onSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
+        if (role === "RECEPTION" && assignedClinics.length === 0) {
+            setError(labels.auth.userManagement.receptionClinicsRequired);
+            return;
+        }
         setSaving(true);
         setError(null);
         setSuccess(null);
@@ -522,6 +563,7 @@ const UserRegisterPage: React.FC = () => {
                     email: email.trim() || undefined,
                     password,
                     role,
+                    assignedClinics: role === "RECEPTION" ? assignedClinics : [],
                     mfaRequired: effectiveMfaRequired,
                 }),
             });
@@ -544,6 +586,7 @@ const UserRegisterPage: React.FC = () => {
             setPassword("");
             setRole("MEDECIN");
             setMfaRequired(false);
+            setAssignedClinics([]);
             await loadUsers(1);
         } catch (err) {
             if (err instanceof SessionExpiredError) {
@@ -646,7 +689,11 @@ const UserRegisterPage: React.FC = () => {
                     <select
                         id="role"
                         value={role}
-                        onChange={(event) => setRole(event.target.value as NewUserRole)}
+                        onChange={(event) => {
+                            const nextRole = event.target.value as NewUserRole;
+                            setRole(nextRole);
+                            if (nextRole !== "RECEPTION") setAssignedClinics([]);
+                        }}
                         className="w-full rounded-lg border px-3 py-2 text-sm"
                     >
                         {ROLE_OPTIONS.map((value) => (
@@ -656,6 +703,21 @@ const UserRegisterPage: React.FC = () => {
                         ))}
                     </select>
                 </div>
+
+                {role === "RECEPTION" && (
+                    <fieldset className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <legend className="px-1 text-sm font-medium text-gray-800">{labels.auth.userManagement.receptionClinicsLabel}</legend>
+                        <p className="mb-2 text-xs text-gray-600">{labels.auth.userManagement.receptionClinicsHelp}</p>
+                        <div className="space-y-1">
+                            {clinics.map((clinic) => (
+                                <label key={clinic._id} className="flex items-center gap-2 text-sm text-gray-800">
+                                    <input type="checkbox" checked={assignedClinics.includes(clinic._id)} disabled={!assignedClinics.includes(clinic._id) && assignedClinics.length >= 2} onChange={() => toggleClinic(clinic._id, assignedClinics, setAssignedClinics)} />
+                                    {clinic.nom}
+                                </label>
+                            ))}
+                        </div>
+                    </fieldset>
+                )}
 
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                     <label className="flex items-start gap-2 text-sm font-medium text-gray-800" htmlFor="mfa-required">
@@ -916,9 +978,13 @@ const UserRegisterPage: React.FC = () => {
                             Role
                         </label>
                         <select
-                            id="edit-role"
-                            value={editRole}
-                            onChange={(event) => setEditRole(event.target.value as NewUserRole)}
+                        id="edit-role"
+                        value={editRole}
+                        onChange={(event) => {
+                            const nextRole = event.target.value as NewUserRole;
+                            setEditRole(nextRole);
+                            if (nextRole !== "RECEPTION") setEditAssignedClinics([]);
+                        }}
                             className="w-full rounded-lg border px-3 py-2 text-sm"
                         >
                             {ROLE_OPTIONS.map((value) => (
@@ -926,8 +992,23 @@ const UserRegisterPage: React.FC = () => {
                                     {value}
                                 </option>
                             ))}
-                        </select>
-                    </div>
+                    </select>
+                </div>
+
+                {editRole === "RECEPTION" && (
+                    <fieldset className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <legend className="px-1 text-sm font-medium text-gray-800">{labels.auth.userManagement.receptionClinicsLabel}</legend>
+                        <p className="mb-2 text-xs text-gray-600">{labels.auth.userManagement.receptionClinicsHelp}</p>
+                        <div className="space-y-1">
+                            {clinics.map((clinic) => (
+                                <label key={clinic._id} className="flex items-center gap-2 text-sm text-gray-800">
+                                    <input type="checkbox" checked={editAssignedClinics.includes(clinic._id)} disabled={!editAssignedClinics.includes(clinic._id) && editAssignedClinics.length >= 2} onChange={() => toggleClinic(clinic._id, editAssignedClinics, setEditAssignedClinics)} />
+                                    {clinic.nom}
+                                </label>
+                            ))}
+                        </div>
+                    </fieldset>
+                )}
 
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                         <label className="flex items-start gap-2 text-sm font-medium text-gray-800" htmlFor="edit-mfa-required">

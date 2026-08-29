@@ -156,6 +156,44 @@ describe("appointments service", () => {
         expect(appointmentQuery.sort).toHaveBeenCalledWith({ date: 1, time: 1 });
     });
 
+    it("allows SUPERADMIN to view appointments and patient display names across owners", async () => {
+        const appointment = {
+            _id: "appointment-reception-1",
+            patient: "507f1f77bcf86cd799439012",
+            date: "2099-01-01",
+            time: "10:00",
+            status: "scheduled",
+        };
+        const appointmentQuery = {
+            sort: vi.fn().mockReturnThis(),
+            skip: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockReturnThis(),
+            lean: vi.fn().mockResolvedValue([appointment]),
+        };
+        find.mockReturnValue(appointmentQuery);
+        countDocuments.mockResolvedValue(1);
+        patientFind.mockReturnValue({
+            select: vi.fn().mockReturnValue({
+                lean: vi.fn().mockResolvedValue([
+                    { _id: appointment.patient, prenom: "Micko", nom: "Spenard" },
+                ]),
+            }),
+        });
+
+        await expect(listAppointmentsPaginated({
+            page: 1,
+            limit: 10,
+            authUser: { userId: "507f1f77bcf86cd799439098", role: "SUPERADMIN" },
+        })).resolves.toMatchObject({
+            data: [{ _id: appointment._id, patientName: "Micko Spenard" }],
+        });
+
+        expect(find).toHaveBeenCalledWith({});
+        expect(patientFind).toHaveBeenCalledWith({
+            _id: { $in: [appointment.patient] },
+        });
+    });
+
     it("exposes the specialist's configured evening slots", async () => {
         const specialistId = "507f1f77bcf86cd799439021";
         specialistFindById.mockReturnValue({
@@ -195,6 +233,28 @@ describe("appointments service", () => {
 
         await expect(
             getAvailableSlots(specialistId, "2099-01-01", { clinique: clinicB })
+        ).resolves.toEqual(["11:00"]);
+    });
+
+    it("returns only slots explicitly reserved for walk-ins", async () => {
+        const specialistId = "507f1f77bcf86cd799439021";
+        const clinicId = "507f1f77bcf86cd799439022";
+        specialistFindById.mockReturnValue({
+            lean: vi.fn().mockResolvedValue({
+                practiceLocations: [{
+                    clinique: clinicId,
+                    disponibilites: [new Date("2099-01-01T10:00:00")],
+                    walkInDisponibilites: [new Date("2099-01-01T11:00:00")],
+                }],
+            }),
+        });
+        find.mockReturnValue({ lean: vi.fn().mockResolvedValue([]) });
+
+        await expect(
+            getAvailableSlots(specialistId, "2099-01-01", {
+                clinique: clinicId,
+                slotType: "walk_in",
+            })
         ).resolves.toEqual(["11:00"]);
     });
 

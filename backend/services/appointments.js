@@ -21,11 +21,21 @@ function getClinicalWriteOptions(session) {
         : CLINICAL_WRITE_CONCERN;
 }
 
+// SUPERADMIN has an explicitly requested, read-only operational overview of
+// all appointments. Appointment mutations still use buildOwnerScope below.
+function buildAppointmentListReadScope(authUser) {
+    if (authUser?.role === "SUPERADMIN") {
+        return {};
+    }
+    return buildOwnerScope(authUser);
+}
+
 export function getPracticeLocations(specialist) {
     if (Array.isArray(specialist?.practiceLocations) && specialist.practiceLocations.length > 0) {
         return specialist.practiceLocations.map((location) => ({
             clinique: String(location.clinique),
             disponibilites: location.disponibilites || [],
+            walkInDisponibilites: location.walkInDisponibilites || [],
         }));
     }
 
@@ -33,6 +43,7 @@ export function getPracticeLocations(specialist) {
         return [{
             clinique: String(specialist.clinique_associer),
             disponibilites: specialist.disponibilites || [],
+            walkInDisponibilites: specialist.walkInDisponibilites || [],
         }];
     }
 
@@ -130,7 +141,11 @@ async function releaseDailyAppointmentCapacity({ patient, specialist, date, sess
 /* Service Appointment                                                 */
 /* ------------------------------------------------------------------ */
 
-export async function createAppointment(dto, authUser, { session = null } = {}) {
+export async function createAppointment(
+    dto,
+    authUser,
+    { session = null, patientFromTransaction = null } = {}
+) {
     /* ---------------- Validation métier ---------------- */
 
     const ALLOWED_PRIORITIES = ["normal", "urgent"];
@@ -146,6 +161,14 @@ export async function createAppointment(dto, authUser, { session = null } = {}) 
         throw {
             code: "INVALID_PRIORITY",
             message: "Priorité invalide (normal ou urgent).",
+        };
+    }
+
+    const slotType = dto.slotType ?? "regular";
+    if (!['regular', 'walk_in'].includes(slotType)) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Type de créneau invalide.",
         };
     }
 
@@ -178,10 +201,19 @@ export async function createAppointment(dto, authUser, { session = null } = {}) 
         };
     }
 
-    const patient = await Patient.findOne({
-        _id: dto.patient,
-        ...buildOwnerScope(authUser),
-    }).lean();
+    let patient = patientFromTransaction;
+    if (patient && String(patient._id) !== String(dto.patient)) {
+        throw {
+            code: "INVALID_INPUT",
+            message: "Patient de transaction invalide.",
+        };
+    }
+    if (!patient) {
+        patient = await Patient.findOne({
+            _id: dto.patient,
+            ...buildOwnerScope(authUser),
+        }).lean();
+    }
     if (!patient) {
         throw {
             code: "INVALID_INPUT",
@@ -200,6 +232,7 @@ export async function createAppointment(dto, authUser, { session = null } = {}) 
         clinique_associer: 1,
         specialite: 1,
         disponibilites: 1,
+        walkInDisponibilites: 1,
         practiceLocations: 1,
     }).lean();
     if (!specialist) {
@@ -238,7 +271,7 @@ export async function createAppointment(dto, authUser, { session = null } = {}) 
     const availableSlots = await getAvailableSlots(
         dto.specialist,
         dto.date,
-        { patient: dto.patient, clinique: dto.clinique }
+        { patient: dto.patient, clinique: dto.clinique, slotType }
     );
     if (!availableSlots.includes(dto.time)) {
         throw {
@@ -257,8 +290,10 @@ export async function createAppointment(dto, authUser, { session = null } = {}) 
 
     /* ---------------- Persistance ---------------- */
 
+    const { slotType: ignoredSlotType, ...appointmentDto } = dto;
+    void ignoredSlotType;
     const appointment = new Appointment({
-        ...dto,
+        ...appointmentDto,
         patientInsuranceNumber: patient.num_assurance_maladie || undefined,
         patientInsuranceJurisdiction:
             patient.num_assurance_maladie
@@ -285,7 +320,7 @@ export async function createAppointment(dto, authUser, { session = null } = {}) 
 /* ------------------------------------------------------------------ */
 
 export async function listAppointments(filters = {}, authUser) {
-    const query = buildOwnerScope(authUser);
+    const query = buildAppointmentListReadScope(authUser);
 
     if (filters.specialist) query.specialist = filters.specialist;
     if (filters.date) query.date = filters.date;
@@ -1214,14 +1249,27 @@ function isQuarterHourTime(value) {
     return /^([01]\d|2[0-3]):(00|15|30|45)$/.test(value || "");
 }
 
-async function getSpecialistAvailableTimes(specialist, date, clinique = null) {
+async function getSpecialistAvailableTimes(
+    specialist,
+    date,
+    clinique = null,
+    slotType = "regular"
+) {
+    if (!["regular", "walk_in"].includes(slotType)) {
+        throw { code: "INVALID_INPUT", message: "Type de créneau invalide." };
+    }
     if (!mongoose.Types.ObjectId.isValid(specialist)) {
         return new Set();
     }
 
     const specialistDoc = await Specialist.findById(
         specialist,
-        { disponibilites: 1, clinique_associer: 1, practiceLocations: 1 }
+        {
+            disponibilites: 1,
+            walkInDisponibilites: 1,
+            clinique_associer: 1,
+            practiceLocations: 1,
+        }
     ).lean();
 
     const availableTimes = new Set();
@@ -1234,8 +1282,14 @@ async function getSpecialistAvailableTimes(specialist, date, clinique = null) {
         (location) => !clinique || location.clinique === String(clinique)
     );
     const configuredSlots = locations.length
-        ? locations.flatMap((location) => location.disponibilites)
-        : specialistDoc.disponibilites || [];
+        ? locations.flatMap((location) =>
+            slotType === "walk_in"
+                ? location.walkInDisponibilites || []
+                : location.disponibilites || []
+        )
+        : slotType === "walk_in"
+            ? specialistDoc.walkInDisponibilites || []
+            : specialistDoc.disponibilites || [];
     configuredSlots.forEach((slot) => {
         const slotDate = new Date(slot);
         if (toSchedulingDateKey(slotDate) === date) {
@@ -1249,13 +1303,20 @@ async function getSpecialistAvailableTimes(specialist, date, clinique = null) {
 export async function getAvailableSlots(
     specialist,
     date,
-    { patient = null, excludeAppointmentId = null, authUser = null, clinique = null } = {}
+    {
+        patient = null,
+        excludeAppointmentId = null,
+        authUser = null,
+        clinique = null,
+        slotType = "regular",
+    } = {}
 ) {
     const schedule = await getAvailableSlotSchedule(specialist, date, {
         patient,
         excludeAppointmentId,
         authUser,
         clinique,
+        slotType,
     });
 
     return schedule.slots;
@@ -1264,7 +1325,13 @@ export async function getAvailableSlots(
 export async function getAvailableSlotSchedule(
     specialist,
     date,
-    { patient = null, excludeAppointmentId = null, authUser = null, clinique = null } = {}
+    {
+        patient = null,
+        excludeAppointmentId = null,
+        authUser = null,
+        clinique = null,
+        slotType = "regular",
+    } = {}
 ) {
     if (!specialist || !date) {
         throw {
@@ -1357,7 +1424,8 @@ export async function getAvailableSlotSchedule(
     const specialistTimes = await getSpecialistAvailableTimes(
         specialist,
         date,
-        clinique
+        clinique,
+        slotType
     );
     if (specialistTimes.size === 0) {
         return {
@@ -1407,8 +1475,8 @@ export async function listAppointmentsPaginated({
                                                     patientInsuranceNumber,
                                                     sortDirection = "asc",
                                                     authUser,
-                                                }) {
-    const query = buildOwnerScope(authUser);
+}) {
+    const query = buildAppointmentListReadScope(authUser);
 
     if (specialist) query.specialist = specialist;
     if (clinique) query.clinique = clinique;
@@ -1451,7 +1519,7 @@ export async function listAppointmentsPaginated({
     const patients = patientIds.length
         ? await Patient.find({
             _id: { $in: patientIds },
-            ...buildOwnerScope(authUser),
+            ...buildAppointmentListReadScope(authUser),
         })
             .select("_id nom prenom")
             .lean()

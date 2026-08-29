@@ -9,6 +9,7 @@ const mockCountDocuments = vi.fn();
 const mockAuthAuditCountDocuments = vi.fn();
 const mockAuthAuditFind = vi.fn();
 const mockAuthAuditAggregate = vi.fn();
+const mockCliniqueCountDocuments = vi.fn();
 
 const recordAuthAuditEvent = vi.fn();
 const createRefreshTokenFamilyId = vi.fn(() => "family-123");
@@ -41,6 +42,12 @@ vi.mock("../../models/AuthAuditLog.js", () => ({
         countDocuments: mockAuthAuditCountDocuments,
         find: mockAuthAuditFind,
         aggregate: mockAuthAuditAggregate,
+    },
+}));
+
+vi.mock("../../models/Clinique.js", () => ({
+    Clinique: {
+        countDocuments: mockCliniqueCountDocuments,
     },
 }));
 
@@ -181,6 +188,7 @@ beforeEach(() => {
         penaltyLevel: 0,
         shouldCreateIncident: false,
     });
+    mockCliniqueCountDocuments.mockResolvedValue(0);
     mockFindOneAndUpdate.mockResolvedValue(null);
     createMfaSecret.mockReturnValue("mfa-secret");
     createRecoveryCodes.mockReturnValue(["recovery-code"]);
@@ -663,6 +671,60 @@ describe("auth service", () => {
                 outcome: "SUCCESS",
             })
         );
+    });
+
+    it("requires one or two existing clinics for a reception account", async () => {
+        mockFindOne.mockResolvedValue(null);
+        mockCliniqueCountDocuments.mockResolvedValue(1);
+        hash.mockResolvedValue("hashed-password");
+        mockCreate.mockResolvedValue({
+            _id: "507f1f77bcf86cd799439016",
+            username: "reception.mas",
+            email: "reception@clinia.local",
+            role: "RECEPTION",
+            assignedClinics: ["507f1f77bcf86cd799439012"],
+            mfaRequired: false,
+        });
+
+        const result = await register({
+            username: "reception.mas",
+            email: "reception@clinia.local",
+            password: "cobalt meadow lantern river",
+            role: "RECEPTION",
+            assignedClinics: ["507f1f77bcf86cd799439012"],
+            authUser: {
+                userId: "507f1f77bcf86cd799439011",
+                username: "admin",
+                role: "ADMIN",
+            },
+            req: { headers: {}, ip: "127.0.0.1" },
+        });
+
+        expect(mockCliniqueCountDocuments).toHaveBeenCalledWith({
+            _id: { $in: ["507f1f77bcf86cd799439012"] },
+        });
+        expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+            role: "RECEPTION",
+            assignedClinics: ["507f1f77bcf86cd799439012"],
+        }));
+        expect(result.user.assignedClinics).toEqual(["507f1f77bcf86cd799439012"]);
+    });
+
+    it("rejects a reception account without an assigned clinic", async () => {
+        await expect(register({
+            username: "reception.mas",
+            email: "reception@clinia.local",
+            password: "cobalt meadow lantern river",
+            role: "RECEPTION",
+            assignedClinics: [],
+            authUser: {
+                userId: "507f1f77bcf86cd799439011",
+                username: "admin",
+                role: "ADMIN",
+            },
+            req: { headers: {}, ip: "127.0.0.1" },
+        })).rejects.toMatchObject({ code: "INVALID_INPUT" });
+        expect(mockCreate).not.toHaveBeenCalled();
     });
 
     it("rejects superadmin creation by non-superadmin", async () => {

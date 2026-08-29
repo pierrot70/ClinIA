@@ -8,6 +8,9 @@ const PracticeLocationSchema = new mongoose.Schema(
             required: true,
         },
         disponibilites: [{ type: Date }],
+        // Slots expressly reserved by the physician for patients arriving
+        // without an existing appointment or patient relationship.
+        walkInDisponibilites: { type: [Date], default: [] },
     },
     { _id: false }
 );
@@ -69,6 +72,11 @@ const SpecialistSchema = new mongoose.Schema(
             ref: "Clinique",
         },
         disponibilites: [
+            {
+                type: Date,
+            },
+        ],
+        walkInDisponibilites: [
             {
                 type: Date,
             },

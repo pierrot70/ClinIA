@@ -15,9 +15,11 @@ export interface Specialist {
     clinique_associer?: string | null;
     specialite?: string;
     disponibilites?: string[];
+    walkInDisponibilites?: string[];
     practiceLocations?: Array<{
         clinique: string;
         disponibilites: string[];
+        walkInDisponibilites?: string[];
     }>;
 }
 
@@ -44,9 +46,11 @@ export interface SpecialistPayload {
     clinique_associer?: string | null;
     specialite?: string;
     disponibilites?: string[];
+    walkInDisponibilites?: string[];
     practiceLocations?: Array<{
         clinique: string;
         disponibilites: string[];
+        walkInDisponibilites?: string[];
     }>;
 }
 

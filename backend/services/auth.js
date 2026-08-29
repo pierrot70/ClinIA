@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 import {
     ACCESS_TOKEN_EXPIRES_IN,
@@ -16,6 +17,7 @@ import {
 } from "../auth/constants.js";
 import { recordAuthAuditEvent } from "../audit/authAudit.js";
 import { AdminUser } from "../models/AdminUser.js";
+import { Clinique } from "../models/Clinique.js";
 import { AuthAuditLog } from "../models/AuthAuditLog.js";
 import {
     enforceScheduledShutdownIfDue,
@@ -315,6 +317,9 @@ function mapPublicUser(user) {
         username: user.username,
         email: user.email || null,
         role: user.role,
+        assignedClinics: Array.isArray(user.assignedClinics)
+            ? user.assignedClinics.map((clinicId) => String(clinicId))
+            : [],
         isActive: user.isActive !== false,
         passwordResetRequired: user.passwordResetRequired === true,
         mustChangePasswordOnNextLogin:
@@ -326,6 +331,36 @@ function mapPublicUser(user) {
         lastLogoutAt: user.lastLogoutAt || null,
         authTokenInvalidBefore: user.authTokenInvalidBefore || null,
     };
+}
+
+async function normalizeReceptionClinics(value) {
+    if (!Array.isArray(value)) {
+        throw createAuthError(
+            "INVALID_INPUT",
+            "Une ou deux cliniques sont requises pour un compte RECEPTION."
+        );
+    }
+
+    const clinicIds = [...new Set(value.map((clinicId) => String(clinicId)))];
+    if (
+        clinicIds.length < 1 ||
+        clinicIds.length > 2 ||
+        clinicIds.some((clinicId) => !mongoose.Types.ObjectId.isValid(clinicId))
+    ) {
+        throw createAuthError(
+            "INVALID_INPUT",
+            "Un compte RECEPTION doit avoir une ou deux cliniques valides."
+        );
+    }
+
+    const existingCount = await Clinique.countDocuments({
+        _id: { $in: clinicIds },
+    });
+    if (existingCount !== clinicIds.length) {
+        throw createAuthError("INVALID_INPUT", "Une clinique assignee est introuvable.");
+    }
+
+    return clinicIds;
 }
 
 function normalizeUsername(username) {
@@ -1165,6 +1200,7 @@ export async function register({
     email,
     password,
     role,
+    assignedClinics,
     mfaRequired,
     authUser,
     req,
@@ -1233,11 +1269,15 @@ export async function register({
     const passwordHash = await hashPassword(password);
     const roleRequiresMfa =
         isPrivilegedMfaEnforced() && isPrivilegedRole(role);
+    const normalizedAssignedClinics = role === AUTH_ROLES.RECEPTION
+        ? await normalizeReceptionClinics(assignedClinics)
+        : [];
     const created = await AdminUser.create({
         username: uniqueUsername,
         email: normalizedEmail,
         passwordHash,
         role,
+        assignedClinics: normalizedAssignedClinics,
         mfaRequired: roleRequiresMfa || mfaRequired === true,
     });
 
@@ -1257,6 +1297,7 @@ export async function register({
             username: created.username,
             email: created.email,
             role: created.role,
+            assignedClinics: normalizedAssignedClinics,
             mfaRequired: created.mfaRequired === true,
         },
     };
@@ -1384,7 +1425,7 @@ export async function listUsers({
     const skip = (effectivePage - 1) * parsedLimit;
 
     const users = await AdminUser.find(query)
-            .select("username email role isActive mfaRequired mfaEnabled createdAt lastLoginAt lastLogoutAt")
+            .select("username email role assignedClinics isActive mfaRequired mfaEnabled createdAt lastLoginAt lastLogoutAt")
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(parsedLimit)
@@ -1418,7 +1459,7 @@ export async function listActiveUsers({ authUser }) {
         refreshTokenHash: { $ne: null },
         refreshTokenExpiresAt: { $gt: new Date() },
     })
-        .select("username email role isActive mfaRequired mfaEnabled createdAt lastLoginAt lastLogoutAt")
+        .select("username email role assignedClinics isActive mfaRequired mfaEnabled createdAt lastLoginAt lastLogoutAt")
         .sort({ lastLoginAt: -1, createdAt: -1 })
         .lean();
 
@@ -1460,6 +1501,19 @@ export async function updateUser({ userId, updates, authUser, req }) {
         next.role = updates.role;
     }
 
+    const effectiveRole = next.role || user.role;
+    const includesAssignedClinics = Object.prototype.hasOwnProperty.call(
+        updates || {},
+        "assignedClinics"
+    );
+    if (effectiveRole === AUTH_ROLES.RECEPTION) {
+        next.assignedClinics = await normalizeReceptionClinics(
+            includesAssignedClinics ? updates.assignedClinics : user.assignedClinics
+        );
+    } else if (includesAssignedClinics || user.role === AUTH_ROLES.RECEPTION) {
+        next.assignedClinics = [];
+    }
+
     if (typeof updates?.mfaRequired !== "undefined") {
         if (typeof updates.mfaRequired !== "boolean") {
             throw createAuthError("INVALID_INPUT", "Parametre MFA invalide.");
@@ -1467,7 +1521,6 @@ export async function updateUser({ userId, updates, authUser, req }) {
         next.mfaRequired = updates.mfaRequired;
     }
 
-    const effectiveRole = next.role || user.role;
     if (isPrivilegedMfaEnforced() && isPrivilegedRole(effectiveRole)) {
         next.mfaRequired = true;
     }

@@ -134,6 +134,7 @@ export const APPROVED_UI_TRANSLATION_CATALOG = Object.freeze([
     { key: "header.nav.comments", namespace: "header", text: "Commentaires" },
     { key: "header.nav.clinicManagement", namespace: "header", text: "Gestion clinique" },
     { key: "header.nav.appointments", namespace: "header", text: "Rendez-vous" },
+    { key: "header.nav.walkInArrival", namespace: "header", text: "Arrivée sans rendez-vous" },
     { key: "header.nav.patients", namespace: "header", text: "Patients" },
     { key: "header.nav.cliniques", namespace: "header", text: "Cliniques" },
     { key: "header.nav.specialists", namespace: "header", text: "Spécialistes" },

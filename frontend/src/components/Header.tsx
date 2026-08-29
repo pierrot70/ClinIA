@@ -62,6 +62,7 @@ const HEADER_TRANSLATION_KEYS: Record<string, string> = {
     Commentaires: "header.nav.comments",
     "Gestion clinique": "header.nav.clinicManagement",
     "Rendez-vous": "header.nav.appointments",
+    "Arrivée sans rendez-vous": "header.nav.walkInArrival",
     Patients: "header.nav.patients",
     Cliniques: "header.nav.cliniques",
     "Spécialistes": "header.nav.specialists",
@@ -426,6 +427,7 @@ const Header: React.FC = () => {
 
     const clinicNavPaths = [
         "/appointments",
+        "/walk-in-arrival",
         "/patients",
         "/cliniques",
         "/specialists",
@@ -1506,6 +1508,10 @@ const Header: React.FC = () => {
                                 </button>
                                 <div className="absolute right-0 top-full z-10 mt-2 hidden min-w-[160px] rounded-lg border border-gray-200 bg-white shadow-lg transition group-hover:block group-focus-within:block">
                                     {[
+                                        ...(user?.role === "RECEPTION" ? [{
+                                            label: headerLabels.nav.walkInArrival,
+                                            path: "/walk-in-arrival",
+                                        }] : [
                                         {
                                             label: headerLabels.nav.appointments,
                                             path: "/appointments",
@@ -1519,9 +1525,10 @@ const Header: React.FC = () => {
                                                 path: "/cliniques",
                                             },
                                             {
-                                                label: headerLabels.nav.specialists,
+                                            label: headerLabels.nav.specialists,
                                             path: "/specialists",
                                         },
+                                        ]),
                                     ].map((item) => (
                                         user?.role === "MEDECIN" &&
                                         ["/cliniques", "/specialists"].includes(item.path) ? (
@@ -1881,6 +1888,7 @@ const Header: React.FC = () => {
                                     <HeaderLabel text={headerLabels.nav.clinicManagement} />
                                 </div>
                             )}
+                            {user?.role === "RECEPTION" ? <Link to="/walk-in-arrival" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.walkInArrival} /></Link> : <>
                             <Link to="/appointments" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.appointments} /></Link>
                             <Link to="/patients" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.patients} /></Link>
                             {user?.role === "MEDECIN" ? (
@@ -1893,6 +1901,7 @@ const Header: React.FC = () => {
                             ) : (
                                 <Link to="/specialists" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.specialists} /></Link>
                             )}
+                            </>}
                             {showAdminHeaderNav && (
                                 <button
                                     type="button"

@@ -9,6 +9,7 @@ const PatientAuditLogSchema = new mongoose.Schema(
                 "PATIENT_UPDATE",
                 "PATIENT_ARCHIVE",
                 "PATIENT_DELETE",
+                "RECEPTION_RAMQ_LOOKUP",
             ],
             required: true,
         },

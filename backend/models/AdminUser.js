@@ -19,13 +19,25 @@ const AdminUserSchema = new mongoose.Schema({
     passwordHash: { type: String, required: true },
     role: {
         type: String,
-        enum: ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"],
+        enum: ["USER", "RECEPTION", "MEDECIN", "ADMIN", "SUPERADMIN"],
         default: "USER",
         required: true,
     },
     isActive: {
         type: Boolean,
         default: true,
+    },
+    // Reception accounts are limited to one or two explicit clinics. This is
+    // an authorization boundary, not a patient-data relationship.
+    assignedClinics: {
+        type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Clinique" }],
+        default: [],
+        validate: {
+            validator(value) {
+                return Array.isArray(value) && value.length <= 2;
+            },
+            message: "Un compte reception peut avoir au plus deux cliniques.",
+        },
     },
     refreshTokenHash: {
         type: String,

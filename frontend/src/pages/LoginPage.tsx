@@ -183,7 +183,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                     ? "/security/change-password-required"
                     : typeof from === "string" && from.trim().length > 0
                     ? from
-                    : adminOnly
+                    : adminOnly || session.user.role === "RECEPTION"
                         ? getDefaultRouteForRole(session.user.role)
                         : "/";
 

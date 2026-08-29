@@ -23,6 +23,7 @@ import UserRegisterPage from "./pages/UserRegisterPage";
 import {ClinicalAnalyzePage} from "./pages/ClinicalAnalyzePage";
 import { AppointmentsPage } from "./pages/AppointmentsPage";
 import { AppointmentsListPage } from "./pages/AppointmentsList";
+import { WalkInArrivalPage } from "./pages/WalkInArrivalPage";
 import { PatientsPage } from "./pages/PatientsPage";
 import { PatientAuditLogsPage } from "./pages/PatientAuditLogsPage";
 import { OpenAILogsPage } from "./pages/OpenAILogsPage";
@@ -319,6 +320,14 @@ const App: React.FC = () => {
                         element={
                             <ProtectedRoute allowedRoles={[...CLINICAL_ROLES]}>
                                 <AppointmentsListPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/walk-in-arrival"
+                        element={
+                            <ProtectedRoute allowedRoles={["RECEPTION"]}>
+                                <WalkInArrivalPage />
                             </ProtectedRoute>
                         }
                     />

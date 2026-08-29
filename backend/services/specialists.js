@@ -123,11 +123,13 @@ function validatePracticeLocations(practiceLocations, existingPastSlotsByClinic 
             };
         }
         clinicIds.add(clinicId);
-        validateDisponibilites(
-            location.disponibilites,
-            existingPastSlotsByClinic.get(clinicId) ?? new Set()
-        );
-        for (const slot of location.disponibilites || []) {
+        const pastSlots = existingPastSlotsByClinic.get(clinicId) ?? new Set();
+        validateDisponibilites(location.disponibilites, pastSlots);
+        validateDisponibilites(location.walkInDisponibilites, pastSlots);
+        for (const slot of [
+            ...(location.disponibilites || []),
+            ...(location.walkInDisponibilites || []),
+        ]) {
             const instant = new Date(slot).toISOString();
             if (slotInstants.has(instant)) {
                 throw {
@@ -147,6 +149,7 @@ function getExistingPastSlotsByClinic(specialist) {
           ? [{
                 clinique: specialist.clinique_associer,
                 disponibilites: specialist.disponibilites || [],
+                walkInDisponibilites: specialist.walkInDisponibilites || [],
             }]
           : [];
     const slotsByClinic = new Map();
@@ -155,7 +158,10 @@ function getExistingPastSlotsByClinic(specialist) {
     for (const location of locations) {
         const clinicId = String(location.clinique);
         const pastSlots = new Set();
-        for (const slot of location.disponibilites || []) {
+        for (const slot of [
+            ...(location.disponibilites || []),
+            ...(location.walkInDisponibilites || []),
+        ]) {
             const date = new Date(slot);
             if (!Number.isNaN(date.getTime()) && date.getTime() < now) {
                 pastSlots.add(date.toISOString());
@@ -177,6 +183,7 @@ function applyPracticeLocationCompatibility(dto) {
         // clinic. Appointment scheduling reads practiceLocations instead.
         clinique_associer: primary.clinique,
         disponibilites: primary.disponibilites,
+        walkInDisponibilites: primary.walkInDisponibilites || [],
     };
 }
 
@@ -231,6 +238,7 @@ export async function createSpecialist(dto) {
     }
 
     validateDisponibilites(dto.disponibilites);
+    validateDisponibilites(dto.walkInDisponibilites);
     validatePracticeLocations(dto.practiceLocations);
     await validateAccountUserLink(dto.accountUserId);
 
@@ -343,6 +351,7 @@ export async function updateSpecialist(id, updates) {
     }
 
     validateDisponibilites(updates.disponibilites);
+    validateDisponibilites(updates.walkInDisponibilites);
     await validateAccountUserLink(updates.accountUserId);
 
     let existing = null;

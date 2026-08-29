@@ -69,8 +69,19 @@ function normalizePracticeLocations(value) {
         if (!location || typeof location !== "object") return null;
         const clinique = normalizeCliniqueAssocier(location.clinique);
         const disponibilites = normalizeDisponibilites(location.disponibilites);
-        if (!clinique || disponibilites === "__invalid__") return null;
-        return { clinique, disponibilites: disponibilites || [] };
+        const walkInDisponibilites = normalizeDisponibilites(
+            location.walkInDisponibilites
+        );
+        if (
+            !clinique ||
+            disponibilites === "__invalid__" ||
+            walkInDisponibilites === "__invalid__"
+        ) return null;
+        return {
+            clinique,
+            disponibilites: disponibilites || [],
+            walkInDisponibilites: walkInDisponibilites || [],
+        };
     });
 }
 
@@ -93,6 +104,9 @@ export function toCreateSpecialistDTO(body) {
         ),
         specialite: normalizeSpecialite(body.specialite),
         disponibilites: normalizeDisponibilites(body.disponibilites),
+        walkInDisponibilites: normalizeDisponibilites(
+            body.walkInDisponibilites
+        ),
         practiceLocations: normalizePracticeLocations(body.practiceLocations),
     };
 }
@@ -125,6 +139,10 @@ export function toUpdateSpecialistDTO(body) {
     if (body.disponibilites !== undefined)
         dto.disponibilites = normalizeDisponibilites(
             body.disponibilites
+        );
+    if (body.walkInDisponibilites !== undefined)
+        dto.walkInDisponibilites = normalizeDisponibilites(
+            body.walkInDisponibilites
         );
     if (body.practiceLocations !== undefined)
         dto.practiceLocations = normalizePracticeLocations(

@@ -1,5 +1,6 @@
 export const AUTH_ROLES = {
     USER: "USER",
+    RECEPTION: "RECEPTION",
     MEDECIN: "MEDECIN",
     ADMIN: "ADMIN",
     SUPERADMIN: "SUPERADMIN",

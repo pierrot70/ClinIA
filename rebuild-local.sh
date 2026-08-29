@@ -23,9 +23,65 @@ if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
   STAGING_FRONTEND_PORT="${STAGING_FRONTEND_PORT:-5174}"
   STAGING_FRONTEND_API_URL="${STAGING_FRONTEND_API_URL:-http://localhost:4002}"
   STAGING_FRONTEND_LOG_FILE="${STAGING_FRONTEND_LOG_FILE:-/tmp/clinia-staging-frontend-vite.log}"
+  START_DOCKER_DESKTOP="${START_DOCKER_DESKTOP:-1}"
+  DOCKER_DESKTOP_WAIT_SECONDS="${DOCKER_DESKTOP_WAIT_SECONDS:-75}"
 
   sdc() {
     docker compose -p "$STAGING_PROJECT_NAME" -f "$STAGING_COMPOSE_FILE" "$@"
+  }
+
+  docker_is_ready() {
+    command -v docker >/dev/null 2>&1 && \
+      docker version --format '{{.Server.Version}}' >/dev/null 2>&1
+  }
+
+  find_docker_desktop_executable() {
+    local candidate
+    for candidate in \
+      "${DOCKER_DESKTOP_EXE:-}" \
+      "/mnt/c/Program Files/Docker/Docker/Docker Desktop.exe"; do
+      if [[ -n "$candidate" && -f "$candidate" ]]; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+    done
+    return 1
+  }
+
+  ensure_docker_desktop() {
+    local docker_desktop_exe attempt max_attempts
+
+    if docker_is_ready; then
+      return 0
+    fi
+
+    echo "INFO Docker n'est pas disponible depuis cette session WSL."
+
+    if [[ "$START_DOCKER_DESKTOP" == "1" ]] && \
+      docker_desktop_exe="$(find_docker_desktop_executable 2>/dev/null)"; then
+      echo "INFO Demarrage de Docker Desktop..."
+      "$docker_desktop_exe" >/dev/null 2>&1 &
+
+      max_attempts=$(( (DOCKER_DESKTOP_WAIT_SECONDS + 1) / 2 ))
+      for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+        if docker_is_ready; then
+          echo "OK Docker Desktop est pret attempt=$attempt"
+          return 0
+        fi
+        sleep 2
+      done
+    fi
+
+    echo "ERREUR Docker Desktop n'est pas accessible depuis cette distribution WSL."
+    if ! command -v docker >/dev/null 2>&1; then
+      echo "Action : demarrez Docker Desktop, puis activez cette distribution dans Settings > Resources > WSL Integration."
+      echo "Verification : wsl -l -v dans PowerShell, puis rouvrez ce terminal WSL."
+    else
+      echo "Action : Docker est installe, mais son moteur ne repond pas encore. Verifiez que Docker Desktop est ouvert."
+      echo "Si Docker Desktop est deja ouvert, verifiez Settings > Resources > WSL Integration, puis rouvrez ce terminal WSL."
+    fi
+    echo "Astuce : START_DOCKER_DESKTOP=0 desactive le demarrage automatique."
+    return 1
   }
 
   wait_for_staging_url() {
@@ -93,8 +149,7 @@ if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
 
   headline "ClinIA local staging rebuild"
 
-  command -v docker >/dev/null 2>&1 || {
-    echo "ERREUR docker introuvable"
+  ensure_docker_desktop || {
     exit 1
   }
   command -v curl >/dev/null 2>&1 || {

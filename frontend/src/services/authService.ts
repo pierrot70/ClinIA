@@ -186,7 +186,7 @@ function parseJwtPayload(token: string): DecodedTokenPayload | null {
 }
 
 function isLikelyRole(value: unknown): value is UserRole {
-    return value === "USER" || value === "MEDECIN" || value === "ADMIN" || value === "SUPERADMIN";
+    return value === "USER" || value === "RECEPTION" || value === "MEDECIN" || value === "ADMIN" || value === "SUPERADMIN";
 }
 
 function isAccessTokenExpired(token: string): boolean {

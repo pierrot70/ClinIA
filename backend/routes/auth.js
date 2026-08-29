@@ -591,7 +591,7 @@ router.post(
     requireRecentReauth,
     requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
     async (req, res) => {
-        const { username, email, password, role, mfaRequired } = req.body ?? {};
+        const { username, email, password, role, mfaRequired, assignedClinics } = req.body ?? {};
 
         try {
             const data = await register({
@@ -599,6 +599,7 @@ router.post(
                 email,
                 password,
                 role,
+                assignedClinics,
                 mfaRequired,
                 authUser: req.auth,
                 req,

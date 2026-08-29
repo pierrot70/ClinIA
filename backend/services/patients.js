@@ -120,7 +120,7 @@ function assertPatientAuditAccess(authUser) {
 export async function createPatient(
     dto,
     authUser,
-    { allowPotentialDuplicate = false } = {}
+    { allowPotentialDuplicate = false, session = null } = {}
 ) {
     const ownerScope = buildOwnerScope(authUser);
 
@@ -162,11 +162,15 @@ export async function createPatient(
         ownerUserId: authUser.userId,
     });
 
-    const savedPatient = await patient.save(CLINICAL_WRITE_CONCERN);
+    const savedPatient = await patient.save({
+        ...CLINICAL_WRITE_CONCERN,
+        ...(session ? { session } : {}),
+    });
     if (Object.hasOwn(dto, "secure_request_profile")) {
         await savePatientSecureRequestSnapshot(
             savedPatient._id,
-            dto.secure_request_profile
+            dto.secure_request_profile,
+            { session }
         );
     }
     return savedPatient;
