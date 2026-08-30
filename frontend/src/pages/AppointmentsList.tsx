@@ -30,9 +30,10 @@ import {
     WriteVerificationReceipt,
 } from "../components/system/WriteVerificationReceipt";
 import { labels } from "../i18n/uiLabels";
+import { appointmentListLabel } from "../i18n/appointmentListLabels";
+import { displaySpecialty } from "../i18n/specialtyLabels";
 import { logSafeClientError } from "../utils/safeClientLog";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
-import { useTranslation } from "../hooks/useTranslation";
 import { useAuth } from "../hooks/useAuth";
 
 /* ------------------------------------------------------------------ */
@@ -57,26 +58,6 @@ function useDebounce<T>(value: T, delay = 300): T {
 export function AppointmentsListPage() {
     const { user } = useAuth();
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
-    const translationOptions = {
-        targetLang: i18n.locale,
-        namespace: "appointments-list",
-    };
-    const { translated: allClinics } = useTranslation({
-        text: labels.appointmentsList.filters.allClinics,
-        ...translationOptions,
-    });
-    const { translated: clinicColumn } = useTranslation({
-        text: labels.appointmentsList.table.clinic,
-        ...translationOptions,
-    });
-    const { translated: sortDateAscending } = useTranslation({
-        text: labels.appointmentsList.table.sortDateAscending,
-        ...translationOptions,
-    });
-    const { translated: sortDateDescending } = useTranslation({
-        text: labels.appointmentsList.table.sortDateDescending,
-        ...translationOptions,
-    });
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
@@ -438,7 +419,9 @@ export function AppointmentsListPage() {
     ) {
         if (!specialist) return fallback || "—";
         const list = normalizeSpecialties(specialist.specialite);
-        return list.length > 0 ? list.join(", ") : fallback || "—";
+        return list.length > 0
+            ? list.map((specialty) => displaySpecialty(specialty, i18n.locale)).join(", ")
+            : fallback || "—";
     }
 
     function showToast(
@@ -633,18 +616,20 @@ export function AppointmentsListPage() {
     const isEditTimeAllowed =
         isEditTimeSameAsOriginal || editSlots.includes(editTime);
     const appointmentLabels = labels.appointmentsList;
+    const overviewLabels = appointmentLabels.overview;
+    const localize = (key: string, french: string) => appointmentListLabel(i18n.locale, key, french);
     const canManageSpecialistAvailability =
         user?.role === "ADMIN" || user?.role === "SUPERADMIN";
 
     function statusLabel(appointment: Appointment) {
-        if (appointment.status === "awaiting_confirmation") return appointmentLabels.statuses.awaitingConfirmation;
-        if (appointment.status === "scheduled") return appointmentLabels.statuses.scheduled;
-        if (appointment.status === "completed") return appointmentLabels.statuses.completed;
-        if (appointment.status === "no_show") return appointmentLabels.statuses.noShow;
-        if (appointment.status === "rescheduled") return appointmentLabels.statuses.rescheduled;
+        if (appointment.status === "awaiting_confirmation") return localize("awaitingConfirmation", appointmentLabels.statuses.awaitingConfirmation);
+        if (appointment.status === "scheduled") return localize("scheduled", appointmentLabels.statuses.scheduled);
+        if (appointment.status === "completed") return localize("completed", appointmentLabels.statuses.completed);
+        if (appointment.status === "no_show") return localize("noShow", appointmentLabels.statuses.noShow);
+        if (appointment.status === "rescheduled") return localize("rescheduled", appointmentLabels.statuses.rescheduled);
         return appointment.cancellationReason === "clinic_emergency"
-            ? appointmentLabels.statuses.cancelledClinicEmergency
-            : appointmentLabels.statuses.cancelledPatient;
+            ? localize("cancelled", appointmentLabels.statuses.cancelledClinicEmergency)
+            : localize("cancelled", appointmentLabels.statuses.cancelledPatient);
     }
 
     return (
@@ -676,21 +661,21 @@ export function AppointmentsListPage() {
 
             <div className="flex justify-between">
                 <h1 className="text-2xl font-semibold">
-                    Tous les rendez-vous
+                    {localize("title", overviewLabels.title)}
                 </h1>
 
                 <Link
                     to="/appointments"
                     className="px-3 py-1 border rounded hover:bg-gray-100"
                 >
-                    Créer un rendez-vous
+                    {localize("createAppointment", overviewLabels.createAppointment)}
                 </Link>
             </div>
 
             {canManageSpecialistAvailability && (
                 <section className="rounded border border-violet-300 bg-violet-50 p-4">
-                    <h2 className="font-semibold text-violet-950">Demandes de disponibilités</h2>
-                    <p className="mt-1 text-sm text-violet-900">Aucune donnée patient n’est incluse dans ces demandes.</p>
+                    <h2 className="font-semibold text-violet-950">{localize("availabilityRequests", overviewLabels.availabilityRequests)}</h2>
+                    <p className="mt-1 text-sm text-violet-900">{localize("availabilityDescription", overviewLabels.availabilityDescription)}</p>
                     {availabilityRequestsError && <p className="mt-2 text-sm text-red-700">{availabilityRequestsError}</p>}
                     {!availabilityRequestsError && availabilityRequests.length === 0 && <p className="mt-2 text-sm text-violet-900">Aucune demande en attente.</p>}
                     <div className="mt-3 space-y-2">
@@ -703,8 +688,8 @@ export function AppointmentsListPage() {
                                     onClick={() => void handleResolveAvailabilityRequest(request.id)}
                                 >
                                     {resolvingAvailabilityRequestId === request.id
-                                        ? "Traitement…"
-                                        : "Marquer traitée"}
+                                        ? localize("processing", overviewLabels.processing)
+                                        : localize("markResolved", overviewLabels.markResolved)}
                                 </button>
                             </div>
                         ))}
@@ -733,12 +718,12 @@ export function AppointmentsListPage() {
                         setSpecialist(e.target.value);
                     }}
                 >
-                    <option value="">Tous les spécialistes</option>
+                    <option value="">{localize("allSpecialists", overviewLabels.allSpecialists)}</option>
                     {specialists.map((sp) => (
                         <option key={sp._id} value={sp._id}>
                             {`${sp.prenom} ${sp.nom}${
                                 sp.specialite
-                                    ? ` — ${sp.specialite}`
+                                    ? ` — ${displaySpecialty(sp.specialite, i18n.locale)}`
                                     : ""
                             }`}
                         </option>
@@ -753,7 +738,7 @@ export function AppointmentsListPage() {
                         setClinique(e.target.value);
                     }}
                 >
-                    <option value="">{allClinics}</option>
+                    <option value="">{localize("allClinics", appointmentLabels.filters.allClinics)}</option>
                     {cliniques.map((item) => (
                         <option key={item._id} value={item._id}>
                             {item.nom}
@@ -769,13 +754,13 @@ export function AppointmentsListPage() {
                         setStatus(e.target.value as AppointmentStatus | "");
                     }}
                 >
-                    <option value="">Tous les statuts</option>
-                    <option value="scheduled">{appointmentLabels.statuses.scheduled}</option>
-                    <option value="awaiting_confirmation">{appointmentLabels.statuses.awaitingConfirmation}</option>
-                    <option value="cancelled">Annulé</option>
-                    <option value="completed">{appointmentLabels.statuses.completed}</option>
-                    <option value="no_show">{appointmentLabels.statuses.noShow}</option>
-                    <option value="rescheduled">{appointmentLabels.statuses.rescheduled}</option>
+                    <option value="">{localize("allStatuses", labels.coordinationRequestsPage.allStatuses)}</option>
+                    <option value="scheduled">{localize("scheduled", appointmentLabels.statuses.scheduled)}</option>
+                    <option value="awaiting_confirmation">{localize("awaitingConfirmation", appointmentLabels.statuses.awaitingConfirmation)}</option>
+                    <option value="cancelled">{localize("cancelled", "Annulé")}</option>
+                    <option value="completed">{localize("completed", appointmentLabels.statuses.completed)}</option>
+                    <option value="no_show">{localize("noShow", appointmentLabels.statuses.noShow)}</option>
+                    <option value="rescheduled">{localize("rescheduled", appointmentLabels.statuses.rescheduled)}</option>
                 </select>
             </div>
 
@@ -798,10 +783,10 @@ export function AppointmentsListPage() {
                     <table className="w-full border text-sm">
                         <thead className="bg-gray-100">
                         <tr>
-                            <th className="p-2">Patient</th>
-                            <th className="p-2">Spécialiste</th>
-                            <th className="p-2">Spécialités</th>
-                            <th className="p-2">{clinicColumn}</th>
+                            <th className="p-2">{localize("patient", overviewLabels.patient)}</th>
+                            <th className="p-2">{localize("specialist", overviewLabels.specialist)}</th>
+                            <th className="p-2">{localize("specialties", overviewLabels.specialties)}</th>
+                            <th className="p-2">{localize("clinic", appointmentLabels.table.clinic)}</th>
                             <th className="p-2" aria-sort={sortDirection === "asc" ? "ascending" : "descending"}>
                                 <button
                                     type="button"
@@ -814,16 +799,16 @@ export function AppointmentsListPage() {
                                     }}
                                     title={
                                         sortDirection === "asc"
-                                            ? sortDateDescending
-                                            : sortDateAscending
+                                            ? localize("sortDateDescending", appointmentLabels.table.sortDateDescending)
+                                            : localize("sortDateAscending", appointmentLabels.table.sortDateAscending)
                                     }
                                 >
-                                    Date {sortDirection === "asc" ? "↑" : "↓"}
+                                    {localize("date", overviewLabels.date)} {sortDirection === "asc" ? "↑" : "↓"}
                                 </button>
                             </th>
-                            <th className="p-2">Heure</th>
-                            <th className="p-2">Statut</th>
-                            <th className="p-2">Actions</th>
+                            <th className="p-2">{localize("time", overviewLabels.time)}</th>
+                            <th className="p-2">{localize("status", overviewLabels.status)}</th>
+                            <th className="p-2">{localize("actions", overviewLabels.actions)}</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -1073,7 +1058,7 @@ export function AppointmentsListPage() {
                                                     )
                                                 }
                                             >
-                                                {appointmentLabels.actions.markCompleted}
+                                                {localize("markCompleted", appointmentLabels.actions.markCompleted)}
                                             </button>
 
                                             <button
@@ -1084,7 +1069,7 @@ export function AppointmentsListPage() {
                                                     successMessage: appointmentLabels.feedback.noShow,
                                                 })}
                                             >
-                                                {appointmentLabels.actions.markNoShow}
+                                                {localize("noShow", appointmentLabels.actions.markNoShow)}
                                             </button>
 
                                             <button
@@ -1095,7 +1080,7 @@ export function AppointmentsListPage() {
                                                     successMessage: appointmentLabels.feedback.cancelledPatient,
                                                 })}
                                             >
-                                                {appointmentLabels.actions.cancelPatient}
+                                                {localize("cancelPatient", appointmentLabels.actions.cancelPatient)}
                                             </button>
 
                                             <button
@@ -1106,7 +1091,7 @@ export function AppointmentsListPage() {
                                                     successMessage: appointmentLabels.feedback.cancelledClinicEmergency,
                                                 })}
                                             >
-                                                {appointmentLabels.actions.cancelClinicEmergency}
+                                                {localize("cancelClinicEmergency", appointmentLabels.actions.cancelClinicEmergency)}
                                             </button>
 
                                             <button
@@ -1114,7 +1099,7 @@ export function AppointmentsListPage() {
                                                 className="rounded bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-45"
                                                 onClick={() => void startRescheduling(a)}
                                             >
-                                                {appointmentLabels.actions.reschedule}
+                                                {localize("reschedule", appointmentLabels.actions.reschedule)}
                                             </button>
 
                                             <button
@@ -1124,7 +1109,7 @@ export function AppointmentsListPage() {
                                                     startEditing(a)
                                                 }
                                             >
-                                                {labels.appointmentsList.edit.modifySchedule}
+                                                {localize("modifySchedule", labels.appointmentsList.edit.modifySchedule)}
                                             </button>
                                         </>
                                     ) : (

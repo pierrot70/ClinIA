@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { labels } from "../i18n/uiLabels";
 import {
     createWalkInBooking,
@@ -8,6 +8,8 @@ import {
     type WalkInAvailability,
 } from "../services/receptionApi";
 import { useReceptionClinic } from "../contexts/ReceptionClinicContext";
+import { useHomeI18n } from "../contexts/HomeI18nContext";
+import { isReceptionLabel, receptionLabel } from "../i18n/receptionLabels";
 
 const source = labels.walkInArrival;
 
@@ -25,17 +27,19 @@ type SelectedWalkInSlot = {
 function AvailabilityOptions({
     availability,
     onChooseSlot,
+    locale,
 }: {
     availability: WalkInAvailability;
     onChooseSlot?: (slot: SelectedWalkInSlot) => void;
+    locale: string;
 }) {
     return (
         <div className="space-y-4">
-            <p className="text-sm text-slate-700">{source.availabilityIntro}</p>
+            <p className="text-sm text-slate-700">{receptionLabel(locale, "availabilityIntro", source.availabilityIntro)}</p>
             <div>
-                <h3 className="text-sm font-semibold text-slate-900">{source.availabilityToday}</h3>
+                <h3 className="text-sm font-semibold text-slate-900">{receptionLabel(locale, "availabilityToday", source.availabilityToday)}</h3>
                 {availability.today.length === 0 ? (
-                    <p className="mt-1 text-sm text-slate-700">{source.noSameDayAvailability}</p>
+                    <p className="mt-1 text-sm text-slate-700">{receptionLabel(locale, "noSameDayAvailability", source.noSameDayAvailability)}</p>
                 ) : (
                     <ul className="mt-2 space-y-2">
                         {availability.today.map((option) => (
@@ -56,7 +60,7 @@ function AvailabilityOptions({
                                             disabled={!onChooseSlot}
                                             className="rounded border border-blue-600 px-2 py-1 text-xs font-medium text-blue-700 disabled:border-slate-300 disabled:text-slate-600"
                                         >
-                                            {time}{onChooseSlot ? ` — ${source.chooseSlot}` : ""}
+                                            {time}{onChooseSlot ? ` — ${receptionLabel(locale, "chooseSlot", source.chooseSlot)}` : ""}
                                         </button>
                                     ))}
                                 </div>
@@ -66,9 +70,9 @@ function AvailabilityOptions({
                 )}
             </div>
             <div>
-                <h3 className="text-sm font-semibold text-slate-900">{source.availabilityFuture}</h3>
+                <h3 className="text-sm font-semibold text-slate-900">{receptionLabel(locale, "availabilityFuture", source.availabilityFuture)}</h3>
                 {availability.future.length === 0 ? (
-                    <p className="mt-1 text-sm text-slate-700">{source.noFutureAvailability}</p>
+                    <p className="mt-1 text-sm text-slate-700">{receptionLabel(locale, "noFutureAvailability", source.noFutureAvailability)}</p>
                 ) : (
                     <ul className="mt-2 space-y-2">
                         {availability.future.map((option) => (
@@ -89,7 +93,7 @@ function AvailabilityOptions({
                                             disabled={!onChooseSlot}
                                             className="rounded border border-blue-600 px-2 py-1 text-xs font-medium text-blue-700 disabled:border-slate-300 disabled:text-slate-600"
                                         >
-                                            {time}{onChooseSlot ? ` — ${source.chooseSlot}` : ""}
+                                            {time}{onChooseSlot ? ` — ${receptionLabel(locale, "chooseSlot", source.chooseSlot)}` : ""}
                                         </button>
                                     ))}
                                 </div>
@@ -103,6 +107,7 @@ function AvailabilityOptions({
 }
 
 export function WalkInArrivalPage() {
+    const { locale } = useHomeI18n();
     const [ramq, setRamq] = useState("");
     const [patients, setPatients] = useState<ReceptionPatient[]>([]);
     const [selectedPatient, setSelectedPatient] = useState<ReceptionPatient | null>(null);
@@ -112,10 +117,18 @@ export function WalkInArrivalPage() {
     const [selectedSlot, setSelectedSlot] = useState<SelectedWalkInSlot | null>(null);
     const [newPatient, setNewPatient] = useState({ prenom: "", nom: "" });
     const [message, setMessage] = useState("");
+    const [messageKind, setMessageKind] = useState<"noPatient" | "bookingCreated" | null>(null);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const { activeClinic, isLoading: clinicsLoading, error: clinicsError } = useReceptionClinic();
     const clinicId = activeClinic?._id || "";
+
+    useEffect(() => {
+        if (isReceptionLabel(message, "noPatient", source.noPatient)) {
+            setMessage("");
+            setMessageKind("noPatient");
+        }
+    }, [locale, message]);
 
     async function loadWalkInAvailability(
         selectedClinicId = clinicId,
@@ -141,6 +154,7 @@ export function WalkInArrivalPage() {
 
     async function searchPatient() {
         setMessage("");
+        setMessageKind(null);
         setError("");
         setSelectedPatient(null);
         setPatients([]);
@@ -149,7 +163,7 @@ export function WalkInArrivalPage() {
         setSelectedSlot(null);
         setNewPatient({ prenom: "", nom: "" });
         if (!ramq.trim()) {
-            setError(source.noPatient);
+            setError(receptionLabel(locale, "noPatient", source.noPatient));
             return;
         }
 
@@ -171,7 +185,7 @@ export function WalkInArrivalPage() {
         setPatients(matches);
         if (matches.length === 0) {
             setIsNewPatient(true);
-            setMessage(source.noPatient);
+            setMessageKind("noPatient");
             await loadWalkInAvailability();
         }
     }
@@ -224,7 +238,8 @@ export function WalkInArrivalPage() {
             return;
         }
 
-        setMessage(selectedPatient ? source.existingBookingCreated : source.bookingCreated);
+        setMessageKind("bookingCreated");
+        setMessage("");
         setSelectedSlot(null);
         setNewPatient({ prenom: "", nom: "" });
         setRamq("");
@@ -241,13 +256,13 @@ export function WalkInArrivalPage() {
                 <header>
                     <h1 className="text-2xl font-semibold text-slate-900">
                         {selectedPatient
-                            ? source.existingPatientFormTitle
-                            : source.newPatientFormTitle}
+                            ? receptionLabel(locale, "existingPatientFormTitle", source.existingPatientFormTitle)
+                            : receptionLabel(locale, "newPatientFormTitle", source.newPatientFormTitle)}
                     </h1>
                     <p className="mt-1 text-sm text-slate-600">
                         {selectedPatient
-                            ? source.existingPatientFormDescription
-                            : source.newPatientFormDescription}
+                            ? receptionLabel(locale, "existingPatientFormDescription", source.existingPatientFormDescription)
+                            : receptionLabel(locale, "newPatientFormDescription", source.newPatientFormDescription)}
                     </p>
                 </header>
 
@@ -255,22 +270,22 @@ export function WalkInArrivalPage() {
 
                 <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                     <p className="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-slate-800">
-                        {source.selectedSlot
+                        {receptionLabel(locale, "selectedSlot", source.selectedSlot)
                             .replace("{specialist}", `${selectedSlot.specialist.prenom} ${selectedSlot.specialist.nom}`)
                             .replace("{date}", selectedSlot.date)
                             .replace("{time}", selectedSlot.time)}
-                        <span className="block text-slate-600">{source.assignedClinic.replace("{name}", clinicName)}</span>
+                        <span className="block text-slate-600">{receptionLabel(locale, "assignedClinic", source.assignedClinic).replace("{name}", clinicName)}</span>
                     </p>
 
                     {selectedPatient ? (
                         <p className="text-sm font-medium text-slate-800">
-                            {source.existingPatientLabel.replace("{name}", patientName(selectedPatient))}
+                            {receptionLabel(locale, "existingPatientLabel", source.existingPatientLabel).replace("{name}", patientName(selectedPatient))}
                         </p>
                     ) : (
                         <>
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <label className="text-sm font-medium text-slate-800">
-                                    {source.firstNameLabel}
+                                    {receptionLabel(locale, "firstNameLabel", source.firstNameLabel)}
                                     <input
                                         value={newPatient.prenom}
                                         onChange={(event) => setNewPatient((current) => ({ ...current, prenom: event.target.value }))}
@@ -279,7 +294,7 @@ export function WalkInArrivalPage() {
                                     />
                                 </label>
                                 <label className="text-sm font-medium text-slate-800">
-                                    {source.lastNameLabel}
+                                    {receptionLabel(locale, "lastNameLabel", source.lastNameLabel)}
                                     <input
                                         value={newPatient.nom}
                                         onChange={(event) => setNewPatient((current) => ({ ...current, nom: event.target.value }))}
@@ -289,7 +304,7 @@ export function WalkInArrivalPage() {
                                 </label>
                             </div>
                             <label className="block text-sm font-medium text-slate-800">
-                                {source.ramqReadOnlyLabel}
+                                {receptionLabel(locale, "ramqReadOnlyLabel", source.ramqReadOnlyLabel)}
                                 <input value={ramq} readOnly className="mt-1 w-full rounded border border-slate-300 bg-slate-50 px-3 py-2 font-normal text-slate-700" />
                             </label>
                         </>
@@ -297,14 +312,14 @@ export function WalkInArrivalPage() {
 
                     <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={() => { setSelectedSlot(null); setError(""); }} disabled={loading} className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-50">
-                            {source.backToAvailability}
+                            {receptionLabel(locale, "backToAvailability", source.backToAvailability)}
                         </button>
                         <button type="button" onClick={() => void createPatientAndAppointment()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
                             {loading
-                                ? source.creatingPatientAndAppointment
+                                ? receptionLabel(locale, "creatingPatientAndAppointment", source.creatingPatientAndAppointment)
                                 : selectedPatient
-                                    ? source.createAppointment
-                                    : source.createPatientAndAppointment}
+                                    ? receptionLabel(locale, "createAppointment", source.createAppointment)
+                                    : receptionLabel(locale, "createPatientAndAppointment", source.createPatientAndAppointment)}
                         </button>
                     </div>
                 </div>
@@ -315,36 +330,36 @@ export function WalkInArrivalPage() {
     return (
         <section className="mx-auto max-w-3xl space-y-5 px-4 py-6">
             <header>
-                <h1 className="text-2xl font-semibold text-slate-900">{source.title}</h1>
-                <p className="mt-1 text-sm text-slate-600">{source.description}</p>
+                <h1 className="text-2xl font-semibold text-slate-900">{receptionLabel(locale, "title", source.title)}</h1>
+                <p className="mt-1 text-sm text-slate-600">{receptionLabel(locale, "description", source.description)}</p>
             </header>
 
-            {message && <p role="status" className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{message}</p>}
-            {error && <p role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
+            {(message || messageKind) && <p role="status" className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{messageKind === "bookingCreated" ? receptionLabel(locale, "existingBookingCreated", source.existingBookingCreated) : messageKind === "noPatient" || isReceptionLabel(message, "noPatient", source.noPatient) ? receptionLabel(locale, "noPatient", source.noPatient) : message}</p>}
+            {error && <p role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{(isReceptionLabel(error, "noPatient", source.noPatient) || /active patient.*health insurance/i.test(error)) ? receptionLabel(locale, "noPatient", source.noPatient) : error}</p>}
 
             <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                <label className="mb-1 block text-sm font-medium text-slate-800" htmlFor="walk-in-ramq">{source.ramqLabel}</label>
+                <label className="mb-1 block text-sm font-medium text-slate-800" htmlFor="walk-in-ramq">{receptionLabel(locale, "ramqLabel", source.ramqLabel)}</label>
                 <div className="flex gap-2">
                     <input id="walk-in-ramq" value={ramq} onChange={(event) => setRamq(event.target.value)} placeholder={source.ramqPlaceholder} className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2" />
-                    <button type="button" onClick={() => void searchPatient()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{source.searchPatient}</button>
+                    <button type="button" onClick={() => void searchPatient()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{receptionLabel(locale, "searchPatient", source.searchPatient)}</button>
                 </div>
 
                 {patients.length > 0 && (
                     <div className="mt-3 space-y-1">
                         {patients.map((patient) => (
                             <button key={patient._id} type="button" onClick={() => { setSelectedPatient(patient); setMessage(""); setWalkInAvailability(null); }} className={`block w-full rounded border px-3 py-2 text-left text-sm ${selectedPatient?._id === patient._id ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:bg-slate-50"}`}>
-                                {patientName(patient)} <span className="float-right text-blue-700">{source.selectPatient}</span>
+                                {patientName(patient)} <span className="float-right text-blue-700">{receptionLabel(locale, "selectPatient", source.selectPatient)}</span>
                             </button>
                         ))}
                     </div>
                 )}
-                {selectedPatient && <p className="mt-3 text-sm text-slate-700">{source.selectedPatient.replace("{name}", patientName(selectedPatient))}</p>}
+                {selectedPatient && <p className="mt-3 text-sm text-slate-700">{receptionLabel(locale, "selectedPatient", source.selectedPatient).replace("{name}", patientName(selectedPatient))}</p>}
 
                 {clinicsLoading ? (
-                    <p className="mt-5 text-sm text-slate-600">{source.availabilityLoading}</p>
+                    <p className="mt-5 text-sm text-slate-600">{receptionLabel(locale, "availabilityLoading", source.availabilityLoading)}</p>
                 ) : activeClinic ? (
                     <p className="mt-5 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
-                        {source.assignedClinic.replace("{name}", activeClinic.nom)}
+                        {receptionLabel(locale, "assignedClinic", source.assignedClinic).replace("{name}", activeClinic.nom)}
                     </p>
                 ) : (
                     <p role="alert" className="mt-5 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -355,21 +370,21 @@ export function WalkInArrivalPage() {
                 {isNewPatient ? (
                     <div className="mt-5 space-y-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
                         <div>
-                            <h2 className="font-medium text-amber-950">{source.newPatientTitle}</h2>
-                            <p className="mt-1 text-sm text-amber-900">{source.newPatientDescription}</p>
+                            <h2 className="font-medium text-amber-950">{receptionLabel(locale, "newPatientTitle", source.newPatientTitle)}</h2>
+                            <p className="mt-1 text-sm text-amber-900">{receptionLabel(locale, "newPatientDescription", source.newPatientDescription)}</p>
                         </div>
-                        <button type="button" onClick={() => void loadWalkInAvailability()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{source.searchAvailability}</button>
+                        <button type="button" onClick={() => void loadWalkInAvailability()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{receptionLabel(locale, "searchAvailability", source.searchAvailability)}</button>
                         {loading && <p className="text-sm text-slate-600">{source.availabilityLoading}</p>}
-                        {walkInAvailability && <AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} />}
+                        {walkInAvailability && <AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} />}
                     </div>
                 ) : (
                     <>
-                        <button type="button" onClick={confirmSelection} disabled={!selectedPatient || loading} className="mt-4 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{source.searchAvailability}</button>
-                        {selectedPatient && <p className="mt-3 text-sm text-slate-700">{source.existingPatientDescription}</p>}
+                        <button type="button" onClick={confirmSelection} disabled={!selectedPatient || loading} className="mt-4 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{receptionLabel(locale, "searchAvailability", source.searchAvailability)}</button>
+                        {selectedPatient && <p className="mt-3 text-sm text-slate-700">{receptionLabel(locale, "existingPatientDescription", source.existingPatientDescription)}</p>}
                         {loading && selectedPatient && <p className="mt-3 text-sm text-slate-600">{source.availabilityLoading}</p>}
                         {selectedPatient && walkInAvailability && (
                             <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4">
-                                <AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} />
+                                <AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} />
                             </div>
                         )}
                     </>

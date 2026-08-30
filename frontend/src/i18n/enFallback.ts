@@ -1,5 +1,7 @@
 // Fallback anglais pour les textes statiques cliniques
 export const enFallback: Record<string, string> = {
+  "Arrivée sans rendez-vous": "Walk-in arrival",
+  "Gestion clinique": "Clinical Management",
   "Aide pour cette action": "Help for this action",
   "Retournez à la liste des patients sans modifier la note.": "Return to the patient list without changing the note.",
   "Cette note est conservée dans le dossier local du patient. Elle n'est jamais envoyée automatiquement à OpenAI.": "This note is kept in the patient's local record. It is never automatically sent to OpenAI.",

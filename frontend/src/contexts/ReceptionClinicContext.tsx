@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { labels } from "../i18n/uiLabels";
 import { useAuth } from "../hooks/useAuth";
 import { fetchReceptionClinics, type ReceptionClinic } from "../services/receptionApi";
+import { useHomeI18n } from "./HomeI18nContext";
+import { receptionLabel } from "../i18n/receptionLabels";
 
 const source = labels.receptionClinic;
 const storageKeyFor = (userId: string) => `clinia.reception.active-clinic.${userId}`;
@@ -18,6 +20,7 @@ const ReceptionClinicContext = createContext<ReceptionClinicContextValue | undef
 
 export function ReceptionClinicProvider({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, user } = useAuth();
+    const { locale } = useHomeI18n();
     const [clinics, setClinics] = useState<ReceptionClinic[]>([]);
     const [activeClinicId, setActiveClinicId] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -117,10 +120,10 @@ export function ReceptionClinicProvider({ children }: { children: React.ReactNod
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="reception-clinic-selection-title">
                     <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
                         <h1 id="reception-clinic-selection-title" className="text-xl font-semibold text-slate-900">
-                            {source.selectionTitle}
+                            {receptionLabel(locale, "selectionTitle", source.selectionTitle)}
                         </h1>
-                        <p className="mt-2 text-sm text-slate-700">{source.selectionDescription}</p>
-                        {isLoading && <p className="mt-4 text-sm text-slate-600">{source.loading}</p>}
+                        <p className="mt-2 text-sm text-slate-700">{receptionLabel(locale, "selectionDescription", source.selectionDescription)}</p>
+                        {isLoading && <p className="mt-4 text-sm text-slate-600">{receptionLabel(locale, "loading", source.loading)}</p>}
                         {error && <p role="alert" className="mt-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
                         {!isLoading && !error && (
                             <div className="mt-5 space-y-2">

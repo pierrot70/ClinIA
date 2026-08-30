@@ -20,6 +20,7 @@ import {
     fetchCliniquesPaginated,
 } from "../services/cliniqueApi";
 import { SPECIALTIES } from "../data/specialties";
+import { displaySpecialty } from "../i18n/specialtyLabels";
 
 type DisponibiliteForm = {
     date: string; // YYYY-MM-DD
@@ -983,7 +984,7 @@ export function SpecialistsPage() {
                                     key={specialite}
                                     value={specialite}
                                 >
-                                    {specialite}
+                                    {displaySpecialty(specialite, i18n.locale)}
                                 </option>
                             ))}
                         </select>
@@ -1605,7 +1606,9 @@ export function SpecialistsPage() {
                                 const associatedClinique = practiceLocations[0]
                                     ? cliniqueMap[practiceLocations[0].clinique]
                                     : undefined;
-                                const specialtyLabel = sp.specialite?.trim() || "—";
+                                const specialtyLabel = sp.specialite?.trim()
+                                    ? displaySpecialty(sp.specialite, i18n.locale)
+                                    : "—";
                                 const clinicLabel = practiceLocations
                                     .map((location) =>
                                         cliniqueMap[location.clinique]?.nom ?? location.clinique
@@ -1802,8 +1805,9 @@ export function SpecialistsPage() {
                                         const associatedClinique = practiceLocations[0]
                                             ? cliniqueMap[practiceLocations[0].clinique]
                                             : undefined;
-                                        const specialtyLabel =
-                                            sp.specialite?.trim() || "—";
+                                        const specialtyLabel = sp.specialite?.trim()
+                                            ? displaySpecialty(sp.specialite, i18n.locale)
+                                            : "—";
                                         const clinicLabel = practiceLocations
                                             .map((location) =>
                                                 cliniqueMap[location.clinique]?.nom ?? location.clinique

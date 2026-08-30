@@ -43,6 +43,8 @@ import { useTranslation } from "./hooks/useTranslation";
 import { API_URL } from "./services/config";
 import { useAuth } from "./hooks/useAuth";
 import { useReceptionClinic } from "./contexts/ReceptionClinicContext";
+import { useHomeI18n } from "./contexts/HomeI18nContext";
+import { receptionLabel } from "./i18n/receptionLabels";
 
 const CLINICAL_ROLES = ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
 const ADMIN_ROLES = ["ADMIN", "SUPERADMIN"] as const;
@@ -69,6 +71,7 @@ function DevRouteIndicator() {
 
 function ReceptionClinicStatus() {
     const { user } = useAuth();
+    const { locale } = useHomeI18n();
     const { clinics, activeClinic, isLoading, changeClinic } = useReceptionClinic();
 
     if (user?.role !== "RECEPTION" || isLoading || !activeClinic) {
@@ -78,14 +81,14 @@ function ReceptionClinicStatus() {
     return (
         <div className="border-b border-blue-200 bg-blue-50 px-4 py-2">
             <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 text-sm text-blue-950">
-                <span>{labels.receptionClinic.active.replace("{name}", activeClinic.nom)}</span>
+                <span>{receptionLabel(locale, "active", labels.receptionClinic.active).replace("{name}", activeClinic.nom)}</span>
                 {clinics.length > 1 && (
                     <button
                         type="button"
                         onClick={changeClinic}
                         className="rounded border border-blue-600 px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100"
                     >
-                        {labels.receptionClinic.change}
+                        {receptionLabel(locale, "change", labels.receptionClinic.change)}
                     </button>
                 )}
             </div>

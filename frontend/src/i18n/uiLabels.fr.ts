@@ -1336,6 +1336,22 @@ export const UI_LABELS_FR = {
         },
     },
     appointmentsList: {
+        overview: {
+            title: "Tous les rendez-vous",
+            createAppointment: "Créer un rendez-vous",
+            availabilityRequests: "Demandes de disponibilités",
+            availabilityDescription: "Aucune donnée patient n’est incluse dans ces demandes.",
+            markResolved: "Marquer traitée",
+            processing: "Traitement…",
+            allSpecialists: "Tous les spécialistes",
+            patient: "Patient",
+            specialist: "Spécialiste",
+            specialties: "Spécialités",
+            date: "Date",
+            time: "Heure",
+            status: "Statut",
+            actions: "Actions",
+        },
         statuses: {
             scheduled: "Planifié",
             awaitingConfirmation: "À confirmer",

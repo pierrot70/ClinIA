@@ -7,6 +7,16 @@ import { getPatientPageFallback } from "../i18n/patientPageFallbacks";
 
 // Fallbacks locaux pour les labels critiques (clé = texte source)
 const criticalLabelFallbacks: Record<string, Record<string, string>> = {
+  "Arrivée sans rendez-vous": {
+    "en": "Walk-in arrival", "es": "Llegada sin cita", "vi": "Tiếp nhận không hẹn",
+    "no": "Oppmøte uten timeavtale", "ja": "予約なし来院", "zh": "无预约到诊",
+    "he": "הגעה ללא תור", "ko": "예약 없이 방문"
+  },
+  "Gestion clinique": {
+    "en": "Clinical Management", "es": "Gestión clínica", "vi": "Quản lý lâm sàng",
+    "no": "Klinisk administrasjon", "ja": "臨床管理", "zh": "临床管理",
+    "he": "ניהול קליני", "ko": "임상 관리"
+  },
     "Exemple de cas fictif : patient de 55 ans présentant de la fatigue, une polyurie et une polydipsie.": {
       "en": "Example case: 55-year-old patient with fatigue, polyuria and polydipsia.",
       "en-CA": "Example case: 55-year-old patient with fatigue, polyuria and polydipsia.",
