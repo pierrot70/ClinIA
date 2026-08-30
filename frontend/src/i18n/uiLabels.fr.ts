@@ -1430,6 +1430,13 @@ export const UI_LABELS_FR = {
         ready: "Étape 1 terminée. Aucun rendez-vous ni fiche d'arrivée n'a été créé.",
         required: "Sélectionnez un patient et une clinique.",
     },
+    receptionClinic: {
+        selectionTitle: "Où travaillez-vous aujourd'hui ?",
+        selectionDescription: "Choisissez la clinique active avant de continuer. Cette sélection sera utilisée pour les arrivées sans rendez-vous.",
+        loading: "Chargement de vos cliniques…",
+        active: "Clinique active : {name}",
+        change: "Changer",
+    },
     // PatientsPage.tsx - page /patients, création et recherche de patients.
     patientsPage: {
         title: "Patients",

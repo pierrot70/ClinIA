@@ -1,14 +1,13 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { labels } from "../i18n/uiLabels";
 import {
     createWalkInBooking,
-    fetchReceptionClinics,
     fetchWalkInAvailability,
     findReceptionPatientByRamq,
-    type ReceptionClinic,
     type ReceptionPatient,
     type WalkInAvailability,
 } from "../services/receptionApi";
+import { useReceptionClinic } from "../contexts/ReceptionClinicContext";
 
 const source = labels.walkInArrival;
 
@@ -107,8 +106,6 @@ export function WalkInArrivalPage() {
     const [ramq, setRamq] = useState("");
     const [patients, setPatients] = useState<ReceptionPatient[]>([]);
     const [selectedPatient, setSelectedPatient] = useState<ReceptionPatient | null>(null);
-    const [clinics, setClinics] = useState<ReceptionClinic[]>([]);
-    const [clinicId, setClinicId] = useState("");
     const [walkInAvailability, setWalkInAvailability] =
         useState<WalkInAvailability | null>(null);
     const [isNewPatient, setIsNewPatient] = useState(false);
@@ -117,6 +114,8 @@ export function WalkInArrivalPage() {
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const { activeClinic, isLoading: clinicsLoading, error: clinicsError } = useReceptionClinic();
+    const clinicId = activeClinic?._id || "";
 
     async function loadWalkInAvailability(
         selectedClinicId = clinicId,
@@ -139,18 +138,6 @@ export function WalkInArrivalPage() {
 
         setWalkInAvailability(response.data || { today: [], future: [] });
     }
-
-    useEffect(() => {
-        void (async () => {
-            const response = await fetchReceptionClinics();
-            if (response.data) {
-                const availableClinics = response.data;
-                setClinics(availableClinics);
-                if (availableClinics.length === 1) setClinicId(availableClinics[0]._id);
-            }
-            if (response.error) setError(response.error.message);
-        })();
-    }, []);
 
     async function searchPatient() {
         setMessage("");
@@ -248,7 +235,7 @@ export function WalkInArrivalPage() {
     }
 
     if (selectedSlot) {
-        const clinicName = clinics.find((clinic) => clinic._id === clinicId)?.nom ?? clinicId;
+        const clinicName = activeClinic?.nom ?? clinicId;
         return (
             <section className="mx-auto max-w-3xl space-y-5 px-4 py-6">
                 <header>
@@ -353,18 +340,16 @@ export function WalkInArrivalPage() {
                 )}
                 {selectedPatient && <p className="mt-3 text-sm text-slate-700">{source.selectedPatient.replace("{name}", patientName(selectedPatient))}</p>}
 
-                {clinics.length === 1 ? (
+                {clinicsLoading ? (
+                    <p className="mt-5 text-sm text-slate-600">{source.availabilityLoading}</p>
+                ) : activeClinic ? (
                     <p className="mt-5 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
-                        {source.assignedClinic.replace("{name}", clinics[0].nom)}
+                        {source.assignedClinic.replace("{name}", activeClinic.nom)}
                     </p>
                 ) : (
-                    <>
-                        <label className="mb-1 mt-5 block text-sm font-medium text-slate-800" htmlFor="walk-in-clinic">{source.clinicLabel}</label>
-                        <select id="walk-in-clinic" value={clinicId} onChange={(event) => { setClinicId(event.target.value); setMessage(""); setWalkInAvailability(null); }} className="w-full rounded border border-slate-300 px-3 py-2">
-                            <option value="">{source.chooseClinic}</option>
-                            {clinics.map((clinic) => <option key={clinic._id} value={clinic._id}>{clinic.nom}</option>)}
-                        </select>
-                    </>
+                    <p role="alert" className="mt-5 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                        {clinicsError || source.availabilityRequiredClinic}
+                    </p>
                 )}
 
                 {isNewPatient ? (

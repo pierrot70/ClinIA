@@ -7,6 +7,7 @@ import "./index.css";
 import { HomeI18nProvider } from "./contexts/HomeI18nContext";
 import { AuthProvider } from "./auth/AuthContext";
 import { ClinicalAnalysisNavigationProvider } from "./contexts/ClinicalAnalysisNavigationContext";
+import { ReceptionClinicProvider } from "./contexts/ReceptionClinicContext";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   // <React.StrictMode>
@@ -14,9 +15,11 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       <AuthProvider>
         <HomeI18nProvider>
           <ClinicalAnalysisNavigationProvider>
-            <SecurityIncidentProvider>
-              <App />
-            </SecurityIncidentProvider>
+            <ReceptionClinicProvider>
+              <SecurityIncidentProvider>
+                <App />
+              </SecurityIncidentProvider>
+            </ReceptionClinicProvider>
           </ClinicalAnalysisNavigationProvider>
         </HomeI18nProvider>
       </AuthProvider>

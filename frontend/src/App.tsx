@@ -41,6 +41,8 @@ import { labels } from "./i18n/uiLabels";
 import { HomeI18nContext } from "./contexts/HomeI18nContext";
 import { useTranslation } from "./hooks/useTranslation";
 import { API_URL } from "./services/config";
+import { useAuth } from "./hooks/useAuth";
+import { useReceptionClinic } from "./contexts/ReceptionClinicContext";
 
 const CLINICAL_ROLES = ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
 const ADMIN_ROLES = ["ADMIN", "SUPERADMIN"] as const;
@@ -60,6 +62,32 @@ function DevRouteIndicator() {
         <div className="border-b border-gray-200 bg-gray-50 px-4 py-1.5">
             <div className="mx-auto max-w-6xl font-mono text-xs text-gray-500">
                 {location.pathname}
+            </div>
+        </div>
+    );
+}
+
+function ReceptionClinicStatus() {
+    const { user } = useAuth();
+    const { clinics, activeClinic, isLoading, changeClinic } = useReceptionClinic();
+
+    if (user?.role !== "RECEPTION" || isLoading || !activeClinic) {
+        return null;
+    }
+
+    return (
+        <div className="border-b border-blue-200 bg-blue-50 px-4 py-2">
+            <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 text-sm text-blue-950">
+                <span>{labels.receptionClinic.active.replace("{name}", activeClinic.nom)}</span>
+                {clinics.length > 1 && (
+                    <button
+                        type="button"
+                        onClick={changeClinic}
+                        className="rounded border border-blue-600 px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100"
+                    >
+                        {labels.receptionClinic.change}
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -261,6 +289,7 @@ const App: React.FC = () => {
     return (
         <div className="min-h-screen bg-background">
             <Header />
+            <ReceptionClinicStatus />
             {blockingIncident && (
                 <SecurityBlockingAlert
                     blocking={blockingIncident}
