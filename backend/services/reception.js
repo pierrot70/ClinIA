@@ -98,9 +98,18 @@ export async function listWalkInFamilyMedicineOptions({
         const location = getLocationForClinic(specialist, clinicId);
         if (!location) continue;
 
-        const configuredSlots = patientId
-            ? location.disponibilites || []
-            : location.walkInDisponibilites || [];
+        // A person already known to the clinic may still arrive without an
+        // appointment. They can therefore use either their regular slots or
+        // the capacity the physician explicitly reserved for walk-ins. A new
+        // patient remains restricted to walk-in capacity.
+        const slotTypes = patientId
+            ? ["regular", "walk_in"]
+            : ["walk_in"];
+        const configuredSlots = slotTypes.flatMap((slotType) =>
+            slotType === "walk_in"
+                ? location.walkInDisponibilites || []
+                : location.disponibilites || []
+        );
         const dates = [...new Set(
             configuredSlots
                 .map(toSchedulingDateKey)
@@ -108,18 +117,25 @@ export async function listWalkInFamilyMedicineOptions({
         )].sort();
 
         for (const date of dates) {
-            const schedule = await getAvailableSlotSchedule(
-                String(specialist._id),
-                date,
-                {
-                    clinique: String(clinicId),
-                    ...(patientId ? { patient: String(patientId) } : {}),
-                    slotType: patientId ? "regular" : "walk_in",
-                }
+            const schedules = await Promise.all(
+                slotTypes.map((slotType) =>
+                    getAvailableSlotSchedule(
+                        String(specialist._id),
+                        date,
+                        {
+                            clinique: String(clinicId),
+                            ...(patientId ? { patient: String(patientId) } : {}),
+                            slotType,
+                        }
+                    )
+                )
             );
-            if (schedule.slots.length === 0) continue;
+            const slots = Array.from(
+                new Set(schedules.flatMap((schedule) => schedule.slots))
+            ).sort();
+            if (slots.length === 0) continue;
 
-            const option = toOption(specialist, date, schedule);
+            const option = toOption(specialist, date, { slots });
             if (date === today) {
                 todayOptions.push(option);
             } else {

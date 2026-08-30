@@ -162,6 +162,44 @@ describe("listWalkInFamilyMedicineOptions", () => {
                 slotType: "regular",
             }
         );
+        expect(getAvailableSlotSchedule).toHaveBeenCalledWith(
+            "507f1f77bcf86cd799439013",
+            "2030-01-01",
+            {
+                clinique: clinicId,
+                patient: "507f1f77bcf86cd799439088",
+                slotType: "walk_in",
+            }
+        );
+    });
+
+    it("offers walk-in capacity to a patient already known to the clinic", async () => {
+        specialistFind.mockReturnValue(resolvedLean([
+            {
+                _id: "507f1f77bcf86cd799439013",
+                prenom: "Marie",
+                nom: "Leroux",
+                practiceLocations: [{
+                    clinique: clinicId,
+                    disponibilites: [],
+                    walkInDisponibilites: [
+                        new Date("2030-01-01T14:00:00.000Z"),
+                    ],
+                }],
+            },
+        ]));
+
+        await expect(listWalkInFamilyMedicineOptions({
+            clinicId,
+            patientId: "507f1f77bcf86cd799439088",
+            authUser: { userId: receptionId, role: "RECEPTION" },
+            now: new Date("2030-01-01T13:00:00.000Z"),
+        })).resolves.toMatchObject({
+            today: [expect.objectContaining({
+                date: "2030-01-01",
+                slots: ["09:00", "09:15"],
+            })],
+        });
     });
 
     it("finds an active patient through an exact RAMQ lookup and records a minimized audit event", async () => {
