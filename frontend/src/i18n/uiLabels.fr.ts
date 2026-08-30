@@ -1341,6 +1341,7 @@ export const UI_LABELS_FR = {
             createAppointment: "Créer un rendez-vous",
             availabilityRequests: "Demandes de disponibilités",
             availabilityDescription: "Aucune donnée patient n’est incluse dans ces demandes.",
+            noPendingRequests: "Aucune demande en attente.",
             markResolved: "Marquer traitée",
             processing: "Traitement…",
             allSpecialists: "Tous les spécialistes",

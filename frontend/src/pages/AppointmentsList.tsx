@@ -677,7 +677,7 @@ export function AppointmentsListPage() {
                     <h2 className="font-semibold text-violet-950">{localize("availabilityRequests", overviewLabels.availabilityRequests)}</h2>
                     <p className="mt-1 text-sm text-violet-900">{localize("availabilityDescription", overviewLabels.availabilityDescription)}</p>
                     {availabilityRequestsError && <p className="mt-2 text-sm text-red-700">{availabilityRequestsError}</p>}
-                    {!availabilityRequestsError && availabilityRequests.length === 0 && <p className="mt-2 text-sm text-violet-900">Aucune demande en attente.</p>}
+                    {!availabilityRequestsError && availabilityRequests.length === 0 && <p className="mt-2 text-sm text-violet-900">{localize("noPendingRequests", overviewLabels.noPendingRequests)}</p>}
                     <div className="mt-3 space-y-2">
                         {availabilityRequests.map((request) => (
                             <div key={request.id} className="flex flex-wrap items-center justify-between gap-3 rounded bg-white p-3 text-sm">

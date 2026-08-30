@@ -9,6 +9,20 @@ const translations: Record<string, Record<string, string>> = {
   ko: { title: "모든 예약", createAppointment: "예약 만들기", availabilityRequests: "예약 가능 여부 요청", availabilityDescription: "이 요청에는 환자 데이터가 포함되지 않습니다.", markResolved: "처리 완료로 표시", processing: "처리 중…", allSpecialists: "모든 전문의", allClinics: "모든 진료소", allStatuses: "모든 상태", patient: "환자", specialist: "전문의", specialties: "전문 분야", clinic: "진료소", date: "날짜", time: "시간", status: "상태", actions: "작업", scheduled: "예약됨", awaitingConfirmation: "확인 대기", completed: "완료", noShow: "환자 미방문", cancelled: "취소됨", rescheduled: "일정 변경됨", markCompleted: "완료", cancelPatient: "환자 취소", cancelClinicEmergency: "임상 응급 상황", reschedule: "일정 변경", modifySchedule: "시간 및 진료소 변경" },
 };
 
+const pendingRequestTranslations: Record<string, string> = {
+  en: "No pending requests.",
+  es: "No hay solicitudes pendientes.",
+  vi: "Không có yêu cầu nào đang chờ xử lý.",
+  no: "Ingen ventende forespørsler.",
+  ja: "保留中の依頼はありません。",
+  zh: "没有待处理请求。",
+  he: "אין בקשות ממתינות.",
+  ko: "대기 중인 요청이 없습니다.",
+};
+
 export function appointmentListLabel(locale: string, key: string, french: string) {
-  return translations[locale.toLowerCase().split("-")[0]]?.[key] || french;
+  const language = locale.toLowerCase().split("-")[0];
+  return translations[language]?.[key]
+    || (key === "noPendingRequests" ? pendingRequestTranslations[language] : undefined)
+    || french;
 }
