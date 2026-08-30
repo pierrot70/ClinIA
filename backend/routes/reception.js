@@ -3,6 +3,7 @@ import { AdminUser } from "../models/AdminUser.js";
 import { Clinique } from "../models/Clinique.js";
 import {
     createWalkInPatientAndAppointment,
+    createWalkInAppointmentForExistingPatient,
     findReceptionPatientByRamq,
     listWalkInFamilyMedicineOptions,
 } from "../services/reception.js";
@@ -119,28 +120,10 @@ router.get("/patient-lookup", async (req, res) => {
 });
 
 router.post("/walk-in-bookings", async (req, res) => {
-    let patientDto;
-    try {
-        patientDto = toCreatePatientDTO(req.body?.patient || {});
-    } catch (err) {
-        return res.status(400).json({
-            error: {
-                code: err.code || "INVALID_INPUT",
-                message: err.message || "Informations patient invalides.",
-                retryable: false,
-            },
-        });
-    }
-
-    if (
-        !patientDto.nom ||
-        !patientDto.prenom ||
-        !patientDto.num_assurance_maladie ||
-        !req.body?.specialist ||
-        !req.body?.clinic ||
-        !req.body?.date ||
-        !req.body?.time
-    ) {
+    const existingPatientId = req.body?.patientId;
+    const commonFieldsAreMissing = !req.body?.specialist || !req.body?.clinic ||
+        !req.body?.date || !req.body?.time;
+    if (commonFieldsAreMissing || (existingPatientId && req.body?.patient)) {
         return res.status(400).json({
             error: {
                 code: "INVALID_INPUT",
@@ -150,14 +133,38 @@ router.post("/walk-in-bookings", async (req, res) => {
         });
     }
 
+    let patientDto = null;
+    if (!existingPatientId) {
+        try {
+            patientDto = toCreatePatientDTO(req.body?.patient || {});
+        } catch (err) {
+            return res.status(400).json({
+                error: {
+                    code: err.code || "INVALID_INPUT",
+                    message: err.message || "Informations patient invalides.",
+                    retryable: false,
+                },
+            });
+        }
+        if (!patientDto.nom || !patientDto.prenom || !patientDto.num_assurance_maladie) {
+            return res.status(400).json({
+                error: {
+                    code: "INVALID_INPUT",
+                    message: "Le patient, le créneau et la clinique sont requis.",
+                    retryable: false,
+                },
+            });
+        }
+    }
+
     try {
         const requestContext = getRequestContext(req);
-        const data = await createWalkInPatientAndAppointment({
+        const booking = {
             clinicId: req.body.clinic,
             specialistId: req.body.specialist,
             date: req.body.date,
             time: req.body.time,
-            patientDto,
+            slotType: req.body.slotType,
             authUser: req.auth,
             audit: {
                 actorUserId: req.auth?.userId,
@@ -167,7 +174,16 @@ router.post("/walk-in-bookings", async (req, res) => {
                 requestId: requestContext.requestId,
                 instanceId: requestContext.instanceId,
             },
-        });
+        };
+        const data = existingPatientId
+            ? await createWalkInAppointmentForExistingPatient({
+                ...booking,
+                patientId: existingPatientId,
+            })
+            : await createWalkInPatientAndAppointment({
+                ...booking,
+                patientDto,
+            });
         return res.status(201).json({
             data,
             meta: { source: "real", model: "mongo" },

@@ -44,6 +44,7 @@ const {
     findReceptionPatientByRamq,
     listWalkInFamilyMedicineOptions,
     createWalkInPatientAndAppointment,
+    createWalkInAppointmentForExistingPatient,
 } = await import("../reception.js");
 
 const receptionId = "507f1f77bcf86cd799439011";
@@ -293,5 +294,60 @@ describe("createWalkInPatientAndAppointment", () => {
             })
         );
         expect(transactionSession.endSession).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("createWalkInAppointmentForExistingPatient", () => {
+    it("creates a selected slot for an existing patient without creating a second dossier", async () => {
+        patientFindOne.mockReturnValue(resolvedLean({
+            _id: "507f1f77bcf86cd799439088",
+            nom: "Lasante",
+            prenom: "Marie",
+            ownerUserId: "507f1f77bcf86cd799439077",
+        }));
+        createAppointment.mockResolvedValue({
+            _id: "507f1f77bcf86cd799439099",
+            date: "2030-01-01",
+            time: "09:00",
+        });
+
+        await expect(createWalkInAppointmentForExistingPatient({
+            clinicId,
+            specialistId: "507f1f77bcf86cd799439013",
+            patientId: "507f1f77bcf86cd799439088",
+            date: "2030-01-01",
+            time: "09:00",
+            slotType: "walk_in",
+            authUser: { userId: receptionId, username: "reception", role: "RECEPTION" },
+        })).resolves.toMatchObject({
+            patient: { _id: "507f1f77bcf86cd799439088" },
+            appointment: { _id: "507f1f77bcf86cd799439099" },
+        });
+
+        expect(createPatient).not.toHaveBeenCalled();
+        expect(createAppointment).toHaveBeenCalledWith(
+            expect.objectContaining({
+                patient: "507f1f77bcf86cd799439088",
+                specialist: "507f1f77bcf86cd799439013",
+                clinique: clinicId,
+                date: "2030-01-01",
+                time: "09:00",
+                slotType: "walk_in",
+            }),
+            expect.objectContaining({ userId: receptionId }),
+            expect.objectContaining({
+                session: transactionSession,
+                patientFromTransaction: expect.objectContaining({
+                    _id: "507f1f77bcf86cd799439088",
+                }),
+            })
+        );
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith(
+            expect.objectContaining({
+                collectionName: "appointments",
+                operation: "CREATE",
+                patientId: "507f1f77bcf86cd799439088",
+            })
+        );
     });
 });

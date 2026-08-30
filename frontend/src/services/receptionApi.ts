@@ -15,6 +15,7 @@ export interface WalkInAppointmentOption {
     };
     date: string;
     slots: string[];
+    slotTypes?: Record<string, "regular" | "walk_in">;
 }
 
 export interface WalkInAvailability {
@@ -33,7 +34,9 @@ export interface CreateWalkInBookingPayload {
     specialist: string;
     date: string;
     time: string;
-    patient: {
+    slotType: "regular" | "walk_in";
+    patientId?: string;
+    patient?: {
         nom: string;
         prenom: string;
         num_assurance_maladie: string;

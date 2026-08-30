@@ -20,6 +20,7 @@ type SelectedWalkInSlot = {
     specialist: WalkInAvailability["today"][number]["specialist"];
     date: string;
     time: string;
+    slotType: "regular" | "walk_in";
 };
 
 function AvailabilityOptions({
@@ -51,6 +52,7 @@ function AvailabilityOptions({
                                                 specialist: option.specialist,
                                                 date: option.date,
                                                 time,
+                                                slotType: option.slotTypes?.[time] ?? "walk_in",
                                             })}
                                             disabled={!onChooseSlot}
                                             className="rounded border border-blue-600 px-2 py-1 text-xs font-medium text-blue-700 disabled:border-slate-300 disabled:text-slate-600"
@@ -83,6 +85,7 @@ function AvailabilityOptions({
                                                 specialist: option.specialist,
                                                 date: option.date,
                                                 time,
+                                                slotType: option.slotTypes?.[time] ?? "walk_in",
                                             })}
                                             disabled={!onChooseSlot}
                                             className="rounded border border-blue-600 px-2 py-1 text-xs font-medium text-blue-700 disabled:border-slate-300 disabled:text-slate-600"
@@ -100,8 +103,6 @@ function AvailabilityOptions({
     );
 }
 
-// This is intentionally only the first walk-in step. It does not persist an
-// arrival, reserve a slot, or create an appointment.
 export function WalkInArrivalPage() {
     const [ramq, setRamq] = useState("");
     const [patients, setPatients] = useState<ReceptionPatient[]>([]);
@@ -203,7 +204,7 @@ export function WalkInArrivalPage() {
             setError(source.required);
             return;
         }
-        if (!newPatient.prenom.trim() || !newPatient.nom.trim()) {
+        if (!selectedPatient && (!newPatient.prenom.trim() || !newPatient.nom.trim())) {
             setError(source.required);
             return;
         }
@@ -215,14 +216,19 @@ export function WalkInArrivalPage() {
             specialist: selectedSlot.specialist._id,
             date: selectedSlot.date,
             time: selectedSlot.time,
-            patient: {
-                prenom: newPatient.prenom.trim(),
-                nom: newPatient.nom.trim(),
-                num_assurance_maladie: ramq.trim(),
-                country: "CA",
-                healthInsuranceJurisdiction: "QC",
-                language: "fr",
-            },
+            slotType: selectedSlot.slotType,
+            ...(selectedPatient
+                ? { patientId: selectedPatient._id }
+                : {
+                    patient: {
+                        prenom: newPatient.prenom.trim(),
+                        nom: newPatient.nom.trim(),
+                        num_assurance_maladie: ramq.trim(),
+                        country: "CA",
+                        healthInsuranceJurisdiction: "QC",
+                        language: "fr",
+                    },
+                }),
         });
         setLoading(false);
 
@@ -231,7 +237,7 @@ export function WalkInArrivalPage() {
             return;
         }
 
-        setMessage(source.bookingCreated);
+        setMessage(selectedPatient ? source.existingBookingCreated : source.bookingCreated);
         setSelectedSlot(null);
         setNewPatient({ prenom: "", nom: "" });
         setRamq("");
@@ -247,10 +253,14 @@ export function WalkInArrivalPage() {
             <section className="mx-auto max-w-3xl space-y-5 px-4 py-6">
                 <header>
                     <h1 className="text-2xl font-semibold text-slate-900">
-                        {source.newPatientFormTitle}
+                        {selectedPatient
+                            ? source.existingPatientFormTitle
+                            : source.newPatientFormTitle}
                     </h1>
                     <p className="mt-1 text-sm text-slate-600">
-                        {source.newPatientFormDescription}
+                        {selectedPatient
+                            ? source.existingPatientFormDescription
+                            : source.newPatientFormDescription}
                     </p>
                 </header>
 
@@ -265,37 +275,49 @@ export function WalkInArrivalPage() {
                         <span className="block text-slate-600">{source.assignedClinic.replace("{name}", clinicName)}</span>
                     </p>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="text-sm font-medium text-slate-800">
-                            {source.firstNameLabel}
-                            <input
-                                value={newPatient.prenom}
-                                onChange={(event) => setNewPatient((current) => ({ ...current, prenom: event.target.value }))}
-                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 font-normal"
-                                autoComplete="given-name"
-                            />
-                        </label>
-                        <label className="text-sm font-medium text-slate-800">
-                            {source.lastNameLabel}
-                            <input
-                                value={newPatient.nom}
-                                onChange={(event) => setNewPatient((current) => ({ ...current, nom: event.target.value }))}
-                                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 font-normal"
-                                autoComplete="family-name"
-                            />
-                        </label>
-                    </div>
-                    <label className="block text-sm font-medium text-slate-800">
-                        {source.ramqReadOnlyLabel}
-                        <input value={ramq} readOnly className="mt-1 w-full rounded border border-slate-300 bg-slate-50 px-3 py-2 font-normal text-slate-700" />
-                    </label>
+                    {selectedPatient ? (
+                        <p className="text-sm font-medium text-slate-800">
+                            {source.existingPatientLabel.replace("{name}", patientName(selectedPatient))}
+                        </p>
+                    ) : (
+                        <>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <label className="text-sm font-medium text-slate-800">
+                                    {source.firstNameLabel}
+                                    <input
+                                        value={newPatient.prenom}
+                                        onChange={(event) => setNewPatient((current) => ({ ...current, prenom: event.target.value }))}
+                                        className="mt-1 w-full rounded border border-slate-300 px-3 py-2 font-normal"
+                                        autoComplete="given-name"
+                                    />
+                                </label>
+                                <label className="text-sm font-medium text-slate-800">
+                                    {source.lastNameLabel}
+                                    <input
+                                        value={newPatient.nom}
+                                        onChange={(event) => setNewPatient((current) => ({ ...current, nom: event.target.value }))}
+                                        className="mt-1 w-full rounded border border-slate-300 px-3 py-2 font-normal"
+                                        autoComplete="family-name"
+                                    />
+                                </label>
+                            </div>
+                            <label className="block text-sm font-medium text-slate-800">
+                                {source.ramqReadOnlyLabel}
+                                <input value={ramq} readOnly className="mt-1 w-full rounded border border-slate-300 bg-slate-50 px-3 py-2 font-normal text-slate-700" />
+                            </label>
+                        </>
+                    )}
 
                     <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={() => { setSelectedSlot(null); setError(""); }} disabled={loading} className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-50">
                             {source.backToAvailability}
                         </button>
                         <button type="button" onClick={() => void createPatientAndAppointment()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
-                            {loading ? source.creatingPatientAndAppointment : source.createPatientAndAppointment}
+                            {loading
+                                ? source.creatingPatientAndAppointment
+                                : selectedPatient
+                                    ? source.createAppointment
+                                    : source.createPatientAndAppointment}
                         </button>
                     </div>
                 </div>
@@ -362,7 +384,7 @@ export function WalkInArrivalPage() {
                         {loading && selectedPatient && <p className="mt-3 text-sm text-slate-600">{source.availabilityLoading}</p>}
                         {selectedPatient && walkInAvailability && (
                             <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4">
-                                <AvailabilityOptions availability={walkInAvailability} />
+                                <AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} />
                             </div>
                         )}
                     </>

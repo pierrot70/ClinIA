@@ -49,7 +49,7 @@ function getLocationForClinic(specialist, clinicId) {
     );
 }
 
-function toOption(specialist, date, schedule) {
+function toOption(specialist, date, schedule, slotTypes = {}) {
     return {
         specialist: {
             _id: String(specialist._id),
@@ -58,6 +58,7 @@ function toOption(specialist, date, schedule) {
         },
         date,
         slots: schedule.slots,
+        slotTypes,
     };
 }
 
@@ -130,12 +131,19 @@ export async function listWalkInFamilyMedicineOptions({
                     )
                 )
             );
-            const slots = Array.from(
-                new Set(schedules.flatMap((schedule) => schedule.slots))
-            ).sort();
+            const slotTypesByTime = {};
+            const slots = [];
+            schedules.forEach((schedule, index) => {
+                schedule.slots.forEach((time) => {
+                    if (slotTypesByTime[time]) return;
+                    slotTypesByTime[time] = slotTypes[index];
+                    slots.push(time);
+                });
+            });
+            slots.sort();
             if (slots.length === 0) continue;
 
-            const option = toOption(specialist, date, { slots });
+            const option = toOption(specialist, date, { slots }, slotTypesByTime);
             if (date === today) {
                 todayOptions.push(option);
             } else {
@@ -257,6 +265,86 @@ export async function createWalkInPatientAndAppointment({
                 session,
                 throwOnError: true,
             });
+            await recordWriteOperationAuditEvent({
+                collectionName: "appointments",
+                operation: "CREATE",
+                outcome: "SUCCESS",
+                actorUserId: audit.actorUserId ?? authUser?.userId ?? null,
+                actorUsername: audit.actorUsername ?? authUser?.username ?? null,
+                actorRole: "RECEPTION",
+                ip: audit.ip ?? null,
+                requestId: audit.requestId ?? null,
+                instanceId: audit.instanceId ?? null,
+                resourceId: String(appointment._id),
+                patientId: String(patient._id),
+                changedFields: ["patient", "specialist", "clinique", "date", "time", "status"],
+                requestPath: audit.requestPath ?? "/api/reception/walk-in-bookings",
+                writeConcern: CLINICAL_WRITE_CONCERN,
+                session,
+                throwOnError: true,
+            });
+
+            result = {
+                patient: {
+                    _id: String(patient._id),
+                    nom: patient.nom,
+                    prenom: patient.prenom,
+                },
+                appointment,
+            };
+        }, { writeConcern: CLINICAL_WRITE_CONCERN });
+        return result;
+    } finally {
+        await session.endSession();
+    }
+}
+
+// A known patient does not need a new dossier. The appointment is still
+// created in a transaction and the patient is resolved without the usual
+// owner scope: reception already proved access through its clinic assignment
+// and the exact RAMQ lookup.
+export async function createWalkInAppointmentForExistingPatient({
+    clinicId,
+    specialistId,
+    patientId,
+    date,
+    time,
+    slotType = "walk_in",
+    authUser,
+    audit = {},
+}) {
+    await assertReceptionClinicAccess(clinicId, authUser);
+
+    if (!mongoose.Types.ObjectId.isValid(patientId)) {
+        throw invalidInput("Patient invalide.");
+    }
+
+    const session = await mongoose.startSession();
+    try {
+        let result;
+        await session.withTransaction(async () => {
+            const patient = await Patient.findOne(
+                { _id: patientId, archivedAt: null },
+                { _id: 1, nom: 1, prenom: 1, num_assurance_maladie: 1, healthInsuranceJurisdiction: 1, ownerUserId: 1 }
+            ).lean();
+            if (!patient) {
+                throw invalidInput("Patient introuvable.");
+            }
+
+            const appointment = await createAppointment(
+                {
+                    patient: String(patient._id),
+                    specialist: specialistId,
+                    clinique: clinicId,
+                    date,
+                    time,
+                    priority: "normal",
+                    slotType,
+                },
+                authUser,
+                { session, patientFromTransaction: patient }
+            );
+
             await recordWriteOperationAuditEvent({
                 collectionName: "appointments",
                 operation: "CREATE",
