@@ -19,6 +19,7 @@ import { resolveOpenAIModel } from "../services/aiModelPolicy.js";
 import { requireRole } from "../middleware/requireRole.js";
 import { getRequestContext } from "../app/requestContext.js";
 import { getSafeRequestPath, logSafeError } from "../utils/requestLogSafety.js";
+import { listApprovedClinicalTerms } from "../services/clinicalTermCatalog.js";
 
 export function createAiAnalyzeRouter(deps) {
     const {
@@ -50,6 +51,8 @@ export function createAiAnalyzeRouter(deps) {
         recordOpenAISuccess,
         recordOpenAIFailure,
         sanitizeNonSecureContent,
+        // Tests and lightweight router embeddings do not require Mongo access.
+        getApprovedClinicalTerms = async () => [],
     } = deps;
 
     const router = express.Router();
@@ -268,7 +271,8 @@ export function createAiAnalyzeRouter(deps) {
                     cloudSafePatient = buildCloudSafePatientPayload(patient);
                 }
 
-                const cloudAssessment = assessCloudClinicalPayload(patient);
+                const dynamicTerms = await getApprovedClinicalTerms();
+                const cloudAssessment = assessCloudClinicalPayload(patient, { dynamicTerms });
                 cloudSafePatient = cloudAssessment.cloudPayload;
 
                 if (!cloudAssessment.approved) {
@@ -410,6 +414,7 @@ export function createAiAnalyzeRouter(deps) {
                     isPlaceholderClinicalAnalysis,
                     recordOpenAISuccess,
                     recordOpenAIFailure,
+                    dynamicTerms,
                     res,
                 });
 

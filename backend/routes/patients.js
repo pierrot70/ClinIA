@@ -33,6 +33,7 @@ import {
 import { minimizePatientAuditContext } from "../audit/auditDataMinimization.js";
 import { getTrustedRequestIp } from "../utils/requestIp.js";
 import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
+import { listApprovedClinicalTerms } from "../services/clinicalTermCatalog.js";
 
 const router = express.Router();
 
@@ -171,7 +172,7 @@ function clinicalParametersFingerprint(parameters) {
     });
 }
 
-function rejectUnsafeClinicalAnalysisProfile(res, dto, existingPatient = null) {
+async function rejectUnsafeClinicalAnalysisProfile(res, dto, existingPatient = null) {
     const clinicalParameters =
         dto?.secure_request_profile?.clinicalAnalysisParameters;
 
@@ -189,7 +190,8 @@ function rejectUnsafeClinicalAnalysisProfile(res, dto, existingPatient = null) {
         return false;
     }
 
-    const assessment = assessCloudClinicalPayload(clinicalParameters);
+    const dynamicTerms = await listApprovedClinicalTerms();
+    const assessment = assessCloudClinicalPayload(clinicalParameters, { dynamicTerms });
     if (assessment.rejectedFields.length === 0) {
         return false;
     }
@@ -252,7 +254,7 @@ router.post("/", async (req, res) => {
         });
     }
 
-    if (rejectUnsafeClinicalAnalysisProfile(res, dto)) {
+    if (await rejectUnsafeClinicalAnalysisProfile(res, dto)) {
         return;
     }
 
@@ -661,7 +663,7 @@ router.patch("/:id", async (req, res) => {
 
     try {
         const beforePatient = await getPatientById(req.params.id, req.auth);
-        if (rejectUnsafeClinicalAnalysisProfile(res, dto, beforePatient)) {
+        if (await rejectUnsafeClinicalAnalysisProfile(res, dto, beforePatient)) {
             return;
         }
         const clinicalNotesChanged =

@@ -199,6 +199,35 @@ describe("requestSafety", () => {
         });
     });
 
+    it("maps urinary retention phrasing to a controlled clinical symptom", () => {
+        const assessment = assessCloudClinicalPayload({
+            diagnosis: "Migraine",
+            symptoms: ["Impossible d'uriner"],
+        });
+
+        expect(assessment.approved).toBe(true);
+        expect(assessment.cloudPayload.symptoms).toEqual(["Urinary retention"]);
+    });
+
+    it("accepts a symptom only when it is supplied by the approved dynamic catalog", () => {
+        const payload = { symptoms: ["Brulure mictionnelle"] };
+        expect(assessCloudClinicalPayload(payload).approved).toBe(false);
+
+        const assessment = assessCloudClinicalPayload(payload, {
+            dynamicTerms: [{
+                field: "symptoms",
+                canonicalValue: "Dysuria",
+                aliases: ["Brulure mictionnelle"],
+            }],
+        });
+
+        expect(assessment).toMatchObject({
+            approved: true,
+            rejectedFields: [],
+            cloudPayload: { symptoms: ["Dysuria"] },
+        });
+    });
+
     it("accepts its own canonical payload on a second safety pass", () => {
         const firstAssessment = assessCloudClinicalPayload({
             diagnosis: "Hypertension arterielle",

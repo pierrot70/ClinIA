@@ -54,6 +54,7 @@ import { registerRoutes } from "./app/registerRoutes.js";
 import { createStartServer } from "./app/startServer.js";
 import { registerGracefulShutdown } from "./app/gracefulShutdown.js";
 import { createAiAnalyzeRouter } from "./routes/aiAnalyze.js";
+import { listApprovedClinicalTerms } from "./services/clinicalTermCatalog.js";
 import { createRespondWithSecurityIncident } from "./services/aiSecurityResponseService.js";
 import {
     findPersistedDiagnosisByFingerprint,
@@ -128,6 +129,7 @@ const aiAnalyzeRouter = createAiAnalyzeRouter({
     openai,
     assessCloudClinicalPayload,
     buildCloudSafePatientPayload,
+    getApprovedClinicalTerms: listApprovedClinicalTerms,
     sanitizeRequestPayload,
     validateAnalyzeRequestShape,
     validateClinicalInputBounds,

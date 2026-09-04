@@ -107,7 +107,7 @@ export function ClinicalAnalyzePage() {
         useState<"real" | "mock" | "degraded" | null>(null);
     const [reverifyLoading, setReverifyLoading] = useState(false);
     const [copyRequestFeedback, setCopyRequestFeedback] = useState<string | null>(null);
-    const [cachedResultConfirmationRequired, setCachedResultConfirmationRequired] =
+    const [cachedResultNoticeVisible, setCachedResultNoticeVisible] =
         useState(false);
 
     const [forceReal, setForceReal] = useState(false);
@@ -154,6 +154,16 @@ export function ClinicalAnalyzePage() {
         targetLang,
         translationKey: "clinicalDemo.cachedResultNotice.confirmation",
     });
+    const { translated: cachedResultRefreshHint } = useTranslation({
+        text: cachedResultNoticeLabels.refreshHint,
+        targetLang,
+        translationKey: "clinicalDemo.cachedResultNotice.refreshHint",
+    });
+    const { translated: editClinicalParametersAction } = useTranslation({
+        text: cachedResultNoticeLabels.editParametersAction,
+        targetLang,
+        translationKey: "clinicalDemo.cachedResultNotice.editParametersAction",
+    });
     const { translated: backToClinicalDemoLabel } = useTranslation({
         text: navigationLabels.backToClinicalDemo,
         targetLang,
@@ -179,9 +189,12 @@ export function ClinicalAnalyzePage() {
             : null;
 
     useEffect(() => {
-        if (result && responseMeta?.cacheHit === true) {
-            setCachedResultConfirmationRequired(true);
+        if (!result || responseMeta?.cacheHit !== true) {
+            setCachedResultNoticeVisible(false);
+            return;
         }
+
+        setCachedResultNoticeVisible(true);
     }, [result, responseMeta?.cacheHit]);
 
     useEffect(() => {
@@ -830,7 +843,7 @@ export function ClinicalAnalyzePage() {
 
         return (
         <div className="max-w-5xl mx-auto p-6 space-y-6">
-            {cachedResultConfirmationRequired && (
+            {cachedResultNoticeVisible && (
                 <div
                     className="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-950/75 px-4"
                     role="dialog"
@@ -847,13 +860,25 @@ export function ClinicalAnalyzePage() {
                         <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-700">
                             {cachedResultNoticeDescription}
                         </p>
-                        <button
-                            type="button"
-                            onClick={() => setCachedResultConfirmationRequired(false)}
-                            className="mt-6 rounded bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
-                        >
-                            {cachedResultNoticeConfirmation}
-                        </button>
+                        <p className="mx-auto mt-5 max-w-xl rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
+                            {cachedResultRefreshHint}
+                        </p>
+                        <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+                            <button
+                                type="button"
+                                onClick={handleBackToClinicalDemo}
+                                className="inline-flex min-h-12 items-center justify-center rounded-lg border border-blue-300 bg-white px-6 py-3 text-base font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 focus:outline-none focus:ring-4 focus:ring-blue-200"
+                            >
+                                {editClinicalParametersAction}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setCachedResultNoticeVisible(false)}
+                                className="inline-flex min-h-12 items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200"
+                            >
+                                {cachedResultNoticeConfirmation}
+                            </button>
+                        </div>
                     </section>
                 </div>
             )}
@@ -1608,7 +1633,7 @@ export function ClinicalAnalyzePage() {
                 !loading &&
                 !comparisonLoading &&
                 !isComparisonMode &&
-                !cachedResultConfirmationRequired && (
+                !cachedResultNoticeVisible && (
                 <div className="space-y-4">
                     <div className="flex justify-start">
                         <button

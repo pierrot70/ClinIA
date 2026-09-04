@@ -90,6 +90,15 @@ const APPROVED_CLOUD_CLINICAL_TERMS = {
         ["Loss of interest", ["loss of interest", "perte d interet"]],
         ["Polydipsia", ["polydipsia", "polydipsie"]],
         ["Polyuria", ["polyuria", "polyurie"]],
+        [
+            "Urinary retention",
+            [
+                "urinary retention",
+                "retention urinaire",
+                "impossible d uriner",
+                "incapable d uriner",
+            ],
+        ],
         ["Persistent hyperglycemia", ["persistent hyperglycemia", "hyperglycemie persistante"]],
         ["Progressive weight gain", ["progressive weight gain", "prise de poids progressive"]],
     ],
@@ -183,14 +192,39 @@ const CLINICAL_CATALOGS = Object.fromEntries(
     ])
 );
 
-function getApprovedClinicalValue(field, value) {
+// The UI needs aliases only to avoid presenting a duplicate concept after a
+// clinician used a different approved spelling. They are all controlled terms.
+export function getStaticApprovedClinicalTerms(field = "symptoms") {
+    return (APPROVED_CLOUD_CLINICAL_TERMS[field] ?? []).map(
+        ([canonicalValue, aliases]) => ({ field, canonicalValue, aliases: [canonicalValue, ...aliases] })
+    );
+}
+
+function getDynamicClinicalCatalog(entries = []) {
+    const catalog = new Map();
+    for (const entry of entries) {
+        if (!entry || entry.field !== "symptoms" || typeof entry.canonicalValue !== "string") {
+            continue;
+        }
+        const canonicalValue = entry.canonicalValue;
+        catalog.set(normalizeClinicalCatalogValue(canonicalValue), canonicalValue);
+        for (const alias of Array.isArray(entry.aliases) ? entry.aliases : []) {
+            catalog.set(normalizeClinicalCatalogValue(alias), canonicalValue);
+        }
+    }
+    return catalog;
+}
+
+function getApprovedClinicalValue(field, value, dynamicTerms = []) {
     if (typeof value !== "string") {
         return "";
     }
-    return CLINICAL_CATALOGS[field]?.get(normalizeClinicalCatalogValue(value)) ?? "";
+    const normalized = normalizeClinicalCatalogValue(value);
+    return CLINICAL_CATALOGS[field]?.get(normalized) ??
+        getDynamicClinicalCatalog(dynamicTerms).get(normalized) ?? "";
 }
 
-function buildApprovedClinicalList(field, values, maxItems) {
+function buildApprovedClinicalList(field, values, maxItems, dynamicTerms = []) {
     if (!Array.isArray(values)) {
         return { approved: [], rejectedCount: 0 };
     }
@@ -198,7 +232,7 @@ function buildApprovedClinicalList(field, values, maxItems) {
     const approved = [];
     let rejectedCount = 0;
     for (const value of values.slice(0, maxItems)) {
-        const mapped = getApprovedClinicalValue(field, value);
+        const mapped = getApprovedClinicalValue(field, value, dynamicTerms);
         if (mapped) {
             if (!approved.includes(mapped)) approved.push(mapped);
         } else if (String(value ?? "").trim()) {
@@ -486,13 +520,13 @@ function toWeightBand(weight) {
     return "100kg+";
 }
 
-export function buildCloudSafePatientPayload(payload = {}) {
+export function buildCloudSafePatientPayload(payload = {}, { dynamicTerms = [] } = {}) {
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
         return {};
     }
 
     const safePayload = {};
-    const diagnosis = getApprovedClinicalValue("diagnosis", payload.diagnosis);
+    const diagnosis = getApprovedClinicalValue("diagnosis", payload.diagnosis, dynamicTerms);
     const sex = ["male", "female", "other"].includes(payload.sex)
         ? payload.sex
         : "";
@@ -504,16 +538,18 @@ export function buildCloudSafePatientPayload(payload = {}) {
         (APPROVED_WEIGHT_BANDS.has(payload.weight_band)
             ? payload.weight_band
             : null);
-    const symptoms = buildApprovedClinicalList("symptoms", payload.symptoms, 6).approved;
+    const symptoms = buildApprovedClinicalList("symptoms", payload.symptoms, 6, dynamicTerms).approved;
     const medicalHistory = buildApprovedClinicalList(
         "medical_history",
         payload.medical_history,
-        6
+        6,
+        dynamicTerms
     ).approved;
     const currentMedications = buildApprovedClinicalList(
         "current_medications",
         payload.current_medications,
-        6
+        6,
+        dynamicTerms
     ).approved;
 
     if (diagnosis) {
@@ -590,10 +626,10 @@ export function buildCloudSafePatientPayload(payload = {}) {
     return safePayload;
 }
 
-export function assessCloudClinicalPayload(payload = {}) {
+export function assessCloudClinicalPayload(payload = {}, { dynamicTerms = [] } = {}) {
     const rejectedFields = [];
     const diagnosisInput = String(payload?.diagnosis ?? "").trim();
-    const diagnosis = getApprovedClinicalValue("diagnosis", diagnosisInput);
+    const diagnosis = getApprovedClinicalValue("diagnosis", diagnosisInput, dynamicTerms);
     if (diagnosisInput && !diagnosis) {
         rejectedFields.push("diagnosis");
     }
@@ -603,7 +639,7 @@ export function assessCloudClinicalPayload(payload = {}) {
         ["medical_history", 6],
         ["current_medications", 6],
     ]) {
-        const assessment = buildApprovedClinicalList(field, payload?.[field], maxItems);
+        const assessment = buildApprovedClinicalList(field, payload?.[field], maxItems, dynamicTerms);
         if (
             assessment.rejectedCount > 0 ||
             (Array.isArray(payload?.[field]) && payload[field].length > maxItems)
@@ -622,7 +658,7 @@ export function assessCloudClinicalPayload(payload = {}) {
         }
     }
 
-    const cloudPayload = buildCloudSafePatientPayload(payload);
+    const cloudPayload = buildCloudSafePatientPayload(payload, { dynamicTerms });
     const hasPrimaryClinicalConcept = Boolean(
         cloudPayload.diagnosis || cloudPayload.symptoms?.length
     );

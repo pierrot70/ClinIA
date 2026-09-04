@@ -12,6 +12,7 @@ import { HomeI18nContext } from "../../contexts/HomeI18nContext";
 import { labels } from "../../i18n/uiLabels";
 import { getClinicalFormReviewedStrings } from "../../i18n/clinicalFormStrings";
 import { InfoTooltip } from "../system/InfoTooltip";
+import { createClinicalTermRequest, listApprovedClinicalTerms, type ApprovedClinicalTerm } from "../../services/clinicalTermsApi";
 import type {
     ClinicalPayload,
     DiabetesClinicalContext,
@@ -214,6 +215,20 @@ function normalize(value: string | undefined) {
         .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
         .trim();
+}
+
+function normalizeCatalogTerm(value: string | undefined) {
+    return normalize(value)
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim()
+        .replace(/\s+/g, " ");
+}
+
+function displaySymptomLabel(canonicalValue: string, locale: string) {
+    if (!locale.startsWith("fr")) return canonicalValue;
+    return labels.clinicalSymptomLabels[
+        canonicalValue as keyof typeof labels.clinicalSymptomLabels
+    ] ?? canonicalValue;
 }
 
 function formatList(values: string[] | undefined) {
@@ -550,7 +565,7 @@ export function ClinicalForm({
     initialData?: ClinicalPayload | null;
     restoreInitialDataForCorrection?: boolean;
 }) {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
     const [form, setForm] = useState<ClinicalPayload>(
         initialData ?? EMPTY_FORM
     );
@@ -610,6 +625,13 @@ export function ClinicalForm({
             (initialData ?? EMPTY_FORM).current_medications
         ),
     }));
+    const [termRequestFeedback, setTermRequestFeedback] = useState<{
+        type: "success" | "error"; message: string;
+    } | null>(null);
+    const [submittingTermRequest, setSubmittingTermRequest] = useState(false);
+    const [symptomSuggestions, setSymptomSuggestions] = useState<ApprovedClinicalTerm[]>([]);
+    const [showSymptomSuggestions, setShowSymptomSuggestions] = useState(false);
+    const [symptomSuggestionsError, setSymptomSuggestionsError] = useState("");
     const debouncedPatientSearch = useDebounce(patientSearch, 250);
 
     // 🔁 Recharger le formulaire quand un patient est sélectionné
@@ -659,6 +681,22 @@ export function ClinicalForm({
         };
     }, [debouncedPatientSearch, inputMode, isAuthenticated, selectedPatient]);
 
+    useEffect(() => {
+        if (!showSymptomSuggestions || !isAuthenticated) return;
+        let active = true;
+        void (async () => {
+            const response = await listApprovedClinicalTerms();
+            if (!active) return;
+            if ("error" in response) {
+                setSymptomSuggestionsError(response.error.message);
+                return;
+            }
+            setSymptomSuggestions(response.data);
+            setSymptomSuggestionsError("");
+        })();
+        return () => { active = false; };
+    }, [isAuthenticated, showSymptomSuggestions]);
+
     function update<K extends keyof ClinicalPayload>(key: K, value: any) {
         setForm((prev) => ({ ...prev, [key]: value }));
     }
@@ -689,9 +727,49 @@ export function ClinicalForm({
             [key]: rawValue,
         }));
         update(key, parseList(rawValue));
+        if (key === "symptoms") {
+            setShowSymptomSuggestions(rawValue.includes(","));
+        }
+    }
+
+    function addSymptomSuggestion(term: string) {
+        const lastSeparator = listInputs.symptoms.lastIndexOf(",");
+        // Replace the active search fragment instead of appending it again.
+        const prefix = lastSeparator >= 0
+            ? listInputs.symptoms.slice(0, lastSeparator + 1).trimEnd()
+            : "";
+        const nextValue = prefix ? `${prefix} ${term}` : term;
+        updateListField("symptoms", nextValue);
+        setShowSymptomSuggestions(false);
+    }
+
+    async function requestSymptomTerm() {
+        const candidate = listInputs.symptoms.split(",").at(-1)?.trim() ?? "";
+        if (!candidate) return;
+        setSubmittingTermRequest(true);
+        setTermRequestFeedback(null);
+        const response = await createClinicalTermRequest(candidate);
+        setSubmittingTermRequest(false);
+        setTermRequestFeedback("error" in response
+            ? { type: "error", message: response.error.message }
+            : { type: "success", message: termRequestSentLabel });
     }
 
     const isHighlighted = (field: string) => highlightFields.includes(field);
+    const symptomSearch = normalizeCatalogTerm(listInputs.symptoms.split(",").at(-1));
+    const selectedSymptomValues = new Set(
+        parseList(listInputs.symptoms)
+            .map(normalizeCatalogTerm)
+            .filter(Boolean)
+    );
+    const visibleSymptomSuggestions = symptomSuggestions.filter((suggestion) => {
+        const aliases = [suggestion.canonicalValue, ...suggestion.aliases]
+            .map(normalizeCatalogTerm)
+            .filter(Boolean);
+        const alreadySelected = aliases.some((alias) => selectedSymptomValues.has(alias));
+        const matchesSearch = !symptomSearch || aliases.some((alias) => alias.includes(symptomSearch));
+        return !alreadySelected && matchesSearch;
+    });
 
     function resetPatient() {
         applyFormData(EMPTY_FORM);
@@ -1101,12 +1179,20 @@ export function ClinicalForm({
     const { translated: sexHelpLabel } = useTranslation({ text: "Selectionnez le sexe clinique pertinent pour l'analyse", targetLang });
     const { translated: weightHelpLabel } = useTranslation({ text: "Entrez une valeur numerique, exemple: 92", targetLang });
     const { translated: heightHelpLabel } = useTranslation({ text: "Entrez une valeur numerique, exemple: 175", targetLang });
+    const { translated: ageRangeLabel } = useTranslation({ text: clinicalFormLabels.ageRange, targetLang, translationKey: "clinicalDemo.form.ageRange" });
+    const { translated: weightRangeLabel } = useTranslation({ text: clinicalFormLabels.weightRange, targetLang, translationKey: "clinicalDemo.form.weightRange" });
+    const { translated: heightRangeLabel } = useTranslation({ text: clinicalFormLabels.heightRange, targetLang, translationKey: "clinicalDemo.form.heightRange" });
+    const { translated: rangeErrorLabel } = useTranslation({ text: clinicalFormLabels.rangeError, targetLang, translationKey: "clinicalDemo.form.rangeError" });
     const { translated: symptomsHelpLabel } = useTranslation({ text: "Separez chaque symptome par une virgule, exemple: fatigue, polydipsie", targetLang });
     const { translated: medicalHistoryHelpLabel } = useTranslation({ text: "Conditions ou diagnostics connus, separes par des virgules", targetLang });
     const { translated: medicationsHelpLabel } = useTranslation({ text: "Noms des medicaments en cours, separes par des virgules", targetLang });
     const { translated: analyzeButtonLabel } = useTranslation({ text: "Analyser", targetLang });
     const { translated: analyzingButtonLabel } = useTranslation({ text: "Analyse…", targetLang });
     const { translated: clearPatientDataLabel } = useTranslation({ text: "Effacer les donnees patient", targetLang });
+    const { translated: termRequestSentLabel } = useTranslation({ text: labels.clinicalTermRequest.sent, targetLang, translationKey: "clinicalTermRequest.sent" });
+    const { translated: termRequestSendingLabel } = useTranslation({ text: labels.clinicalTermRequest.sending, targetLang, translationKey: "clinicalTermRequest.sending" });
+    const { translated: termRequestActionLabel } = useTranslation({ text: labels.clinicalTermRequest.action, targetLang, translationKey: "clinicalTermRequest.action" });
+    const { translated: termRequestPrivacyLabel } = useTranslation({ text: labels.clinicalTermRequest.privacy, targetLang, translationKey: "clinicalTermRequest.privacy" });
     const { translated: diabetesModalButtonLabel } = useTranslation({ text: "Parametres diabete type 2", targetLang });
     const { translated: diabetesModalTitleLabel } = useTranslation({ text: "Parametres cliniques supplementaires - Diabete Type 2", targetLang });
     const { translated: diabetesModalDescriptionLabel } = useTranslation({ text: "Ajustez ces parametres pour enrichir l'analyse sans alourdir les donnees cliniques principales.", targetLang });
@@ -1123,6 +1209,13 @@ export function ClinicalForm({
         { value: "female", label: femaleLabel },
         { value: "other", label: otherLabel },
     ];
+    const ageOutOfRange = form.age < 0 || form.age > 130;
+    const weightOutOfRange =
+        form.weight !== undefined && (form.weight < 0.5 || form.weight > 500);
+    const heightOutOfRange =
+        form.height !== undefined && (form.height < 20 || form.height > 300);
+    const rangeInputClass = (invalid: boolean) =>
+        `input w-full ${invalid ? "border-red-500 bg-red-50 text-red-950 ring-1 ring-red-500 focus:border-red-600 focus:ring-red-500" : ""}`;
     const countryOptions = buildCountryOptions(targetLang);
     const detectedCountryLabel = getCountryLabel(browserCountryCode, targetLang);
     const hasSelectedExampleCase = Boolean(selectedExampleCase);
@@ -1139,6 +1232,21 @@ export function ClinicalForm({
         targetLang,
         translationKey: "clinicalPatientSelection.existingPatient",
     });
+    const { translated: patientSearchLabel } = useTranslation({
+        text: patientSelectionLabels.searchLabel,
+        targetLang,
+        translationKey: "clinicalPatientSelection.searchLabel",
+    });
+    const { translated: patientSearchPlaceholder } = useTranslation({
+        text: patientSelectionLabels.searchPlaceholder,
+        targetLang,
+        translationKey: "clinicalPatientSelection.searchPlaceholder",
+    });
+    const { translated: selectedPatientLabel } = useTranslation({ text: patientSelectionLabels.selected, targetLang, translationKey: "clinicalPatientSelection.selected" });
+    const { translated: structuredOnlyLabel } = useTranslation({ text: patientSelectionLabels.structuredOnly, targetLang, translationKey: "clinicalPatientSelection.structuredOnly" });
+    const { translated: returnToManualLabel } = useTranslation({ text: patientSelectionLabels.clear, targetLang, translationKey: "clinicalPatientSelection.clear" });
+    const { translated: patientSearchLoadingLabel } = useTranslation({ text: patientSelectionLabels.loading, targetLang, translationKey: "clinicalPatientSelection.loading" });
+    const { translated: patientSearchEmptyLabel } = useTranslation({ text: patientSelectionLabels.empty, targetLang, translationKey: "clinicalPatientSelection.empty" });
     const ethnicityOptions: Array<{ value: PatientEthnicity; label: string }> = [
         { value: "caucasian", label: caucasianLabel },
         { value: "black", label: blackLabel },
@@ -1345,7 +1453,7 @@ export function ClinicalForm({
 
             {isAuthenticated && (
                 <div className="rounded border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex flex-wrap gap-2" role="group" aria-label={patientSelectionLabels.selected}>
+                    <div className="flex flex-wrap gap-2" role="group" aria-label={selectedPatientLabel}>
                         <InfoTooltip label={helpButtonLabel}>{inputModeHelpLabel}</InfoTooltip>
                         <button
                             type="button"
@@ -1369,10 +1477,10 @@ export function ClinicalForm({
                                 <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-emerald-200 bg-emerald-50 p-3">
                                     <div>
                                         <p className="text-sm font-semibold text-emerald-950">
-                                            {patientSelectionLabels.selected}: {selectedPatient.prenom} {selectedPatient.nom}
+                                            {selectedPatientLabel}: {selectedPatient.prenom} {selectedPatient.nom}
                                         </p>
                                         <p className="mt-1 text-xs text-emerald-900">
-                                            {patientSelectionLabels.structuredOnly}
+                                            {structuredOnlyLabel}
                                         </p>
                                     </div>
                                     <button
@@ -1380,13 +1488,13 @@ export function ClinicalForm({
                                         onClick={returnToManualInput}
                                         className="rounded border border-emerald-400 bg-white px-3 py-2 text-sm font-medium text-emerald-900"
                                     >
-                                        {patientSelectionLabels.clear}
+                                        {returnToManualLabel}
                                     </button>
                                 </div>
                             ) : (
                                 <>
                                     <label htmlFor="clinical-patient-search" className="text-sm font-medium text-gray-700">
-                                        {patientSelectionLabels.searchLabel}
+                                        {patientSearchLabel}
                                     </label>
                                     <InfoTooltip label={helpButtonLabel}>{patientSearchHelpLabel}</InfoTooltip>
                                     <input
@@ -1394,12 +1502,12 @@ export function ClinicalForm({
                                         className="input w-full"
                                         value={patientSearch}
                                         onChange={(event) => setPatientSearch(event.target.value)}
-                                        placeholder={patientSelectionLabels.searchPlaceholder}
+                                        placeholder={patientSearchPlaceholder}
                                         autoComplete="off"
                                     />
-                                    {patientsLoading && <p className="text-sm text-slate-600">{patientSelectionLabels.loading}</p>}
+                                    {patientsLoading && <p className="text-sm text-slate-600">{patientSearchLoadingLabel}</p>}
                                     {!patientsLoading && patientSearch.trim().length >= 2 && patientMatches.length === 0 && (
-                                        <p className="text-sm text-slate-600">{patientSelectionLabels.empty}</p>
+                                        <p className="text-sm text-slate-600">{patientSearchEmptyLabel}</p>
                                     )}
                                     {patientMatches.length > 0 && (
                                         <ul className="divide-y rounded border border-slate-200 bg-white">
@@ -1671,14 +1779,19 @@ export function ClinicalForm({
                         <p className="text-xs text-gray-500">
                             {ageHelpLabel}
                         </p>
+                        <p id="clinical-age-range" className={ageOutOfRange ? "text-xs font-medium text-red-700" : "text-xs text-gray-500"}>
+                            {ageRangeLabel} {ageOutOfRange ? rangeErrorLabel : ""}
+                        </p>
                         <input
                             id="clinical-age"
                             type="number"
                             min={0}
                             max={130}
-                            className="input w-full"
+                            className={rangeInputClass(ageOutOfRange)}
                             placeholder={reviewedStrings.agePlaceholder}
                             value={form.age ?? ""}
+                            aria-invalid={ageOutOfRange}
+                            aria-describedby="clinical-age-range"
                             onChange={(e) =>
                                 update(
                                     "age",
@@ -1783,6 +1896,7 @@ export function ClinicalForm({
                         className="input w-full"
                         maxLength={160}
                         placeholder={reviewedStrings.diagnosisPlaceholder}
+                        autoComplete="off"
                         value={form.diagnosis ?? ""}
                         onChange={(e) => update("diagnosis", e.target.value)}
                     />
@@ -1798,15 +1912,20 @@ export function ClinicalForm({
                         <p className="text-xs text-gray-500">
                             {weightHelpLabel}
                         </p>
+                        <p id="clinical-weight-range" className={weightOutOfRange ? "text-xs font-medium text-red-700" : "text-xs text-gray-500"}>
+                            {weightRangeLabel} {weightOutOfRange ? rangeErrorLabel : ""}
+                        </p>
                         <input
                             id="clinical-weight"
                             type="number"
                             min={0.5}
                             max={500}
                             step="any"
-                            className="input w-full"
+                            className={rangeInputClass(weightOutOfRange)}
                             placeholder={reviewedStrings.weightPlaceholder}
                             value={form.weight ?? ""}
+                            aria-invalid={weightOutOfRange}
+                            aria-describedby="clinical-weight-range"
                             onChange={(e) =>
                                 update(
                                     "weight",
@@ -1825,15 +1944,20 @@ export function ClinicalForm({
                         <p className="text-xs text-gray-500">
                             {heightHelpLabel}
                         </p>
+                        <p id="clinical-height-range" className={heightOutOfRange ? "text-xs font-medium text-red-700" : "text-xs text-gray-500"}>
+                            {heightRangeLabel} {heightOutOfRange ? rangeErrorLabel : ""}
+                        </p>
                         <input
                             id="clinical-height"
                             type="number"
                             min={20}
                             max={300}
                             step="any"
-                            className="input w-full"
+                            className={rangeInputClass(heightOutOfRange)}
                             placeholder={reviewedStrings.heightPlaceholder}
                             value={form.height ?? ""}
+                            aria-invalid={heightOutOfRange}
+                            aria-describedby="clinical-height-range"
                             onChange={(e) =>
                                 update(
                                     "height",
@@ -1847,9 +1971,16 @@ export function ClinicalForm({
 
             <Field highlight={isHighlighted("symptoms")}> 
                 <div className="space-y-1">
-                    <label htmlFor="clinical-symptoms" className="text-sm font-medium text-gray-700">
-                        {symptomsLabel}
-                    </label>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <label htmlFor="clinical-symptoms" className="text-sm font-medium text-gray-700">
+                            {symptomsLabel}
+                        </label>
+                        {user?.role === "MEDECIN" && listInputs.symptoms.trim() && (
+                            <button type="button" onClick={() => void requestSymptomTerm()} disabled={submittingTermRequest} className="rounded border border-blue-600 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-60">
+                                {submittingTermRequest ? termRequestSendingLabel : termRequestActionLabel}
+                            </button>
+                        )}
+                    </div>
                     <p className="text-xs text-gray-500">
                         {symptomsHelpLabel}
                     </p>
@@ -1858,11 +1989,21 @@ export function ClinicalForm({
                         className="input w-full"
                         maxLength={725}
                         placeholder={reviewedStrings.symptomsPlaceholder}
+                        autoComplete="off"
                         value={listInputs.symptoms}
+                        onFocus={() => setShowSymptomSuggestions(true)}
                         onChange={(e) =>
                             updateListField("symptoms", e.target.value)
                         }
                     />
+                    {showSymptomSuggestions && (
+                        <div className="rounded border border-blue-200 bg-blue-50 p-3" aria-label="Suggestions de symptômes">
+                            <p className="mb-2 text-xs font-medium text-blue-950">{labels.clinicalTermRequest.suggestionsTitle}</p>
+                            {symptomSuggestionsError ? <p role="alert" className="text-xs text-red-700">{symptomSuggestionsError}</p> : symptomSuggestions.length === 0 ? <p className="text-xs text-gray-600">{labels.clinicalTermRequest.suggestionsLoading}</p> : visibleSymptomSuggestions.length === 0 ? <p className="text-xs text-gray-600">{labels.clinicalTermRequest.suggestionsEmpty}</p> : <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">{visibleSymptomSuggestions.map((suggestion) => { const displayLabel = displaySymptomLabel(suggestion.canonicalValue, targetLang); return <button key={suggestion.canonicalValue} type="button" onClick={() => addSymptomSuggestion(displayLabel)} className="rounded border border-blue-300 bg-white px-2 py-1 text-xs text-blue-800 hover:bg-blue-100">{displayLabel}</button>; })}</div>}
+                        </div>
+                    )}
+                    {user?.role === "MEDECIN" && listInputs.symptoms.trim() && <p className="text-xs text-gray-500">{termRequestPrivacyLabel}</p>}
+                    {termRequestFeedback && <p role={termRequestFeedback.type === "error" ? "alert" : "status"} className={termRequestFeedback.type === "error" ? "text-xs text-red-700" : "text-xs text-emerald-700"}>{termRequestFeedback.message}</p>}
                 </div>
             </Field>
 
@@ -1880,6 +2021,7 @@ export function ClinicalForm({
                         className="input w-full"
                         maxLength={725}
                         placeholder={reviewedStrings.medicalHistoryPlaceholder}
+                        autoComplete="off"
                         value={listInputs.medical_history}
                         onChange={(e) =>
                             updateListField("medical_history", e.target.value)
@@ -1901,6 +2043,7 @@ export function ClinicalForm({
                         className="input w-full"
                         maxLength={725}
                         placeholder={reviewedStrings.medicationsPlaceholder}
+                        autoComplete="off"
                         value={listInputs.current_medications}
                         onChange={(e) =>
                             updateListField("current_medications", e.target.value)

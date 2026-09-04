@@ -1,4 +1,53 @@
 export const UI_LABELS_FR = {
+    // Libellés d'interface français des concepts canoniques anglais.
+    // Les clés restent stables pour la validation serveur et les futurs codes SNOMED CT.
+    clinicalSymptomLabels: {
+        "Cervical lymphadenopathy": "Adénopathies cervicales",
+        "Depressed mood": "Humeur dépressive",
+        "Elevated blood pressure": "Pression artérielle élevée",
+        "Epigastric pain": "Douleur épigastrique",
+        Fatigue: "Fatigue",
+        Fever: "Fièvre",
+        Glare: "Éblouissements",
+        Headache: "Céphalée",
+        Insomnia: "Insomnie",
+        "Loss of interest": "Perte d’intérêt",
+        Nausea: "Nausées",
+        "Persistent hyperglycemia": "Hyperglycémie persistante",
+        Polydipsia: "Polydipsie",
+        Polyuria: "Polyurie",
+        "Progressive blurred vision": "Vision floue progressive",
+        "Progressive weight gain": "Prise de poids progressive",
+        "Reduced visual acuity": "Baisse de l’acuité visuelle",
+        "Severe fatigue": "Fatigue intense",
+        "Urinary retention": "Rétention urinaire",
+        "Weight loss": "Perte de poids",
+    },
+    clinicalTermRequest: {
+        sent: "Demande envoyee au SUPERADMIN. Le terme ne sera utilisable qu'apres approbation.",
+        sending: "Envoi...",
+        action: "Demander l'ajout du dernier symptome",
+        privacy: "N'ajoutez jamais de renseignement permettant d'identifier le patient.",
+        suggestionsTitle: "Choisissez un symptôme autorisé :",
+        suggestionsLoading: "Chargement du catalogue...",
+        suggestionsEmpty: "Aucun nouveau symptôme correspondant.",
+    },
+    clinicalTermCatalog: {
+        title: "Catalogue clinique",
+        description: "Validez les termes cliniques courts demandés par les médecins. Une approbation rend le terme utilisable immédiatement pour l'analyse.",
+        privacyNotice: "Ne validez jamais un terme contenant une donnée permettant d'identifier un patient. Refusez les notes, phrases ou formulations ambiguës.",
+        refresh: "Actualiser",
+        loading: "Chargement des demandes...",
+        empty: "Aucune demande de terme en attente.",
+        term: "Terme proposé",
+        requestedAt: "Demandé le",
+        actions: "Décision",
+        approve: "Approuver",
+        reject: "Refuser",
+        processing: "Traitement...",
+        approved: "Terme approuvé. Il est maintenant disponible pour l'analyse.",
+        rejected: "Demande refusée.",
+    },
     writeVerification: {
         title: "No verification",
         unavailable: "Confirmation de sauvegarde indisponible.",
@@ -263,6 +312,7 @@ export const UI_LABELS_FR = {
             supportAccessInbox: "Accès de soutien",
             delegatedPatients: "Dossiers autorisés",
             requestSupportAccess: "Demandes de soutien",
+            clinicalTermCatalog: "Catalogue clinique",
             cliniques: "Cliniques",
             specialists: "Spécialistes",
             openaiLogs: "OpenAI logs",
@@ -614,12 +664,15 @@ export const UI_LABELS_FR = {
                 "ClinIA a trouve une analyse clinique equivalente deja enregistree. Aucun nouvel appel a OpenAI n'a ete necessaire.",
             confirmation:
                 "J'ai pris connaissance du resultat reutilise",
+            refreshHint:
+                "Pour declencher une nouvelle analyse, revenez aux parametres, mettez a jour les renseignements cliniques pertinents, puis cliquez de nouveau sur Analyser. Une relance identique forcee doit etre demandee a un SUPERADMIN.",
+            editParametersAction: "Modifier les parametres cliniques",
         },
         navigation: {
             backToClinicalDemo: "Retour a",
         },
         loading: {
-            openAiRequestInProgress: "Requete OpenAI en cours...",
+            openAiRequestInProgress: "Analyse clinique en cours...",
         },
         cloudContentGuard: {
             title: "Analyse interrompue avant transmission",
@@ -732,6 +785,10 @@ export const UI_LABELS_FR = {
             ethnicityLabel: "Ethnicite du patient",
             ethnicityHelp:
                 "Selectionnez l'ethnicite la plus pertinente pour le contexte clinique si elle est connue.",
+            ageRange: "Plage autorisee : 0 a 130 ans.",
+            weightRange: "Plage autorisee : 0,5 a 500 kg.",
+            heightRange: "Plage autorisee : 20 a 300 cm.",
+            rangeError: "Valeur hors plage autorisee.",
             ethnicityOptions: {
                 caucasian: "Caucasien",
                 black: "Noir",

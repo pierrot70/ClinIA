@@ -89,6 +89,7 @@ const HEADER_TRANSLATION_KEYS: Record<string, string> = {
     "Accès de soutien": "header.nav.supportAccessInbox",
     "Dossiers autorisés": "header.nav.delegatedPatients",
     "Demander un accès": "header.nav.requestSupportAccess",
+    "Catalogue clinique": "header.nav.clinicalTermCatalog",
     "x-y graph": "header.appManagement.xyGraph",
     "Pie graph": "header.appManagement.pieGraph",
     "Histogramme graph": "header.appManagement.histogramGraph",
@@ -1477,6 +1478,11 @@ const Header: React.FC = () => {
                                     <HeaderLabel text={headerLabels.nav.delegatedPatients} />
                                 </Link>
                             )}
+                            {user?.role === "SUPERADMIN" && (
+                                <Link to="/admin/clinical-terms" className={linkClass("/admin/clinical-terms")}>
+                                    <HeaderLabel text={headerLabels.nav.clinicalTermCatalog} />
+                                </Link>
+                            )}
 
                             <div className="relative group">
                                 <button
@@ -1860,6 +1866,7 @@ const Header: React.FC = () => {
                             {user?.role === "MEDECIN" && <Link to="/clinical-support-access/inbox" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.supportAccessInbox} /></Link>}
                             {user?.role === "SUPERADMIN" && <Link to="/clinical-support-access/patients" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.delegatedPatients} /></Link>}
                             {user?.role === "SUPERADMIN" && <Link to="/clinical-support-access/request" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.requestSupportAccess} /></Link>}
+                            {user?.role === "SUPERADMIN" && <Link to="/admin/clinical-terms" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.clinicalTermCatalog} /></Link>}
                             {isPhysicianMobileNav && (
                                 <div className="mt-3 border-t border-gray-100 px-2 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     <HeaderLabel text={headerLabels.nav.clinicManagement} />

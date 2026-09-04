@@ -72,6 +72,26 @@ export const APPROVED_UI_TRANSLATION_CATALOG = Object.freeze([
         text: "Mode simulation",
     },
     {
+        key: "clinicalDemo.form.ageRange",
+        namespace: "clinical-demo",
+        text: "Plage autorisee : 0 a 130 ans.",
+    },
+    {
+        key: "clinicalDemo.form.weightRange",
+        namespace: "clinical-demo",
+        text: "Plage autorisee : 0,5 a 500 kg.",
+    },
+    {
+        key: "clinicalDemo.form.heightRange",
+        namespace: "clinical-demo",
+        text: "Plage autorisee : 20 a 300 cm.",
+    },
+    {
+        key: "clinicalDemo.form.rangeError",
+        namespace: "clinical-demo",
+        text: "Valeur hors plage autorisee.",
+    },
+    {
         key: "clinicalDemo.cachedResultNotice.title",
         namespace: "clinical-demo",
         text: "Analyse equivalente deja disponible",
@@ -87,6 +107,16 @@ export const APPROVED_UI_TRANSLATION_CATALOG = Object.freeze([
         text: "J'ai pris connaissance du resultat reutilise",
     },
     {
+        key: "clinicalDemo.cachedResultNotice.refreshHint",
+        namespace: "clinical-demo",
+        text: "Pour declencher une nouvelle analyse, revenez aux parametres, mettez a jour les renseignements cliniques pertinents, puis cliquez de nouveau sur Analyser. Une relance identique forcee doit etre demandee a un SUPERADMIN.",
+    },
+    {
+        key: "clinicalDemo.cachedResultNotice.editParametersAction",
+        namespace: "clinical-demo",
+        text: "Modifier les parametres cliniques",
+    },
+    {
         key: "clinicalDemo.navigation.backToClinicalDemo",
         namespace: "clinical-demo",
         text: "Retour a",
@@ -94,7 +124,7 @@ export const APPROVED_UI_TRANSLATION_CATALOG = Object.freeze([
     {
         key: "clinicalDemo.loading.openAiRequestInProgress",
         namespace: "clinical-demo",
-        text: "Requete OpenAI en cours...",
+        text: "Analyse clinique en cours...",
     },
     {
         key: "clinicalDemo.comparison.reverifyAction",

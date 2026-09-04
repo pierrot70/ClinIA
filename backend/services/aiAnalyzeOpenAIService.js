@@ -51,6 +51,7 @@ export async function executeOpenAIAnalyze({
     isPlaceholderClinicalAnalysis,
     recordOpenAISuccess,
     recordOpenAIFailure,
+    dynamicTerms = [],
     res,
     logger = console,
 }) {
@@ -58,7 +59,7 @@ export async function executeOpenAIAnalyze({
         ...patient,
         diagnosis,
         symptoms,
-    });
+    }, { dynamicTerms });
     if (!cloudAssessment.approved) {
         return {
             ok: false,

@@ -3,6 +3,8 @@ import type { ClinicalPayload, ClinicalAnalysis } from "../types/clinical";
 import type { SecurityIncidentBlockingData } from "../types/api";
 import { authFetch } from "../services/authService";
 
+const MIN_LOADING_INDICATOR_MS = 500;
+
 export type ClinicalAnalysisResponseMeta = {
   source?: string;
   model?: string;
@@ -20,6 +22,7 @@ export function useClinicalAnalysis() {
   const analyze = useCallback(async (
     payload: ClinicalPayload
   ): Promise<SecurityIncidentBlockingData | null> => {
+    const startedAt = Date.now();
     setLoading(true);
     setError(null);
     setErrorCode(null);
@@ -62,6 +65,12 @@ export function useClinicalAnalysis() {
       setResult(null);
       return null;
     } finally {
+      const remainingIndicatorTime = MIN_LOADING_INDICATOR_MS - (Date.now() - startedAt);
+      if (remainingIndicatorTime > 0) {
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, remainingIndicatorTime);
+        });
+      }
       setLoading(false);
     }
   }, []);

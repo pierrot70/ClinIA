@@ -500,4 +500,61 @@ describe("ClinicalForm", () => {
             );
         });
     });
+
+    it("shows the allowed ranges and highlights an out-of-range value", () => {
+        render(
+            <ClinicalForm
+                onSubmit={vi.fn()}
+                loading={false}
+                initialData={{
+                    age: 55,
+                    sex: "male",
+                    diagnosis: "",
+                    symptoms: [],
+                    medical_history: [],
+                    current_medications: [],
+                }}
+            />
+        );
+
+        selectExampleCase("diabetesType255");
+
+        expect(screen.getByText("Plage autorisee : 0 a 130 ans.")).toBeInTheDocument();
+        expect(screen.getByText("Plage autorisee : 0,5 a 500 kg.")).toBeInTheDocument();
+        expect(screen.getByText("Plage autorisee : 20 a 300 cm.")).toBeInTheDocument();
+
+        const heightInput = screen.getByLabelText("Taille du patient (cm)");
+        fireEvent.change(heightInput, { target: { value: "12" } });
+
+        expect(heightInput).toHaveAttribute("aria-invalid", "true");
+        expect(screen.getByText(/Valeur hors plage autorisee/)).toBeInTheDocument();
+    });
+
+    it("disables browser autocomplete for free-text clinical fields", () => {
+        render(
+            <ClinicalForm
+                onSubmit={vi.fn()}
+                loading={false}
+                initialData={{
+                    age: 55,
+                    sex: "male",
+                    diagnosis: "",
+                    symptoms: [],
+                    medical_history: [],
+                    current_medications: [],
+                }}
+            />
+        );
+
+        selectExampleCase("diabetesType255");
+
+        [
+            "Diagnostic / motif clinique principal",
+            "Symptomes principaux",
+            "Antecedents medicaux",
+            "Medication actuelle",
+        ].forEach((label) => {
+            expect(screen.getByLabelText(label)).toHaveAttribute("autocomplete", "off");
+        });
+    });
 });
