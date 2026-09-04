@@ -290,7 +290,7 @@ const App: React.FC = () => {
     }, []);
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-background lg:pl-64 lg:pt-16">
             <Header />
             <ReceptionClinicStatus />
             {blockingIncident && (

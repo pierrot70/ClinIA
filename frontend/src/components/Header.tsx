@@ -420,9 +420,9 @@ const Header: React.FC = () => {
     }, []);
 
     const linkClass = (path: string) =>
-        "hover:text-primary transition-colors " +
+        "rounded-lg px-3 py-2 hover:bg-slate-100 hover:text-primary transition-colors lg:block " +
         (location.pathname === path
-            ? "text-primary font-medium"
+            ? "bg-blue-50 text-primary font-medium"
             : "text-gray-600");
 
     const clinicNavPaths = [
@@ -1303,8 +1303,8 @@ const Header: React.FC = () => {
     ]);
 
     return (
-        <header className="sticky top-0 z-50 border-b border-gray-200 bg-white">
-            <div className="mx-auto max-w-6xl px-4 py-3">
+        <header className="sticky top-0 z-50 border-b border-gray-200 bg-white lg:fixed lg:inset-x-0 lg:h-16">
+            <div className="mx-auto max-w-6xl px-4 py-3 lg:ml-64 lg:max-w-none lg:py-2">
                 <div className="space-y-2 lg:hidden">
                     <div className="relative flex h-9 items-center justify-between">
                         <button type="button" onClick={() => setIsMobileMenuOpen(true)} className="rounded p-2 text-xl text-slate-700" aria-label={headerLabels.controls.openMenu}>☰</button>
@@ -1319,7 +1319,7 @@ const Header: React.FC = () => {
                     </label>
                 </div>
 
-                <div className="hidden items-center justify-between gap-3 lg:flex">
+                <div className="relative hidden items-center justify-between gap-3 lg:flex">
                     <Link to="/" className="flex min-w-0 items-center gap-3">
                         <img
                             src="/logo.png"
@@ -1337,6 +1337,27 @@ const Header: React.FC = () => {
                     </Link>
 
                     <div className="flex items-center gap-3">
+                        <div className="absolute left-1/2 -translate-x-1/2">
+                            {showPublicLanguageTip && (
+                                <div className="absolute right-0 top-full z-[100] mt-3 w-72 rounded-xl border border-cyan-500 bg-cyan-50 p-4 text-sm text-cyan-950 shadow-2xl">
+                                    <div className="mb-2 text-base font-semibold"><HeaderLabel text={headerLabels.controls.language} /></div>
+                                    <p><HeaderLabel text={headerLabels.publicHome.languageTooltip} /></p>
+                                    <button type="button" onClick={completePublicLanguageTip} className="mt-3 rounded bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"><HeaderLabel text={headerLabels.publicHome.tooltipOk} /></button>
+                                </div>
+                            )}
+                            <label className="flex items-center gap-2 text-gray-600">
+                                <span className="text-xs"><HeaderLabel text={headerLabels.controls.language} /></span>
+                                <select
+                                    className={"rounded border bg-white px-2 py-1 text-xs transition " + (showPublicLanguageTip ? "border-emerald-500 ring-2 ring-emerald-200" : "border-gray-300")}
+                                    value={locale}
+                                    onChange={onLanguageChange}
+                                    disabled={isTranslating}
+                                    aria-label={headerLabels.controls.language}
+                                >
+                                    {languageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                </select>
+                            </label>
+                        </div>
                         {isAuthenticated && user && (
                             <div className="text-right">
                                 <div className="max-w-[260px] truncate text-sm font-medium text-gray-900">
@@ -1378,6 +1399,15 @@ const Header: React.FC = () => {
                                 )}
                             </div>
                         )}
+                        {isAuthenticated ? (
+                            <button onClick={logout} className="rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700">
+                                <HeaderLabel text={headerLabels.nav.logout} />
+                            </button>
+                        ) : (
+                            <Link to="/login" className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                                <HeaderLabel text={headerLabels.nav.login} />
+                            </Link>
+                        )}
                         {isAuthenticated && isDev && (
                             <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 border border-blue-300">
                                 DEV – Docker
@@ -1410,58 +1440,13 @@ const Header: React.FC = () => {
                     </div>
                 </div>
 
-                <nav className="mt-3 hidden items-center gap-4 text-sm lg:flex">
+                <nav className="mt-3 hidden items-center gap-4 text-sm lg:fixed lg:inset-y-0 lg:left-0 lg:mt-0 lg:flex lg:w-64 lg:flex-col lg:items-stretch lg:gap-1 lg:overflow-y-auto lg:border-r lg:border-slate-200 lg:bg-slate-50 lg:px-3 lg:py-5 lg:shadow-sm">
                     {showFullHeaderNav && canAccessAdmin && <VoiceNavButton />}
-
-                    <div className="relative">
-                        {showPublicLanguageTip && (
-                            <div className="absolute left-1/2 top-full z-[100] mt-3 w-72 -translate-x-1/2 rounded-xl border border-cyan-500 bg-cyan-50 p-4 text-sm text-cyan-950 shadow-2xl">
-                                <span className="absolute bottom-full left-1/2 h-3 w-3 -translate-x-1/2 translate-y-1/2 rotate-45 border-l border-t border-cyan-500 bg-cyan-50" aria-hidden="true" />
-                                <div className="mb-2 text-base font-semibold">
-                                    <HeaderLabel text={headerLabels.controls.language} />
-                                </div>
-                                <p><HeaderLabel text={headerLabels.publicHome.languageTooltip} /></p>
-                                <button
-                                    type="button"
-                                    onClick={completePublicLanguageTip}
-                                    className="mt-3 rounded bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
-                                >
-                                    <HeaderLabel text={headerLabels.publicHome.tooltipOk} />
-                                </button>
-                            </div>
-                        )}
-                        <label className="flex items-center gap-2 text-gray-600">
-                            <span className="text-xs"><HeaderLabel text={headerLabels.controls.language} /></span>
-                            <select
-                                className={
-                                    "rounded border bg-white px-2 py-1 text-xs transition " +
-                                    (showPublicLanguageTip
-                                        ? "border-emerald-500 ring-2 ring-emerald-200"
-                                        : "border-gray-300")
-                                }
-                                value={locale}
-                                onChange={onLanguageChange}
-                                disabled={isTranslating}
-                                aria-label={headerLabels.controls.language}
-                            >
-                                {languageOptions.map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                    </div>
 
                     <Link to="/" className={linkClass("/")}>
                         <HeaderLabel text={headerLabels.nav.home} />
                     </Link>
 
-                    {!isAuthenticated && (
-                        <Link to="/login" className={linkClass("/login")}>
-                            <HeaderLabel text={headerLabels.nav.login} />
-                        </Link>
-                    )}
 
                     {showFullHeaderNav && (
                         <>
@@ -1801,14 +1786,6 @@ const Header: React.FC = () => {
                         </Link>
                     )}
 
-                    {isAuthenticated && (
-                        <button
-                            onClick={logout}
-                            className="text-sm text-red-600 hover:text-red-700 ml-3"
-                        >
-                            <HeaderLabel text={headerLabels.nav.logout} />
-                        </button>
-                    )}
                 </nav>
 
                 {isMobileMenuOpen && (
