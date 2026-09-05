@@ -1,0 +1,155 @@
+import { UI_LABELS_FR } from "./uiLabels.fr";
+import { esFallback } from "./esFallback";
+
+const { reasons, ...mainLabels } = UI_LABELS_FR.clinicalSupportAccessInbox;
+export const supportInboxFrench = { ...mainLabels, ...reasons };
+type InboxLabels = Record<keyof typeof supportInboxFrench, string>;
+
+// Human-readable UI only: no patient values are passed to this dictionary.
+export const supportInboxTranslations: Record<string, InboxLabels> = {
+    fr: supportInboxFrench,
+    es: Object.fromEntries(Object.entries(supportInboxFrench).map(
+        ([key, source]) => [key, esFallback[source]]
+    )) as InboxLabels,
+    en: {
+        title: "Support access requests",
+        description: "Approve or deny temporary read-only access to a record for which you are the responsible physician. No patient-identifying information is displayed in this inbox.",
+        refresh: "Refresh", loading: "Loading access requests...",
+        empty: "No pending support access requests.",
+        activeTitle: "Active support access",
+        activeDescription: "You can immediately revoke an authorization that is still active.",
+        activeEmpty: "No active support access.",
+        expiresAt: "Expires on", requestedAt: "Requested on", dossier: "Record reference",
+        reason: "Reason", superadminJustification: "SUPERADMIN justification",
+        duration: "Access duration if approved", approve: "Allow read-only access",
+        approving: "Authorizing...", reject: "Deny", rejecting: "Denying...",
+        revoke: "Revoke access", revoking: "Revoking...",
+        revoked: "Support access revoked immediately.",
+        approved: "Temporary read-only access granted.", rejected: "Access request denied.",
+        technicalSupport: "Technical support", securityIncident: "Security incident",
+        dataAccessRequest: "Data access request",
+    },
+    ko: {
+        title: "지원 접근 요청",
+        description: "담당 의사로서 관리하는 환자 기록에 대한 임시 읽기 전용 접근을 허용하거나 거부하세요. 이 수신함에는 환자를 식별할 수 있는 정보가 표시되지 않습니다.",
+        refresh: "새로고침", loading: "접근 요청을 불러오는 중...",
+        empty: "대기 중인 지원 접근 요청이 없습니다.",
+        activeTitle: "활성 지원 접근 권한",
+        activeDescription: "아직 유효한 접근 권한을 즉시 철회할 수 있습니다.",
+        activeEmpty: "활성 지원 접근 권한이 없습니다.",
+        expiresAt: "만료 일시", requestedAt: "요청 일시", dossier: "기록 참조",
+        reason: "사유", superadminJustification: "SUPERADMIN의 요청 사유",
+        duration: "승인 시 접근 허용 시간", approve: "읽기 전용 접근 허용",
+        approving: "승인 중...", reject: "거부", rejecting: "거부 중...",
+        revoke: "접근 권한 철회", revoking: "철회 중...",
+        revoked: "지원 접근 권한이 즉시 철회되었습니다.",
+        approved: "임시 읽기 전용 접근이 허용되었습니다.", rejected: "접근 요청이 거부되었습니다.",
+        technicalSupport: "기술 지원", securityIncident: "보안 사고",
+        dataAccessRequest: "데이터 접근 요청",
+    },
+    vi: {
+        title: "Yêu cầu quyền truy cập hỗ trợ",
+        description: "Cho phép hoặc từ chối quyền truy cập tạm thời chỉ đọc vào hồ sơ mà bạn là bác sĩ phụ trách. Hộp thư này không hiển thị thông tin nhận dạng bệnh nhân.",
+        refresh: "Làm mới", loading: "Đang tải yêu cầu truy cập...",
+        empty: "Không có yêu cầu truy cập hỗ trợ đang chờ.",
+        activeTitle: "Quyền truy cập hỗ trợ đang có hiệu lực",
+        activeDescription: "Bạn có thể thu hồi ngay quyền truy cập vẫn còn hiệu lực.",
+        activeEmpty: "Không có quyền truy cập hỗ trợ nào đang có hiệu lực.",
+        expiresAt: "Hết hạn lúc", requestedAt: "Thời điểm yêu cầu", dossier: "Mã tham chiếu hồ sơ",
+        reason: "Lý do", superadminJustification: "Lý do của SUPERADMIN",
+        duration: "Thời hạn truy cập nếu được duyệt", approve: "Cho phép truy cập chỉ đọc",
+        approving: "Đang cấp quyền...", reject: "Từ chối", rejecting: "Đang từ chối...",
+        revoke: "Thu hồi quyền truy cập", revoking: "Đang thu hồi...",
+        revoked: "Quyền truy cập hỗ trợ đã được thu hồi ngay lập tức.",
+        approved: "Đã cấp quyền truy cập tạm thời chỉ đọc.", rejected: "Đã từ chối yêu cầu truy cập.",
+        technicalSupport: "Hỗ trợ kỹ thuật", securityIncident: "Sự cố bảo mật",
+        dataAccessRequest: "Yêu cầu truy cập dữ liệu",
+    },
+    no: {
+        title: "Forespørsler om støttetilgang",
+        description: "Godkjenn eller avslå midlertidig lesetilgang til en journal du er ansvarlig lege for. Ingen opplysninger som identifiserer pasienten, vises i denne innboksen.",
+        refresh: "Oppdater", loading: "Laster tilgangsforespørsler...",
+        empty: "Ingen ventende forespørsler om støttetilgang.",
+        activeTitle: "Aktive støttetilganger",
+        activeDescription: "Du kan umiddelbart trekke tilbake en tilgang som fortsatt er aktiv.",
+        activeEmpty: "Ingen aktive støttetilganger.",
+        expiresAt: "Utløper", requestedAt: "Forespurt", dossier: "Journalreferanse",
+        reason: "Årsak", superadminJustification: "Begrunnelse fra SUPERADMIN",
+        duration: "Tilgangsvarighet ved godkjenning", approve: "Tillat lesetilgang",
+        approving: "Godkjenner...", reject: "Avslå", rejecting: "Avslår...",
+        revoke: "Trekk tilbake tilgang", revoking: "Trekker tilbake...",
+        revoked: "Støttetilgangen er trukket tilbake med umiddelbar virkning.",
+        approved: "Midlertidig lesetilgang er gitt.", rejected: "Tilgangsforespørselen er avslått.",
+        technicalSupport: "Teknisk støtte", securityIncident: "Sikkerhetshendelse",
+        dataAccessRequest: "Forespørsel om datatilgang",
+    },
+    ja: {
+        title: "サポートアクセス申請",
+        description: "担当医として管理する患者記録への一時的な読み取り専用アクセスを許可または拒否します。この受信箱には患者を特定できる情報は表示されません。",
+        refresh: "更新", loading: "アクセス申請を読み込み中...",
+        empty: "保留中のサポートアクセス申請はありません。",
+        activeTitle: "有効なサポートアクセス",
+        activeDescription: "有効なアクセス権限は直ちに取り消すことができます。",
+        activeEmpty: "有効なサポートアクセスはありません。",
+        expiresAt: "有効期限", requestedAt: "申請日時", dossier: "記録参照番号",
+        reason: "理由", superadminJustification: "SUPERADMINの申請理由",
+        duration: "承認時のアクセス許可時間", approve: "読み取り専用アクセスを許可",
+        approving: "許可中...", reject: "拒否", rejecting: "拒否中...",
+        revoke: "アクセス権限を取り消す", revoking: "取り消し中...",
+        revoked: "サポートアクセス権限を直ちに取り消しました。",
+        approved: "一時的な読み取り専用アクセスを許可しました。", rejected: "アクセス申請を拒否しました。",
+        technicalSupport: "技術サポート", securityIncident: "セキュリティインシデント",
+        dataAccessRequest: "データアクセス申請",
+    },
+    zh: {
+        title: "支持访问申请",
+        description: "允许或拒绝对您作为负责医生管理的病历进行临时只读访问。此收件箱不显示任何可识别患者身份的信息。",
+        refresh: "刷新", loading: "正在加载访问申请...",
+        empty: "没有待处理的支持访问申请。",
+        activeTitle: "有效的支持访问权限",
+        activeDescription: "您可以立即撤销仍然有效的授权。",
+        activeEmpty: "没有有效的支持访问权限。",
+        expiresAt: "到期时间", requestedAt: "申请时间", dossier: "病历参考编号",
+        reason: "原因", superadminJustification: "SUPERADMIN 申请理由",
+        duration: "批准后的访问时长", approve: "允许只读访问",
+        approving: "正在授权...", reject: "拒绝", rejecting: "正在拒绝...",
+        revoke: "撤销访问权限", revoking: "正在撤销...",
+        revoked: "支持访问权限已立即撤销。",
+        approved: "已授予临时只读访问权限。", rejected: "访问申请已被拒绝。",
+        technicalSupport: "技术支持", securityIncident: "安全事件",
+        dataAccessRequest: "数据访问申请",
+    },
+    he: {
+        title: "בקשות גישה לצורך תמיכה",
+        description: "ניתן לאשר או לדחות גישה זמנית לקריאה בלבד לתיק שבאחריותך הרפואית. בתיבת בקשות זו לא מוצג מידע המאפשר לזהות את המטופל.",
+        refresh: "רענון", loading: "טעינת בקשות גישה...",
+        empty: "אין בקשות ממתינות לגישה לצורך תמיכה.",
+        activeTitle: "הרשאות גישה פעילות לצורך תמיכה",
+        activeDescription: "ניתן לבטל מיידית הרשאה שעדיין בתוקף.",
+        activeEmpty: "אין הרשאות גישה פעילות לצורך תמיכה.",
+        expiresAt: "מועד תפוגה", requestedAt: "מועד הבקשה", dossier: "מזהה התיק",
+        reason: "סיבה", superadminJustification: "נימוק של SUPERADMIN",
+        duration: "משך הגישה אם תאושר", approve: "אישור גישה לקריאה בלבד",
+        approving: "האישור מתבצע...", reject: "דחייה", rejecting: "הדחייה מתבצעת...",
+        revoke: "ביטול הרשאת הגישה", revoking: "ההרשאה מבוטלת...",
+        revoked: "הרשאת הגישה לצורך תמיכה בוטלה מיידית.",
+        approved: "אושרה גישה זמנית לקריאה בלבד.", rejected: "בקשת הגישה נדחתה.",
+        technicalSupport: "תמיכה טכנית", securityIncident: "אירוע אבטחה",
+        dataAccessRequest: "בקשת גישה לנתונים",
+    },
+};
+
+export function getSupportInboxFallback(source: string, locale: string): string | null {
+    if (source === UI_LABELS_FR.header.nav.supportAccessInbox) {
+        const navigationLabels: Record<string, string> = {
+            fr: UI_LABELS_FR.header.nav.supportAccessInbox,
+            en: "Support access", es: "Acceso de soporte", ko: "지원 접근",
+            vi: "Quyền truy cập hỗ trợ", no: "Støttetilgang", ja: "サポートアクセス",
+            zh: "支持访问", he: "גישה לצורך תמיכה",
+        };
+        return navigationLabels[locale.toLowerCase().split("-")[0]] ?? null;
+    }
+    const key = (Object.keys(supportInboxFrench) as Array<keyof InboxLabels>)
+        .find((candidate) => supportInboxFrench[candidate] === source);
+    return key ? supportInboxTranslations[locale.toLowerCase().split("-")[0]]?.[key] ?? null : null;
+}

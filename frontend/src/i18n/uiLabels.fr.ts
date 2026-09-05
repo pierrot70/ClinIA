@@ -282,8 +282,8 @@ export const UI_LABELS_FR = {
             tooltipOk: "OK",
         },
         aiMode: {
-            real: "IA réelle",
-            mock: "IA mock",
+            real: "AI real",
+            mock: "AI mock",
             forceRealTitle: "Forcer IA réelle",
             mockTitle: "Utiliser le mode mock",
         },

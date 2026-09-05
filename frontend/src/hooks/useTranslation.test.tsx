@@ -2,6 +2,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { labels } from "../i18n/uiLabels";
+import { supportInboxFrench, supportInboxTranslations } from "../i18n/supportAccessInboxLabels";
 import { useTranslation } from "./useTranslation";
 
 const { translateTextMock } = vi.hoisted(() => ({
@@ -13,6 +14,49 @@ vi.mock("../services/translationApi", () => ({
 }));
 
 describe("useTranslation", () => {
+    it.each([
+        ["fr-CA", "Accès de soutien"], ["en-CA", "Support access"],
+        ["es", "Acceso de soporte"], ["ko", "지원 접근"],
+        ["vi", "Quyền truy cập hỗ trợ"], ["no", "Støttetilgang"],
+        ["ja", "サポートアクセス"], ["zh", "支持访问"], ["he", "גישה לצורך תמיכה"],
+    ])("localizes support navigation and preserves AI mode identifiers in %s", async (locale, expected) => {
+        const { result, rerender } = renderHook(({ locale }) => ({
+            navigation: useTranslation({ text: labels.header.nav.supportAccessInbox, targetLang: locale, translationKey: "header.nav.supportAccessInbox" }),
+            mock: useTranslation({ text: labels.header.aiMode.mock, targetLang: locale, translationKey: "header.aiMode.mock" }),
+            real: useTranslation({ text: labels.header.aiMode.real, targetLang: locale, translationKey: "header.aiMode.real" }),
+        }), { initialProps: { locale: "fr-CA" } });
+        rerender({ locale });
+        await waitFor(() => {
+            expect(result.current.navigation.translated).toBe(expected);
+            expect(result.current.mock.translated).toBe("AI mock");
+            expect(result.current.real.translated).toBe("AI real");
+        });
+        expect(translateTextMock).not.toHaveBeenCalled();
+    });
+
+    const inboxCases = ["fr-CA", "en-CA", "es", "ko", "vi", "no", "ja", "zh", "he"].flatMap(
+        locale => Object.entries(supportInboxFrench).map(([key, source]) => ({
+            locale, key, source,
+            expected: supportInboxTranslations[locale.split("-")[0]][key as keyof typeof supportInboxFrench],
+        }))
+    );
+
+    it.each(inboxCases)("switches the support inbox label $key to $locale without the translation service", async ({ locale, source, expected }) => {
+        translateTextMock.mockRejectedValue(new Error("Offline"));
+        expect(expected).toBeTruthy();
+        if (!locale.startsWith("fr")) expect(expected).not.toBe(source);
+        const { result, rerender } = renderHook(
+            ({ locale }) => useTranslation({ text: source, targetLang: locale }),
+            { initialProps: { locale: "fr" } }
+        );
+        expect(result.current.translated).toBe(source);
+        rerender({ locale });
+        await waitFor(() => expect(result.current.translated).toBe(expected));
+        rerender({ locale: "fr" });
+        await waitFor(() => expect(result.current.translated).toBe(source));
+        expect(translateTextMock).not.toHaveBeenCalled();
+    });
+
     beforeEach(() => {
         window.localStorage.clear();
         translateTextMock.mockReset();

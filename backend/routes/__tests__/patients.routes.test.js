@@ -32,6 +32,10 @@ vi.mock("../../services/patients.js", () => ({
 
 vi.mock("../../dto/patient.dto.js", () => dto);
 vi.mock("../../services/dbStatus.js", () => ({ getReplicaSetStatus }));
+// The route unit tests exercise validation without a live terminology database.
+vi.mock("../../services/clinicalTermCatalog.js", () => ({
+    listApprovedClinicalTerms: vi.fn().mockResolvedValue([]),
+}));
 
 import router from "../patients.js";
 

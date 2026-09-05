@@ -4,6 +4,8 @@ import { enFallback } from "../i18n/enFallback";
 import { esFallback } from "../i18n/esFallback";
 import { heFallback } from "../i18n/heFallback";
 import { getPatientPageFallback } from "../i18n/patientPageFallbacks";
+import { getSupportInboxFallback } from "../i18n/supportAccessInboxLabels";
+import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 
 // Fallbacks locaux pour les labels critiques (clé = texte source)
 const criticalLabelFallbacks: Record<string, Record<string, string>> = {
@@ -120,7 +122,11 @@ function shouldTranslateText(text: unknown) {
 }
 
 function getVersionedLocalFallback(text: string, targetLang: string): string | null {
+  // Product mode identifiers intentionally remain identical in every language.
+  if (text === UI_LABELS_FR.header.aiMode.mock || text === UI_LABELS_FR.header.aiMode.real) return text;
   const targetBase = baseLocale(targetLang);
+  const supportInboxFallback = getSupportInboxFallback(text, targetBase);
+  if (supportInboxFallback) return supportInboxFallback;
   if (targetBase === "es") return esFallback[text] || null;
   if (targetBase === "he") return heFallback[text] || null;
   const patientPageFallback = getPatientPageFallback(text, targetBase);
