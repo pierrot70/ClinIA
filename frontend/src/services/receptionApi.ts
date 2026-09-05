@@ -27,6 +27,7 @@ export interface ReceptionPatient {
     _id: string;
     nom: string;
     prenom: string;
+    existingAppointments?: { _id: string; date: string; time: string }[];
 }
 
 export interface CreateWalkInBookingPayload {
@@ -36,6 +37,7 @@ export interface CreateWalkInBookingPayload {
     time: string;
     slotType: "regular" | "walk_in";
     patientId?: string;
+    replaceAppointmentId?: string;
     patient?: {
         nom: string;
         prenom: string;
@@ -74,12 +76,14 @@ export async function fetchReceptionClinics(): Promise<ApiResponse<ReceptionClin
 
 export async function fetchWalkInAvailability(
     clinicId: string,
-    patientId?: string
+    patientId?: string,
+    replaceAppointmentId?: string
 ): Promise<ApiResponse<WalkInAvailability>> {
     return withSecurityIncidentGuard((async () => {
         try {
             const query = new URLSearchParams({ clinic: clinicId });
             if (patientId) query.set("patient", patientId);
+            if (replaceAppointmentId) query.set("replaceAppointmentId", replaceAppointmentId);
             const response = await authFetch(
                 `/api/reception/walk-in-options?${query.toString()}`
             );

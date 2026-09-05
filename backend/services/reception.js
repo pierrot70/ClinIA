@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { AdminUser } from "../models/AdminUser.js";
 import { Patient } from "../models/Patient.js";
 import { Specialist } from "../models/Specialist.js";
+import { Appointment } from "../models/Appointment.js";
 import { recordPatientAuditEvent } from "../audit/patientAudit.js";
 import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
@@ -10,6 +11,7 @@ import {
     createAppointment,
     getAvailableSlotSchedule,
     getPracticeLocations,
+    releaseDailyAppointmentCapacity,
 } from "./appointments.js";
 import { createPatient } from "./patients.js";
 import { isSchedulingDatePast, toSchedulingDateKey } from "../utils/schedulingTime.js";
@@ -17,6 +19,23 @@ import { normalizePatientIdentifierSearch } from "../utils/patientSearchKeys.js"
 
 const FAMILY_MEDICINE_SPECIALTY = "Medecin de famille";
 const MAX_FUTURE_OPTIONS = 8;
+
+function replacementConflict() {
+    return { code: "RECEPTION_REPLAN_REQUIRED", message: "Le rendez-vous existant a changé ou plusieurs rendez-vous sont planifiés. Recherchez à nouveau le patient avant de replanifier." };
+}
+
+async function pendingAppointments(patientId, clinicId, session = null) {
+    return Appointment.find({ patient: patientId, clinique: clinicId, status: "scheduled" },
+        { _id: 1, date: 1, time: 1, specialist: 1 }).session(session).sort({ date: 1, time: 1 }).limit(2).lean();
+}
+
+function validateReplacement(pending, replacementId) {
+    if (pending.length === 0 && !replacementId) return null;
+    if (pending.length !== 1 || typeof replacementId !== "string" || String(pending[0]._id) !== replacementId) {
+        throw replacementConflict();
+    }
+    return pending[0];
+}
 
 function invalidInput(message) {
     return { code: "INVALID_INPUT", message };
@@ -88,6 +107,7 @@ function toOption(specialist, date, schedule, slotTypes = {}) {
 export async function listWalkInFamilyMedicineOptions({
     clinicId,
     patientId = null,
+    replaceAppointmentId = null,
     authUser,
     now = new Date(),
 }) {
@@ -102,6 +122,10 @@ export async function listWalkInFamilyMedicineOptions({
             throw invalidInput("Patient introuvable.");
         }
     }
+    const previous = patientId
+        ? validateReplacement(await pendingAppointments(patientId, clinicId), replaceAppointmentId)
+        : null;
+    if (!patientId && replaceAppointmentId) throw invalidInput("Patient requis pour replanifier.");
 
     const today = toSchedulingDateKey(now);
     if (!today) {
@@ -154,6 +178,7 @@ export async function listWalkInFamilyMedicineOptions({
                         {
                             clinique: String(clinicId),
                             ...(patientId ? { patient: String(patientId) } : {}),
+                            ...(previous ? { excludeAppointmentId: String(previous._id) } : {}),
                             slotType,
                         }
                     )
@@ -163,6 +188,7 @@ export async function listWalkInFamilyMedicineOptions({
             const slots = [];
             schedules.forEach((schedule, index) => {
                 schedule.slots.forEach((time) => {
+                    if (previous && String(previous.specialist) === String(specialist._id) && previous.date === date && previous.time === time) return;
                     if (slotTypesByTime[time]) return;
                     slotTypesByTime[time] = slotTypes[index];
                     slots.push(time);
@@ -223,7 +249,8 @@ export async function findReceptionPatientByRamq({ clinicId, ramq, authUser, aud
     });
 
     return patient
-        ? { _id: String(patient._id), nom: patient.nom, prenom: patient.prenom }
+        ? { _id: String(patient._id), nom: patient.nom, prenom: patient.prenom,
+            existingAppointments: (await pendingAppointments(patient._id, clinicId)).map(({ _id, date, time }) => ({ _id: String(_id), date, time })) }
         : null;
 }
 
@@ -349,6 +376,7 @@ export async function createWalkInAppointmentForExistingPatient({
     date,
     time,
     slotType = "walk_in",
+    replaceAppointmentId = null,
     authUser,
     audit = {},
 }) {
@@ -363,12 +391,24 @@ export async function createWalkInAppointmentForExistingPatient({
         let result;
         await session.withTransaction(async () => {
             const receivingPhysicianUserId = await requireActiveReceivingPhysician(specialistId, clinicId, session);
-            const patient = await Patient.findOne(
+            // All reception bookings for this patient serialize on this document.
+            // A transaction retried after a concurrent booking rechecks pending appointments.
+            const patient = await Patient.findOneAndUpdate(
                 { _id: patientId, archivedAt: null },
-                { _id: 1, nom: 1, prenom: 1, num_assurance_maladie: 1, healthInsuranceJurisdiction: 1, ownerUserId: 1 }
+                { $inc: { __v: 1 } },
+                { session, new: true, projection: { _id: 1, nom: 1, prenom: 1, num_assurance_maladie: 1, healthInsuranceJurisdiction: 1, ownerUserId: 1 } }
             ).lean();
             if (!patient) {
                 throw invalidInput("Patient introuvable.");
+            }
+
+            const previous = validateReplacement(await pendingAppointments(patientId, clinicId, session), replaceAppointmentId);
+            if (previous) {
+                if (String(previous.specialist) === String(specialistId) && previous.date === date && previous.time === time) throw invalidInput("Choisissez un autre créneau.");
+                const changed = await Appointment.updateOne({ _id: previous._id, patient: patientId, clinique: clinicId, status: "scheduled" },
+                    { $set: { status: "rescheduled" } }, { session });
+                if (changed.modifiedCount !== 1) throw replacementConflict();
+                await releaseDailyAppointmentCapacity({ patient: patientId, specialist: previous.specialist, date: previous.date, session });
             }
 
             const appointment = await createAppointment(
@@ -382,8 +422,21 @@ export async function createWalkInAppointmentForExistingPatient({
                     slotType,
                 },
                 authUser,
-                { session, patientFromTransaction: patient, receivingPhysicianUserId }
+                { session, patientFromTransaction: patient, receivingPhysicianUserId, ...(previous ? { excludeAppointmentId: String(previous._id) } : {}) }
             );
+
+            if (previous) {
+                const newLink = await Appointment.updateOne({ _id: appointment._id }, { $set: { rescheduledFrom: previous._id } }, { session });
+                const oldLink = await Appointment.updateOne({ _id: previous._id }, { $set: { rescheduledTo: appointment._id } }, { session });
+                if (newLink.modifiedCount !== 1 || oldLink.modifiedCount !== 1) throw replacementConflict();
+                await recordWriteOperationAuditEvent({
+                    collectionName: "appointments", operation: "UPDATE", outcome: "SUCCESS",
+                    actorUserId: authUser.userId, actorUsername: authUser.username, actorRole: "RECEPTION",
+                    ip: audit.ip ?? null, resourceId: String(previous._id), patientId: String(patientId),
+                    changedFields: ["status", "rescheduledTo"], requestPath: "/api/reception/walk-in-bookings",
+                    writeConcern: CLINICAL_WRITE_CONCERN, session, throwOnError: true,
+                });
+            }
 
             await recordWriteOperationAuditEvent({
                 collectionName: "appointments",

@@ -1,4 +1,12 @@
 export const UI_LABELS_FR = {
+    receptionReplan: {
+        notice: "Un rendez-vous est déjà planifié dans cette clinique : {date} à {time}.",
+        start: "Replanifier ce rendez-vous",
+        confirm: "Confirmer le remplacement du rendez-vous",
+        kept: "Le rendez-vous initial reste réservé jusqu’à la confirmation du nouveau créneau. En cas d’échec, il est conservé.",
+        conflict: "Le rendez-vous a changé ou plusieurs rendez-vous sont planifiés. Recherchez à nouveau le patient. Les doublons existants doivent être examinés avant de poursuivre.",
+        success: "Rendez-vous replanifié. L’ancien rendez-vous est conservé dans l’historique.",
+    },
     consultations: {
         title: "Consultations",
         description: "Ouvrez un rendez-vous pour consulter l’historique. Un rendez-vous ne constitue pas une prise en charge permanente.",

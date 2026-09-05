@@ -64,6 +64,7 @@ router.get("/walk-in-options", async (req, res) => {
         const data = await listWalkInFamilyMedicineOptions({
             clinicId: req.query.clinic,
             patientId: req.query.patient,
+            replaceAppointmentId: req.query.replaceAppointmentId,
             authUser: req.auth,
         });
         return res.status(200).json({
@@ -71,6 +72,9 @@ router.get("/walk-in-options", async (req, res) => {
             meta: { source: "real", model: "computed" },
         });
     } catch (err) {
+        if (err.code === "RECEPTION_REPLAN_REQUIRED") {
+            return res.status(409).json({ error: { code: err.code, message: err.message, retryable: false } });
+        }
         if (err.code === "INVALID_INPUT" || err.code === "FORBIDDEN") {
             return res.status(err.code === "FORBIDDEN" ? 403 : 400).json({
                 error: { code: err.code, message: err.message, retryable: false },
@@ -123,7 +127,7 @@ router.post("/walk-in-bookings", async (req, res) => {
     const existingPatientId = req.body?.patientId;
     const commonFieldsAreMissing = !req.body?.specialist || !req.body?.clinic ||
         !req.body?.date || !req.body?.time;
-    if (commonFieldsAreMissing || (existingPatientId && req.body?.patient)) {
+    if (commonFieldsAreMissing || (existingPatientId && req.body?.patient) || (req.body?.replaceAppointmentId && !existingPatientId)) {
         return res.status(400).json({
             error: {
                 code: "INVALID_INPUT",
@@ -179,6 +183,7 @@ router.post("/walk-in-bookings", async (req, res) => {
             ? await createWalkInAppointmentForExistingPatient({
                 ...booking,
                 patientId: existingPatientId,
+                replaceAppointmentId: req.body.replaceAppointmentId,
             })
             : await createWalkInPatientAndAppointment({
                 ...booking,
@@ -207,6 +212,7 @@ router.post("/walk-in-bookings", async (req, res) => {
                 "NO_AVAILABILITY",
                 "PATIENT_ALREADY_EXISTS",
                 "RECEIVING_PHYSICIAN_UNAVAILABLE",
+                "RECEPTION_REPLAN_REQUIRED",
                 "SPECIALIST_ALREADY_BOOKED",
                 "PATIENT_ALREADY_BOOKED",
                 "MAXIMUM_APPOINTMENTS_REACHED",

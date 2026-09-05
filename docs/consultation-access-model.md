@@ -44,3 +44,45 @@ Parcours confirmé par l'utilisateur avec deux comptes médecins et un patient f
 - après clôture, le médecin ayant accepté la prise en charge conserve la lecture des deux notes.
 
 Le filtre réception exige la spécialité médecin de famille, même si un autre spécialiste possède des disponibilités walk-in. Ces captures valident le parcours fonctionnel, pas les refus API ni les courses concurrentes en environnement réel.
+
+## Replanification par RECEPTION
+
+La recherche exacte du patient annonce immédiatement ses rendez-vous `scheduled`
+dans la clinique active (y compris ceux dont l'heure est passée mais qui ne sont
+pas clôturés). Les rendez-vous des autres cliniques ne sont ni retournés ni modifiés.
+
+- Aucun rendez-vous planifié : création habituelle.
+- Un rendez-vous planifié : proposer une replanification explicite, jamais une
+  deuxième création. Le choix d'un autre médecin actif de la clinique est possible.
+- Plusieurs rendez-vous déjà planifiés : bloquer et demander une vérification des
+  doublons existants. Aucun nettoyage automatique, aucune annulation implicite.
+
+Le navigateur transmet `replaceAppointmentId` lors de la recherche des créneaux
+et de la confirmation. Le serveur vérifie cet identifiant contre le rendez-vous
+planifié du patient dans la clinique autorisée. Une sélection manquante, étrangère
+ou périmée produit `RECEPTION_REPLAN_REQUIRED` (HTTP 409).
+
+La recherche est en lecture seule. À la confirmation, une transaction verrouille
+le patient (`__v`) pour sérialiser les réservations RECEPTION concurrentes,
+revérifie le rendez-vous, passe l'ancien à `rescheduled`, libère sa capacité
+journalière, crée le nouveau et relie les deux avec `rescheduledFrom` /
+`rescheduledTo`. Les audits sont inclus. En cas d'erreur, toute la transaction est
+annulée. Ce verrou ne remplace pas les règles des autres parcours de réservation.
+
+### Test STAGING supplémentaire
+
+1. Utiliser un patient fictif ayant exactement un rendez-vous planifié dans la
+   clinique active. À la recherche, vérifier l'avertissement et le bouton
+   « Replanifier ce rendez-vous ».
+2. Chercher un autre créneau, puis revenir en arrière sans confirmer : vérifier
+   que l'ancien rendez-vous est toujours `scheduled`.
+3. Confirmer un nouveau créneau : vérifier un seul rendez-vous `scheduled`,
+   l'ancien `rescheduled`, les liens historiques et les notes inchangées.
+4. Sur un autre cas fictif, rendre le nouveau créneau indisponible avant la
+   confirmation : la réservation doit échouer et l'ancien rendez-vous rester intact.
+5. Confirmer deux remplacements concurrents par API : un seul doit réussir ;
+   l'autre doit être refusé après revérification, sans deuxième réservation active.
+6. Vérifier qu'un identifiant d'un autre patient ou d'une autre clinique est refusé.
+
+Les tests unitaires couvrent les branches, le partage de session et les refus.
+Le rollback et la concurrence sur MongoDB réel restent à confirmer avec ce drill.

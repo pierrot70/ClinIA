@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { labels } from "../i18n/uiLabels";
 import {
     createWalkInBooking,
@@ -10,6 +10,7 @@ import {
 import { useReceptionClinic } from "../contexts/ReceptionClinicContext";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { isReceptionLabel, receptionLabel } from "../i18n/receptionLabels";
+import { receptionReplanLabels } from "../i18n/receptionReplanLabels";
 
 const source = labels.walkInArrival;
 
@@ -28,14 +29,16 @@ function AvailabilityOptions({
     availability,
     onChooseSlot,
     locale,
+    introduction,
 }: {
     availability: WalkInAvailability;
     onChooseSlot?: (slot: SelectedWalkInSlot) => void;
     locale: string;
+    introduction?: string;
 }) {
     return (
         <div className="space-y-4">
-            <p className="text-sm text-slate-700">{receptionLabel(locale, "availabilityIntro", source.availabilityIntro)}</p>
+            <p className="text-sm text-slate-700">{introduction || receptionLabel(locale, "availabilityIntro", source.availabilityIntro)}</p>
             <div>
                 <h3 className="text-sm font-semibold text-slate-900">{receptionLabel(locale, "availabilityToday", source.availabilityToday)}</h3>
                 {availability.today.length === 0 ? (
@@ -108,6 +111,10 @@ function AvailabilityOptions({
 
 export function WalkInArrivalPage() {
     const { locale } = useHomeI18n();
+    const replan = receptionReplanLabels(locale);
+    const requestEpoch = useRef(0);
+    const [replacementId, setReplacementId] = useState<string | undefined>();
+    const [rescheduled, setRescheduled] = useState(false);
     const [ramq, setRamq] = useState("");
     const [patients, setPatients] = useState<ReceptionPatient[]>([]);
     const [selectedPatient, setSelectedPatient] = useState<ReceptionPatient | null>(null);
@@ -122,6 +129,19 @@ export function WalkInArrivalPage() {
     const [loading, setLoading] = useState(false);
     const { activeClinic, isLoading: clinicsLoading, error: clinicsError } = useReceptionClinic();
     const clinicId = activeClinic?._id || "";
+    const existingPatient = selectedPatient || patients[0];
+    const pending = existingPatient?.existingAppointments || [];
+
+    function clearSelection() {
+        requestEpoch.current++;
+        setPatients([]); setSelectedPatient(null); setSelectedSlot(null);
+        setWalkInAvailability(null); setReplacementId(undefined); setIsNewPatient(false);
+        setLoading(false); setError(""); setMessage(""); setMessageKind(null); setRescheduled(false);
+    }
+    useEffect(() => {
+        clearSelection();
+        return () => { requestEpoch.current++; };
+    }, [clinicId]);
 
     useEffect(() => {
         if (isReceptionLabel(message, "noPatient", source.noPatient)) {
@@ -132,7 +152,8 @@ export function WalkInArrivalPage() {
 
     async function loadWalkInAvailability(
         selectedClinicId = clinicId,
-        patientId = selectedPatient?._id
+        patientId: string | null | undefined = selectedPatient?._id,
+        replaceId: string | null | undefined = replacementId
     ) {
         if (!selectedClinicId) {
             setError(source.availabilityRequiredClinic);
@@ -140,12 +161,15 @@ export function WalkInArrivalPage() {
         }
 
         setError("");
+        setWalkInAvailability(null);
+        const epoch = ++requestEpoch.current;
         setLoading(true);
-        const response = await fetchWalkInAvailability(selectedClinicId, patientId);
+        const response = await fetchWalkInAvailability(selectedClinicId, patientId || undefined, replaceId || undefined);
+        if (epoch !== requestEpoch.current) return;
         setLoading(false);
 
         if (response.error) {
-            setError(response.error.message);
+            setError(response.error.code === "RECEPTION_REPLAN_REQUIRED" ? replan.conflict : response.error.message);
             return;
         }
 
@@ -153,6 +177,9 @@ export function WalkInArrivalPage() {
     }
 
     async function searchPatient() {
+        const epoch = ++requestEpoch.current;
+        setReplacementId(undefined);
+        setRescheduled(false);
         setMessage("");
         setMessageKind(null);
         setError("");
@@ -174,6 +201,7 @@ export function WalkInArrivalPage() {
 
         setLoading(true);
         const response = await findReceptionPatientByRamq(clinicId, ramq.trim());
+        if (epoch !== requestEpoch.current) return;
         setLoading(false);
 
         if (response.error) {
@@ -186,7 +214,7 @@ export function WalkInArrivalPage() {
         if (matches.length === 0) {
             setIsNewPatient(true);
             setMessageKind("noPatient");
-            await loadWalkInAvailability();
+            await loadWalkInAvailability(clinicId, null, null);
         }
     }
 
@@ -212,12 +240,14 @@ export function WalkInArrivalPage() {
 
         setError("");
         setLoading(true);
+        const epoch = ++requestEpoch.current;
         const response = await createWalkInBooking({
             clinic: clinicId,
             specialist: selectedSlot.specialist._id,
             date: selectedSlot.date,
             time: selectedSlot.time,
             slotType: selectedSlot.slotType,
+            ...(replacementId ? { replaceAppointmentId: replacementId } : {}),
             ...(selectedPatient
                 ? { patientId: selectedPatient._id }
                 : {
@@ -231,16 +261,19 @@ export function WalkInArrivalPage() {
                     },
                 }),
         });
+        if (epoch !== requestEpoch.current) return;
         setLoading(false);
 
         if (response.error) {
-            setError(response.error.code === "RECEIVING_PHYSICIAN_UNAVAILABLE"
+            setError(response.error.code === "RECEPTION_REPLAN_REQUIRED" ? replan.conflict : response.error.code === "RECEIVING_PHYSICIAN_UNAVAILABLE"
                 ? receptionLabel(locale, "receivingPhysicianUnavailable", source.receivingPhysicianUnavailable)
                 : response.error.message);
             return;
         }
 
-        setMessageKind("bookingCreated");
+        setRescheduled(Boolean(replacementId));
+        setReplacementId(undefined);
+        setMessageKind(replacementId ? null : "bookingCreated");
         setMessage("");
         setSelectedSlot(null);
         setNewPatient({ prenom: "", nom: "" });
@@ -257,12 +290,12 @@ export function WalkInArrivalPage() {
             <section className="mx-auto max-w-3xl space-y-5 px-4 py-6">
                 <header>
                     <h1 className="text-2xl font-semibold text-slate-900">
-                        {selectedPatient
+                        {replacementId ? replan.start : selectedPatient
                             ? receptionLabel(locale, "existingPatientFormTitle", source.existingPatientFormTitle)
                             : receptionLabel(locale, "newPatientFormTitle", source.newPatientFormTitle)}
                     </h1>
                     <p className="mt-1 text-sm text-slate-600">
-                        {selectedPatient
+                        {replacementId ? replan.kept : selectedPatient
                             ? receptionLabel(locale, "existingPatientFormDescription", source.existingPatientFormDescription)
                             : receptionLabel(locale, "newPatientFormDescription", source.newPatientFormDescription)}
                     </p>
@@ -319,7 +352,7 @@ export function WalkInArrivalPage() {
                         <button type="button" onClick={() => void createPatientAndAppointment()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
                             {loading
                                 ? receptionLabel(locale, "creatingPatientAndAppointment", source.creatingPatientAndAppointment)
-                                : selectedPatient
+                                : replacementId ? replan.confirm : selectedPatient
                                     ? receptionLabel(locale, "createAppointment", source.createAppointment)
                                     : receptionLabel(locale, "createPatientAndAppointment", source.createPatientAndAppointment)}
                         </button>
@@ -342,20 +375,29 @@ export function WalkInArrivalPage() {
             <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="mb-1 block text-sm font-medium text-slate-800" htmlFor="walk-in-ramq">{receptionLabel(locale, "ramqLabel", source.ramqLabel)}</label>
                 <div className="flex gap-2">
-                    <input id="walk-in-ramq" value={ramq} onChange={(event) => setRamq(event.target.value)} placeholder={source.ramqPlaceholder} className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2" />
+                    <input id="walk-in-ramq" value={ramq} onChange={(event) => { clearSelection(); setRamq(event.target.value); }} placeholder={source.ramqPlaceholder} className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2" />
                     <button type="button" onClick={() => void searchPatient()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{receptionLabel(locale, "searchPatient", source.searchPatient)}</button>
                 </div>
 
                 {patients.length > 0 && (
                     <div className="mt-3 space-y-1">
                         {patients.map((patient) => (
-                            <button key={patient._id} type="button" onClick={() => { setSelectedPatient(patient); setMessage(""); setWalkInAvailability(null); }} className={`block w-full rounded border px-3 py-2 text-left text-sm ${selectedPatient?._id === patient._id ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:bg-slate-50"}`}>
+                            <button key={patient._id} disabled={loading} type="button" onClick={() => { setSelectedPatient(patient); setReplacementId(undefined); setMessage(""); setWalkInAvailability(null); }} className={`block w-full rounded border px-3 py-2 text-left text-sm ${selectedPatient?._id === patient._id ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:bg-slate-50"}`}>
                                 {patientName(patient)} <span className="float-right text-blue-700">{receptionLabel(locale, "selectPatient", source.selectPatient)}</span>
                             </button>
                         ))}
                     </div>
                 )}
                 {selectedPatient && <p className="mt-3 text-sm text-slate-700">{receptionLabel(locale, "selectedPatient", source.selectedPatient).replace("{name}", patientName(selectedPatient))}</p>}
+                {rescheduled && <p role="status">{replan.success}</p>}
+                {pending.length > 0 && <div role="status" className="mt-4 space-y-2 rounded border border-amber-300 bg-amber-50 p-4">
+                    <p>{pending.length > 1 ? replan.conflict : replan.notice.replace("{date}", pending[0].date).replace("{time}", pending[0].time)}</p>
+                    <p>{replan.kept}</p>
+                    {pending.length === 1 && <button type="button" disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-white" onClick={() => {
+                        setSelectedPatient(existingPatient); setReplacementId(pending[0]._id);
+                        void loadWalkInAvailability(clinicId, existingPatient._id, pending[0]._id);
+                    }}>{replan.start}</button>}
+                </div>}
 
                 {clinicsLoading ? (
                     <p className="mt-5 text-sm text-slate-600">{receptionLabel(locale, "availabilityLoading", source.availabilityLoading)}</p>
@@ -381,12 +423,12 @@ export function WalkInArrivalPage() {
                     </div>
                 ) : (
                     <>
-                        <button type="button" onClick={confirmSelection} disabled={!selectedPatient || loading} className="mt-4 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{receptionLabel(locale, "searchAvailability", source.searchAvailability)}</button>
+                        {pending.length === 0 && <button type="button" onClick={confirmSelection} disabled={!selectedPatient || loading} className="mt-4 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{receptionLabel(locale, "searchAvailability", source.searchAvailability)}</button>}
                         {selectedPatient && <p className="mt-3 text-sm text-slate-700">{receptionLabel(locale, "existingPatientDescription", source.existingPatientDescription)}</p>}
                         {loading && selectedPatient && <p className="mt-3 text-sm text-slate-600">{source.availabilityLoading}</p>}
                         {selectedPatient && walkInAvailability && (
                             <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4">
-                                <AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} />
+                                <AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} introduction={replacementId ? replan.kept : undefined} />
                             </div>
                         )}
                     </>

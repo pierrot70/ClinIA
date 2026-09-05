@@ -126,7 +126,7 @@ async function reserveDailyAppointmentCapacity({ patient, specialist, date, sess
     };
 }
 
-async function releaseDailyAppointmentCapacity({ patient, specialist, date, session }) {
+export async function releaseDailyAppointmentCapacity({ patient, specialist, date, session }) {
     await AppointmentBookingGuard.updateOne(
         {
             ...getBookingGuardKey({ patient, specialist, date }),
@@ -144,8 +144,11 @@ async function releaseDailyAppointmentCapacity({ patient, specialist, date, sess
 export async function createAppointment(
     dto,
     authUser,
-    { session = null, patientFromTransaction = null, receivingPhysicianUserId = null } = {}
+    { session = null, patientFromTransaction = null, receivingPhysicianUserId = null, excludeAppointmentId = null } = {}
 ) {
+    if (excludeAppointmentId && (!session || !patientFromTransaction)) {
+        throw { code: "FORBIDDEN", message: "Transactional replacement required." };
+    }
     if (authUser?.role === "RECEPTION" || receivingPhysicianUserId !== null) {
         if (authUser?.role !== "RECEPTION" || !session || !patientFromTransaction ||
             !receivingPhysicianUserId || !mongoose.Types.ObjectId.isValid(receivingPhysicianUserId)) {
@@ -277,7 +280,7 @@ export async function createAppointment(
     const availableSlots = await getAvailableSlots(
         dto.specialist,
         dto.date,
-        { patient: dto.patient, clinique: dto.clinique, slotType }
+        { patient: dto.patient, clinique: dto.clinique, slotType, ...(excludeAppointmentId ? { excludeAppointmentId } : {}) }
     );
     if (!availableSlots.includes(dto.time)) {
         throw {

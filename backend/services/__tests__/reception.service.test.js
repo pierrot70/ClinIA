@@ -6,6 +6,10 @@ const adminUserFind = vi.fn();
 const specialistFindOne = vi.fn();
 const specialistFind = vi.fn();
 const patientFindOne = vi.fn();
+const patientFindOneAndUpdate = vi.fn();
+const appointmentFind = vi.fn();
+const appointmentUpdateOne = vi.fn();
+const releaseDailyAppointmentCapacity = vi.fn();
 const patientExists = vi.fn();
 const getAvailableSlotSchedule = vi.fn();
 const createAppointment = vi.fn();
@@ -26,8 +30,9 @@ vi.mock("../../models/Specialist.js", () => ({
 }));
 
 vi.mock("../../models/Patient.js", () => ({
-    Patient: { findOne: patientFindOne, exists: patientExists },
+    Patient: { findOne: patientFindOne, findOneAndUpdate: patientFindOneAndUpdate, exists: patientExists },
 }));
+vi.mock("../../models/Appointment.js", () => ({ Appointment: { find: appointmentFind, updateOne: appointmentUpdateOne } }));
 
 vi.mock("../../audit/patientAudit.js", () => ({ recordPatientAuditEvent }));
 vi.mock("../../audit/writeOperationAudit.js", () => ({
@@ -38,6 +43,7 @@ vi.mock("../appointments.js", () => ({
     getPracticeLocations: (specialist) => specialist.practiceLocations || [],
     getAvailableSlotSchedule,
     createAppointment,
+    releaseDailyAppointmentCapacity,
 }));
 
 vi.mock("../patients.js", () => ({ createPatient }));
@@ -54,12 +60,89 @@ const clinicId = "507f1f77bcf86cd799439012";
 const physicianId = "507f1f77bcf86cd799439014";
 const specialistId = "507f1f77bcf86cd799439013";
 
+describe("reception appointment replacement", () => {
+    const patientId = "507f1f77bcf86cd799439088";
+    const oldId = "507f1f77bcf86cd799439090";
+    const newId = "507f1f77bcf86cd799439091";
+    const authUser = { userId: receptionId, role: "RECEPTION" };
+    const args = { clinicId, patientId, specialistId, date: "2030-01-01", time: "09:15", authUser };
+    const original = { _id: oldId, date: "2030-01-01", time: "09:00", specialist: specialistId };
+    beforeEach(() => {
+        patientFindOne.mockReturnValue(resolvedLean({ _id: patientId, nom: "Test", prenom: "Patient" }));
+        appointmentFind.mockReturnValue(resolvedLean([original]));
+        createAppointment.mockResolvedValue({ _id: newId });
+    });
+    it("announces an existing appointment immediately at exact patient lookup", async () => {
+        const result = await findReceptionPatientByRamq({ clinicId, ramq: "676767", authUser });
+        expect(result.existingAppointments).toEqual([{ _id: oldId, date: "2030-01-01", time: "09:00" }]);
+        expect(appointmentFind).toHaveBeenCalledWith({ patient: patientId, clinique: clinicId, status: "scheduled" }, expect.anything());
+        expect(appointmentUpdateOne).not.toHaveBeenCalled();
+    });
+    it("refuses an additional booking without explicit replacement", async () => {
+        await expect(createWalkInAppointmentForExistingPatient(args)).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
+        expect(createAppointment).not.toHaveBeenCalled();
+        expect(appointmentUpdateOne).not.toHaveBeenCalled();
+    });
+    it("refuses availability without choosing to replan", async () => {
+        await expect(listWalkInFamilyMedicineOptions({ clinicId, patientId, authUser })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
+        expect(getAvailableSlotSchedule).not.toHaveBeenCalled();
+    });
+    it("keeps the original while searching and excludes its occupied slot from choices", async () => {
+        const result = await listWalkInFamilyMedicineOptions({ clinicId, patientId, authUser, replaceAppointmentId: oldId, now: new Date("2030-01-01T13:00:00Z") });
+        expect(result.today[0].slots).toEqual(["09:15"]);
+        expect(getAvailableSlotSchedule).toHaveBeenCalledWith(specialistId, "2030-01-01", expect.objectContaining({ excludeAppointmentId: oldId }));
+        expect(appointmentUpdateOne).not.toHaveBeenCalled();
+        expect(releaseDailyAppointmentCapacity).not.toHaveBeenCalled();
+    });
+    it("replaces and links both records with audited writes in the same transaction", async () => {
+        await createWalkInAppointmentForExistingPatient({ ...args, replaceAppointmentId: oldId });
+        expect(patientFindOneAndUpdate).toHaveBeenCalledWith({ _id: patientId, archivedAt: null }, { $inc: { __v: 1 } }, expect.objectContaining({ session: transactionSession }));
+        expect(appointmentUpdateOne).toHaveBeenCalledWith({ _id: oldId, patient: patientId, clinique: clinicId, status: "scheduled" }, { $set: { status: "rescheduled" } }, { session: transactionSession });
+        expect(releaseDailyAppointmentCapacity).toHaveBeenCalledWith({ patient: patientId, specialist: specialistId, date: original.date, session: transactionSession });
+        expect(createAppointment).toHaveBeenCalledWith(expect.objectContaining({ time: "09:15" }), authUser, expect.objectContaining({ session: transactionSession, excludeAppointmentId: oldId }));
+        expect(appointmentUpdateOne).toHaveBeenCalledWith({ _id: newId }, { $set: { rescheduledFrom: oldId } }, { session: transactionSession });
+        expect(appointmentUpdateOne).toHaveBeenCalledWith({ _id: oldId }, { $set: { rescheduledTo: newId } }, { session: transactionSession });
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ operation: "UPDATE", resourceId: oldId, session: transactionSession, throwOnError: true }));
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ operation: "CREATE", resourceId: newId, session: transactionSession, throwOnError: true }));
+    });
+    it.each([[], [original, { ...original, _id: newId }], [{ ...original, _id: newId }]].map(pending => ({ pending })))("rejects stale, foreign or ambiguous replacements %#", async ({ pending }) => {
+        appointmentFind.mockReturnValue(resolvedLean(pending));
+        await expect(createWalkInAppointmentForExistingPatient({ ...args, replaceAppointmentId: oldId })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
+        expect(appointmentUpdateOne).not.toHaveBeenCalled();
+        expect(createAppointment).not.toHaveBeenCalled();
+    });
+    it("rejects another clinic before any booking change", async () => {
+        await expect(createWalkInAppointmentForExistingPatient({ ...args, clinicId: "507f1f77bcf86cd799439099", replaceAppointmentId: oldId })).rejects.toMatchObject({ code: "FORBIDDEN" });
+        expect(appointmentUpdateOne).not.toHaveBeenCalled();
+    });
+    it("rejects an unchanged time", async () => {
+        await expect(createWalkInAppointmentForExistingPatient({ ...args, time: "09:00", replaceAppointmentId: oldId })).rejects.toMatchObject({ code: "INVALID_INPUT" });
+        expect(appointmentUpdateOne).not.toHaveBeenCalled();
+    });
+    it("aborts the transaction if the selected slot is taken", async () => {
+        createAppointment.mockRejectedValueOnce({ code: "NO_AVAILABILITY" });
+        await expect(createWalkInAppointmentForExistingPatient({ ...args, replaceAppointmentId: oldId })).rejects.toMatchObject({ code: "NO_AVAILABILITY" });
+        expect(transactionSession.withTransaction).toHaveBeenCalled();
+        expect(appointmentUpdateOne).toHaveBeenCalledTimes(1);
+        expect(transactionSession.endSession).toHaveBeenCalled();
+        expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
+    });
+    it("does not create a replacement after a competing cancellation", async () => {
+        appointmentUpdateOne.mockResolvedValueOnce({ modifiedCount: 0 });
+        await expect(createWalkInAppointmentForExistingPatient({ ...args, replaceAppointmentId: oldId })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
+        expect(createAppointment).not.toHaveBeenCalled();
+    });
+});
+
 function resolvedLean(value) {
-    return { lean: vi.fn().mockResolvedValue(value), session: vi.fn().mockReturnThis() };
+    return { lean: vi.fn().mockResolvedValue(value), session: vi.fn().mockReturnThis(), sort: vi.fn().mockReturnThis(), limit: vi.fn().mockReturnThis() };
 }
 
 beforeEach(() => {
     vi.clearAllMocks();
+    appointmentFind.mockReturnValue(resolvedLean([]));
+    appointmentUpdateOne.mockResolvedValue({ modifiedCount: 1 });
+    patientFindOneAndUpdate.mockImplementation(query => patientFindOne(query));
     vi.spyOn(mongoose, "startSession").mockResolvedValue(transactionSession);
     transactionSession.withTransaction.mockImplementation(async (callback) => callback());
     transactionSession.endSession.mockResolvedValue();
@@ -252,6 +335,7 @@ describe("listWalkInFamilyMedicineOptions", () => {
             _id: "507f1f77bcf86cd799439088",
             nom: "Lasante",
             prenom: "Ginger",
+            existingAppointments: [],
         });
         expect(patientFindOne).toHaveBeenCalledWith(
             { healthInsuranceNumberSearch: "234567", archivedAt: null },

@@ -12,6 +12,7 @@ export type ApiErrorCode =
     | "POTENTIAL_DUPLICATE"   // Homonyme detecte avant creation patient
     | "PATIENT_ARCHIVED"      // Dossier retiré des opérations actives
     | "RECEIVING_PHYSICIAN_UNAVAILABLE" // Médecin sans compte ClinIA actif
+    | "RECEPTION_REPLAN_REQUIRED"
     | "SECURITY_INCIDENT_BLOCKING" // Acknowledgment explicite obligatoire
     | "TOKEN_REVOKED"         // Session invalidée par le backend
     | "ACCOUNT_TEMPORARILY_RESTRICTED" // Restriction temporaire sur routes sensibles
