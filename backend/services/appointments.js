@@ -144,8 +144,14 @@ async function releaseDailyAppointmentCapacity({ patient, specialist, date, sess
 export async function createAppointment(
     dto,
     authUser,
-    { session = null, patientFromTransaction = null } = {}
+    { session = null, patientFromTransaction = null, receivingPhysicianUserId = null } = {}
 ) {
+    if (authUser?.role === "RECEPTION" || receivingPhysicianUserId !== null) {
+        if (authUser?.role !== "RECEPTION" || !session || !patientFromTransaction ||
+            !receivingPhysicianUserId || !mongoose.Types.ObjectId.isValid(receivingPhysicianUserId)) {
+            throw { code: "FORBIDDEN", message: "Validated reception booking required." };
+        }
+    }
     /* ---------------- Validation métier ---------------- */
 
     const ALLOWED_PRIORITIES = ["normal", "urgent"];
@@ -299,7 +305,7 @@ export async function createAppointment(
             patient.num_assurance_maladie
                 ? patient.healthInsuranceJurisdiction || undefined
                 : undefined,
-        ownerUserId: patient.ownerUserId || authUser.userId,
+        ownerUserId: receivingPhysicianUserId || patient.ownerUserId || authUser.userId,
     });
 
     try {
@@ -519,6 +525,12 @@ export async function rescheduleAppointment(id, schedule, authUser, { session = 
 
     // The transaction makes this all-or-nothing: removing the previous slot,
     // reserving the new slot, and linking the two records.
+    // Scheduling authority comes from the authorized original appointment, not
+    // from permanent patient ownership (walk-in patients may have no holder).
+    const patient = await Patient.findOne({ _id: appointment.patient, archivedAt: null }, {
+        _id: 1, ownerUserId: 1, num_assurance_maladie: 1, healthInsuranceJurisdiction: 1,
+    }).lean();
+    if (!patient) throw { code: "INVALID_INPUT", message: "Patient introuvable." };
     appointment.status = "rescheduled";
     await appointment.save(getClinicalWriteOptions(session));
     await releaseDailyAppointmentCapacity({
@@ -536,8 +548,9 @@ export async function rescheduleAppointment(id, schedule, authUser, { session = 
         time,
         reason: appointment.reason,
         priority: appointment.priority,
-    }, authUser, { session });
+    }, authUser, { session, patientFromTransaction: patient });
 
+    replacement.ownerUserId = appointment.ownerUserId || authUser.userId;
     replacement.rescheduledFrom = appointment._id;
     await replacement.save(getClinicalWriteOptions(session));
     appointment.rescheduledTo = replacement._id;
@@ -1519,7 +1532,10 @@ export async function listAppointmentsPaginated({
     const patients = patientIds.length
         ? await Patient.find({
             _id: { $in: patientIds },
-            ...buildAppointmentListReadScope(authUser),
+            // These IDs come exclusively from the already-authorized page of
+            // appointments. A doctor's booking may concern an unassigned patient
+            // or another doctor's patient. Expose display names, never a profile.
+            ...(authUser?.role === "MEDECIN" ? {} : buildAppointmentListReadScope(authUser)),
         })
             .select("_id nom prenom")
             .lean()

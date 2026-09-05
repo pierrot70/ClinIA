@@ -7,6 +7,7 @@ import { AuthGraphsModal } from "./admin/AuthGraphsModal";
 import { ClinicianInboxModal } from "./admin/ClinicianInboxModal";
 import { SecurityIncidentsModal } from "./admin/SecurityIncidentsModal";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
+import { consultationLabels } from "../i18n/consultationLabels";
 import { useAuth } from "../hooks/useAuth";
 import { useSensitiveReauthDialog } from "../hooks/useSensitiveReauthDialog";
 import { isAdminRole } from "../auth/roles";
@@ -1464,6 +1465,11 @@ const Header: React.FC = () => {
                             </Link>
 
                             {user?.role === "MEDECIN" && (
+                                <Link to="/consultations" className={linkClass("/consultations")}>
+                                    {consultationLabels(locale).title}
+                                </Link>
+                            )}
+                            {user?.role === "MEDECIN" && (
                                 <Link to="/clinical-support-access/inbox" className={linkClass("/clinical-support-access/inbox")}>
                                     <HeaderLabel text={headerLabels.nav.supportAccessInbox} />
                                 </Link>
@@ -1863,6 +1869,7 @@ const Header: React.FC = () => {
                             <Link to="/clinical" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.clinicalAnalysis} /></Link>
                             <Link to="/comments" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.comments} /></Link>
                             <Link to="/my-write-receipts" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.myWriteReceipts} /></Link>
+                            {user?.role === "MEDECIN" && <Link to="/consultations" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">{consultationLabels(locale).title}</Link>}
                             {user?.role === "MEDECIN" && <Link to="/clinical-support-access/inbox" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.supportAccessInbox} /></Link>}
                             {user?.role === "SUPERADMIN" && <Link to="/clinical-support-access/patients" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.delegatedPatients} /></Link>}
                             {user?.role === "SUPERADMIN" && <Link to="/clinical-support-access/request" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.requestSupportAccess} /></Link>}

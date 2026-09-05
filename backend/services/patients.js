@@ -120,9 +120,19 @@ function assertPatientAuditAccess(authUser) {
 export async function createPatient(
     dto,
     authUser,
-    { allowPotentialDuplicate = false, session = null } = {}
+    { allowPotentialDuplicate = false, session = null, receivingPhysicianUserId = null } = {}
 ) {
-    const ownerScope = buildOwnerScope(authUser);
+    let ownerScope = buildOwnerScope(authUser);
+    // This internal option is only supplied by the transactional reception
+    // booking workflow after validating the receiving physician's active account.
+    if (authUser.role === "RECEPTION" || receivingPhysicianUserId !== null) {
+        if (authUser.role !== "RECEPTION" || !session || !receivingPhysicianUserId ||
+            !mongoose.Types.ObjectId.isValid(receivingPhysicianUserId)) {
+            throw createPatientError("FORBIDDEN", "Un médecin responsable validé est requis pour créer ce dossier.");
+        }
+        // A consultation is not acceptance into the physician's permanent care.
+        ownerScope = { ownerUserId: null };
+    }
 
     if (!dto.nom || !dto.prenom) {
         throw {
@@ -159,7 +169,7 @@ export async function createPatient(
             dto.num_assurance_maladie
         ),
         ...buildPatientSearchKeys(dto),
-        ownerUserId: authUser.userId,
+        ownerUserId: ownerScope.ownerUserId,
     });
 
     const savedPatient = await patient.save({

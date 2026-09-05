@@ -15,6 +15,7 @@ import writeOperationAuditsRouter from "../routes/writeOperationAudits.js";
 import coordinationRequestsRouter from "../routes/coordinationRequests.js";
 import clinicalSupportAccessRouter from "../routes/clinicalSupportAccess.js";
 import receptionRouter from "../routes/reception.js";
+import consultationsRouter from "../routes/consultations.js";
 import clinicalTermsRouter from "../routes/clinicalTerms.js";
 
 import { verifyJWT } from "../middleware/verifyJWT.js";
@@ -57,6 +58,8 @@ export function registerRoutes(app, deps) {
     app.use("/api/ai", aiAnalyzeRouter || createAiAnalyzeRouter({}));
 
     app.use("/api/auth", authRouter);
+    app.use("/api/consultations", verifyJWT, requireRole(AUTH_ROLES.MEDECIN),
+        massDownloadRestrictionGuard, loi25DataLeakGuard, consultationsRouter);
 
     app.use(
         "/api/appointments",
@@ -73,9 +76,10 @@ export function registerRoutes(app, deps) {
     app.use(
         "/api/patients",
         verifyJWT,
+        // Reception uses only clinic-scoped /api/reception workflows, never
+        // the generic patient record, clinical profile or note endpoints.
         requireRole(
             AUTH_ROLES.USER,
-            AUTH_ROLES.RECEPTION,
             AUTH_ROLES.MEDECIN,
             AUTH_ROLES.ADMIN,
             AUTH_ROLES.SUPERADMIN

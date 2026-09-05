@@ -83,6 +83,7 @@ const {
     getAvailableSlots,
     listManualAppointmentOptions,
     listAppointmentsPaginated,
+    rescheduleAppointment,
     updateAppointmentSchedule,
     updateAppointmentStatus,
 } = await import("../appointments.js");
@@ -118,6 +119,21 @@ describe("appointments service", () => {
         role: "MEDECIN",
     };
 
+    it.each([null, "507f1f77bcf86cd799439088"])("reschedules an authorized encounter without requiring patient ownership (%s)", async ownerUserId => {
+        const patientId = "507f1f77bcf86cd799439012";
+        const specialistId = "507f1f77bcf86cd799439021";
+        const appointment = buildAppointment({ patient: patientId, specialist: specialistId, ownerUserId: authUser.userId, priority: "normal" });
+        findOne.mockResolvedValue(appointment);
+        patientFindOne.mockReturnValue({ lean: vi.fn().mockResolvedValue({ _id: patientId, ownerUserId }) });
+        specialistFindById.mockReturnValue({ lean: vi.fn().mockResolvedValue({ disponibilites: [new Date("2099-01-01T12:00:00")] }) });
+        find.mockReturnValue({ lean: vi.fn().mockResolvedValue([]) });
+        const result = await rescheduleAppointment(appointment._id, { date: "2099-01-01", time: "12:00" }, authUser, { session: transactionSession });
+        expect(findOne).toHaveBeenCalledWith({ _id: appointment._id, ownerUserId: authUser.userId });
+        expect(result.appointment.ownerUserId).toBe(authUser.userId);
+        expect(result.previousAppointment.status).toBe("rescheduled");
+        expect(patientFindOne).toHaveBeenCalledTimes(1);
+    });
+
     it("returns only the current page's patient display names", async () => {
         const appointment = {
             _id: "appointment-1",
@@ -151,8 +167,9 @@ describe("appointments service", () => {
 
         expect(patientFind).toHaveBeenCalledWith({
             _id: { $in: [appointment.patient] },
-            ownerUserId: authUser.userId,
         });
+        expect(find).toHaveBeenCalledWith({ ownerUserId: authUser.userId });
+        expect(patientFind.mock.results[0].value.select).toHaveBeenCalledWith("_id nom prenom");
         expect(appointmentQuery.sort).toHaveBeenCalledWith({ date: 1, time: 1 });
     });
 

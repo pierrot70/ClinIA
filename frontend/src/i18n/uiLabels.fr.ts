@@ -1,4 +1,24 @@
 export const UI_LABELS_FR = {
+    consultations: {
+        title: "Consultations",
+        description: "Ouvrez un rendez-vous pour consulter l’historique. Un rendez-vous ne constitue pas une prise en charge permanente.",
+        refresh: "Actualiser",
+        open: "Ouvrir",
+        empty: "Aucune consultation disponible (100 rendez-vous les plus récents).",
+        history: "Historique des notes",
+        legacy: "Note antérieure du dossier",
+        ownOnly: "Consultation terminée : seules vos notes de ce rendez-vous sont accessibles sans prise en charge permanente.",
+        add: "Nouvelle note — rédigez en anglais",
+        save: "Ajouter la note",
+        noteHelp: "La note sera conservée séparément, avec son auteur. Elle ne pourra pas être modifiée ici. Aucun envoi à un service d’IA.",
+        accept: "Accepter la prise en charge permanente",
+        confirm: "Confirmez-vous l’ajout de ce patient à votre clientèle ? Cette action est distincte du rendez-vous.",
+        accepted: "Ce patient fait partie de votre clientèle.",
+        saved: "Enregistré.",
+        error: "Action impossible. Actualisez la page et vérifiez vos droits d’accès.",
+        loading: "Chargement…",
+        author: "Auteur",
+    },
     // Libellés d'interface français des concepts canoniques anglais.
     // Les clés restent stables pour la validation serveur et les futurs codes SNOMED CT.
     clinicalSymptomLabels: {
@@ -1491,6 +1511,7 @@ export const UI_LABELS_FR = {
         },
     },
     walkInArrival: {
+        receivingPhysicianUnavailable: "Ce médecin n'est plus lié à un compte ClinIA actif. Choisissez un autre médecin actif.",
         title: "Arrivée sans rendez-vous",
         description: "Étape 1 : identifier le patient par son numéro d'assurance maladie et choisir la clinique d'arrivée.",
         ramqLabel: "Numéro d'assurance maladie",

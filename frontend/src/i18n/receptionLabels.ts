@@ -66,8 +66,20 @@ const newPatientFormTranslations: Record<string, Record<string, string>> = {
   ko: { newPatientFormTitle: "환자 기록 및 예약 만들기", newPatientFormDescription: "환자의 최소 정보를 입력하세요. 저장하기 전에 예약 시간이 다시 확인됩니다.", firstNameLabel: "이름", lastNameLabel: "성", ramqReadOnlyLabel: "건강보험 번호", createPatientAndAppointment: "환자 및 예약 만들기", creatingPatientAndAppointment: "생성 중…" },
 };
 
+const receivingPhysicianUnavailable: Record<string, string> = {
+    en: "This physician is no longer linked to an active ClinIA account. Choose another active physician.",
+    es: "Este médico ya no está vinculado a una cuenta ClinIA activa. Seleccione otro médico activo.",
+    ko: "이 의사는 더 이상 활성 ClinIA 계정에 연결되어 있지 않습니다. 다른 활성 의사를 선택하세요.",
+    vi: "Bác sĩ này không còn liên kết với tài khoản ClinIA đang hoạt động. Hãy chọn bác sĩ khác đang hoạt động.",
+    no: "Denne legen er ikke lenger knyttet til en aktiv ClinIA-konto. Velg en annen aktiv lege.",
+    ja: "この医師は有効なClinIAアカウントに関連付けられていません。別の有効な医師を選択してください。",
+    zh: "该医生已不再关联有效的ClinIA账户。请选择其他有效医生。",
+    he: "הרופא הזה אינו מקושר עוד לחשבון ClinIA פעיל. יש לבחור רופא פעיל אחר.",
+};
+
 export function receptionLabel(locale: string, key: string, french: string) {
     const language = locale.toLowerCase().split("-")[0];
+    if (key === "receivingPhysicianUnavailable") return receivingPhysicianUnavailable[language] ?? french;
     return translations[language]?.[key] || availabilityTranslations[language]?.[key] || confirmationTranslations[language]?.[key] || newPatientFormTranslations[language]?.[key] || french;
 }
 

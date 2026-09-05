@@ -234,7 +234,9 @@ export function WalkInArrivalPage() {
         setLoading(false);
 
         if (response.error) {
-            setError(response.error.message);
+            setError(response.error.code === "RECEIVING_PHYSICIAN_UNAVAILABLE"
+                ? receptionLabel(locale, "receivingPhysicianUnavailable", source.receivingPhysicianUnavailable)
+                : response.error.message);
             return;
         }
 

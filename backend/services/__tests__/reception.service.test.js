@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const adminUserFindOne = vi.fn();
+const adminUserFind = vi.fn();
+const specialistFindOne = vi.fn();
 const specialistFind = vi.fn();
 const patientFindOne = vi.fn();
 const patientExists = vi.fn();
@@ -16,11 +18,11 @@ const transactionSession = {
 };
 
 vi.mock("../../models/AdminUser.js", () => ({
-    AdminUser: { findOne: adminUserFindOne },
+    AdminUser: { findOne: adminUserFindOne, find: adminUserFind },
 }));
 
 vi.mock("../../models/Specialist.js", () => ({
-    Specialist: { find: specialistFind },
+    Specialist: { find: specialistFind, findOne: specialistFindOne },
 }));
 
 vi.mock("../../models/Patient.js", () => ({
@@ -49,9 +51,11 @@ const {
 
 const receptionId = "507f1f77bcf86cd799439011";
 const clinicId = "507f1f77bcf86cd799439012";
+const physicianId = "507f1f77bcf86cd799439014";
+const specialistId = "507f1f77bcf86cd799439013";
 
 function resolvedLean(value) {
-    return { lean: vi.fn().mockResolvedValue(value) };
+    return { lean: vi.fn().mockResolvedValue(value), session: vi.fn().mockReturnThis() };
 }
 
 beforeEach(() => {
@@ -59,10 +63,17 @@ beforeEach(() => {
     vi.spyOn(mongoose, "startSession").mockResolvedValue(transactionSession);
     transactionSession.withTransaction.mockImplementation(async (callback) => callback());
     transactionSession.endSession.mockResolvedValue();
-    adminUserFindOne.mockReturnValue(resolvedLean({ assignedClinics: [clinicId] }));
+    adminUserFindOne.mockImplementation(query => resolvedLean(query.role === "RECEPTION"
+        ? { assignedClinics: [clinicId] } : { _id: physicianId }));
+    adminUserFind.mockReturnValue(resolvedLean([{ _id: physicianId }]));
+    specialistFindOne.mockReturnValue(resolvedLean({
+        _id: specialistId, accountUserId: physicianId,
+        practiceLocations: [{ clinique: clinicId }],
+    }));
     specialistFind.mockReturnValue(resolvedLean([
         {
             _id: "507f1f77bcf86cd799439013",
+            accountUserId: physicianId,
             prenom: "Marie",
             nom: "Leroux",
             practiceLocations: [{
@@ -87,6 +98,24 @@ beforeEach(() => {
 });
 
 describe("listWalkInFamilyMedicineOptions", () => {
+    it("excludes unlinked specialists and accounts that are not active physicians before looking up slots", async () => {
+        const location = { clinique: clinicId, walkInDisponibilites: [new Date("2030-01-01T14:00:00Z")] };
+        specialistFind.mockReturnValue(resolvedLean([
+            { _id: specialistId, accountUserId: physicianId, practiceLocations: [location] },
+            { _id: "507f1f77bcf86cd799439015", practiceLocations: [location] },
+            { _id: "507f1f77bcf86cd799439016", accountUserId: "507f1f77bcf86cd799439017", practiceLocations: [location] },
+        ]));
+        const result = await listWalkInFamilyMedicineOptions({ clinicId, authUser: { userId: receptionId, role: "RECEPTION" }, now: new Date("2030-01-01T13:00:00Z") });
+        expect(result.today.map(option => option.specialist._id)).toEqual([specialistId]);
+        expect(adminUserFind).toHaveBeenCalledWith({ _id: { $in: [physicianId, "507f1f77bcf86cd799439017"] }, role: "MEDECIN", isActive: true }, { _id: 1 });
+        expect(getAvailableSlotSchedule.mock.calls.every(([id]) => id === specialistId)).toBe(true);
+    });
+
+    it("returns no slots when no linked physician account is active", async () => {
+        adminUserFind.mockReturnValue(resolvedLean([]));
+        await expect(listWalkInFamilyMedicineOptions({ clinicId, authUser: { userId: receptionId, role: "RECEPTION" }, now: new Date("2030-01-01T13:00:00Z") })).resolves.toEqual({ today: [], future: [] });
+        expect(getAvailableSlotSchedule).not.toHaveBeenCalled();
+    });
     it("returns same-day and future family-medicine slots without a patient identifier", async () => {
         const result = await listWalkInFamilyMedicineOptions({
             clinicId,
@@ -124,6 +153,7 @@ describe("listWalkInFamilyMedicineOptions", () => {
         specialistFind.mockReturnValue(resolvedLean([
             {
                 _id: "507f1f77bcf86cd799439013",
+                accountUserId: physicianId,
                 prenom: "Marie",
                 nom: "Leroux",
                 practiceLocations: [{
@@ -178,6 +208,7 @@ describe("listWalkInFamilyMedicineOptions", () => {
         specialistFind.mockReturnValue(resolvedLean([
             {
                 _id: "507f1f77bcf86cd799439013",
+                accountUserId: physicianId,
                 prenom: "Marie",
                 nom: "Leroux",
                 practiceLocations: [{
@@ -258,6 +289,8 @@ describe("createWalkInPatientAndAppointment", () => {
                 nom: "Nouveau",
                 prenom: "Patient",
                 num_assurance_maladie: "123456",
+                secure_request_profile: { clinicalNotes: "Forged reception note" },
+                ownerUserId: "forged-owner",
             },
             authUser: { userId: receptionId, username: "reception", role: "RECEPTION" },
         })).resolves.toMatchObject({
@@ -268,8 +301,10 @@ describe("createWalkInPatientAndAppointment", () => {
         expect(createPatient).toHaveBeenCalledWith(
             expect.objectContaining({ num_assurance_maladie: "123456" }),
             expect.objectContaining({ userId: receptionId }),
-            { session: transactionSession }
+            { session: transactionSession, receivingPhysicianUserId: physicianId }
         );
+        expect(createPatient.mock.calls[0][0]).not.toHaveProperty("secure_request_profile");
+        expect(createPatient.mock.calls[0][0]).not.toHaveProperty("ownerUserId");
         expect(createAppointment).toHaveBeenCalledWith(
             expect.objectContaining({
                 patient: "507f1f77bcf86cd799439088",
@@ -282,6 +317,7 @@ describe("createWalkInPatientAndAppointment", () => {
             expect.objectContaining({ userId: receptionId }),
             expect.objectContaining({
                 session: transactionSession,
+                receivingPhysicianUserId: physicianId,
                 patientFromTransaction: expect.objectContaining({
                     _id: "507f1f77bcf86cd799439088",
                 }),
@@ -290,7 +326,9 @@ describe("createWalkInPatientAndAppointment", () => {
         expect(recordPatientAuditEvent).toHaveBeenCalledWith(
             expect.objectContaining({
                 action: "PATIENT_CREATE",
-                changedFields: ["nom", "prenom", "num_assurance_maladie"],
+                changedFields: ["nom", "prenom", "num_assurance_maladie", "ownerUserId"],
+                actorUserId: receptionId,
+                actorRole: "RECEPTION",
             })
         );
         expect(transactionSession.endSession).toHaveBeenCalledTimes(1);
@@ -337,8 +375,10 @@ describe("createWalkInAppointmentForExistingPatient", () => {
             expect.objectContaining({ userId: receptionId }),
             expect.objectContaining({
                 session: transactionSession,
+                receivingPhysicianUserId: physicianId,
                 patientFromTransaction: expect.objectContaining({
                     _id: "507f1f77bcf86cd799439088",
+                    ownerUserId: "507f1f77bcf86cd799439077",
                 }),
             })
         );
@@ -349,5 +389,35 @@ describe("createWalkInAppointmentForExistingPatient", () => {
                 patientId: "507f1f77bcf86cd799439088",
             })
         );
+    });
+});
+
+describe.each([createWalkInPatientAndAppointment, createWalkInAppointmentForExistingPatient])("receiving physician validation for %s", book => {
+    const booking = () => ({ clinicId, specialistId, patientId: "507f1f77bcf86cd799439088", date: "2030-01-01", time: "09:00",
+        patientDto: { nom: "Test", prenom: "Demo", num_assurance_maladie: "123456" },
+        authUser: { userId: receptionId, role: "RECEPTION" } });
+
+    it.each(["unlinked", "inactive-or-missing", "wrong-clinic", "missing-specialist"])("rejects %s before any patient or appointment write", async scenario => {
+        patientExists.mockResolvedValue(null);
+        if (scenario === "unlinked") specialistFindOne.mockReturnValue(resolvedLean({ _id: specialistId, practiceLocations: [{ clinique: clinicId }] }));
+        if (scenario === "inactive-or-missing") adminUserFindOne.mockImplementation(query => resolvedLean(query.role === "RECEPTION" ? { assignedClinics: [clinicId] } : null));
+        if (scenario === "wrong-clinic") specialistFindOne.mockReturnValue(resolvedLean({ _id: specialistId, accountUserId: physicianId, practiceLocations: [] }));
+        if (scenario === "missing-specialist") specialistFindOne.mockReturnValue(resolvedLean(null));
+        await expect(book(booking())).rejects.toMatchObject({ code: scenario === "unlinked" || scenario === "inactive-or-missing" ? "RECEIVING_PHYSICIAN_UNAVAILABLE" : "FORBIDDEN" });
+        expect(createPatient).not.toHaveBeenCalled();
+        expect(createAppointment).not.toHaveBeenCalled();
+        expect(recordPatientAuditEvent).not.toHaveBeenCalled();
+        expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
+        expect(transactionSession.endSession).toHaveBeenCalled();
+    });
+
+    it("rechecks account eligibility at booking after valid availability was displayed", async () => {
+        await listWalkInFamilyMedicineOptions({ clinicId, authUser: booking().authUser, now: new Date("2030-01-01T13:00:00Z") });
+        expect(getAvailableSlotSchedule).toHaveBeenCalled();
+        patientExists.mockResolvedValue(null);
+        adminUserFindOne.mockImplementation(query => resolvedLean(query.role === "RECEPTION" ? { assignedClinics: [clinicId] } : null));
+        await expect(book(booking())).rejects.toMatchObject({ code: "RECEIVING_PHYSICIAN_UNAVAILABLE" });
+        expect(adminUserFindOne).toHaveBeenCalledWith({ _id: physicianId, role: "MEDECIN", isActive: true }, { _id: 1 });
+        expect(createAppointment).not.toHaveBeenCalled();
     });
 });

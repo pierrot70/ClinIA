@@ -49,6 +49,26 @@ function getLocationForClinic(specialist, clinicId) {
     );
 }
 
+// Resolve ownership from the professional directory, never from client input.
+async function requireActiveReceivingPhysician(specialistId, clinicId, session) {
+    if (!mongoose.Types.ObjectId.isValid(specialistId)) throw invalidInput("Médecin invalide.");
+    const specialist = await Specialist.findOne({
+        _id: specialistId, specialite: FAMILY_MEDICINE_SPECIALTY,
+    }).session(session).lean();
+    if (!specialist || !getLocationForClinic(specialist, clinicId)) {
+        throw { code: "FORBIDDEN", message: "Ce médecin n'exerce pas dans la clinique sélectionnée." };
+    }
+    const account = specialist.accountUserId
+        ? await AdminUser.findOne({
+            _id: specialist.accountUserId, role: "MEDECIN", isActive: true,
+        }, { _id: 1 }).session(session).lean()
+        : null;
+    if (!account) {
+        throw { code: "RECEIVING_PHYSICIAN_UNAVAILABLE", message: "Ce médecin n'est plus lié à un compte ClinIA actif. Choisissez un autre médecin actif." };
+    }
+    return String(account._id);
+}
+
 function toOption(specialist, date, schedule, slotTypes = {}) {
     return {
         specialist: {
@@ -92,10 +112,18 @@ export async function listWalkInFamilyMedicineOptions({
         specialite: FAMILY_MEDICINE_SPECIALTY,
     }).lean();
 
+    const accountIds = specialists.filter(s => getLocationForClinic(s, clinicId) && s.accountUserId)
+        .map(s => s.accountUserId);
+    const activeAccounts = accountIds.length ? await AdminUser.find({
+        _id: { $in: accountIds }, role: "MEDECIN", isActive: true,
+    }, { _id: 1 }).lean() : [];
+    const activeAccountIds = new Set(activeAccounts.map(account => String(account._id)));
+
     const todayOptions = [];
     const futureCandidates = [];
 
     for (const specialist of specialists) {
+        if (!specialist.accountUserId || !activeAccountIds.has(String(specialist.accountUserId))) continue;
         const location = getLocationForClinic(specialist, clinicId);
         if (!location) continue;
 
@@ -235,8 +263,19 @@ export async function createWalkInPatientAndAppointment({
     try {
         let result;
         await session.withTransaction(async () => {
-            const patient = await createPatient(patientDto, authUser, {
+            const receivingPhysicianUserId = await requireActiveReceivingPhysician(specialistId, clinicId, session);
+            // Reception creates identity data only, never a clinical profile or
+            // notes, even if such fields are forged in the HTTP payload.
+            const patient = await createPatient({
+                nom: patientDto.nom,
+                prenom: patientDto.prenom,
+                num_assurance_maladie: patientDto.num_assurance_maladie,
+                country: patientDto.country,
+                healthInsuranceJurisdiction: patientDto.healthInsuranceJurisdiction,
+                language: patientDto.language,
+            }, authUser, {
                 session,
+                receivingPhysicianUserId,
             });
             const appointment = await createAppointment(
                 {
@@ -249,7 +288,7 @@ export async function createWalkInPatientAndAppointment({
                     slotType: "walk_in",
                 },
                 authUser,
-                { session, patientFromTransaction: patient }
+                { session, patientFromTransaction: patient, receivingPhysicianUserId }
             );
 
             await recordPatientAuditEvent({
@@ -260,7 +299,7 @@ export async function createWalkInPatientAndAppointment({
                 actorRole: "RECEPTION",
                 ip: audit.ip ?? null,
                 patientId: String(patient._id),
-                changedFields: ["nom", "prenom", "num_assurance_maladie"],
+                changedFields: ["nom", "prenom", "num_assurance_maladie", "ownerUserId"],
                 requestPath: audit.requestPath ?? "/api/reception/walk-in-bookings",
                 session,
                 throwOnError: true,
@@ -323,6 +362,7 @@ export async function createWalkInAppointmentForExistingPatient({
     try {
         let result;
         await session.withTransaction(async () => {
+            const receivingPhysicianUserId = await requireActiveReceivingPhysician(specialistId, clinicId, session);
             const patient = await Patient.findOne(
                 { _id: patientId, archivedAt: null },
                 { _id: 1, nom: 1, prenom: 1, num_assurance_maladie: 1, healthInsuranceJurisdiction: 1, ownerUserId: 1 }
@@ -342,7 +382,7 @@ export async function createWalkInAppointmentForExistingPatient({
                     slotType,
                 },
                 authUser,
-                { session, patientFromTransaction: patient }
+                { session, patientFromTransaction: patient, receivingPhysicianUserId }
             );
 
             await recordWriteOperationAuditEvent({

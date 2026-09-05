@@ -105,6 +105,23 @@ beforeEach(() => {
 });
 
 describe("patients service audit logs", () => {
+    it("leaves a reception-created patient without permanent care, ignoring a DTO owner", async () => {
+        patientSave.mockResolvedValue({ _id: "new-patient" });
+        await createPatient({ nom: "Test", prenom: "Demo", num_assurance_maladie: "123456", ownerUserId: "client-supplied" },
+            { userId: "reception-user", role: "RECEPTION" },
+            { session: transactionSession, receivingPhysicianUserId: "physician-user" });
+        expect(PatientModel).toHaveBeenCalledWith(expect.objectContaining({ ownerUserId: null }));
+        expect(patientSave).toHaveBeenCalledWith(expect.objectContaining({ session: transactionSession }));
+    });
+
+    it.each([
+        ["RECEPTION", {}],
+        ["RECEPTION", { receivingPhysicianUserId: "physician-user" }],
+        ["MEDECIN", { session: transactionSession, receivingPhysicianUserId: "other-user" }],
+    ])("rejects unsupported clinical owner assignment for %s", async (role, options) => {
+        await expect(createPatient({ nom: "Test", prenom: "Demo" }, { userId: "actor", role }, options)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        expect(PatientModel).not.toHaveBeenCalled();
+    });
     it("does not perform a cross-owner duplicate lookup for the same patient identifiers", async () => {
         patientSave
             .mockResolvedValueOnce({ _id: "patient-owner-one" })

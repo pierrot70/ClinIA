@@ -206,6 +206,7 @@ router.post("/walk-in-bookings", async (req, res) => {
                 "FORBIDDEN",
                 "NO_AVAILABILITY",
                 "PATIENT_ALREADY_EXISTS",
+                "RECEIVING_PHYSICIAN_UNAVAILABLE",
                 "SPECIALIST_ALREADY_BOOKED",
                 "PATIENT_ALREADY_BOOKED",
                 "MAXIMUM_APPOINTMENTS_REACHED",

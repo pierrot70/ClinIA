@@ -191,6 +191,8 @@ const PatientSchema = new mongoose.Schema(
             trim: true,
         },
         ownerUserId: {
+            // Permanent care holder. Reception-created walk-in patients have
+            // no holder until a physician explicitly accepts ongoing care.
             type: mongoose.Schema.Types.ObjectId,
             ref: "AdminUser",
             index: true,

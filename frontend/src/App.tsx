@@ -25,6 +25,7 @@ import { AppointmentsPage } from "./pages/AppointmentsPage";
 import { AppointmentsListPage } from "./pages/AppointmentsList";
 import { WalkInArrivalPage } from "./pages/WalkInArrivalPage";
 import { PatientsPage } from "./pages/PatientsPage";
+import { ConsultationsPage } from "./pages/ConsultationsPage";
 import { PatientAuditLogsPage } from "./pages/PatientAuditLogsPage";
 import { OpenAILogsPage } from "./pages/OpenAILogsPage";
 import { DbStatusPage } from "./pages/DbStatusPage";
@@ -325,6 +326,7 @@ const App: React.FC = () => {
                     <Route path="/treatment/:id" element={<TreatmentDetails />} />
                     <Route path="/quick" element={<QuickMode />} />
                     <Route path="/patient-summary" element={<PatientSummary />} />
+                    <Route path="/consultations" element={<ProtectedRoute allowedRoles={["MEDECIN"]}><ConsultationsPage /></ProtectedRoute>} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/security/change-password-required" element={<ChangePasswordRequiredPage />} />
                     <Route path="/security/password-reset-required" element={<PasswordResetRequiredPage />} />
