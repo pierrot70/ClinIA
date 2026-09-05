@@ -37,6 +37,7 @@ function useCommentsPageLabels(targetLang: string) {
     const { translated: pageDescription } = useTranslation({ text: source.header.description, ...translationOptions });
     const { translated: guestHint } = useTranslation({ text: source.header.guestHint, ...translationOptions });
     const { translated: newCommentLabel } = useTranslation({ text: source.form.newCommentLabel, ...translationOptions });
+    const { translated: englishOnlyHint } = useTranslation({ text: source.form.englishOnlyHint, ...translationOptions });
     const { translated: nameLabel } = useTranslation({ text: source.form.nameLabel, ...translationOptions });
     const { translated: namePlaceholder } = useTranslation({ text: source.form.namePlaceholder, ...translationOptions });
     const { translated: trackingCodeLabel } = useTranslation({ text: source.form.trackingCodeLabel, ...translationOptions });
@@ -67,6 +68,9 @@ function useCommentsPageLabels(targetLang: string) {
     const { translated: replyPlaceholder } = useTranslation({ text: source.list.replyPlaceholder, ...translationOptions });
     const { translated: replySubmitLabel } = useTranslation({ text: source.list.replySubmit, ...translationOptions });
     const { translated: redactionSuffix } = useTranslation({ text: source.list.redactionSuffix, ...translationOptions });
+    const { translated: receiptTitle } = useTranslation({ text: labels.writeVerification.title, ...translationOptions });
+    const { translated: receiptUnavailable } = useTranslation({ text: labels.writeVerification.unavailable, ...translationOptions });
+    const { translated: receiptCopy } = useTranslation({ text: labels.writeVerification.copy, ...translationOptions });
 
     return {
         categoryOptions: [
@@ -79,6 +83,7 @@ function useCommentsPageLabels(targetLang: string) {
         pageDescription,
         guestHint,
         newCommentLabel,
+        englishOnlyHint,
         nameLabel,
         namePlaceholder,
         trackingCodeLabel,
@@ -109,6 +114,7 @@ function useCommentsPageLabels(targetLang: string) {
         replyPlaceholder,
         replySubmitLabel,
         redactionSuffix,
+        receiptLabels: { title: receiptTitle, unavailable: receiptUnavailable, copy: receiptCopy },
     };
 }
 
@@ -403,8 +409,13 @@ export function ClinicianCommentsPage() {
                             ))}
                         </select>
                     </div>
+                    <p id="clinician-comment-language-hint" className="mb-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+                        {ui.englishOnlyHint}
+                    </p>
                     <textarea
                         id="clinician-comment"
+                        aria-describedby="clinician-comment-language-hint"
+                        lang="en"
                         className="min-h-[220px] w-full rounded-lg border border-gray-300 px-3 py-3 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                         placeholder={ui.commentPlaceholder}
                         value={comment}
@@ -428,7 +439,7 @@ export function ClinicianCommentsPage() {
                             </div>
                             <WriteVerificationReceipt
                                 verification={lastWriteVerification}
-                                labels={labels.writeVerification}
+                                labels={ui.receiptLabels}
                             />
                         </div>
                     )}

@@ -1,6 +1,47 @@
 // Traductions locales des libellés courants de la page Patients. Elles sont
 // dérivées de la source française versionnée et ne contiennent aucune donnée patient.
+import { UI_LABELS_FR } from "./uiLabels.fr";
 type PatientPageFallback = Record<string, string>;
+
+const form = UI_LABELS_FR.patientsPage.form;
+// French source, then EN, ES, KO, VI, NO, JA, ZH, HE; never patient-entered values.
+export const patientFormRows: Array<readonly [string, string, string, string, string, string, string, string, string]> = [
+    [form.firstNamePlaceholder, "First name *", "Nombre *", "이름 *", "Tên *", "Fornavn *", "名 *", "名字 *", "שם פרטי *"],
+    [form.lastNamePlaceholder, "Last name *", "Apellido *", "성 *", "Họ *", "Etternavn *", "姓 *", "姓氏 *", "שם משפחה *"],
+    [form.ramqPlaceholder, "Health insurance number (optional)", "Número de seguro médico (opcional)", "건강보험 번호 (선택 사항)", "Số bảo hiểm y tế (không bắt buộc)", "Helseforsikringsnummer (valgfritt)", "健康保険番号（任意）", "医疗保险号码（可选）", "מספר ביטוח בריאות (לא חובה)"],
+    [form.phonePlaceholder, "Phone (optional)", "Teléfono (opcional)", "전화번호 (선택 사항)", "Số điện thoại (không bắt buộc)", "Telefon (valgfritt)", "電話番号（任意）", "电话号码（可选）", "טלפון (לא חובה)"],
+    [form.emailPlaceholder, "Email (optional)", "Correo electrónico (opcional)", "이메일 (선택 사항)", "Email (không bắt buộc)", "E-post (valgfritt)", "メールアドレス（任意）", "电子邮件（可选）", "דוא״ל (לא חובה)"],
+    [form.addressPlaceholder, "Address (optional)", "Dirección (opcional)", "주소 (선택 사항)", "Địa chỉ (không bắt buộc)", "Adresse (valgfritt)", "住所（任意）", "地址（可选）", "כתובת (לא חובה)"],
+    [form.latitudePlaceholder, "Latitude (optional)", "Latitud (opcional)", "위도 (선택 사항)", "Vĩ độ (không bắt buộc)", "Breddegrad (valgfritt)", "緯度（任意）", "纬度（可选）", "קו רוחב (לא חובה)"],
+    [form.longitudePlaceholder, "Longitude (optional)", "Longitud (opcional)", "경도 (선택 사항)", "Kinh độ (không bắt buộc)", "Lengdegrad (valgfritt)", "経度（任意）", "经度（可选）", "קו אורך (לא חובה)"],
+    [form.smsEnabled, "SMS enabled", "SMS habilitados", "SMS 사용", "Đã bật SMS", "SMS aktivert", "SMS有効", "已启用短信", "SMS מופעל"],
+    [form.create, "Create", "Crear", "생성", "Tạo", "Opprett", "作成", "创建", "יצירה"],
+    [form.languageLabel, "Language", "Idioma", "언어", "Ngôn ngữ", "Språk", "言語", "语言", "שפה"],
+];
+
+export const patientAdministrativeLabels: Record<string, readonly [string, string, string, string]> = {
+    fr: [UI_LABELS_FR.patientsPage.tabs.archived, UI_LABELS_FR.patientsPage.form.countryLabel, UI_LABELS_FR.patientsPage.form.healthInsuranceJurisdictionLabel, UI_LABELS_FR.patientsPage.form.healthInsuranceJurisdictionOptions.UNKNOWN],
+    en: ["Archived records", "Country", "Insurance province or territory", "Not specified"],
+    es: ["Expedientes archivados", "País", "Provincia o territorio del seguro", "No especificado"],
+    ko: ["보관된 기록", "국가", "보험 관할 주 또는 준주", "미지정"],
+    vi: ["Hồ sơ đã lưu trữ", "Quốc gia", "Tỉnh hoặc vùng lãnh thổ bảo hiểm", "Chưa xác định"],
+    no: ["Arkiverte journaler", "Land", "Forsikringsprovins eller -territorium", "Ikke angitt"],
+    ja: ["アーカイブ済み記録", "国", "保険の管轄州または準州", "未指定"],
+    zh: ["已归档病历", "国家", "保险所属省或地区", "未指定"],
+    he: ["תיקים בארכיון", "מדינה", "פרובינציה או טריטוריה של הביטוח", "לא צוין"],
+};
+
+const resultCountLabels: Record<string, readonly [string, string]> = {
+    fr: [UI_LABELS_FR.patientsPage.search.resultSingular, UI_LABELS_FR.patientsPage.search.resultPlural],
+    en: ["patient found", "patients found"],
+    es: ["paciente encontrado", "pacientes encontrados"],
+    ko: ["명의 환자를 찾았습니다", "명의 환자를 찾았습니다"],
+    vi: ["bệnh nhân được tìm thấy", "bệnh nhân được tìm thấy"],
+    no: ["pasient funnet", "pasienter funnet"],
+    ja: ["人の患者が見つかりました", "人の患者が見つかりました"],
+    zh: ["位患者已找到", "位患者已找到"],
+    he: ["מטופל נמצא", "מטופלים נמצאו"],
+};
 
 const patientPageSource = {
     "Patients": true,
@@ -49,6 +90,16 @@ export const patientPageFallbacks: Record<string, PatientPageFallback> = {
 };
 
 export function getPatientPageFallback(text: string, targetBase: string): string | null {
+    const row = patientFormRows.find(row => row[0] === text);
+    if (row) {
+        const index = ["fr", "en", "es", "ko", "vi", "no", "ja", "zh", "he"].indexOf(targetBase);
+        return index < 0 ? null : row[index];
+    }
+    const administrativeIndex = patientAdministrativeLabels.fr.indexOf(text);
+    if (administrativeIndex >= 0) return patientAdministrativeLabels[targetBase]?.[administrativeIndex] ?? null;
+    const countLabels = resultCountLabels[targetBase];
+    if (text === UI_LABELS_FR.patientsPage.search.resultSingular) return countLabels?.[0] ?? null;
+    if (text === UI_LABELS_FR.patientsPage.search.resultPlural) return countLabels?.[1] ?? null;
     if (!(text in patientPageSource)) return null;
     return patientPageFallbacks[targetBase]?.[text] || null;
 }

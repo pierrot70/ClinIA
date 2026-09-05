@@ -6,6 +6,9 @@ import { heFallback } from "../i18n/heFallback";
 import { getPatientPageFallback } from "../i18n/patientPageFallbacks";
 import { getSupportInboxFallback } from "../i18n/supportAccessInboxLabels";
 import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
+import { getCommentsPageFallback } from "../i18n/commentsPageLabels";
+import { getReceiptLabelFallback } from "../i18n/myWriteReceiptsLabels";
+import { getAppointmentCreationFallback } from "../i18n/appointmentCreationLabels";
 
 // Fallbacks locaux pour les labels critiques (clé = texte source)
 const criticalLabelFallbacks: Record<string, Record<string, string>> = {
@@ -125,12 +128,18 @@ function getVersionedLocalFallback(text: string, targetLang: string): string | n
   // Product mode identifiers intentionally remain identical in every language.
   if (text === UI_LABELS_FR.header.aiMode.mock || text === UI_LABELS_FR.header.aiMode.real) return text;
   const targetBase = baseLocale(targetLang);
+  const appointmentCreationFallback = getAppointmentCreationFallback(text, targetBase);
+  if (appointmentCreationFallback) return appointmentCreationFallback;
+  const receiptFallback = getReceiptLabelFallback(text, targetBase);
+  if (receiptFallback) return receiptFallback;
+  const commentsPageFallback = getCommentsPageFallback(text, targetBase);
+  if (commentsPageFallback) return commentsPageFallback;
   const supportInboxFallback = getSupportInboxFallback(text, targetBase);
   if (supportInboxFallback) return supportInboxFallback;
-  if (targetBase === "es") return esFallback[text] || null;
-  if (targetBase === "he") return heFallback[text] || null;
   const patientPageFallback = getPatientPageFallback(text, targetBase);
   if (patientPageFallback) return patientPageFallback;
+  if (targetBase === "es") return esFallback[text] || null;
+  if (targetBase === "he") return heFallback[text] || null;
   if (targetBase === "en") return enFallback[text] || null;
   return null;
 }

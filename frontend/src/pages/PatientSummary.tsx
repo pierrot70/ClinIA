@@ -1,45 +1,44 @@
 import React from "react";
+import { PATIENT_SUMMARY_EXAMPLE_EN as panel, getPatientSummaryHeader } from "../i18n/patientSummaryExample";
+import { useHomeI18n } from "../contexts/HomeI18nContext";
 
 const PatientSummary: React.FC = () => {
+  const { locale } = useHomeI18n();
+  const header = getPatientSummaryHeader(locale);
   return (
     <div className="max-w-3xl mx-auto px-4 py-10 space-y-6">
-      <header className="space-y-2">
+      <header lang={locale} dir={locale.split("-")[0] === "he" ? "rtl" : "ltr"} className="space-y-2">
         <h1 className="text-2xl font-semibold text-gray-900">
-          Résumé patient (exemple)
+          {header.title}
         </h1>
         <p className="text-sm text-gray-600">
-          Cette page illustre comment ClinIA pourrait, à terme, pré-remplir
-          un résumé à partager avec le patient ou à consigner au dossier médical.
-          Toutes les données affichées sont simulées.
+          {header.description}
         </p>
       </header>
 
-      <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm text-sm space-y-3">
+      <section lang="en" dir="ltr" translate="no" aria-labelledby="patient-summary-example-title" className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm text-sm space-y-3">
         <div>
-          <h2 className="text-sm font-semibold text-gray-800 mb-1">
-            Exemple de contenu pour le patient
+          <h2 id="patient-summary-example-title" className="text-sm font-semibold text-gray-800 mb-1">
+            {panel.title}
           </h2>
           <p className="text-gray-800">
-            Aujourd&apos;hui, nous avons discuté de votre tension artérielle élevée.
-            Un traitement a été proposé pour aider à la contrôler et réduire les risques
-            à long terme sur le coeur, le cerveau et les reins.
+            {panel.summary}
           </p>
         </div>
 
         <div className="border-t border-dashed border-gray-200 pt-3 space-y-1">
           <p className="text-gray-800">
-            Le médicament simulé choisi : <span className="font-semibold">Indapamide</span>.
+            {panel.medicationLabel} <span className="font-semibold">{panel.medication}</span>.
           </p>
           <ul className="list-disc ml-4 text-gray-700">
-            <li>À prendre une fois par jour, le matin.</li>
-            <li>Surveiller l&apos;apparition de vertiges ou de fatigue inhabituelle.</li>
-            <li>Revenir en consultation ou contacter la clinique en cas de symptômes inquiétants.</li>
+            <li>{panel.instruction}</li>
+            <li>{panel.monitoring}</li>
+            <li>{panel.followUp}</li>
           </ul>
         </div>
 
         <p className="text-xs text-gray-500">
-          Dans un projet réel, ce type de texte serait personnalisé et rédigé avec l&apos;appui de
-          médecins, puis validé d&apos;un point de vue clinique, éthique et légal.
+          {panel.disclaimer}
         </p>
       </section>
     </div>

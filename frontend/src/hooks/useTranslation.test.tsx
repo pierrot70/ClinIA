@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { labels } from "../i18n/uiLabels";
 import { supportInboxFrench, supportInboxTranslations } from "../i18n/supportAccessInboxLabels";
 import { useTranslation } from "./useTranslation";
+import { commentsPageFrench, commentsPageTranslations } from "../i18n/commentsPageLabels";
+import { appointmentCreationRows } from "../i18n/appointmentCreationLabels";
+import { patientAdministrativeLabels, patientFormRows } from "../i18n/patientPageFallbacks";
 
 const { translateTextMock } = vi.hoisted(() => ({
     translateTextMock: vi.fn(),
@@ -14,6 +17,71 @@ vi.mock("../services/translationApi", () => ({
 }));
 
 describe("useTranslation", () => {
+    it.each(["fr-CA", "en-CA", "es", "ko-KR", "vi", "no-NO", "ja", "zh", "he"].flatMap((locale, index) =>
+        patientFormRows.map(row => ({ locale, source: row[0], expected: row[index] }))
+    ))("switches patient form label '$source' to $locale", async ({ locale, source, expected }) => {
+        const { result, rerender } = renderHook(({ targetLang }) => useTranslation({ text: source, targetLang, namespace: "patients-page" }), { initialProps: { targetLang: "fr-CA" } });
+        rerender({ targetLang: locale });
+        await waitFor(() => expect(result.current.translated).toBe(expected));
+        expect(expected).toBeTruthy();
+        rerender({ targetLang: "fr-CA" });
+        await waitFor(() => expect(result.current.translated).toBe(source));
+        expect(translateTextMock).not.toHaveBeenCalled();
+    });
+    it.each(Object.entries(patientAdministrativeLabels).flatMap(([locale, translated]) =>
+        patientAdministrativeLabels.fr.map((source, index) => ({ locale, source, expected: translated[index] }))
+    ))("localizes patient administrative label '$source' in $locale", async ({ locale, source, expected }) => {
+        const { result, rerender } = renderHook(({ targetLang }) => useTranslation({ text: source, targetLang, namespace: "patients-page" }), { initialProps: { targetLang: "fr-CA" } });
+        rerender({ targetLang: locale });
+        await waitFor(() => expect(result.current.translated).toBe(expected));
+        expect(expected).toBeTruthy();
+        expect(translateTextMock).not.toHaveBeenCalled();
+    });
+    it.each([
+        ["fr-CA", "patient trouvé", "patients trouvés"],
+        ["en-CA", "patient found", "patients found"],
+        ["es", "paciente encontrado", "pacientes encontrados"],
+        ["ko-KR", "명의 환자를 찾았습니다", "명의 환자를 찾았습니다"],
+        ["vi", "bệnh nhân được tìm thấy", "bệnh nhân được tìm thấy"],
+        ["no-NO", "pasient funnet", "pasienter funnet"],
+        ["ja", "人の患者が見つかりました", "人の患者が見つかりました"],
+        ["zh", "位患者已找到", "位患者已找到"],
+        ["he", "מטופל נמצא", "מטופלים נמצאו"],
+    ])("localizes patient result counts in %s", async (locale, singular, plural) => {
+        const { result, rerender } = renderHook(({ targetLang }) => ({
+            singular: useTranslation({ text: labels.patientsPage.search.resultSingular, targetLang, namespace: "patients-page" }).translated,
+            plural: useTranslation({ text: labels.patientsPage.search.resultPlural, targetLang, namespace: "patients-page" }).translated,
+        }), { initialProps: { targetLang: "fr-CA" } });
+        rerender({ targetLang: locale });
+        await waitFor(() => expect(result.current).toEqual({ singular, plural }));
+        for (const count of [0, 1, 4]) {
+            expect(`${count} ${count === 1 ? result.current.singular : result.current.plural}`)
+                .toBe(`${count} ${count === 1 ? singular : plural}`);
+        }
+        expect(translateTextMock).not.toHaveBeenCalled();
+    });
+    it.each(["fr-CA", "en-CA", "es", "ko-KR", "vi", "no-NO", "ja", "zh", "he"].flatMap((locale, index) =>
+        appointmentCreationRows.map(row => ({ locale, source: row[0], expected: row[index] }))
+    ))("switches appointment UI '$source' to $locale locally", async ({ locale, source, expected }) => {
+        expect(expected).toBeTruthy();
+        const { result, rerender } = renderHook(({ targetLang }) => useTranslation({ text: source, targetLang, namespace: "appointments-page" }), { initialProps: { targetLang: "fr-CA" } });
+        expect(result.current.translated).toBe(source);
+        rerender({ targetLang: locale });
+        await waitFor(() => expect(result.current.translated).toBe(expected));
+        rerender({ targetLang: "fr-CA" });
+        await waitFor(() => expect(result.current.translated).toBe(source));
+        expect(translateTextMock).not.toHaveBeenCalled();
+    });
+    it.each(Object.entries(commentsPageTranslations).flatMap(([locale, translated]) =>
+        Object.entries(commentsPageFrench).map(([key, source]) => ({ locale, key, source,
+            expected: translated[key as keyof typeof commentsPageFrench] }))
+    ))("uses a local comments-page translation for $key in $locale", async ({ locale, source, expected }) => {
+        expect(expected).toBeTruthy();
+        const { result, rerender } = renderHook(({ targetLang }) => useTranslation({ text: source, targetLang, namespace: "comments-page" }), { initialProps: { targetLang: "fr-CA" } });
+        rerender({ targetLang: locale });
+        await waitFor(() => expect(result.current.translated).toBe(expected));
+        expect(translateTextMock).not.toHaveBeenCalled();
+    });
     it.each([
         ["fr-CA", "Accès de soutien"], ["en-CA", "Support access"],
         ["es", "Acceso de soporte"], ["ko", "지원 접근"],

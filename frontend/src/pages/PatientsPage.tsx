@@ -59,6 +59,7 @@ function usePatientsPageLabels(targetLang: string) {
     const { translated: ramqPlaceholder } = useTranslation({ text: source.form.ramqPlaceholder, ...options });
     const { translated: countryLabel } = useTranslation({ text: source.form.countryLabel, ...options });
     const { translated: healthInsuranceJurisdictionLabel } = useTranslation({ text: source.form.healthInsuranceJurisdictionLabel, ...options });
+    const { translated: unspecifiedJurisdiction } = useTranslation({ text: source.form.healthInsuranceJurisdictionOptions.UNKNOWN, ...options });
     const { translated: phonePlaceholder } = useTranslation({ text: source.form.phonePlaceholder, ...options });
     const { translated: emailPlaceholder } = useTranslation({ text: source.form.emailPlaceholder, ...options });
     const { translated: addressPlaceholder } = useTranslation({ text: source.form.addressPlaceholder, ...options });
@@ -141,7 +142,7 @@ function usePatientsPageLabels(targetLang: string) {
         countryLabel,
         countryOptions: source.form.countryOptions,
         healthInsuranceJurisdictionLabel,
-        healthInsuranceJurisdictionOptions: source.form.healthInsuranceJurisdictionOptions,
+        healthInsuranceJurisdictionOptions: { ...source.form.healthInsuranceJurisdictionOptions, UNKNOWN: unspecifiedJurisdiction },
         phonePlaceholder,
         emailPlaceholder,
         addressPlaceholder,

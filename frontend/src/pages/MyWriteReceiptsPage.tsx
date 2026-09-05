@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { ClipboardCheck, Copy, Eye, RefreshCw, Search, X } from "lucide-react";
-import { labels } from "../i18n/uiLabels";
+import { getMyWriteReceiptsLabels } from "../i18n/myWriteReceiptsLabels";
+import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { fetchPatientsPaginated, type Patient } from "../services/patientsApi";
 import {
     fetchMyWriteReceipts,
@@ -10,12 +11,17 @@ import {
 import { useDebounce } from "../hooks/useDebounce";
 
 const LIMIT = 25;
+// Receipt results are an English-only technical panel, independent of the filters' locale.
+const RECEIPT_LOCALE = "en-CA";
+const receiptLabels = getMyWriteReceiptsLabels(RECEIPT_LOCALE);
+const receiptCollectionLabel = (value: string) => receiptLabels.collections[value as keyof typeof receiptLabels.collections] ?? value;
+const receiptOperationLabel = (value: string) => receiptLabels.operations[value as keyof typeof receiptLabels.operations] ?? value;
 const COLLECTIONS = ["", "patients", "appointments", "diagnosisresults", "cliniciancomments"];
 const OPERATIONS: Array<"" | WriteOperationAuditOperation> = ["", "CREATE", "UPDATE", "DELETE", "REPLY"];
 
-function formatTimestamp(value: string) {
+function formatTimestamp(value: string, locale: string) {
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleString("fr-CA");
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString(locale);
 }
 
 function receiptStatus(receipt: MyWriteReceipt) {
@@ -40,7 +46,10 @@ function formatWriteConcern(receipt: MyWriteReceipt) {
 }
 
 export function MyWriteReceiptsPage() {
-    const pageLabels = labels.myWriteReceipts;
+    const { locale } = useHomeI18n();
+    const pageLabels = getMyWriteReceiptsLabels(locale);
+    const collectionLabel = (value: string) => pageLabels.collections[value as keyof typeof pageLabels.collections] ?? value;
+    const operationLabel = (value: string) => pageLabels.operations[value as keyof typeof pageLabels.operations] ?? value;
     const [patients, setPatients] = useState<Patient[]>([]);
     const [receipts, setReceipts] = useState<MyWriteReceipt[]>([]);
     const [patientId, setPatientId] = useState("");
@@ -54,7 +63,8 @@ export function MyWriteReceiptsPage() {
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
+    const [errorKind, setError] = useState<"" | "copyError" | "loadError">("");
+    const error = errorKind ? receiptLabels.status[errorKind] : "";
     const [copiedId, setCopiedId] = useState("");
     const [patientsLoading, setPatientsLoading] = useState(false);
     const [selectedReceiptId, setSelectedReceiptId] = useState("");
@@ -113,7 +123,7 @@ export function MyWriteReceiptsPage() {
             endDate: endDate || undefined,
         });
         if (response.error) {
-            setError(response.error.message);
+            setError("loadError");
             setReceipts([]);
         } else if (response.data) {
             setReceipts(response.data.logs);
@@ -147,7 +157,7 @@ export function MyWriteReceiptsPage() {
             setCopiedId(verificationId);
             window.setTimeout(() => setCopiedId(""), 1500);
         } catch {
-            setError("Impossible de copier le reçu.");
+            setError("copyError");
         }
     };
 
@@ -190,12 +200,12 @@ export function MyWriteReceiptsPage() {
                     </div>
                     <label className="text-sm text-gray-700">{pageLabels.filters.collection}
                         <select value={collectionName} onChange={(event) => setCollectionName(event.target.value)} className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm">
-                            {COLLECTIONS.map((value) => <option key={value || "all"} value={value}>{value || pageLabels.filters.allCollections}</option>)}
+                            {COLLECTIONS.map((value) => <option key={value || "all"} value={value}>{value ? collectionLabel(value) : pageLabels.filters.allCollections}</option>)}
                         </select>
                     </label>
                     <label className="text-sm text-gray-700">{pageLabels.filters.operation}
                         <select value={operation} onChange={(event) => setOperation(event.target.value as "" | WriteOperationAuditOperation)} className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm">
-                            {OPERATIONS.map((value) => <option key={value || "all"} value={value}>{value || pageLabels.filters.allOperations}</option>)}
+                            {OPERATIONS.map((value) => <option key={value || "all"} value={value}>{value ? operationLabel(value) : pageLabels.filters.allOperations}</option>)}
                         </select>
                     </label>
                     <label className="text-sm text-gray-700">{pageLabels.filters.startDate}
@@ -212,9 +222,9 @@ export function MyWriteReceiptsPage() {
                 </div>
             </section>
 
-            <section className="border border-gray-200 bg-white shadow-sm md:hidden">
+            <section lang="en-CA" dir="ltr" className="border border-gray-200 bg-white shadow-sm md:hidden">
                 {error && <p className="m-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-                {loading ? <p className="p-6 text-sm text-gray-600">{pageLabels.status.loading}</p> : receipts.length === 0 ? <p className="p-6 text-sm text-gray-600">{pageLabels.status.empty}</p> : (
+                {loading ? <p className="p-6 text-sm text-gray-600">{receiptLabels.status.loading}</p> : receipts.length === 0 ? <p className="p-6 text-sm text-gray-600">{receiptLabels.status.empty}</p> : (
                     <div className="divide-y divide-gray-100">
                         {receipts.map((receipt, index) => {
                             const status = receiptStatus(receipt);
@@ -223,33 +233,33 @@ export function MyWriteReceiptsPage() {
                             const expanded = selectedReceiptId === receiptKey;
                             return <article key={receiptKey} className="space-y-2 p-4 text-sm">
                                 <div className="flex items-start justify-between gap-3">
-                                    <time className="text-xs text-gray-600">{formatTimestamp(receipt.timestamp)}</time>
+                                    <time className="text-xs text-gray-600">{formatTimestamp(receipt.timestamp, RECEIPT_LOCALE)}</time>
                                     <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${receiptStatusClass(status)}`}>{status}</span>
                                 </div>
                                 <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
-                                    <div><dt className="text-xs uppercase text-gray-500">{pageLabels.table.patient}</dt><dd className="mt-0.5 font-medium text-gray-900">{patientName || (receipt.patientId ? pageLabels.unavailablePatient : pageLabels.noPatient)}</dd></div>
-                                    <div><dt className="text-xs uppercase text-gray-500">{pageLabels.table.collection}</dt><dd className="mt-0.5 break-words text-gray-800">{receipt.collectionName}</dd></div>
-                                    <div><dt className="text-xs uppercase text-gray-500">{pageLabels.table.operation}</dt><dd className="mt-0.5 text-gray-800">{receipt.operation}</dd></div>
-                                    <div><dt className="text-xs uppercase text-gray-500">{pageLabels.table.replica}</dt><dd className="mt-0.5 text-gray-800">{receipt.replicaSet?.healthyCount ?? "-"}/{receipt.replicaSet?.memberCount ?? "-"} {pageLabels.healthy}</dd></div>
+                                    <div><dt className="text-xs uppercase text-gray-500">{receiptLabels.table.patient}</dt><dd className="mt-0.5 font-medium text-gray-900">{patientName || (receipt.patientId ? receiptLabels.unavailablePatient : receiptLabels.noPatient)}</dd></div>
+                                    <div><dt className="text-xs uppercase text-gray-500">{receiptLabels.table.collection}</dt><dd className="mt-0.5 break-words text-gray-800">{receiptCollectionLabel(receipt.collectionName)}</dd></div>
+                                    <div><dt className="text-xs uppercase text-gray-500">{receiptLabels.table.operation}</dt><dd className="mt-0.5 text-gray-800">{receiptOperationLabel(receipt.operation)}</dd></div>
+                                    <div><dt className="text-xs uppercase text-gray-500">{receiptLabels.table.replica}</dt><dd className="mt-0.5 text-gray-800">{receipt.replicaSet?.healthyCount ?? "-"}/{receipt.replicaSet?.memberCount ?? "-"} {receiptLabels.healthy}</dd></div>
                                 </dl>
-                                <button type="button" onClick={() => setSelectedReceiptId(expanded ? "" : receiptKey)} className="rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{expanded ? pageLabels.actions.hideDetails : pageLabels.actions.showDetails}</button>
-                                {expanded && <div className="rounded bg-slate-50 p-3 text-xs text-gray-700"><div><span className="font-medium">{pageLabels.details.verification}: </span><code className="break-all">{receipt.verificationId || "-"}</code></div><div className="mt-2"><span className="font-medium">{pageLabels.details.fields}: </span>{receipt.changedFields.length ? receipt.changedFields.join(", ") : "-"}</div></div>}
+                                <button type="button" onClick={() => setSelectedReceiptId(expanded ? "" : receiptKey)} className="rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{expanded ? receiptLabels.actions.hideDetails : receiptLabels.actions.showDetails}</button>
+                                {expanded && <div className="rounded bg-slate-50 p-3 text-xs text-gray-700"><div><span className="font-medium">{receiptLabels.details.verification}: </span><code className="break-all">{receipt.verificationId || "-"}</code></div><div className="mt-2"><span className="font-medium">{receiptLabels.details.fields}: </span>{receipt.changedFields.length ? receipt.changedFields.join(", ") : "-"}</div></div>}
                             </article>;
                         })}
                     </div>
                 )}
                 <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 text-sm text-gray-600">
                     <span>{page} / {totalPages}</span>
-                    <div className="flex gap-2"><button type="button" disabled={page <= 1 || loading} onClick={() => void loadReceipts(page - 1)} className="rounded border border-gray-300 px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50">{pageLabels.actions.previous}</button><button type="button" disabled={page >= totalPages || loading} onClick={() => void loadReceipts(page + 1)} className="rounded border border-gray-300 px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50">{pageLabels.actions.next}</button></div>
+                    <div className="flex gap-2"><button type="button" disabled={page <= 1 || loading} onClick={() => void loadReceipts(page - 1)} className="rounded border border-gray-300 px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50">{receiptLabels.actions.previous}</button><button type="button" disabled={page >= totalPages || loading} onClick={() => void loadReceipts(page + 1)} className="rounded border border-gray-300 px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50">{receiptLabels.actions.next}</button></div>
                 </div>
             </section>
 
-            <section className="hidden overflow-x-auto border border-gray-200 bg-white shadow-sm md:block">
+            <section lang="en-CA" dir="ltr" className="hidden overflow-x-auto border border-gray-200 bg-white shadow-sm md:block">
                 {error && <p className="m-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-                {loading ? <p className="p-6 text-sm text-gray-600">{pageLabels.status.loading}</p> : receipts.length === 0 ? <p className="p-6 text-sm text-gray-600">{pageLabels.status.empty}</p> : (
+                {loading ? <p className="p-6 text-sm text-gray-600">{receiptLabels.status.loading}</p> : receipts.length === 0 ? <p className="p-6 text-sm text-gray-600">{receiptLabels.status.empty}</p> : (
                     <table className="min-w-full text-left text-sm">
                         <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-600"><tr>
-                            <th className="px-4 py-3">{pageLabels.table.date}</th><th className="px-4 py-3">{pageLabels.table.patient}</th><th className="px-4 py-3">{pageLabels.table.collection}</th><th className="px-4 py-3">{pageLabels.table.operation}</th><th className="px-4 py-3">{pageLabels.table.verification}</th><th className="px-4 py-3">{pageLabels.table.fields}</th><th className="px-4 py-3">{pageLabels.table.replica}</th><th className="px-4 py-3"><span className="sr-only">{pageLabels.table.details}</span></th>
+                            <th className="px-4 py-3">{receiptLabels.table.date}</th><th className="px-4 py-3">{receiptLabels.table.patient}</th><th className="px-4 py-3">{receiptLabels.table.collection}</th><th className="px-4 py-3">{receiptLabels.table.operation}</th><th className="px-4 py-3">{receiptLabels.table.verification}</th><th className="px-4 py-3">{receiptLabels.table.fields}</th><th className="px-4 py-3">{receiptLabels.table.replica}</th><th className="px-4 py-3"><span className="sr-only">{receiptLabels.table.details}</span></th>
                         </tr></thead>
                         <tbody className="divide-y divide-gray-100">
                             {receipts.map((receipt, index) => {
@@ -260,16 +270,16 @@ export function MyWriteReceiptsPage() {
                                 const replica = receipt.replicaSet;
                                 return <Fragment key={receiptKey}>
                                     <tr key={receiptKey}>
-                                        <td className="whitespace-nowrap px-4 py-3 text-gray-700">{formatTimestamp(receipt.timestamp)}</td>
-                                        <td className="px-4 py-3 font-medium text-gray-900">{patientName || (receipt.patientId ? pageLabels.unavailablePatient : pageLabels.noPatient)}</td>
-                                        <td className="px-4 py-3 text-gray-800">{receipt.collectionName}</td>
-                                        <td className="px-4 py-3 text-gray-800">{receipt.operation}</td>
-                                        <td className="px-4 py-3"><div className="flex min-w-56 items-center gap-2"><code className="break-all text-xs text-gray-800">{receipt.verificationId}</code><button type="button" onClick={() => void copy(receipt.verificationId)} className="inline-flex shrink-0 items-center gap-1 rounded border border-gray-300 p-2 text-gray-700 hover:bg-gray-50" title={pageLabels.actions.copy}><Copy className="h-4 w-4" /><span className="sr-only">{copiedId === receipt.verificationId ? pageLabels.actions.copied : pageLabels.actions.copy}</span></button></div></td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-gray-700">{formatTimestamp(receipt.timestamp, RECEIPT_LOCALE)}</td>
+                                        <td className="px-4 py-3 font-medium text-gray-900">{patientName || (receipt.patientId ? receiptLabels.unavailablePatient : receiptLabels.noPatient)}</td>
+                                        <td className="px-4 py-3 text-gray-800">{receiptCollectionLabel(receipt.collectionName)}</td>
+                                        <td className="px-4 py-3 text-gray-800">{receiptOperationLabel(receipt.operation)}</td>
+                                        <td className="px-4 py-3"><div className="flex min-w-56 items-center gap-2"><code className="break-all text-xs text-gray-800">{receipt.verificationId}</code><button type="button" onClick={() => void copy(receipt.verificationId)} className="inline-flex shrink-0 items-center gap-1 rounded border border-gray-300 p-2 text-gray-700 hover:bg-gray-50" title={receiptLabels.actions.copy}><Copy className="h-4 w-4" /><span className="sr-only">{copiedId === receipt.verificationId ? receiptLabels.actions.copied : receiptLabels.actions.copy}</span></button></div></td>
                                         <td className="px-4 py-3 text-gray-700">{receipt.changedFields.length ? receipt.changedFields.join(", ") : "-"}</td>
-                                        <td className="px-4 py-3"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${receiptStatusClass(status)}`}>{status}</span><div className="mt-1 text-xs text-gray-500">{replica?.healthyCount ?? "-"}/{replica?.memberCount ?? "-"} {pageLabels.healthy}</div></td>
-                                        <td className="px-4 py-3"><button type="button" onClick={() => setSelectedReceiptId(expanded ? "" : receiptKey)} className="inline-flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"><Eye className="h-4 w-4" />{expanded ? pageLabels.actions.hideDetails : pageLabels.actions.showDetails}</button></td>
+                                        <td className="px-4 py-3"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${receiptStatusClass(status)}`}>{status}</span><div className="mt-1 text-xs text-gray-500">{replica?.healthyCount ?? "-"}/{replica?.memberCount ?? "-"} {receiptLabels.healthy}</div></td>
+                                        <td className="px-4 py-3"><button type="button" onClick={() => setSelectedReceiptId(expanded ? "" : receiptKey)} className="inline-flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"><Eye className="h-4 w-4" />{expanded ? receiptLabels.actions.hideDetails : receiptLabels.actions.showDetails}</button></td>
                                     </tr>
-                                    {expanded && <tr className="bg-slate-50"><td colSpan={8} className="px-4 py-4"><section aria-label={pageLabels.details.title} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div><h2 className="text-sm font-semibold text-gray-950">{pageLabels.details.title}</h2><dl className="mt-3 space-y-2 text-sm"><div><dt className="text-xs uppercase text-gray-500">{pageLabels.details.verification}</dt><dd className="break-all font-mono text-xs text-gray-900">{receipt.verificationId}</dd></div><div><dt className="text-xs uppercase text-gray-500">{pageLabels.details.date}</dt><dd>{formatTimestamp(receipt.timestamp)}</dd></div></dl></div><dl className="space-y-2 text-sm"><div><dt className="text-xs uppercase text-gray-500">{pageLabels.details.patient}</dt><dd>{patientName || (receipt.patientId ? pageLabels.unavailablePatient : pageLabels.noPatient)}</dd></div><div><dt className="text-xs uppercase text-gray-500">{pageLabels.details.collection}</dt><dd>{receipt.collectionName}</dd></div><div><dt className="text-xs uppercase text-gray-500">{pageLabels.details.operation}</dt><dd>{receipt.operation}</dd></div></dl><dl className="space-y-2 text-sm"><div><dt className="text-xs uppercase text-gray-500">{pageLabels.details.fields}</dt><dd>{receipt.changedFields.length ? receipt.changedFields.join(", ") : "-"}</dd></div><div><dt className="text-xs uppercase text-gray-500">{pageLabels.details.writeConcern}</dt><dd className="font-mono text-xs">{formatWriteConcern(receipt)}</dd></div><div><dt className="text-xs uppercase text-gray-500">{pageLabels.details.resource}</dt><dd className="break-all font-mono text-xs">{receipt.resourceId || "-"}</dd></div></dl><dl className="space-y-2 text-sm"><div><dt className="text-xs uppercase text-gray-500">{pageLabels.details.persistence}</dt><dd>{replica?.majorityAvailable ? pageLabels.details.confirmed : pageLabels.details.unavailable}</dd></div><div><dt className="text-xs uppercase text-gray-500">{pageLabels.details.replica}</dt><dd>{status} · {replica?.healthyCount ?? "-"}/{replica?.memberCount ?? "-"} {pageLabels.healthy}</dd></div><div><dt className="text-xs uppercase text-gray-500">{pageLabels.details.lag}</dt><dd>{replica?.maxLagSeconds == null ? "-" : `${replica.maxLagSeconds}s`}</dd></div></dl></section></td></tr>}
+                                    {expanded && <tr className="bg-slate-50"><td colSpan={8} className="px-4 py-4"><section aria-label={receiptLabels.details.title} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div><h2 className="text-sm font-semibold text-gray-950">{receiptLabels.details.title}</h2><dl className="mt-3 space-y-2 text-sm"><div><dt className="text-xs uppercase text-gray-500">{receiptLabels.details.verification}</dt><dd className="break-all font-mono text-xs text-gray-900">{receipt.verificationId}</dd></div><div><dt className="text-xs uppercase text-gray-500">{receiptLabels.details.date}</dt><dd>{formatTimestamp(receipt.timestamp, RECEIPT_LOCALE)}</dd></div></dl></div><dl className="space-y-2 text-sm"><div><dt className="text-xs uppercase text-gray-500">{receiptLabels.details.patient}</dt><dd>{patientName || (receipt.patientId ? receiptLabels.unavailablePatient : receiptLabels.noPatient)}</dd></div><div><dt className="text-xs uppercase text-gray-500">{receiptLabels.details.collection}</dt><dd>{receiptCollectionLabel(receipt.collectionName)}</dd></div><div><dt className="text-xs uppercase text-gray-500">{receiptLabels.details.operation}</dt><dd>{receiptOperationLabel(receipt.operation)}</dd></div></dl><dl className="space-y-2 text-sm"><div><dt className="text-xs uppercase text-gray-500">{receiptLabels.details.fields}</dt><dd>{receipt.changedFields.length ? receipt.changedFields.join(", ") : "-"}</dd></div><div><dt className="text-xs uppercase text-gray-500">{receiptLabels.details.writeConcern}</dt><dd className="font-mono text-xs">{formatWriteConcern(receipt)}</dd></div><div><dt className="text-xs uppercase text-gray-500">{receiptLabels.details.resource}</dt><dd className="break-all font-mono text-xs">{receipt.resourceId || "-"}</dd></div></dl><dl className="space-y-2 text-sm"><div><dt className="text-xs uppercase text-gray-500">{receiptLabels.details.persistence}</dt><dd>{replica?.majorityAvailable ? receiptLabels.details.confirmed : receiptLabels.details.unavailable}</dd></div><div><dt className="text-xs uppercase text-gray-500">{receiptLabels.details.replica}</dt><dd>{status} · {replica?.healthyCount ?? "-"}/{replica?.memberCount ?? "-"} {receiptLabels.healthy}</dd></div><div><dt className="text-xs uppercase text-gray-500">{receiptLabels.details.lag}</dt><dd>{replica?.maxLagSeconds == null ? "-" : `${replica.maxLagSeconds}s`}</dd></div></dl></section></td></tr>}
                                 </Fragment>;
                             })}
                         </tbody>
@@ -277,7 +287,7 @@ export function MyWriteReceiptsPage() {
                 )}
                 <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 text-sm text-gray-600">
                     <span>{page} / {totalPages}</span>
-                    <div className="flex gap-2"><button type="button" disabled={page <= 1 || loading} onClick={() => void loadReceipts(page - 1)} className="rounded border border-gray-300 px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50">{pageLabels.actions.previous}</button><button type="button" disabled={page >= totalPages || loading} onClick={() => void loadReceipts(page + 1)} className="rounded border border-gray-300 px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50">{pageLabels.actions.next}</button></div>
+                    <div className="flex gap-2"><button type="button" disabled={page <= 1 || loading} onClick={() => void loadReceipts(page - 1)} className="rounded border border-gray-300 px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50">{receiptLabels.actions.previous}</button><button type="button" disabled={page >= totalPages || loading} onClick={() => void loadReceipts(page + 1)} className="rounded border border-gray-300 px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50">{receiptLabels.actions.next}</button></div>
                 </div>
             </section>
         </main>

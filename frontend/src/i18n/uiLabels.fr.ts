@@ -931,6 +931,7 @@ export const UI_LABELS_FR = {
         },
         form: {
             newCommentLabel: "Nouveau commentaire",
+            englishOnlyHint: "Veuillez rédiger votre commentaire en anglais pour que l'équipe de soutien puisse le lire. ClinIA ne traduit pas les commentaires.",
             nameLabel: "Nom ou pseudonyme",
             namePlaceholder: "Exemple: dr.lasante",
             trackingCodeLabel: "Code de suivi",
@@ -1083,7 +1084,34 @@ export const UI_LABELS_FR = {
             next: "Suivant",
         },
     },
+    quickModePanel: {
+        title: "Recommandation simulée",
+        first: "agent de première ligne, très bon contrôle tensionnel, profil de tolérance favorable.",
+        second: "alternative pertinente, utile chez les patients avec comorbidités cardiaques.",
+        third: "particulièrement intéressante en cas de diabète ou de néphropathie (simulation).",
+        disclaimer: "Exemple de format ultra-condensé que ClinIA pourrait générer à partir de données validées. Ici, toutes les informations sont fictives.",
+    },
+    quickModeHeader: {
+        title: "Mode rapide (démo)",
+        description: 'Exemple de présentation "6 secondes" : 1 traitement recommandé, 2 alternatives et 3 phrases pour l’essentiel. Contenu fictif.',
+    },
+    patientSummaryExample: {
+        title: "Résumé patient (exemple)",
+        description: "Cette page illustre comment ClinIA pourrait, à terme, pré-remplir un résumé à partager avec le patient ou à consigner au dossier médical. Toutes les données affichées sont simulées.",
+        panel: {
+            title: "Exemple de contenu pour le patient",
+            summary: "Aujourd'hui, nous avons discuté de votre tension artérielle élevée. Un traitement a été proposé pour aider à la contrôler et réduire les risques à long terme sur le coeur, le cerveau et les reins.",
+            medicationLabel: "Le médicament simulé choisi :",
+            medication: "Indapamide",
+            instruction: "À prendre une fois par jour, le matin.",
+            monitoring: "Surveiller l'apparition de vertiges ou de fatigue inhabituelle.",
+            followUp: "Revenir en consultation ou contacter la clinique en cas de symptômes inquiétants.",
+            disclaimer: "Dans un projet réel, ce type de texte serait personnalisé et rédigé avec l'appui de médecins, puis validé d'un point de vue clinique, éthique et légal.",
+        },
+    },
     myWriteReceipts: {
+        operations: { CREATE: "Création", UPDATE: "Modification", DELETE: "Suppression", REPLY: "Réponse" },
+        collections: { patients: "Patients", appointments: "Rendez-vous", diagnosisresults: "Résultats d'analyse", cliniciancomments: "Commentaires médecins" },
         title: "Mes reçus d'écriture",
         description: "Retrouvez les confirmations de vos propres écritures cliniques. Les reçus des autres utilisateurs ne sont jamais affichés.",
         filters: {
@@ -1113,6 +1141,8 @@ export const UI_LABELS_FR = {
         },
         status: {
             loading: "Chargement des reçus...",
+            copyError: "Impossible de copier le reçu.",
+            loadError: "Impossible de charger les reçus. Veuillez réessayer.",
             empty: "Aucun reçu ne correspond à ces critères.",
             results: "reçu(s) retrouvé(s)",
             patientsLoading: "Recherche des patients...",
