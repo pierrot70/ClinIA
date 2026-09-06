@@ -86,3 +86,21 @@ annulée. Ce verrou ne remplace pas les règles des autres parcours de réservat
 
 Les tests unitaires couvrent les branches, le partage de session et les refus.
 Le rollback et la concurrence sur MongoDB réel restent à confirmer avec ce drill.
+
+## Créneaux consommés par une consultation terminée
+
+Un rendez-vous `completed` conserve le créneau du médecin comme occupé, au même
+titre qu'un rendez-vous `scheduled`. Le filtre partagé de disponibilités (régulier
+et walk-in) et la validation de réservation côté serveur l'excluent, même pour une
+date de test encore future. Le déplacement d'un rendez-vous vers ce créneau est
+également refusé. Le patient peut revenir sur un autre créneau libre.
+
+La limite journalière de rendez-vous planifiés reste distincte. Aucune donnée
+existante ni aucun index MongoDB n'est modifié par cette correction ; les doublons
+historiques ne sont pas supprimés. Les index uniques actuels restent limités à
+`scheduled` : cette correction ne prétend pas étendre leur garantie aux historiques.
+
+Test navigateur : terminer une consultation fictive à 08:15 sur une date future,
+puis refaire la recherche RECEPTION. Le créneau 08:15 de ce médecin ne doit plus
+être proposé, mais les autres créneaux libres doivent rester disponibles. Un POST
+direct visant 08:15 doit être refusé sans créer de rendez-vous.

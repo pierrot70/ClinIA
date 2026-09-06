@@ -634,7 +634,7 @@ export async function updateAppointmentSchedule(id, { date, time, clinique }, au
             specialist: appointment.specialist,
             date,
             time,
-            status: "scheduled",
+            status: { $in: ["scheduled", "completed"] },
         });
         return typeof conflictQuery?.lean === "function"
             ? conflictQuery.lean()
@@ -1451,7 +1451,10 @@ export async function getAvailableSlotSchedule(
         };
     }
 
-    const bookedQuery = { specialist, date, status: "scheduled" };
+    // A completed encounter consumed this physician's time. Closing it must
+    // never make the configured slot bookable again, including future test dates.
+    // Keep this separate from the daily limit, which counts scheduled visits.
+    const bookedQuery = { specialist, date, status: { $in: ["scheduled", "completed"] } };
     if (excludeAppointmentId) {
         bookedQuery._id = { $ne: excludeAppointmentId };
     }

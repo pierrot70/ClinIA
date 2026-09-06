@@ -119,6 +119,66 @@ describe("appointments service", () => {
         role: "MEDECIN",
     };
 
+    describe("completed slots remain occupied", () => {
+        const specialistId = "507f1f77bcf86cd799439021";
+        const patientId = "507f1f77bcf86cd799439012";
+        const clinicId = "507f1f77bcf86cd799439022";
+        beforeEach(() => {
+            const times = ["12:00", "12:15", "12:30", "12:45", "13:00"];
+            specialistFindById.mockReturnValue({ lean: vi.fn().mockResolvedValue({
+                clinique_associer: clinicId,
+                disponibilites: times.map(time => new Date(`2099-01-01T${time}:00`)),
+                walkInDisponibilites: times.map(time => new Date(`2099-01-01T${time}:00`)),
+            }) });
+            const visits = [
+                { time: "12:00", status: "completed" },
+                { time: "12:15", status: "scheduled" },
+                { time: "12:30", status: "cancelled" },
+                { time: "12:45", status: "rescheduled" },
+                { time: "13:00", status: "no_show" },
+            ];
+            find.mockImplementation(query => ({ lean: vi.fn().mockResolvedValue(
+                query.patient ? [] : visits.filter(v => typeof query.status === "string"
+                    ? v.status === query.status : query.status.$in.includes(v.status))
+            ) }));
+            patientFindOne.mockReturnValue({ lean: vi.fn().mockResolvedValue({ _id: patientId, ownerUserId: authUser.userId }) });
+            cliniqueExists.mockResolvedValue(true);
+        });
+
+        it.each(["regular", "walk_in"])("excludes completed and scheduled slots from %s availability, even without a patient filter", async slotType => {
+            expect(await getAvailableSlots(specialistId, "2099-01-01", { clinique: clinicId, slotType }))
+                .toEqual(["12:30", "12:45", "13:00"]);
+            expect(find).toHaveBeenCalledWith({ specialist: specialistId, date: "2099-01-01", status: { $in: ["scheduled", "completed"] } }, { time: 1, _id: 0 });
+        });
+
+        it.each(["MEDECIN", "RECEPTION"])("rejects a direct %s booking on a completed slot before saving", async role => {
+            const actor = { ...authUser, role };
+            const options = role === "RECEPTION" ? { session: transactionSession,
+                receivingPhysicianUserId: authUser.userId, patientFromTransaction: { _id: patientId } } : {};
+            await expect(createAppointment({ patient: patientId, specialist: specialistId, clinique: clinicId,
+                date: "2099-01-01", time: "12:00", priority: "normal", slotType: "walk_in" }, actor, options))
+                .rejects.toMatchObject({ code: "NO_AVAILABILITY" });
+            expect(appointmentSave).not.toHaveBeenCalled();
+            expect(bookingGuardFindOneAndUpdate).not.toHaveBeenCalled();
+        });
+
+        it("still permits another free slot for a returning patient", async () => {
+            const result = await createAppointment({ patient: patientId, specialist: specialistId, clinique: clinicId,
+                date: "2099-01-01", time: "12:30", priority: "normal" }, authUser);
+            expect(result.time).toBe("12:30");
+            expect(appointmentSave).toHaveBeenCalledOnce();
+        });
+
+        it("also refuses moving an existing appointment onto a completed slot", async () => {
+            const appointment = buildAppointment({ specialist: specialistId, patient: patientId, clinique: clinicId });
+            findOne.mockResolvedValueOnce(appointment).mockReturnValueOnce({ lean: vi.fn().mockResolvedValue({ status: "completed" }) });
+            await expect(updateAppointmentSchedule(appointment._id, { date: "2099-01-01", time: "12:00" }, authUser))
+                .rejects.toMatchObject({ code: "SPECIALIST_ALREADY_BOOKED" });
+            expect(findOne).toHaveBeenLastCalledWith(expect.objectContaining({ status: { $in: ["scheduled", "completed"] } }));
+            expect(appointment.save).not.toHaveBeenCalled();
+        });
+    });
+
     it.each([null, "507f1f77bcf86cd799439088"])("reschedules an authorized encounter without requiring patient ownership (%s)", async ownerUserId => {
         const patientId = "507f1f77bcf86cd799439012";
         const specialistId = "507f1f77bcf86cd799439021";
