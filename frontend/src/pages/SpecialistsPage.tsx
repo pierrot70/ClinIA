@@ -21,6 +21,7 @@ import {
 } from "../services/cliniqueApi";
 import { SPECIALTIES } from "../data/specialties";
 import { displaySpecialty } from "../i18n/specialtyLabels";
+import { urgentologistLabels } from "../i18n/urgentologistLabels";
 
 type DisponibiliteForm = {
     date: string; // YYYY-MM-DD
@@ -780,7 +781,7 @@ export function SpecialistsPage() {
             disponibilites,
         });
         setAvailabilityClinique(clinicId);
-        setAvailabilitySlotType("regular");
+        setAvailabilitySlotType(specialist.specialite === "Urgentologue" ? "walk_in" : "regular");
         setActiveDay(null);
     }
 
@@ -971,12 +972,13 @@ export function SpecialistsPage() {
                         <select
                             className="border rounded p-2"
                             value={form.specialite}
-                            onChange={(event) =>
+                            onChange={(event) => {
+                                if (event.target.value === "Urgentologue") setAvailabilitySlotType("walk_in");
                                 setForm((p) => ({
                                     ...p,
                                     specialite: event.target.value,
-                                }))
-                            }
+                                }));
+                            }}
                         >
                             <option value="">{pageLabels.noSpecialty}</option>
                             {SPECIALTIES.map((specialite) => (
@@ -988,6 +990,7 @@ export function SpecialistsPage() {
                                 </option>
                             ))}
                         </select>
+                        {form.specialite === "Urgentologue" && <p className="text-sm text-amber-900">{urgentologistLabels(i18n.locale).hint}</p>}
                     </div>
 
                     <label className="flex items-center gap-2 text-sm">
@@ -1040,7 +1043,7 @@ export function SpecialistsPage() {
                                     setLastClickedSlot(null);
                                 }}
                             >
-                                <option value="regular">
+                                <option value="regular" disabled={form.specialite === "Urgentologue"}>
                                     {pageLabels.regularSlots}
                                 </option>
                                 <option value="walk_in">

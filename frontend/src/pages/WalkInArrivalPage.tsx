@@ -11,6 +11,7 @@ import { useReceptionClinic } from "../contexts/ReceptionClinicContext";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { isReceptionLabel, receptionLabel } from "../i18n/receptionLabels";
 import { receptionReplanLabels } from "../i18n/receptionReplanLabels";
+import { urgentologistLabels, walkInEmergencyReminder } from "../i18n/urgentologistLabels";
 
 const source = labels.walkInArrival;
 
@@ -36,6 +37,28 @@ function AvailabilityOptions({
     locale: string;
     introduction?: string;
 }) {
+    const urgent = urgentologistLabels(locale, availability.urgentologists?.limit);
+    const [choice, setChoice] = useState<"family" | "tomorrow" | null>(null);
+    useEffect(() => { setChoice(null); }, [availability]);
+    if (availability.presentation === "alternatives" || availability.urgentologists?.allAtCapacity) {
+        const familyAvailability = {
+            today: availability.today.filter(option => option.specialist.specialty !== "Urgentologue"),
+            future: availability.future.filter(option => option.specialist.specialty !== "Urgentologue"),
+        };
+        return <div className="space-y-3">
+            <p role="status">{availability.urgentologists?.allAtCapacity ? urgent.full : urgent.unavailableToday}</p>
+            <p role="alert" lang="en" translate="no" data-content-kind={walkInEmergencyReminder.kind}
+                className="rounded border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-700">
+                {walkInEmergencyReminder.text}
+            </p>
+            <div className="flex flex-wrap gap-2">
+                <button type="button" className="rounded border px-3 py-2" onClick={() => setChoice("tomorrow")}>{urgent.tomorrow}</button>
+                <button type="button" className="rounded border px-3 py-2" onClick={() => setChoice("family")}>{urgent.family}</button>
+            </div>
+            {choice === "tomorrow" && <p role="status">{urgent.tomorrowNotice}</p>}
+            {choice === "family" && <AvailabilityOptions availability={familyAvailability} onChooseSlot={onChooseSlot} locale={locale} introduction={introduction} />}
+        </div>;
+    }
     return (
         <div className="space-y-4">
             <p className="text-sm text-slate-700">{introduction || receptionLabel(locale, "availabilityIntro", source.availabilityIntro)}</p>
@@ -48,6 +71,7 @@ function AvailabilityOptions({
                         {availability.today.map((option) => (
                             <li key={`${option.specialist._id}-${option.date}`} className="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
                                 <strong>{option.specialist.prenom} {option.specialist.nom}</strong>
+                                {option.specialist.specialty === "Urgentologue" && <span lang="en" translate="no"> — Emergency Physician</span>}
                                 <span className="ml-2">{option.date}</span>
                                 <div className="mt-2 flex flex-wrap gap-2">
                                     {option.slots.map((time) => (
@@ -72,7 +96,7 @@ function AvailabilityOptions({
                     </ul>
                 )}
             </div>
-            <div>
+            {availability.presentation !== "urgent_today" && <div>
                 <h3 className="text-sm font-semibold text-slate-900">{receptionLabel(locale, "availabilityFuture", source.availabilityFuture)}</h3>
                 {availability.future.length === 0 ? (
                     <p className="mt-1 text-sm text-slate-700">{receptionLabel(locale, "noFutureAvailability", source.noFutureAvailability)}</p>
@@ -81,6 +105,7 @@ function AvailabilityOptions({
                         {availability.future.map((option) => (
                             <li key={`${option.specialist._id}-${option.date}`} className="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
                                 <strong>{option.specialist.prenom} {option.specialist.nom}</strong>
+                                {option.specialist.specialty === "Urgentologue" && <span lang="en" translate="no"> — Emergency Physician</span>}
                                 <span className="ml-2">{option.date}</span>
                                 <div className="mt-2 flex flex-wrap gap-2">
                                     {option.slots.map((time) => (
@@ -104,7 +129,7 @@ function AvailabilityOptions({
                         ))}
                     </ul>
                 )}
-            </div>
+            </div>}
         </div>
     );
 }
@@ -265,7 +290,7 @@ export function WalkInArrivalPage() {
         setLoading(false);
 
         if (response.error) {
-            setError(response.error.code === "RECEPTION_REPLAN_REQUIRED" ? replan.conflict : response.error.code === "RECEIVING_PHYSICIAN_UNAVAILABLE"
+            setError(response.error.code === "MAXIMUM_APPOINTMENTS_REACHED" ? urgentologistLabels(locale).dailyLimitReached : response.error.code === "RECEPTION_REPLAN_REQUIRED" ? replan.conflict : response.error.code === "RECEIVING_PHYSICIAN_UNAVAILABLE"
                 ? receptionLabel(locale, "receivingPhysicianUnavailable", source.receivingPhysicianUnavailable)
                 : response.error.message);
             return;
@@ -417,13 +442,13 @@ export function WalkInArrivalPage() {
                             <h2 className="font-medium text-amber-950">{receptionLabel(locale, "newPatientTitle", source.newPatientTitle)}</h2>
                             <p className="mt-1 text-sm text-amber-900">{receptionLabel(locale, "newPatientDescription", source.newPatientDescription)}</p>
                         </div>
-                        <button type="button" onClick={() => void loadWalkInAvailability()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{receptionLabel(locale, "searchAvailability", source.searchAvailability)}</button>
+                        <button type="button" onClick={() => void loadWalkInAvailability()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{walkInAvailability ? receptionLabel(locale, "refreshAvailability", source.refreshAvailability) : receptionLabel(locale, "searchAvailability", source.searchAvailability)}</button>
                         {loading && <p className="text-sm text-slate-600">{source.availabilityLoading}</p>}
                         {walkInAvailability && <AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} />}
                     </div>
                 ) : (
                     <>
-                        {pending.length === 0 && <button type="button" onClick={confirmSelection} disabled={!selectedPatient || loading} className="mt-4 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{receptionLabel(locale, "searchAvailability", source.searchAvailability)}</button>}
+                        {pending.length === 0 && <button type="button" onClick={confirmSelection} disabled={!selectedPatient || loading} className="mt-4 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{walkInAvailability ? receptionLabel(locale, "refreshAvailability", source.refreshAvailability) : receptionLabel(locale, "searchAvailability", source.searchAvailability)}</button>}
                         {selectedPatient && <p className="mt-3 text-sm text-slate-700">{receptionLabel(locale, "existingPatientDescription", source.existingPatientDescription)}</p>}
                         {loading && selectedPatient && <p className="mt-3 text-sm text-slate-600">{source.availabilityLoading}</p>}
                         {selectedPatient && walkInAvailability && (

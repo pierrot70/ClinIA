@@ -28,6 +28,8 @@ function specialtyKey(value: string) {
  * display names; every other locale deliberately uses the English term.
  */
 export function displaySpecialty(value: string, locale: string) {
+    // New medical specialty uses one English term in every interface language.
+    if (specialtyKey(value) === "urgentologue") return "Emergency Physician";
     const specialty = specialties[specialtyKey(value)];
     if (!specialty) return value.trim();
 

@@ -66,6 +66,7 @@ services:
       SMTP_FROM: "ClinIA <securite@clinique-ai.ca>"
 
       NODE_ENV: "${NODE_ENV:-development}"
+      CLINIA_TEST_URGENTOLOGIST_LIMIT: "${CLINIA_TEST_URGENTOLOGIST_LIMIT:-1}"
       CHOKIDAR_USEPOLLING: "true"
     ports:
       - "4000:4000"

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { assertUrgentologistAvailability } from "../domain/specialties.js";
 import { Specialist } from "../models/Specialist.js";
 import { AdminUser } from "../models/AdminUser.js";
 import { CLINICAL_QUERY_WRITE_OPTIONS, CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
@@ -240,6 +241,7 @@ export async function createSpecialist(dto) {
     validateDisponibilites(dto.disponibilites);
     validateDisponibilites(dto.walkInDisponibilites);
     validatePracticeLocations(dto.practiceLocations);
+    assertUrgentologistAvailability(dto);
     await validateAccountUserLink(dto.accountUserId);
 
     const specialistPayload = applyPracticeLocationCompatibility(dto);
@@ -355,7 +357,7 @@ export async function updateSpecialist(id, updates) {
     await validateAccountUserLink(updates.accountUserId);
 
     let existing = null;
-    if (updates.practiceLocations !== undefined) {
+    if (updates.practiceLocations !== undefined || updates.specialite !== undefined || updates.disponibilites !== undefined) {
         existing = await Specialist.findById(id).lean();
         if (!existing) {
             throw {
@@ -370,6 +372,7 @@ export async function updateSpecialist(id, updates) {
     );
 
     const compatibleUpdates = applyPracticeLocationCompatibility(updates);
+    assertUrgentologistAvailability({ ...existing, ...compatibleUpdates });
     const unset = {};
     if (compatibleUpdates.accountUserId === null) {
         delete compatibleUpdates.accountUserId;

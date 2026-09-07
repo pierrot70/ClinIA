@@ -5,6 +5,8 @@ import { Specialist } from "../models/Specialist.js";
 import { Patient } from "../models/Patient.js";
 import { Clinique } from "../models/Clinique.js";
 import mongoose from "mongoose";
+import { isUrgentologist, URGENTOLOGIST_DAILY_LIMIT } from "../domain/specialties.js";
+import { countUrgentologistConsultations, reserveUrgentologistCapacity } from "./urgentologistCapacity.js";
 import { buildOwnerScope } from "../auth/resourceAccess.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
@@ -249,6 +251,13 @@ export async function createAppointment(
             code: "INVALID_INPUT",
             message: "Spécialiste introuvable.",
         };
+    }
+    if (isUrgentologist(specialist.specialite)) {
+        if (slotType !== "walk_in") throw { code: "INVALID_INPUT", message: "Un urgentologue accepte uniquement des rendez-vous walk-in." };
+        if (!session) return runAppointmentWriteTransaction(transactionSession => createAppointment(dto, authUser, {
+            session: transactionSession, patientFromTransaction, receivingPhysicianUserId, excludeAppointmentId,
+        }));
+        await reserveUrgentologistCapacity(dto.specialist, dto.date, { session, excludeAppointmentId });
     }
 
     if (dto.clinique) {
@@ -534,6 +543,10 @@ export async function rescheduleAppointment(id, schedule, authUser, { session = 
         _id: 1, ownerUserId: 1, num_assurance_maladie: 1, healthInsuranceJurisdiction: 1,
     }).lean();
     if (!patient) throw { code: "INVALID_INPUT", message: "Patient introuvable." };
+    const receivingSpecialist = await Specialist.findById(appointment.specialist, { specialite: 1 }).lean();
+    if (isUrgentologist(receivingSpecialist?.specialite) && !session) {
+        return runAppointmentWriteTransaction(transactionSession => rescheduleAppointment(id, schedule, authUser, { session: transactionSession }));
+    }
     appointment.status = "rescheduled";
     await appointment.save(getClinicalWriteOptions(session));
     await releaseDailyAppointmentCapacity({
@@ -551,7 +564,10 @@ export async function rescheduleAppointment(id, schedule, authUser, { session = 
         time,
         reason: appointment.reason,
         priority: appointment.priority,
-    }, authUser, { session, patientFromTransaction: patient });
+        ...(isUrgentologist(receivingSpecialist?.specialite) ? { slotType: "walk_in" } : {}),
+    }, authUser, { session, patientFromTransaction: patient,
+        ...(isUrgentologist(receivingSpecialist?.specialite) ? { excludeAppointmentId: String(appointment._id) } : {}),
+    });
 
     replacement.ownerUserId = appointment.ownerUserId || authUser.userId;
     replacement.rescheduledFrom = appointment._id;
@@ -618,6 +634,12 @@ export async function updateAppointmentSchedule(id, { date, time, clinique }, au
     const targetClinique = clinique === undefined
         ? appointment.clinique
         : clinique || null;
+    const receivingSpecialist = await Specialist.findById(appointment.specialist, { specialite: 1 }).lean();
+    const urgentologist = isUrgentologist(receivingSpecialist?.specialite);
+    if (urgentologist) {
+        if (!session) return runAppointmentWriteTransaction(transactionSession => updateAppointmentSchedule(id, { date, time, clinique }, authUser, { session: transactionSession }));
+        await reserveUrgentologistCapacity(appointment.specialist, date, { session, excludeAppointmentId: appointment._id });
+    }
     if (
         clinique !== undefined &&
         (!targetClinique || !mongoose.Types.ObjectId.isValid(targetClinique))
@@ -652,6 +674,7 @@ export async function updateAppointmentSchedule(id, { date, time, clinique }, au
             patient: String(appointment.patient),
             excludeAppointmentId: String(appointment._id),
             clinique: targetClinique ? String(targetClinique) : null,
+            ...(urgentologist ? { slotType: "walk_in" } : {}),
         }
     );
     if (!availableSlots.includes(time)) {
@@ -1207,6 +1230,8 @@ export async function findNextAvailableRescheduleSlot(id, authUser) {
 
     const specialist = await Specialist.findById(appointment.specialist, {
         clinique_associer: 1,
+        specialite: 1,
+        walkInDisponibilites: 1,
         disponibilites: 1,
         practiceLocations: 1,
     }).lean();
@@ -1222,7 +1247,7 @@ export async function findNextAvailableRescheduleSlot(id, authUser) {
     for (const location of getPracticeLocations(specialist)) {
         const dates = Array.from(
             new Set(
-                (location.disponibilites || [])
+                (isUrgentologist(specialist.specialite) ? location.walkInDisponibilites || [] : location.disponibilites || [])
                     .map(toLocalDateKey)
                     .filter((date) => date && !isSchedulingDatePast(date))
             )
@@ -1237,6 +1262,7 @@ export async function findNextAvailableRescheduleSlot(id, authUser) {
                     authUser,
                     clinique: location.clinique,
                     excludeAppointmentId: String(appointment._id),
+                    ...(isUrgentologist(specialist.specialite) ? { slotType: "walk_in" } : {}),
                 }
             );
             const time = schedule.slots[0];
@@ -1269,7 +1295,8 @@ async function getSpecialistAvailableTimes(
     specialist,
     date,
     clinique = null,
-    slotType = "regular"
+    slotType = "regular",
+    excludeAppointmentId = null
 ) {
     if (!["regular", "walk_in"].includes(slotType)) {
         throw { code: "INVALID_INPUT", message: "Type de créneau invalide." };
@@ -1281,6 +1308,7 @@ async function getSpecialistAvailableTimes(
     const specialistDoc = await Specialist.findById(
         specialist,
         {
+            specialite: 1,
             disponibilites: 1,
             walkInDisponibilites: 1,
             clinique_associer: 1,
@@ -1292,6 +1320,10 @@ async function getSpecialistAvailableTimes(
 
     if (!specialistDoc) {
         return availableTimes;
+    }
+    if (isUrgentologist(specialistDoc.specialite)) {
+        if (slotType !== "walk_in") return availableTimes;
+        if (await countUrgentologistConsultations(specialist, date, { excludeAppointmentId }) >= URGENTOLOGIST_DAILY_LIMIT) return availableTimes;
     }
 
     const locations = getPracticeLocations(specialistDoc).filter(
@@ -1441,7 +1473,8 @@ export async function getAvailableSlotSchedule(
         specialist,
         date,
         clinique,
-        slotType
+        slotType,
+        excludeAppointmentId
     );
     if (specialistTimes.size === 0) {
         return {

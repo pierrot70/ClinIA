@@ -77,8 +77,20 @@ const receivingPhysicianUnavailable: Record<string, string> = {
     he: "הרופא הזה אינו מקושר עוד לחשבון ClinIA פעיל. יש לבחור רופא פעיל אחר.",
 };
 
+const refreshAvailability: Record<string, string> = {
+    en: "Refresh available appointments",
+    es: "Actualizar citas disponibles",
+    ko: "예약 가능 시간 새로고침",
+    vi: "Làm mới lịch hẹn còn trống",
+    no: "Oppdater ledige timer",
+    ja: "空き予約枠を更新",
+    zh: "刷新可用预约",
+    he: "רענון תורים פנויים",
+};
+
 export function receptionLabel(locale: string, key: string, french: string) {
     const language = locale.toLowerCase().split("-")[0];
+    if (key === "refreshAvailability") return refreshAvailability[language] ?? french;
     if (key === "receivingPhysicianUnavailable") return receivingPhysicianUnavailable[language] ?? french;
     return translations[language]?.[key] || availabilityTranslations[language]?.[key] || confirmationTranslations[language]?.[key] || newPatientFormTranslations[language]?.[key] || french;
 }

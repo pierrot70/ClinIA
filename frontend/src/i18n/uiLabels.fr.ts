@@ -1,4 +1,14 @@
 export const UI_LABELS_FR = {
+    walkInEmergencyReminder: "Si le patient semble très mal en point, RECEPTION doit lui recommander fortement de se rendre à l’urgence, selon le protocole de la clinique. Les options « revenir demain » ou « prendre un rendez-vous ultérieur » ne doivent pas retarder une prise en charge urgente.",
+    urgentologist: {
+        unavailableToday: "Aucun créneau d’urgentologue n’est disponible aujourd’hui dans cette clinique.",
+        dailyLimitReached: "La limite quotidienne de rendez-vous de ce médecin est atteinte. Actualisez les créneaux disponibles.",
+        hint: "Walk-in uniquement. Le plafond quotidien inclut les consultations réservées ou terminées, toutes cliniques confondues. Retirez les créneaux réguliers avant de changer la spécialité.",
+        full: "Tous les urgentologues de cette clinique ont atteint leur maximum de {limit} consultation(s) pour aujourd’hui.",
+        tomorrow: "Revenir demain",
+        family: "Voir les créneaux des médecins de famille",
+        tomorrowNotice: "Aucune réservation n’a été créée. Revenir demain ne garantit pas une place. Cette option administrative n’évalue pas l’urgence médicale.",
+    },
     receptionReplan: {
         notice: "Un rendez-vous est déjà planifié dans cette clinique : {date} à {time}.",
         start: "Replanifier ce rendez-vous",
@@ -1530,6 +1540,7 @@ export const UI_LABELS_FR = {
         newPatientDescription: "Aucun dossier n'est créé pour le moment. Présentez d'abord les créneaux disponibles au patient.",
         existingPatientDescription: "Présentez les créneaux disponibles au patient avant de créer un rendez-vous.",
         searchAvailability: "Voir les créneaux disponibles",
+        refreshAvailability: "Actualiser les créneaux disponibles",
         availabilityToday: "Médecins disponibles aujourd'hui",
         availabilityFuture: "Prochains créneaux disponibles",
         noSameDayAvailability: "Aucun médecin de famille n'est disponible aujourd'hui dans cette clinique.",

@@ -5,6 +5,10 @@ import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { HOME_STRINGS_FR } from "../i18n/homeStrings";
 import { receptionReplanLabels, receptionReplanTranslations } from "../i18n/receptionReplanLabels";
 import { WalkInArrivalPage } from "./WalkInArrivalPage";
+import { urgentologistLabels, urgentologistTranslations, walkInEmergencyReminder } from "../i18n/urgentologistLabels";
+import { displaySpecialty } from "../i18n/specialtyLabels";
+import { receptionLabel } from "../i18n/receptionLabels";
+import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 
 const api = vi.hoisted(() => ({ lookup: vi.fn(), slots: vi.fn(), book: vi.fn() }));
 vi.mock("../services/receptionApi", () => ({ findReceptionPatientByRamq: api.lookup, fetchWalkInAvailability: api.slots, createWalkInBooking: api.book }));
@@ -22,6 +26,117 @@ beforeEach(() => {
     api.book.mockResolvedValue({ data: { appointment: { _id: "new" } } });
 });
 afterEach(cleanup);
+describe("availability button label", () => {
+    it.each(["fr", "en", "es", "ko", "vi", "no", "ja", "zh", "he"])("switches from view to refresh for existing patients in %s", async locale => {
+        api.lookup.mockResolvedValue({ data: { _id: "patient", prenom: "Test", nom: "Patient", existingAppointments: [] } });
+        const { rerender } = render(<Page />);
+        fireEvent.change(screen.getByRole("textbox"), { target: { value: "676767" } });
+        fireEvent.click(screen.getByRole("button", { name: "Search for patient" }));
+        fireEvent.click(await screen.findByRole("button", { name: /Select/ }));
+        rerender(<Page locale={locale} />);
+        const source = UI_LABELS_FR.walkInArrival;
+        const view = receptionLabel(locale, "searchAvailability", source.searchAvailability);
+        const refresh = receptionLabel(locale, "refreshAvailability", source.refreshAvailability);
+        fireEvent.click(screen.getByRole("button", { name: view }));
+        expect(await screen.findByRole("button", { name: refresh })).toBeEnabled();
+        expect(screen.queryByRole("button", { name: view })).not.toBeInTheDocument();
+        expect(api.slots).toHaveBeenCalledTimes(1);
+        fireEvent.click(screen.getByRole("button", { name: refresh }));
+        await screen.findByRole("button", { name: refresh });
+        expect(api.slots).toHaveBeenCalledTimes(2);
+        expect(api.book).not.toHaveBeenCalled();
+    });
+    it("shows refresh after automatic new-patient loading and replaces stale slots", async () => {
+        api.lookup.mockResolvedValue({ data: null });
+        render(<Page />);
+        fireEvent.change(screen.getByRole("textbox"), { target: { value: "676767" } });
+        fireEvent.click(screen.getByRole("button", { name: "Search for patient" }));
+        await screen.findByRole("button", { name: "Refresh available appointments" });
+        expect(screen.getByRole("button", { name: /08:15/ })).toBeInTheDocument();
+        api.slots.mockResolvedValue({ data: { today: [], future: [] } });
+        fireEvent.click(screen.getByRole("button", { name: "Refresh available appointments" }));
+        await screen.findByRole("button", { name: "Refresh available appointments" });
+        expect(screen.queryByRole("button", { name: /08:15/ })).not.toBeInTheDocument();
+        expect(api.slots).toHaveBeenCalledTimes(2);
+        expect(api.book).not.toHaveBeenCalled();
+    });
+});
+describe("urgentologist capacity fallback", () => {
+    it.each(["fr", "en", "es", "ko", "vi", "no", "ja", "zh", "he"])("keeps the medical reminder in English above both choices in %s", async locale => {
+        api.slots.mockResolvedValue({ data: { presentation: "alternatives", today: [], future: [] } });
+        const { rerender } = render(<Page />); await lookup();
+        fireEvent.click(screen.getByRole("button", { name: "Reschedule this appointment" }));
+        await screen.findByText(walkInEmergencyReminder.text);
+        rerender(<Page locale={locale} />);
+        const reminder = screen.getByText(walkInEmergencyReminder.text);
+        expect(reminder).toHaveAttribute("role", "alert");
+        expect(reminder).toHaveAttribute("lang", "en");
+        expect(reminder).toHaveAttribute("translate", "no");
+        expect(reminder).toHaveAttribute("data-content-kind", "medical");
+        expect(reminder).toHaveClass("font-bold", "text-red-700");
+        const labels = urgentologistLabels(locale);
+        const tomorrow = screen.getByRole("button", { name: labels.tomorrow });
+        expect(reminder.compareDocumentPosition(tomorrow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        fireEvent.click(tomorrow);
+        expect(screen.getByText(walkInEmergencyReminder.text)).toBeVisible();
+        fireEvent.click(screen.getByRole("button", { name: labels.family }));
+        expect(screen.getAllByText(walkInEmergencyReminder.text)).toHaveLength(1);
+        expect(screen.getByText(walkInEmergencyReminder.text)).toBeVisible();
+        expect(api.book).not.toHaveBeenCalled();
+    });
+    it("shows only today's urgent slots without the future-family section", async () => {
+        api.slots.mockResolvedValue({ data: { presentation: "urgent_today", today: [{ specialist: { _id: "urgent", nom: "Urgent", specialty: "Urgentologue" }, date: "2030-01-01", slots: ["12:00"] }], future: [] } });
+        render(<Page />); await lookup();
+        fireEvent.click(screen.getByRole("button", { name: "Reschedule this appointment" }));
+        expect(await screen.findByRole("button", { name: /12:00/ })).toBeInTheDocument();
+        expect(screen.queryByText("Next available appointments")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: urgentologistLabels("en").family })).not.toBeInTheDocument();
+    });
+    it.each(Object.keys(urgentologistTranslations))("requires the family choice when no urgent slot remains, without claiming quota reached (%s)", async locale => {
+        api.slots.mockResolvedValue({ data: { presentation: "alternatives", urgentologists: { limit: 20, day: "2030-01-01", allAtCapacity: false }, today: [], future: [{ specialist: { _id: "family", nom: "Family" }, date: "2030-01-02", slots: ["09:00"] }] } });
+        const { rerender } = render(<Page />); await lookup();
+        fireEvent.click(screen.getByRole("button", { name: "Reschedule this appointment" }));
+        await screen.findByText(urgentologistLabels("en").unavailableToday);
+        rerender(<Page locale={locale} />);
+        const labels = urgentologistLabels(locale);
+        expect(screen.getByText(labels.unavailableToday)).toBeInTheDocument();
+        expect(screen.queryByText(labels.full)).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /09:00/ })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: labels.family }));
+        expect(screen.getByRole("button", { name: /09:00/ })).toBeInTheDocument();
+        expect(screen.getByText("2030-01-02")).toBeInTheDocument();
+        expect(api.book).not.toHaveBeenCalled();
+    });
+    it.each(Object.keys(urgentologistTranslations))("displays the server's temporary limit of 1 in %s", async locale => {
+        api.slots.mockResolvedValue({ data: { urgentologists: { limit: 1, day: "2030-01-01", allAtCapacity: true }, today: [], future: [] } });
+        const { rerender } = render(<Page />);
+        await lookup();
+        fireEvent.click(screen.getByRole("button", { name: "Reschedule this appointment" }));
+        await screen.findByText(urgentologistLabels("en", 1).full);
+        rerender(<Page locale={locale} />);
+        expect(screen.getByText(urgentologistLabels(locale, 1).full)).toBeInTheDocument();
+        expect(screen.queryByText(urgentologistLabels(locale, 20).full)).not.toBeInTheDocument();
+    });
+    it.each(Object.keys(urgentologistTranslations))("offers administrative alternatives in %s without creating a booking", async locale => {
+        api.slots.mockResolvedValue({ data: { urgentologists: { limit: 20, day: "2030-01-01", allAtCapacity: true },
+            today: [{ specialist: { _id: "family", prenom: "Family", nom: "Doctor" }, date: "2030-01-01", slots: ["09:00"] }],
+            future: [{ specialist: { _id: "urgent", nom: "Emergency", specialty: "Urgentologue" }, date: "2030-01-02", slots: ["10:00"] }] } });
+        const { rerender } = render(<Page />);
+        await lookup();
+        fireEvent.click(screen.getByRole("button", { name: "Reschedule this appointment" }));
+        await screen.findByText(urgentologistLabels("en").full);
+        rerender(<Page locale={locale} />);
+        const labels = urgentologistLabels(locale);
+        expect(screen.getByText(labels.full)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: labels.tomorrow }));
+        expect(screen.getByText(labels.tomorrowNotice)).toBeInTheDocument();
+        expect(api.book).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole("button", { name: labels.family }));
+        expect(screen.getByRole("button", { name: /09:00/ })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /10:00/ })).not.toBeInTheDocument();
+        expect(displaySpecialty("Urgentologue", locale)).toBe("Emergency Physician");
+    });
+});
 async function lookup() {
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "676767" } });
     fireEvent.click(screen.getByRole("button", { name: "Search for patient" }));

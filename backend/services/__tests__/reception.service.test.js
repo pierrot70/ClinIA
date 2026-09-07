@@ -9,6 +9,7 @@ const patientFindOne = vi.fn();
 const patientFindOneAndUpdate = vi.fn();
 const appointmentFind = vi.fn();
 const appointmentUpdateOne = vi.fn();
+const appointmentCount = vi.fn();
 const releaseDailyAppointmentCapacity = vi.fn();
 const patientExists = vi.fn();
 const getAvailableSlotSchedule = vi.fn();
@@ -32,7 +33,7 @@ vi.mock("../../models/Specialist.js", () => ({
 vi.mock("../../models/Patient.js", () => ({
     Patient: { findOne: patientFindOne, findOneAndUpdate: patientFindOneAndUpdate, exists: patientExists },
 }));
-vi.mock("../../models/Appointment.js", () => ({ Appointment: { find: appointmentFind, updateOne: appointmentUpdateOne } }));
+vi.mock("../../models/Appointment.js", () => ({ Appointment: { find: appointmentFind, updateOne: appointmentUpdateOne, countDocuments: appointmentCount } }));
 
 vi.mock("../../audit/patientAudit.js", () => ({ recordPatientAuditEvent }));
 vi.mock("../../audit/writeOperationAudit.js", () => ({
@@ -181,6 +182,32 @@ beforeEach(() => {
 });
 
 describe("listWalkInFamilyMedicineOptions", () => {
+    it.each([true, false])("prioritizes urgentologists today, otherwise returns family alternatives (urgent slot: %s)", async urgentAvailable => {
+        const familyId = "507f1f77bcf86cd799439099";
+        const location = { clinique: clinicId, walkInDisponibilites: [new Date("2030-01-01T14:00:00Z"), new Date("2030-01-02T14:00:00Z")] };
+        specialistFind.mockReturnValue(resolvedLean([
+            { _id: specialistId, accountUserId: physicianId, specialite: "Urgentologue", practiceLocations: [location] },
+            { _id: familyId, accountUserId: physicianId, specialite: "Medecin de famille", practiceLocations: [location] },
+        ]));
+        appointmentCount.mockReturnValue({ session: vi.fn().mockResolvedValue(0) });
+        getAvailableSlotSchedule.mockImplementation(async (id, date) => ({ slots: id === specialistId && date === "2030-01-01" && !urgentAvailable ? [] : ["09:00"] }));
+        const result = await listWalkInFamilyMedicineOptions({ clinicId, authUser: { userId: receptionId, role: "RECEPTION" }, now: new Date("2030-01-01T13:00:00Z") });
+        expect(result.presentation).toBe(urgentAvailable ? "urgent_today" : "alternatives");
+        expect(result.today.map(option => option.specialist._id)).toEqual([urgentAvailable ? specialistId : familyId]);
+        expect(result.future.map(option => option.specialist._id)).toEqual(urgentAvailable ? [] : [familyId]);
+        expect(result.urgentologists.allAtCapacity).toBe(false);
+    });
+    it.each([19, 20])("includes active urgentologists with walk-in-only slots and reports daily quota %s", async count => {
+        specialistFind.mockReturnValue(resolvedLean([{ _id: specialistId, accountUserId: physicianId, specialite: "Urgentologue",
+            practiceLocations: [{ clinique: clinicId, disponibilites: [new Date("2030-01-01T15:00:00Z")], walkInDisponibilites: [new Date("2030-01-01T14:00:00Z")] }] }]));
+        appointmentCount.mockReturnValue({ session: vi.fn().mockResolvedValue(count) });
+        getAvailableSlotSchedule.mockResolvedValue({ slots: count === 20 ? [] : ["09:00"] });
+        const result = await listWalkInFamilyMedicineOptions({ clinicId, authUser: { userId: receptionId, role: "RECEPTION" }, now: new Date("2030-01-01T13:00:00Z") });
+        expect(result.urgentologists).toEqual({ limit: 20, day: "2030-01-01", allAtCapacity: count === 20 });
+        expect(getAvailableSlotSchedule).toHaveBeenCalledWith(specialistId, "2030-01-01", expect.objectContaining({ slotType: "walk_in" }));
+        expect(result.today).toHaveLength(count === 20 ? 0 : 1);
+        if (count < 20) expect(result.today[0].specialist.specialty).toBe("Urgentologue");
+    });
     it("excludes unlinked specialists and accounts that are not active physicians before looking up slots", async () => {
         const location = { clinique: clinicId, walkInDisponibilites: [new Date("2030-01-01T14:00:00Z")] };
         specialistFind.mockReturnValue(resolvedLean([
@@ -196,7 +223,7 @@ describe("listWalkInFamilyMedicineOptions", () => {
 
     it("returns no slots when no linked physician account is active", async () => {
         adminUserFind.mockReturnValue(resolvedLean([]));
-        await expect(listWalkInFamilyMedicineOptions({ clinicId, authUser: { userId: receptionId, role: "RECEPTION" }, now: new Date("2030-01-01T13:00:00Z") })).resolves.toEqual({ today: [], future: [] });
+        await expect(listWalkInFamilyMedicineOptions({ clinicId, authUser: { userId: receptionId, role: "RECEPTION" }, now: new Date("2030-01-01T13:00:00Z") })).resolves.toEqual({ presentation: "alternatives", today: [], future: [] });
         expect(getAvailableSlotSchedule).not.toHaveBeenCalled();
     });
     it("returns same-day and future family-medicine slots without a patient identifier", async () => {
@@ -251,7 +278,7 @@ describe("listWalkInFamilyMedicineOptions", () => {
             clinicId,
             authUser: { userId: receptionId, role: "RECEPTION" },
             now: new Date("2030-01-01T13:00:00.000Z"),
-        })).resolves.toEqual({ today: [], future: [] });
+        })).resolves.toEqual({ presentation: "alternatives", today: [], future: [] });
         expect(getAvailableSlotSchedule).not.toHaveBeenCalled();
     });
 

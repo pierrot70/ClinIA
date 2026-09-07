@@ -12,6 +12,7 @@ const patientFind = vi.fn();
 const specialistFindById = vi.fn();
 const specialistFind = vi.fn();
 const specialistFindOne = vi.fn();
+const specialistUpdateOne = vi.fn();
 const cliniqueExists = vi.fn();
 const cliniqueFind = vi.fn();
 const coordinationRequestFindOne = vi.fn();
@@ -49,7 +50,7 @@ vi.mock("../../models/Patient.js", () => ({
 }));
 
 vi.mock("../../models/Specialist.js", () => ({
-    Specialist: { findById: specialistFindById, find: specialistFind, findOne: specialistFindOne },
+    Specialist: { findById: specialistFindById, find: specialistFind, findOne: specialistFindOne, updateOne: specialistUpdateOne },
 }));
 
 vi.mock("../../models/Clinique.js", () => ({
@@ -118,6 +119,53 @@ describe("appointments service", () => {
         userId: "507f1f77bcf86cd799439099",
         role: "MEDECIN",
     };
+
+    describe("urgentologist booking", () => {
+        const specialist = "507f1f77bcf86cd799439021";
+        const patient = "507f1f77bcf86cd799439012";
+        const clinique = "507f1f77bcf86cd799439022";
+        const dto = { patient, specialist, clinique, date: "2099-01-01", time: "12:00", slotType: "walk_in", priority: "normal" };
+        beforeEach(() => {
+            specialistFindById.mockReturnValue({ lean: vi.fn().mockResolvedValue({ specialite: "Urgentologue", clinique_associer: clinique,
+                disponibilites: [new Date("2099-01-01T12:00:00")], walkInDisponibilites: [new Date("2099-01-01T12:00:00")] }) });
+            patientFindOne.mockReturnValue({ lean: vi.fn().mockResolvedValue({ _id: patient, ownerUserId: authUser.userId }) });
+            cliniqueExists.mockResolvedValue(true);
+            find.mockReturnValue({ lean: vi.fn().mockResolvedValue([]) });
+            specialistUpdateOne.mockResolvedValue({ modifiedCount: 1 });
+            countDocuments.mockReturnValue({ session: vi.fn().mockResolvedValue(19) });
+        });
+        it("automatically uses a transaction for the twentieth booking", async () => {
+            expect((await createAppointment(dto, authUser)).time).toBe("12:00");
+            expect(transactionSession.withTransaction).toHaveBeenCalledOnce();
+            expect(specialistUpdateOne).toHaveBeenCalledWith({ _id: specialist }, { $inc: { __v: 1 } }, { session: transactionSession });
+            expect(appointmentSave).toHaveBeenCalledOnce();
+        });
+        it("rejects the twenty-first booking before saving", async () => {
+            countDocuments.mockReturnValue({ session: vi.fn().mockResolvedValue(20) });
+            await expect(createAppointment(dto, authUser)).rejects.toMatchObject({ code: "MAXIMUM_APPOINTMENTS_REACHED" });
+            expect(appointmentSave).not.toHaveBeenCalled();
+        });
+        it("can replace one of twenty consultations without treating it as consultation 21", async () => {
+            const original = buildAppointment({ specialist, patient, clinique, date: dto.date, time: "11:45", priority: "normal" });
+            findOne.mockResolvedValue(original);
+            countDocuments.mockImplementation(query => ({ session: vi.fn().mockResolvedValue(query._id?.$ne === original._id ? 19 : 20) }));
+            const result = await rescheduleAppointment(original._id, { date: dto.date, time: dto.time }, authUser);
+            expect(result.appointment.time).toBe(dto.time);
+            expect(result.previousAppointment.status).toBe("rescheduled");
+            expect(countDocuments).toHaveBeenCalledWith(expect.objectContaining({ _id: { $ne: original._id } }));
+        });
+        it("rejects a direct regular booking even if old regular availability exists", async () => {
+            await expect(createAppointment({ ...dto, slotType: "regular" }, authUser)).rejects.toMatchObject({ code: "INVALID_INPUT" });
+            expect(appointmentSave).not.toHaveBeenCalled();
+        });
+        it("never advertises regular slots", async () => {
+            expect(await getAvailableSlots(specialist, dto.date, { clinique, slotType: "regular" })).toEqual([]);
+        });
+        it("hides walk-in slots when twenty scheduled or completed consultations count", async () => {
+            countDocuments.mockReturnValue({ session: vi.fn().mockResolvedValue(20) });
+            expect(await getAvailableSlots(specialist, dto.date, { clinique, slotType: "walk_in" })).toEqual([]);
+        });
+    });
 
     describe("completed slots remain occupied", () => {
         const specialistId = "507f1f77bcf86cd799439021";

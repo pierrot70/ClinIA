@@ -4,6 +4,8 @@ import { AdminUser } from "../models/AdminUser.js";
 import { Patient } from "../models/Patient.js";
 import { Specialist } from "../models/Specialist.js";
 import { Appointment } from "../models/Appointment.js";
+import { URGENTOLOGIST_SPECIALTY, URGENTOLOGIST_DAILY_LIMIT, isUrgentologist } from "../domain/specialties.js";
+import { countUrgentologistConsultations } from "./urgentologistCapacity.js";
 import { recordPatientAuditEvent } from "../audit/patientAudit.js";
 import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
@@ -72,7 +74,7 @@ function getLocationForClinic(specialist, clinicId) {
 async function requireActiveReceivingPhysician(specialistId, clinicId, session) {
     if (!mongoose.Types.ObjectId.isValid(specialistId)) throw invalidInput("Médecin invalide.");
     const specialist = await Specialist.findOne({
-        _id: specialistId, specialite: FAMILY_MEDICINE_SPECIALTY,
+        _id: specialistId, specialite: { $in: [FAMILY_MEDICINE_SPECIALTY, URGENTOLOGIST_SPECIALTY] },
     }).session(session).lean();
     if (!specialist || !getLocationForClinic(specialist, clinicId)) {
         throw { code: "FORBIDDEN", message: "Ce médecin n'exerce pas dans la clinique sélectionnée." };
@@ -94,6 +96,7 @@ function toOption(specialist, date, schedule, slotTypes = {}) {
             _id: String(specialist._id),
             nom: specialist.nom,
             prenom: specialist.prenom,
+            ...(isUrgentologist(specialist.specialite) ? { specialty: URGENTOLOGIST_SPECIALTY } : {}),
         },
         date,
         slots: schedule.slots,
@@ -133,7 +136,7 @@ export async function listWalkInFamilyMedicineOptions({
     }
 
     const specialists = await Specialist.find({
-        specialite: FAMILY_MEDICINE_SPECIALTY,
+        specialite: { $in: [FAMILY_MEDICINE_SPECIALTY, URGENTOLOGIST_SPECIALTY] },
     }).lean();
 
     const accountIds = specialists.filter(s => getLocationForClinic(s, clinicId) && s.accountUserId)
@@ -145,17 +148,24 @@ export async function listWalkInFamilyMedicineOptions({
 
     const todayOptions = [];
     const futureCandidates = [];
+    let urgentologistCount = 0;
+    let urgentologistsAtCapacity = 0;
 
     for (const specialist of specialists) {
         if (!specialist.accountUserId || !activeAccountIds.has(String(specialist.accountUserId))) continue;
         const location = getLocationForClinic(specialist, clinicId);
         if (!location) continue;
+        const urgentologist = isUrgentologist(specialist.specialite);
+        if (urgentologist) {
+            urgentologistCount++;
+            if (await countUrgentologistConsultations(specialist._id, today, { excludeAppointmentId: previous?._id }) >= URGENTOLOGIST_DAILY_LIMIT) urgentologistsAtCapacity++;
+        }
 
         // A person already known to the clinic may still arrive without an
         // appointment. They can therefore use either their regular slots or
         // the capacity the physician explicitly reserved for walk-ins. A new
         // patient remains restricted to walk-in capacity.
-        const slotTypes = patientId
+        const slotTypes = patientId && !urgentologist
             ? ["regular", "walk_in"]
             : ["walk_in"];
         const configuredSlots = slotTypes.flatMap((slotType) =>
@@ -213,9 +223,18 @@ export async function listWalkInFamilyMedicineOptions({
             "fr"
         );
 
+    // Reception offers today's urgentologist slots first. Family medicine is
+    // the alternative when none remain, not a competing initial choice.
+    const urgentToday = todayOptions.filter(option => option.specialist.specialty === URGENTOLOGIST_SPECIALTY);
+    const hasUrgentToday = urgentToday.length > 0;
     return {
-        today: todayOptions.sort(sortOptions),
-        future: futureCandidates.sort(sortOptions).slice(0, MAX_FUTURE_OPTIONS),
+        presentation: hasUrgentToday ? "urgent_today" : "alternatives",
+        today: (hasUrgentToday ? urgentToday : todayOptions).sort(sortOptions),
+        future: hasUrgentToday ? [] : futureCandidates
+            .filter(option => option.specialist.specialty !== URGENTOLOGIST_SPECIALTY)
+            .sort(sortOptions).slice(0, MAX_FUTURE_OPTIONS),
+        ...(urgentologistCount ? { urgentologists: { limit: URGENTOLOGIST_DAILY_LIMIT, day: today,
+            allAtCapacity: urgentologistsAtCapacity === urgentologistCount } } : {}),
     };
 }
 

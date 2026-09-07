@@ -29,6 +29,10 @@ jobs:
       - run: npm ci --no-audit
       - run: node ../scripts/verify-npm-audit.mjs
       - run: npm test -- --run
+      - name: Prepare disposable MongoDB integration image
+        run: docker pull mongo:7
+      - name: Walk-in capacity integration (41 arrivals and last-place race)
+        run: npm run test:walkin
 
   frontend:
     name: Frontend tests, build and audit

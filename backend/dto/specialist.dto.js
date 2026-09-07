@@ -26,6 +26,7 @@ function normalizeSpecialite(value) {
     if (value === null || value === undefined) return undefined;
     if (typeof value === "string") {
         const trimmed = value.trim();
+        if (trimmed.toLowerCase() === "urgentologue") return "Urgentologue";
         return trimmed === "" ? undefined : trimmed;
     }
     return undefined;

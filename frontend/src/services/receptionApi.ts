@@ -12,6 +12,7 @@ export interface WalkInAppointmentOption {
         _id: string;
         nom: string;
         prenom: string;
+        specialty?: string;
     };
     date: string;
     slots: string[];
@@ -19,6 +20,8 @@ export interface WalkInAppointmentOption {
 }
 
 export interface WalkInAvailability {
+    presentation?: "urgent_today" | "alternatives";
+    urgentologists?: { limit: number; day: string; allAtCapacity: boolean };
     today: WalkInAppointmentOption[];
     future: WalkInAppointmentOption[];
 }

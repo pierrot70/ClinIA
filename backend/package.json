@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon --watch . -r dotenv/config index.js",
     "start": "node -r dotenv/config index.js",
-    "test": "vitest"
+    "test": "vitest",
+    "test:walkin": "bash ../scripts/run-urgentologist-walk-in-integration.sh"
   },
   "dependencies": {
     "bcryptjs": "3.0.3",
