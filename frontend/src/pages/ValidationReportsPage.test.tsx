@@ -26,6 +26,13 @@ describe("validation reports page", () => {
         expect(time).toHaveTextContent(localTime);
         expect(time).toBeVisible();
         expect(container.querySelector("details")).not.toHaveAttribute("open");
+        fireEvent.click(container.querySelector("summary")!);
+        const detailTime = container.querySelector("article time");
+        expect(detailTime).toBeVisible();
+        expect(detailTime).toHaveAttribute("datetime", finishedAt);
+        expect(detailTime).toHaveAttribute("title", "America/Toronto");
+        expect(detailTime).toHaveTextContent(localTime);
+        expect(detailTime?.textContent).toBe(time?.textContent);
     });
     it("groups by full commit, starts collapsed and preserves every run and its downloads", async () => {
         const otherCommit = `${report.commit.slice(0, 39)}b`;
@@ -69,6 +76,7 @@ describe("validation reports page", () => {
         expect(container.querySelector("summary")).toHaveTextContent(`${t.runs}: 1`);
         expect(container.querySelector("summary")).toHaveTextContent(t.latestValidation);
         expect(container.querySelector("summary time")).toHaveAttribute("title", "America/Toronto");
+        expect(container.querySelector("article time")?.textContent).toBe(container.querySelector("summary time")?.textContent);
         expect(screen.getByText(t.match)).toBeInTheDocument(); expect(screen.getByText(t.failed)).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: t.pdf }));
         await waitFor(() => expect(api.download).toHaveBeenCalledWith("run", "pdf"));

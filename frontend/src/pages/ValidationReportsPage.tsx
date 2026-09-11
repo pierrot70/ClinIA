@@ -49,7 +49,7 @@ export function ValidationReportsPage() {
                 <p className={report.correspondence === "match" ? "text-blue-800" : "font-semibold text-red-700"}>{t[report.correspondence]}</p>
                 {report.dirty && report.correspondence !== "dirty" && <p className="text-red-700">{t.dirty}</p>}
                 <p className={report.passed ? "text-green-800" : "font-semibold text-red-700"}>{report.passed ? t.passed : t.failed}</p>
-                <p>{t.date}: {report.finishedAt}</p>
+                <p>{t.date}: <time dateTime={report.finishedAt} title="America/Toronto">{formatValidationDate(report.finishedAt, locale)}</time></p>
                 <p>{t.cleanup}: {report.cleanup ? t.yes : t.no}</p>
                 <ul>{report.points.filter(p => p.point > 0).map(p => <li key={p.point}>{t[`point${p.point}` as keyof typeof t]}: {p.passed}/{p.expected}</li>)}</ul>
                 <div className="flex flex-wrap gap-3"><button disabled={busy} onClick={() => void download(report.runId, "pdf")} className="rounded border px-3 py-2">{t.pdf}</button>
