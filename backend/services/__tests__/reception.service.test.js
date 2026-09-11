@@ -378,6 +378,26 @@ describe("listWalkInFamilyMedicineOptions", () => {
 });
 
 describe("createWalkInPatientAndAppointment", () => {
+    it.each([
+        [{ ownerUserId: 1, country: 1, healthInsuranceJurisdiction: 1, healthInsuranceNumberSearch: 1 }, "PATIENT_ALREADY_EXISTS"],
+        [{ specialist: 1, date: 1, time: 1 }, 11000],
+        [undefined, 11000],
+    ])("maps only the patient identity duplicate (%j)", async (keyPattern, expectedCode) => {
+        patientExists.mockResolvedValue(null);
+        const error = { code: 11000, keyPattern, keyValue: { healthInsuranceNumberSearch: "SENSITIVE_TEST" }, message: "SENSITIVE_TEST" };
+        createPatient.mockRejectedValueOnce(error);
+        let caught;
+        try {
+            await createWalkInPatientAndAppointment({ clinicId, specialistId, date: "2030-01-01", time: "09:00",
+                patientDto: { nom: "Test", prenom: "Patient", num_assurance_maladie: "123456" },
+                authUser: { userId: receptionId, role: "RECEPTION" } });
+        } catch (err) { caught = err; }
+        expect(caught?.code).toBe(expectedCode);
+        if (expectedCode === "PATIENT_ALREADY_EXISTS") expect(JSON.stringify(caught)).not.toContain("SENSITIVE_TEST");
+        else expect(caught).toBe(error);
+        expect(createAppointment).not.toHaveBeenCalled();
+        expect(transactionSession.endSession).toHaveBeenCalled();
+    });
     it("creates the patient and the selected walk-in appointment in one transaction", async () => {
         patientExists.mockResolvedValue(null);
         createPatient.mockResolvedValue({

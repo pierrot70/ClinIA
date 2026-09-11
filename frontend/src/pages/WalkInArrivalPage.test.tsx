@@ -147,6 +147,21 @@ async function choose() {
     fireEvent.click(await screen.findByRole("button", { name: /08:15/ }));
 }
 describe("reception rescheduling", () => {
+    it.each(Object.keys(receptionReplanTranslations))("shows the patient identity conflict in %s", async locale => {
+        api.lookup.mockResolvedValue({ data: null });
+        api.book.mockResolvedValue({ error: { code: "PATIENT_ALREADY_EXISTS", message: "RAW_SERVER_MESSAGE" } });
+        const { rerender } = render(<Page />);
+        fireEvent.change(screen.getByRole("textbox"), { target: { value: "676767" } });
+        fireEvent.click(screen.getByRole("button", { name: "Search for patient" }));
+        fireEvent.click(await screen.findByRole("button", { name: /08:15/ }));
+        fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Test" } });
+        fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Patient" } });
+        rerender(<Page locale={locale} />);
+        const source = UI_LABELS_FR.walkInArrival;
+        fireEvent.click(screen.getByRole("button", { name: receptionLabel(locale, "createPatientAndAppointment", source.createPatientAndAppointment) }));
+        expect(await screen.findByRole("alert")).toHaveTextContent(receptionReplanLabels(locale).patientExists);
+        expect(screen.queryByText("RAW_SERVER_MESSAGE")).not.toBeInTheDocument();
+    });
     it("warns immediately and does not offer a second appointment or mutate while searching", async () => {
         render(<Page />); await lookup();
         expect(screen.queryByRole("button", { name: "View available appointments" })).not.toBeInTheDocument();

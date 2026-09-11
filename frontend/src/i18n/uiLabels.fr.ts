@@ -10,6 +10,7 @@ export const UI_LABELS_FR = {
         tomorrowNotice: "Aucune réservation n’a été créée. Revenir demain ne garantit pas une place. Cette option administrative n’évalue pas l’urgence médicale.",
     },
     receptionReplan: {
+        patientExists: "Un dossier existe déjà pour ce numéro d’assurance maladie. Recherchez à nouveau le patient avant de réserver.",
         notice: "Un rendez-vous est déjà planifié dans cette clinique : {date} à {time}.",
         start: "Replanifier ce rendez-vous",
         confirm: "Confirmer le remplacement du rendez-vous",

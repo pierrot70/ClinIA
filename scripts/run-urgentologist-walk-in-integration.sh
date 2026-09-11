@@ -45,4 +45,4 @@ port="${BASH_REMATCH[1]}"
 cd "$ROOT_DIR/backend"
 TZ=America/Toronto NODE_ENV=test \
     CLINIA_WALKIN_TEST_URI="mongodb://127.0.0.1:$port/clinia_walkin_integration?directConnection=true&replicaSet=walkin_test" \
-    ./node_modules/.bin/vitest run --config vitest.walkin.config.js
+    ./node_modules/.bin/vitest run --config vitest.walkin.config.js "$@"

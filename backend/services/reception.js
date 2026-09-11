@@ -379,6 +379,19 @@ export async function createWalkInPatientAndAppointment({
             };
         }, { writeConcern: CLINICAL_WRITE_CONCERN });
         return result;
+    } catch (err) {
+        // Match only the patient identity index, never slot/appointment indexes.
+        // Do not expose MongoDB messages or key values (patient identifiers).
+        const identityKeys = ["ownerUserId", "country", "healthInsuranceJurisdiction", "healthInsuranceNumberSearch"];
+        if (err?.code === 11000 && err.keyPattern &&
+            Object.keys(err.keyPattern).length === identityKeys.length &&
+            identityKeys.every(key => err.keyPattern[key] === 1)) {
+            throw {
+                code: "PATIENT_ALREADY_EXISTS",
+                message: "Un dossier existe déjà pour ce numéro d'assurance maladie. Recherchez à nouveau le patient avant de réserver.",
+            };
+        }
+        throw err;
     } finally {
         await session.endSession();
     }

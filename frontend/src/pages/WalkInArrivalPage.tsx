@@ -290,7 +290,7 @@ export function WalkInArrivalPage() {
         setLoading(false);
 
         if (response.error) {
-            setError(response.error.code === "MAXIMUM_APPOINTMENTS_REACHED" ? urgentologistLabels(locale).dailyLimitReached : response.error.code === "RECEPTION_REPLAN_REQUIRED" ? replan.conflict : response.error.code === "RECEIVING_PHYSICIAN_UNAVAILABLE"
+            setError(response.error.code === "PATIENT_ALREADY_EXISTS" ? replan.patientExists : response.error.code === "MAXIMUM_APPOINTMENTS_REACHED" ? urgentologistLabels(locale).dailyLimitReached : response.error.code === "RECEPTION_REPLAN_REQUIRED" ? replan.conflict : response.error.code === "RECEIVING_PHYSICIAN_UNAVAILABLE"
                 ? receptionLabel(locale, "receivingPhysicianUnavailable", source.receivingPhysicianUnavailable)
                 : response.error.message);
             return;
