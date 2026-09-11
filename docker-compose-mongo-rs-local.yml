@@ -88,6 +88,7 @@ services:
       - "4002:4000"
     volumes:
       - ./backend:/app
+      - ./validation-artifacts:/validation-artifacts:ro
       - backend_node_modules:/app/node_modules
     depends_on:
       - mongo-rs-1

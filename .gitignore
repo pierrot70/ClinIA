@@ -31,3 +31,5 @@ yarn-error.log*
 
 # Ignore local backup archives
 backups/
+validation-artifacts/
+backend/build-revision.json

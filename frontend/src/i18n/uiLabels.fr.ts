@@ -1,4 +1,18 @@
 export const UI_LABELS_FR = {
+    validationReports: {
+        title: "Rapports de validation", refresh: "Actualiser", version: "Commit de l’image backend", unknown: "Version inconnue — correspondance non vérifiable",
+        empty: "Aucun rapport publié.", error: "Impossible de charger ou télécharger le rapport.",
+        match: "Le commit testé correspond à l’image déployée", mismatch: "Version déployée non couverte par ce rapport",
+        dirty: "Modifications non commitées — le commit seul ne décrit pas la version testée",
+        passed: "Tests réussis", failed: "Échec ou validation incomplète", pdf: "Télécharger le PDF", bundle: "Télécharger les preuves (JSON)",
+        scope: "Validation isolée, pas un test de ce déploiement Coolify ni une certification de sécurité. Les empreintes détectent les modifications, mais n’authentifient pas l’auteur.",
+        rejected: "Des fichiers de rapport invalides ont été exclus.", loading: "Chargement…", run: "Exécution", tested: "Commit testé", date: "Fin de validation", cleanup: "Nettoyage confirmé", yes: "Oui", no: "Non",
+        point1: "Même créneau", point2: "Même patient", point3: "Dernière place urgentologue", point4: "Annulation et report concurrents", point5: "Autorisations API", point6: "Atomicité et audits minimisés",
+        runs: "Exécutions",
+        concurrency: "Tests de concurrence",
+        walkInBooking: "Prise de rendez-vous Walk-In",
+        latestValidation: "Dernière validation",
+    },
     walkInEmergencyReminder: "Si le patient semble très mal en point, RECEPTION doit lui recommander fortement de se rendre à l’urgence, selon le protocole de la clinique. Les options « revenir demain » ou « prendre un rendez-vous ultérieur » ne doivent pas retarder une prise en charge urgente.",
     urgentologist: {
         unavailableToday: "Aucun créneau d’urgentologue n’est disponible aujourd’hui dans cette clinique.",

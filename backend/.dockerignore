@@ -17,3 +17,4 @@ npm-debug.log*
 .gitignore
 .vscode
 .idea
+build-revision.json

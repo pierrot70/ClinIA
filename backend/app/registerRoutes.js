@@ -17,6 +17,7 @@ import clinicalSupportAccessRouter from "../routes/clinicalSupportAccess.js";
 import receptionRouter from "../routes/reception.js";
 import consultationsRouter from "../routes/consultations.js";
 import clinicalTermsRouter from "../routes/clinicalTerms.js";
+import validationReportsRouter from "../routes/validationReports.js";
 
 import { verifyJWT } from "../middleware/verifyJWT.js";
 import { attachOptionalAuth } from "../middleware/attachOptionalAuth.js";
@@ -152,6 +153,7 @@ export function registerRoutes(app, deps) {
         loi25DataLeakGuard,
         clinicalTermsRouter
     );
+    app.use("/api/validation-reports", validationReportsRouter);
     app.use(
         "/api/write-operation-audits",
         verifyJWT,

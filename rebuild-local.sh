@@ -147,6 +147,21 @@ if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
     )
   }
 
+  run_staging_validation_report() {
+    headline "Generating multi-RECEPTION validation report"
+    # Match the directory mounted read-only in the staging backends, even if
+    # the caller configured another export directory for standalone reports.
+    if CLINIA_VALIDATION_REPORT_DIR="$ROOT_DIR/validation-artifacts" \
+      npm --prefix "$ROOT_DIR/backend" run test:validation-report; then
+      echo "OK Rapport disponible dans SUPERADMIN > Rapports de validation (Actualiser)."
+    else
+      local result=$?
+      echo "ERREUR validation multi-RECEPTION echouee ou incomplete."
+      echo "Consultez le rapport dans SUPERADMIN > Rapports de validation s'il a pu etre genere."
+      return "$result"
+    fi
+  }
+
   headline "ClinIA local staging rebuild"
 
   ensure_docker_desktop || {
@@ -167,6 +182,8 @@ if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
 
   headline "Validating staging compose"
   sdc config --quiet
+  # Create as the current user before Docker can create a root-owned bind source.
+  mkdir -p "$ROOT_DIR/validation-artifacts"
 
   headline "Stopping staging containers"
   if [[ "$WIPE_VOLUMES" == "1" ]]; then
@@ -202,6 +219,7 @@ if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
   wait_for_staging_url "frontend" "http://$STAGING_FRONTEND_HOST:$STAGING_FRONTEND_PORT"
 
   run_staging_unit_tests
+  run_staging_validation_report
 
   sdc exec -T mongo-rs-1 sh -c 'mongosh --quiet \
     --username "$CLINIA_RS_ROOT_USERNAME" \

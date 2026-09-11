@@ -32,7 +32,14 @@ jobs:
       - name: Prepare disposable MongoDB integration image
         run: docker pull mongo:7
       - name: Walk-in capacity integration (41 arrivals and last-place race)
-        run: npm run test:walkin
+        run: npm run test:validation-report
+      - name: Archive minimized validation evidence (also on failure)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reception-validation-${{ github.sha }}
+          path: validation-artifacts/*.json
+          if-no-files-found: warn
 
   frontend:
     name: Frontend tests, build and audit

@@ -35,6 +35,7 @@ import { ClinicalSupportAccessInboxPage } from "./pages/ClinicalSupportAccessInb
 import { DelegatedPatientAccessPage } from "./pages/DelegatedPatientAccessPage";
 import { ClinicalSupportAccessRequestPage } from "./pages/ClinicalSupportAccessRequestPage";
 import { ClinicalTermCatalogPage } from "./pages/ClinicalTermCatalogPage";
+import { ValidationReportsPage } from "./pages/ValidationReportsPage";
 import { MyWriteReceiptsPage } from "./pages/MyWriteReceiptsPage";
 import { CliniquesPage } from "./pages/CliniquesPage";
 import { SpecialistsPage } from "./pages/SpecialistsPage";
@@ -486,6 +487,9 @@ const App: React.FC = () => {
                         }
                     />
                     <Route path="/admin/clinical-terms" element={<ProtectedRoute allowedRoles={[...SUPERADMIN_ROLES]}><ClinicalTermCatalogPage /></ProtectedRoute>} />
+                    <Route path="/admin/validation-reports" element={<ProtectedRoute allowedRoles={[...SUPERADMIN_ROLES]}><Navigate to="/admin/validation-reports/concurrency" replace /></ProtectedRoute>} />
+                    <Route path="/admin/validation-reports/concurrency" element={<ProtectedRoute allowedRoles={[...SUPERADMIN_ROLES]}><Navigate to="/admin/validation-reports/concurrency/walk-in" replace /></ProtectedRoute>} />
+                    <Route path="/admin/validation-reports/concurrency/walk-in" element={<ProtectedRoute allowedRoles={[...SUPERADMIN_ROLES]}><ValidationReportsPage /></ProtectedRoute>} />
 
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

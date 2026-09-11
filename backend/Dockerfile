@@ -13,6 +13,10 @@ RUN addgroup -S -g 10001 clinia && adduser -S -D -H -u 10001 -G clinia clinia
 COPY --from=dependencies --chown=clinia:clinia /app/node_modules ./node_modules
 COPY --chown=clinia:clinia . .
 
+# Bake deployment provenance into the image, not a mutable runtime variable.
+ARG SOURCE_COMMIT
+RUN node scripts/write-build-revision.mjs "$SOURCE_COMMIT"
+
 USER 10001:10001
 EXPOSE 4000
 CMD ["npm", "start"]
