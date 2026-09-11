@@ -9,6 +9,10 @@ export function ValidationReportsMenu({ mobile = false, onNavigate }: { mobile?:
     const t = validationReportLabels(locale);
     const menu = useRef<HTMLDetailsElement>(null);
     const concurrency = useRef<HTMLDetailsElement>(null);
+    // Reports stay available in local staging, but are not advertised on Coolify.
+    // This is navigation visibility only; API/route authorization stays unchanged.
+    const local = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(location.hostname);
+    if (import.meta.env.PROD && !local) return null;
     return <details ref={menu} className="relative">
         <summary className="cursor-pointer rounded px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-blue-600">{t.title}</summary>
         <nav aria-label={t.title} className={mobile ? "ml-4 border-l pl-2" : "absolute left-0 z-50 mt-1 min-w-56 rounded border bg-white p-1 shadow-lg"}>

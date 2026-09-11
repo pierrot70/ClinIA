@@ -7,7 +7,7 @@ import { HOME_STRINGS_FR } from "../../i18n/homeStrings";
 import { validationReportLabels } from "../../i18n/validationReportLabels";
 import { ValidationReportsMenu } from "./ValidationReportsMenu";
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 function Menu({ locale = "fr", mobile = false, onNavigate = () => {} }) {
     return <MemoryRouter initialEntries={["/admin/validation-reports/concurrency/walk-in"]}>
         <HomeI18nContext.Provider value={{ locale, strings: HOME_STRINGS_FR, isTranslating: false, setLocaleFromDropdown: vi.fn(), setLocaleFromVoice: vi.fn() }}>
@@ -16,6 +16,25 @@ function Menu({ locale = "fr", mobile = false, onNavigate = () => {} }) {
     </MemoryRouter>;
 }
 describe("validation reports submenu", () => {
+    it.each([false, true])("hides the menu on remote production (mobile=%s)", mobile => {
+        vi.stubEnv("PROD", true);
+        vi.stubGlobal("location", { hostname: "clinia.example.com" });
+        const { container } = render(<Menu mobile={mobile} />);
+        expect(container.querySelector("details")).toBeNull();
+        expect(screen.queryByText("Rapports de validation")).not.toBeInTheDocument();
+    });
+    it.each(["localhost", "127.0.0.1", "[::1]"])("keeps reports in local builds on %s", hostname => {
+        vi.stubEnv("PROD", true);
+        vi.stubGlobal("location", { hostname });
+        render(<Menu />);
+        expect(screen.getByText("Rapports de validation")).toBeVisible();
+    });
+    it("keeps the menu in staging development mode", () => {
+        vi.stubEnv("PROD", false);
+        vi.stubGlobal("location", { hostname: "staging.internal" });
+        render(<Menu />);
+        expect(screen.getByText("Rapports de validation")).toBeVisible();
+    });
     it.each(["fr", "en", "es", "ko", "vi", "no", "ja", "zh", "he"])("updates category and menu labels in %s", locale => {
         const { container, rerender } = render(<Menu />);
         fireEvent.click(container.querySelector("summary")!);
