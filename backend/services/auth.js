@@ -1053,7 +1053,7 @@ export async function refresh({ refreshToken, req }) {
     if (!isKnownActiveSession(user, sessionId)) {
         throw createAuthError(
             "SESSION_REPLACED",
-            "Cette session a ete remplacee par une connexion plus recente."
+            "Cette session n’est plus active. Veuillez vous reconnecter."
         );
     }
 

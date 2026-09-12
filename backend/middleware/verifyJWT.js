@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { isTokenFromInactiveSession } from "../auth/sessionAccess.js";
 import { AUTH_ROLE_VALUES } from "../auth/constants.js";
 import { AdminUser } from "../models/AdminUser.js";
 import {
@@ -29,20 +30,6 @@ function isTokenRevokedByServer(user, payload) {
     return Number.isFinite(issuedAtMs) &&
         issuedAtMs <= new Date(user.authTokenInvalidBefore).getTime();
 }
-
-function isTokenFromInactiveSession(user, payload) {
-    const activeSessionIds = Array.isArray(user?.activeSessionIds)
-        ? user.activeSessionIds
-        : [];
-    const legacySessionId = user?.activeSessionId;
-    const knownSessionIds = new Set([
-        ...activeSessionIds,
-        ...(legacySessionId ? [legacySessionId] : []),
-    ]);
-
-    return knownSessionIds.size > 0 && !knownSessionIds.has(payload?.sid);
-}
-
 function isAllowedWhilePasswordResetRequired(req) {
     const path = req.originalUrl || req.path || req.url || "";
     const method = (req.method || "GET").toUpperCase();
@@ -124,7 +111,7 @@ export async function verifyJWT(req, res, next) {
             return res.status(401).json({
                 error: {
                     code: "SESSION_REPLACED",
-                    message: "Cette session a ete remplacee par une connexion plus recente.",
+                    message: "Cette session n’est plus active. Veuillez vous reconnecter.",
                     retryable: false,
                 },
             });

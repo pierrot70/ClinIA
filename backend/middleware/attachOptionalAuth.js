@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { isTokenFromInactiveSession } from "../auth/sessionAccess.js";
 import { AUTH_ROLE_VALUES } from "../auth/constants.js";
 import { AdminUser } from "../models/AdminUser.js";
 
@@ -24,19 +25,6 @@ function isTokenRevokedByServer(user, payload) {
     return Number.isFinite(issuedAtMs) &&
         issuedAtMs <= new Date(user.authTokenInvalidBefore).getTime();
 }
-
-function isTokenFromInactiveSession(user, payload) {
-    const activeSessionIds = Array.isArray(user?.activeSessionIds)
-        ? user.activeSessionIds
-        : [];
-    const legacySessionId = user?.activeSessionId;
-    const knownSessionIds = new Set([
-        ...activeSessionIds,
-        ...(legacySessionId ? [legacySessionId] : []),
-    ]);
-    return knownSessionIds.size > 0 && !knownSessionIds.has(payload?.sid);
-}
-
 export async function attachOptionalAuth(req, res, next) {
     const token = getTokenFromRequest(req);
 

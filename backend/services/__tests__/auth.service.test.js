@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { isTokenFromInactiveSession } from "../../auth/sessionAccess.js";
 
 const mockFindOne = vi.fn();
 const mockFindById = vi.fn();
@@ -575,6 +576,22 @@ describe("auth service", () => {
                 requestPath: "/api/auth/refresh",
             })
         );
+    });
+
+    it.each([false, true])("rejects the logged-out JWT while preserving other sessions (another session: %s)", async anotherSession => {
+        const user = buildUser({ activeSessionId: "closing-session",
+            activeSessionIds: anotherSession ? ["closing-session", "remaining-session"] : ["closing-session"] });
+        mockFindById.mockResolvedValue(user);
+        const payload = { sid: "closing-session" };
+        expect(isTokenFromInactiveSession(user, payload)).toBe(false);
+        await logout({ refreshToken: null, authUser: { userId: user._id, sessionId: payload.sid },
+            req: { headers: {}, ip: "127.0.0.1" } });
+        expect(isTokenFromInactiveSession(user, payload)).toBe(true);
+        expect(user.activeSessionId).toBeNull();
+        expect(user.activeSessionIds).toEqual(anotherSession ? ["remaining-session"] : []);
+        if (anotherSession) expect(isTokenFromInactiveSession(user, { sid: "remaining-session" })).toBe(false);
+        expect(user.save).toHaveBeenCalledTimes(1);
+        expect(revokeRefreshTokenSessionForUser).toHaveBeenCalledWith(user._id, "closing-session", "LOGOUT", expect.any(Date));
     });
 
     it("logs out by authenticated user and records logout audit", async () => {

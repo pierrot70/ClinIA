@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { requireRole } from "../requireRole.js";
 import { verifyJWT } from "../verifyJWT.js";
+import { attachOptionalAuth } from "../attachOptionalAuth.js";
 
 const { verify } = vi.hoisted(() => ({
     verify: vi.fn(),
@@ -45,6 +46,34 @@ beforeEach(() => {
 });
 
 describe("verifyJWT middleware", () => {
+    it.each([
+        ["last session logged out", [], null, "closed", false],
+        ["another session remains", ["remaining"], null, "closed", false],
+        ["remaining session stays usable", ["remaining"], null, "remaining", true],
+        ["legacy active session", [], "legacy", "legacy", true],
+        ["missing session identifier", [], null, undefined, false],
+        ["missing stored sessions", undefined, undefined, "closed", false],
+    ])("checks session membership: %s", async (_name, activeSessionIds, activeSessionId, sid, accepted) => {
+        verify.mockReturnValue({ sub: "user-1", role: "ADMIN", sid, iat: Math.floor(Date.now() / 1000) });
+        const user = { _id: "user-1", username: "admin", role: "ADMIN", isActive: true, activeSessionIds, activeSessionId,
+            authTokenInvalidBefore: null, lastLogoutAt: new Date() };
+        findById.mockReturnValue({ select: () => Promise.resolve(user) });
+        const req = { headers: { authorization: "Bearer still-unexpired-token" } };
+        const res = makeRes(), next = vi.fn();
+        await verifyJWT(req, res, next);
+        expect(next).toHaveBeenCalledTimes(accepted ? 1 : 0);
+        if (!accepted) {
+            expect(res.status).toHaveBeenCalledWith(401);
+            expect(req.auth).toBeUndefined();
+            expect(touchSessionActivity).not.toHaveBeenCalled();
+        }
+        findById.mockReturnValue({ select: () => ({ lean: async () => user }) });
+        const optionalReq = { headers: req.headers };
+        const optionalNext = vi.fn();
+        await attachOptionalAuth(optionalReq, makeRes(), optionalNext);
+        expect(Boolean(optionalReq.auth)).toBe(accepted);
+        expect(optionalNext).toHaveBeenCalledTimes(1);
+    });
     it("rejects missing bearer token", async () => {
         const req = { headers: {} };
         const res = makeRes();
@@ -62,6 +91,7 @@ describe("verifyJWT middleware", () => {
             sub: "user-1",
             role: "ADMIN",
             username: "admin",
+            sid: "current-session",
             iat: Math.floor(Date.now() / 1000),
         });
         findById.mockReturnValue({
@@ -70,6 +100,7 @@ describe("verifyJWT middleware", () => {
                 role: "ADMIN",
                 username: "admin",
                 isActive: true,
+                activeSessionIds: ["current-session"],
                 authTokenInvalidBefore: null,
             }),
         });
@@ -88,7 +119,7 @@ describe("verifyJWT middleware", () => {
             userId: "user-1",
             role: "ADMIN",
             username: "admin",
-            sessionId: null,
+            sessionId: "current-session",
             passwordResetRequired: false,
             mustChangePasswordOnNextLogin: false,
         });
@@ -136,7 +167,7 @@ describe("verifyJWT middleware", () => {
         expect(res.json).toHaveBeenCalledWith({
             error: {
                 code: "SESSION_REPLACED",
-                message: "Cette session a ete remplacee par une connexion plus recente.",
+                message: "Cette session n’est plus active. Veuillez vous reconnecter.",
                 retryable: false,
             },
         });
@@ -149,6 +180,7 @@ describe("verifyJWT middleware", () => {
             sub: "user-1",
             role: "ADMIN",
             username: "admin",
+            sid: "current-session",
             iat: Math.floor(Date.now() / 1000),
         });
         findById.mockReturnValue({
@@ -157,6 +189,7 @@ describe("verifyJWT middleware", () => {
                 role: "ADMIN",
                 username: "admin",
                 isActive: true,
+                activeSessionIds: ["current-session"],
                 authTokenInvalidBefore: null,
                 passwordResetRequired: true,
             }),
@@ -191,6 +224,7 @@ describe("verifyJWT middleware", () => {
             sub: "user-1",
             role: "ADMIN",
             username: "admin",
+            sid: "current-session",
             iat: Math.floor(Date.now() / 1000),
         });
         findById.mockReturnValue({
@@ -199,6 +233,7 @@ describe("verifyJWT middleware", () => {
                 role: "ADMIN",
                 username: "admin",
                 isActive: true,
+                activeSessionIds: ["current-session"],
                 authTokenInvalidBefore: null,
                 passwordResetRequired: true,
             }),
@@ -220,7 +255,7 @@ describe("verifyJWT middleware", () => {
             userId: "user-1",
             role: "ADMIN",
             username: "admin",
-            sessionId: null,
+            sessionId: "current-session",
             passwordResetRequired: true,
             mustChangePasswordOnNextLogin: false,
         });
@@ -233,6 +268,7 @@ describe("verifyJWT middleware", () => {
             sub: "user-1",
             role: "ADMIN",
             username: "admin",
+            sid: "current-session",
             iat: Math.floor(Date.now() / 1000),
         });
         findById.mockReturnValue({
@@ -241,6 +277,7 @@ describe("verifyJWT middleware", () => {
                 role: "ADMIN",
                 username: "admin",
                 isActive: true,
+                activeSessionIds: ["current-session"],
                 authTokenInvalidBefore: null,
                 passwordResetRequired: false,
                 mustChangePasswordOnNextLogin: true,
@@ -276,6 +313,7 @@ describe("verifyJWT middleware", () => {
             sub: "user-1",
             role: "NOT_A_ROLE",
             username: "admin",
+            sid: "current-session",
             iat: Math.floor(Date.now() / 1000),
         });
 
@@ -299,6 +337,7 @@ describe("verifyJWT middleware", () => {
             sub: "user-1",
             role: "ADMIN",
             username: "admin",
+            sid: "current-session",
             iat: Math.floor(new Date("2026-04-19T10:00:00.000Z").getTime() / 1000),
         });
         findById.mockReturnValue({
@@ -307,6 +346,7 @@ describe("verifyJWT middleware", () => {
                 role: "ADMIN",
                 username: "admin",
                 isActive: true,
+                activeSessionIds: ["current-session"],
                 authTokenInvalidBefore: new Date("2026-04-19T10:00:01.000Z"),
             }),
         });
