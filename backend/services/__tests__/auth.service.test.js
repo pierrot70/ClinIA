@@ -124,6 +124,7 @@ vi.mock("../auth/mfa.js", () => ({
 
 const {
     login,
+    reauthenticate,
     logout,
     refresh,
     hashPassword,
@@ -201,6 +202,24 @@ beforeEach(() => {
 });
 
 describe("auth service", () => {
+    it("binds password confirmation to the authenticated session", async () => {
+        const user = buildUser({ activeSessionIds: ["session-a", "session-b"] });
+        mockFindById.mockResolvedValue(user);
+        compare.mockResolvedValue(true);
+        sign.mockReturnValue("confirmation-token");
+        const token = await reauthenticate({ authUser: { userId: user._id, sessionId: "session-a" },
+            password: "synthetic-password", req: { headers: {}, ip: "127.0.0.1", body: { sessionId: "session-b" } } });
+        expect(token).toBe("confirmation-token");
+        expect(sign).toHaveBeenCalledWith({ purpose: "sensitive-reauth", role: "ADMIN", sid: "session-a" },
+            "test-access-secret", expect.objectContaining({ subject: user._id, expiresIn: 300, audience: "clinia-sensitive-reauth" }));
+    });
+
+    it.each([undefined, null, "", "   "])("does not issue confirmation without a session (%s)", async sessionId => {
+        await expect(reauthenticate({ authUser: { userId: "synthetic-user", sessionId }, password: "synthetic-password", req: {} }))
+            .rejects.toMatchObject({ code: "INVALID_INPUT" });
+        expect(sign).not.toHaveBeenCalled();
+        expect(compare).not.toHaveBeenCalled();
+    });
     it("logs in with email and rotates refresh token", async () => {
         const user = buildUser();
         mockFindOne.mockResolvedValue(user);

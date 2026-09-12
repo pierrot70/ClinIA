@@ -9,7 +9,7 @@ export function requireRecentReauth(req, res, next) {
     const cookies = parseCookies(req.headers.cookie);
     const reauthToken = cookies[SENSITIVE_REAUTH_COOKIE_NAME];
 
-    if (!reauthToken || !req.auth?.userId) {
+    if (!reauthToken || !req.auth?.userId || typeof req.auth.sessionId !== "string" || !req.auth.sessionId.trim()) {
         return res.status(403).json({
             error: {
                 code: "REAUTH_REQUIRED",
@@ -28,7 +28,9 @@ export function requireRecentReauth(req, res, next) {
 
         if (
             payload?.sub !== req.auth.userId ||
-            payload?.purpose !== "sensitive-reauth"
+            payload?.purpose !== "sensitive-reauth" ||
+            payload?.sid !== req.auth.sessionId ||
+            payload?.role !== req.auth.role
         ) {
             throw new Error("Invalid reauth token");
         }

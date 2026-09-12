@@ -713,6 +713,8 @@ export async function reauthenticate({ authUser, password, req }) {
     const normalizedPassword = String(password || "");
     if (
         !authUser?.userId ||
+        typeof authUser.sessionId !== "string" ||
+        !authUser.sessionId.trim() ||
         typeof password !== "string" ||
         normalizedPassword.length < 8 ||
         normalizedPassword.length > 128
@@ -759,6 +761,7 @@ export async function reauthenticate({ authUser, password, req }) {
         {
             purpose: "sensitive-reauth",
             role: user.role,
+            sid: authUser.sessionId,
         },
         getJwtAccessSecret(),
         {
