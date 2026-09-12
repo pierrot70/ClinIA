@@ -1,19 +1,32 @@
 #!/usr/bin/env bash
-# Manual before/after check on local staging only. Never prints credentials or user lists.
+# Manual staging/Coolify check. Never prints credentials, MFA codes or user lists.
 set -euo pipefail
 set +x
 umask 077
-api=http://localhost:4002/api/auth
-origin=http://localhost:5174
+[[ $# -le 1 ]] || { echo 'Usage: bash scripts/test-reauth-session-binding.sh [staging|coolify]' >&2; exit 1; }
+target="${1:-staging}"
+case "$target" in
+    staging) api=http://localhost:4002/api/auth; origin=http://localhost:5174; protocol='=http' ;;
+    coolify) api=https://clinique-ai.ca/api/auth; origin=https://clinique-ai.ca; protocol='=https' ;;
+    *) echo 'Cible invalide : staging ou coolify uniquement.' >&2; exit 1 ;;
+esac
 command -v curl >/dev/null
 command -v jq >/dev/null
+# Ignore local curl configuration; keep TLS verification and never follow redirects.
+curl() { command curl -q --proto "$protocol" "$@"; }
+echo "Cible : $target ($origin)"
+echo 'Utiliser un SUPERADMIN de test : deux sessions seront creees et peuvent remplacer des sessions existantes.'
+if [[ "$target" == coolify ]]; then
+    read -r -p 'Tapez TESTER COOLIFY pour autoriser ces connexions et lectures distantes : ' confirmation
+    [[ "$confirmation" == 'TESTER COOLIFY' ]] || { echo 'Test annule.'; exit 1; }
+fi
 temporary="$(mktemp -d /tmp/clinia-reauth-check.XXXXXXXX)"
 cleanup() {
     for session in a b; do
         if [[ -s "$temporary/$session.header" ]]; then
-            if ! curl --silent --show-error --max-time 15 --output /dev/null \
+            if ! logout_status="$(curl --silent --show-error --max-time 15 --output /dev/null --write-out '%{http_code}' \
                 --request POST --header "Origin: $origin" --header "@$temporary/$session.header" \
-                --cookie "$temporary/$session.cookies" "$api/logout"; then
+                --cookie "$temporary/$session.cookies" "$api/logout")" || [[ "$logout_status" != 200 ]]; then
                 echo "Attention : deconnexion de la session $session non confirmee." >&2
             fi
         fi
@@ -24,7 +37,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-read -r -p 'Identifiant du SUPERADMIN staging : ' identifier
+read -r -p "Identifiant du SUPERADMIN $target : " identifier
 read -r -s -p 'Mot de passe (masque) : ' password
 printf '\n'
 printf '%s' "$identifier" > "$temporary/identifier"
@@ -39,14 +52,33 @@ for session in a b; do
         --header 'Content-Type: application/json' --header "Origin: $origin" \
         --cookie-jar "$temporary/$session.cookies" --data-binary "@$temporary/login.json" "$api/login")"
     echo "Connexion $session : HTTP $status"
+    if [[ "$status" == 202 ]]; then
+        if ! jq -e '.data.mfaRequired == true and .data.mfaEnrollmentRequired == false and (.data.mfaChallenge | type == "string")' "$temporary/$session.json" >/dev/null; then
+            echo 'Test interrompu : MFA non configure ou reponse inattendue. Configurer le MFA dans le UI avant ce test.' >&2
+            exit 1
+        fi
+        echo "Session $session : saisir un code MFA actuel. Pour B, attendre un nouveau code different de celui utilise pour A."
+        read -r -s -p 'Code MFA (6 chiffres, masque) : ' mfa_code
+        printf '\n'
+        [[ "$mfa_code" =~ ^[0-9]{6}$ ]] || { echo 'Format du code MFA invalide.' >&2; exit 1; }
+        printf '%s' "$mfa_code" > "$temporary/mfa-code"
+        unset mfa_code
+        jq --rawfile code "$temporary/mfa-code" '{mfaChallenge:.data.mfaChallenge,code:$code}' "$temporary/$session.json" > "$temporary/mfa.json"
+        status="$(curl --silent --show-error --max-time 20 --output "$temporary/$session.json" --write-out '%{http_code}' \
+            --header 'Content-Type: application/json' --header "Origin: $origin" \
+            --cookie "$temporary/$session.cookies" --cookie-jar "$temporary/$session.cookies" \
+            --data-binary "@$temporary/mfa.json" "$api/login/mfa")"
+        echo "MFA $session : HTTP $status"
+        rm -f -- "$temporary/mfa-code" "$temporary/mfa.json"
+    fi
     if [[ "$status" != 200 ]]; then
-        echo 'Test interrompu : connexion refusee ou MFA demande. Aucun resultat sur la faille.' >&2
+        echo 'Test interrompu : connexion ou MFA refuse. Aucun resultat sur la faille. Pas de nouvelle tentative automatique.' >&2
         exit 1
     fi
     jq -er '.data.accessToken | select(type == "string" and test("^[A-Za-z0-9_.-]+$")) | "Authorization: Bearer " + .' \
         "$temporary/$session.json" > "$temporary/$session.header"
     if ! jq -e '.data.user.role == "SUPERADMIN"' "$temporary/$session.json" >/dev/null; then
-        echo 'Ce test exige un compte SUPERADMIN staging.' >&2
+        echo 'Ce test exige un compte SUPERADMIN.' >&2
         exit 1
     fi
 done
