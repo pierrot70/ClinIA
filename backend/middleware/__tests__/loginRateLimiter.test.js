@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { LOGIN_RATE_LIMIT_MAX_ATTEMPTS } from "../../auth/constants.js";
 
 import {
     createLoginRateLimiter,
@@ -29,6 +30,21 @@ function createModel() {
 }
 
 describe("loginRateLimiter middleware", () => {
+    it("allows normal shared-clinic traffic beyond ten requests without exempting SUPERADMIN", async () => {
+        expect(LOGIN_RATE_LIMIT_MAX_ATTEMPTS).toBe(100);
+        const limiter = createLoginRateLimiter({ RateLimitWindowModel: createModel(), now: () => 1000 });
+        const next = vi.fn();
+        for (let i = 0; i < 100; i++) {
+            const res = makeRes();
+            await limiter({ ip: "192.0.2.1", headers: {}, body: { username: `synthetic-${i}`, role: i % 2 ? "SUPERADMIN" : "RECEPTION" } }, res, next);
+            expect(res.status).not.toHaveBeenCalled();
+        }
+        expect(next).toHaveBeenCalledTimes(100);
+        const res = makeRes();
+        await limiter({ ip: "192.0.2.1", headers: {}, body: { username: "synthetic-superadmin", role: "SUPERADMIN" } }, res, next);
+        expect(res.status).toHaveBeenCalledWith(429);
+        expect(next).toHaveBeenCalledTimes(100);
+    });
     beforeEach(() => {
         vi.restoreAllMocks();
     });
@@ -41,7 +57,7 @@ describe("loginRateLimiter middleware", () => {
         });
         const req = { headers: {}, ip: "127.0.0.10" };
 
-        for (let i = 0; i < 10; i += 1) {
+        for (let i = 0; i < LOGIN_RATE_LIMIT_MAX_ATTEMPTS; i += 1) {
             const res = makeRes();
             const next = vi.fn();
 
@@ -60,7 +76,7 @@ describe("loginRateLimiter middleware", () => {
         });
         const req = { headers: {}, ip: "127.0.0.11" };
 
-        for (let i = 0; i < 10; i += 1) {
+        for (let i = 0; i < LOGIN_RATE_LIMIT_MAX_ATTEMPTS; i += 1) {
             await limiter(req, makeRes(), vi.fn());
         }
 
@@ -111,7 +127,7 @@ describe("loginRateLimiter middleware", () => {
         const nextA = vi.fn();
         const nextB = vi.fn();
 
-        for (let i = 0; i < 10; i += 1) {
+        for (let i = 0; i < LOGIN_RATE_LIMIT_MAX_ATTEMPTS; i += 1) {
             await limiter(
                 { headers: {}, ip: "127.0.0.12" },
                 makeRes(),
@@ -124,7 +140,7 @@ describe("loginRateLimiter middleware", () => {
             nextB
         );
 
-        expect(nextA).toHaveBeenCalledTimes(10);
+        expect(nextA).toHaveBeenCalledTimes(LOGIN_RATE_LIMIT_MAX_ATTEMPTS);
         expect(nextB).toHaveBeenCalledTimes(1);
     });
 
@@ -136,7 +152,7 @@ describe("loginRateLimiter middleware", () => {
         const next = vi.fn();
         const responses = [];
 
-        for (let i = 0; i < 11; i += 1) {
+        for (let i = 0; i < LOGIN_RATE_LIMIT_MAX_ATTEMPTS + 1; i += 1) {
             const res = makeRes();
             responses.push(res);
             await limiter(
@@ -152,8 +168,8 @@ describe("loginRateLimiter middleware", () => {
             );
         }
 
-        expect(next).toHaveBeenCalledTimes(10);
-        expect(responses[10].status).toHaveBeenCalledWith(429);
+        expect(next).toHaveBeenCalledTimes(LOGIN_RATE_LIMIT_MAX_ATTEMPTS);
+        expect(responses[LOGIN_RATE_LIMIT_MAX_ATTEMPTS].status).toHaveBeenCalledWith(429);
     });
 
     it("fails closed when Mongo cannot verify the login limit", async () => {

@@ -6,6 +6,8 @@ import {
 } from "../middleware/loginRateLimiter.js";
 import { requireRole } from "../middleware/requireRole.js";
 import { requireRecentReauth } from "../middleware/requireRecentReauth.js";
+import { reauthRateLimiter } from "../middleware/reauthRateLimiter.js";
+import { withPasswordVerificationDelay } from "../auth/passwordVerificationDelay.js";
 import { verifyJWT } from "../middleware/verifyJWT.js";
 import { AUTH_ROLES } from "../auth/constants.js";
 import {
@@ -81,12 +83,12 @@ router.post("/login", loginRateLimiter, async (req, res) => {
     const { username, email, password } = req.body ?? {};
 
     try {
-        const data = await login({
+        const data = await withPasswordVerificationDelay(() => login({
             username,
             email,
             password,
             req,
-        });
+        }));
 
         if (data.mfaRequired) {
             return res.status(202).json({ data, meta: { source: "real", model: "auth" } });
@@ -472,13 +474,13 @@ router.post("/logout", enforceSensitiveAuthOrigin, verifyJWT, async (req, res) =
     }
 });
 
-router.post("/reauth", enforceSensitiveAuthOrigin, verifyJWT, async (req, res) => {
+router.post("/reauth", enforceSensitiveAuthOrigin, verifyJWT, reauthRateLimiter, async (req, res) => {
     try {
-        const token = await reauthenticate({
+        const token = await withPasswordVerificationDelay(() => reauthenticate({
             authUser: req.auth,
             password: req.body?.password,
             req,
-        });
+        }));
 
         res.cookie(
             SENSITIVE_REAUTH_COOKIE_NAME,

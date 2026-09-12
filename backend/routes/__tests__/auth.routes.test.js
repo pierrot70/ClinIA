@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const { delayedVerification } = vi.hoisted(() => ({ delayedVerification: vi.fn(operation => operation()) }));
+vi.mock("../../auth/passwordVerificationDelay.js", () => ({ withPasswordVerificationDelay: delayedVerification }));
+
 const { completeMfaLogin, login, registerSelf, refresh } = vi.hoisted(() => ({
     completeMfaLogin: vi.fn(),
     login: vi.fn(),
@@ -36,6 +39,16 @@ vi.mock("../../services/appShutdown.js", () => ({
 }));
 
 import router from "../auth.js";
+import { reauthenticate } from "../../services/auth.js";
+import { verifyJWT } from "../../middleware/verifyJWT.js";
+import { reauthRateLimiter } from "../../middleware/reauthRateLimiter.js";
+
+it("limits reauthentication after JWT verification and before checking the password", () => {
+    const handlers = router.stack.find(entry => entry.route?.path === "/reauth").route.stack.map(entry => entry.handle);
+    expect(handlers.indexOf(verifyJWT)).toBeGreaterThanOrEqual(0);
+    expect(handlers.indexOf(reauthRateLimiter)).toBe(handlers.indexOf(verifyJWT) + 1);
+    expect(handlers.indexOf(reauthRateLimiter)).toBe(handlers.length - 2);
+});
 
 function makeRes() {
     return {
@@ -58,6 +71,22 @@ function getLastRouteHandler(method, path) {
 
     return layer.route.stack.at(-1).handle;
 }
+
+describe("password delays are wired to both endpoints", () => {
+    it.each([
+        ["/login", true], ["/login", false], ["/reauth", true], ["/reauth", false],
+    ])("delays %s (success=%s)", async (path, success) => {
+        vi.clearAllMocks();
+        const service = path === "/login" ? login : reauthenticate;
+        if (success) service.mockResolvedValue(path === "/login" ? { accessToken: "synthetic", refreshToken: "synthetic" } : "synthetic");
+        else service.mockRejectedValue({ code: "INVALID_CREDENTIALS", message: "Invalid credentials" });
+        const res = makeRes();
+        await getLastRouteHandler("post", path)({ body: { username: "test", password: "synthetic-password" }, auth: { userId: "test" }, headers: {} }, res);
+        expect(delayedVerification).toHaveBeenCalledTimes(1);
+        expect(service).toHaveBeenCalledTimes(1);
+        expect(res.status).toHaveBeenCalledWith(success ? 200 : 401);
+    });
+});
 
 describe("POST /register-self security", () => {
     const originalFlag = process.env.CLINIA_ALLOW_SELF_REGISTRATION;

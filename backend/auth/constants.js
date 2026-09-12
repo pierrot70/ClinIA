@@ -21,7 +21,9 @@ export const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
 export const MFA_LOCKOUT_DURATION_MS = 15 * 60 * 1000;
 
 export const LOGIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-export const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 10;
+// Coarse shared-IP ceiling (clinics may share one public address).
+// Per-account/source failed-password throttling remains separate and stricter.
+export const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 100;
 
 export const REFRESH_RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
 export const REFRESH_RATE_LIMIT_MAX_ATTEMPTS = 30;
