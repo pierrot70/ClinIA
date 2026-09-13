@@ -79,8 +79,21 @@ export function decryptMfaSecret(encrypted) {
 }
 
 export function verifyTotp(secret, code, now = Date.now()) {
-    if (!/^\d{6}$/.test(String(code || ""))) return false;
-    return [-1, 0, 1].some((offset) => crypto.timingSafeEqual(Buffer.from(totpAt(secret, now + offset * TOTP_PERIOD_SECONDS * 1000)), Buffer.from(String(code))));
+    return matchTotpStep(secret, code, now) !== null;
+}
+
+// Return the actual matched step (including clock skew), not the server's step.
+export function matchTotpStep(secret, code, now = Date.now()) {
+    if (!/^\d{6}$/.test(String(code || ""))) return null;
+    let matched = null;
+    for (const offset of [-1, 0, 1]) {
+        const timestamp = now + offset * TOTP_PERIOD_SECONDS * 1000;
+        if (timestamp < 0) continue;
+        if (crypto.timingSafeEqual(Buffer.from(totpAt(secret, timestamp)), Buffer.from(String(code)))) {
+            matched = Math.floor(timestamp / 1000 / TOTP_PERIOD_SECONDS);
+        }
+    }
+    return matched;
 }
 
 export function createTotp(secret, now = Date.now()) {

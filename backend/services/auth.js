@@ -61,7 +61,7 @@ import {
     encryptMfaSecret,
     hashRecoveryCode,
     MFA_CHALLENGE_TTL_SECONDS,
-    verifyTotp,
+    matchTotpStep,
 } from "./auth/mfa.js";
 
 export { listAuthLogGraphs, listAuthLogs };
@@ -191,21 +191,34 @@ function hasActiveMfaChallenge(user, challenge, now = new Date()) {
     );
 }
 
-async function consumeMfaChallenge(user, challenge) {
+async function consumeMfaChallenge(user, challenge, totpStep = null) {
+    const enrollment = ["mfa-enroll", "mfa-concurrent-enroll"].includes(challenge.purpose);
+    const totpFilter = totpStep === null ? {} : enrollment
+        ? { mfaPendingSecretEncrypted: user.mfaPendingSecretEncrypted }
+        : {
+            mfaSecretEncrypted: user.mfaSecretEncrypted,
+            $or: [
+                { mfaLastUsedTotpStep: null }, // Includes accounts created before this field existed.
+                { mfaLastUsedTotpStep: { $lt: totpStep } },
+            ],
+        };
+    // Claim the challenge and OTP together in MongoDB, across backend instances.
     return AdminUser.findOneAndUpdate(
         {
             ...buildActiveMfaChallengeFilter(user._id, challenge),
+            ...totpFilter,
             mfaChallengeAttempts: { $lt: MFA_CHALLENGE_MAX_ATTEMPTS },
         },
         {
             $set: {
+                ...(totpStep === null ? {} : { mfaLastUsedTotpStep: totpStep }),
                 mfaChallengeId: null,
                 mfaChallengePurpose: null,
                 mfaChallengeExpiresAt: null,
                 mfaChallengeAttempts: 0,
             },
         },
-        { new: true }
+        { new: true, writeConcern: { w: "majority", j: true } }
     );
 }
 
@@ -951,7 +964,7 @@ export async function completeMfaLogin({ mfaChallenge, code, req }) {
     }
     const challenge = verifyMfaChallenge(mfaChallenge);
     const user = await AdminUser.findById(challenge.sub).select(
-        "+mfaSecretEncrypted +mfaPendingSecretEncrypted +mfaPendingExpiresAt +mfaRecoveryCodeHashes +mfaChallengeId +mfaChallengePurpose +mfaChallengeExpiresAt +mfaChallengeAttempts"
+        "+mfaSecretEncrypted +mfaLastUsedTotpStep +mfaPendingSecretEncrypted +mfaPendingExpiresAt +mfaRecoveryCodeHashes +mfaChallengeId +mfaChallengePurpose +mfaChallengeExpiresAt +mfaChallengeAttempts"
     );
     if (!user || user.isActive === false) throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
     const ip = getRequestIp(req);
@@ -961,7 +974,8 @@ export async function completeMfaLogin({ mfaChallenge, code, req }) {
     }
     if (["mfa-enroll", "mfa-concurrent-enroll"].includes(challenge.purpose)) {
         if (!user.mfaPendingSecretEncrypted || !user.mfaPendingExpiresAt || user.mfaPendingExpiresAt <= new Date()) throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
-        if (!verifyTotp(decryptMfaSecret(user.mfaPendingSecretEncrypted), code)) {
+        const totpStep = matchTotpStep(decryptMfaSecret(user.mfaPendingSecretEncrypted), code);
+        if (totpStep === null) {
             const attempt = await recordFailedMfaChallengeAttempt(user, challenge);
             await recordAuthAuditEvent({ action: "MFA_FAILED", outcome: "FAILED", userId: user._id, username: user.username, role: user.role, ip, reason: attempt.exhausted ? "MFA_CHALLENGE_EXHAUSTED" : "INVALID_MFA_CODE" });
             if (attempt.exhausted) {
@@ -970,7 +984,7 @@ export async function completeMfaLogin({ mfaChallenge, code, req }) {
             }
             throw createAuthError("INVALID_MFA_CODE", "Code MFA invalide.");
         }
-        if (!await consumeMfaChallenge(user, challenge)) throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
+        if (!await consumeMfaChallenge(user, challenge, totpStep)) throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
         recoveryCodes = createRecoveryCodes();
         user.mfaSecretEncrypted = user.mfaPendingSecretEncrypted;
         user.mfaPendingSecretEncrypted = null;
@@ -988,7 +1002,8 @@ export async function completeMfaLogin({ mfaChallenge, code, req }) {
     if (challenge.purpose !== "mfa-login" || !user.mfaEnabled || !user.mfaSecretEncrypted) throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
     const recoveryHash = hashRecoveryCode(code);
     const recoveryIndex = user.mfaRecoveryCodeHashes.indexOf(recoveryHash);
-    const valid = recoveryIndex >= 0 || verifyTotp(decryptMfaSecret(user.mfaSecretEncrypted), code);
+    const totpStep = recoveryIndex >= 0 ? null : matchTotpStep(decryptMfaSecret(user.mfaSecretEncrypted), code);
+    const valid = recoveryIndex >= 0 || (totpStep !== null && (user.mfaLastUsedTotpStep == null || totpStep > user.mfaLastUsedTotpStep));
     if (!valid) {
         const attempt = await recordFailedMfaChallengeAttempt(user, challenge);
         await recordAuthAuditEvent({ action: "MFA_FAILED", outcome: "FAILED", userId: user._id, username: user.username, role: user.role, ip, reason: attempt.exhausted ? "MFA_CHALLENGE_EXHAUSTED" : "INVALID_MFA_CODE" });
@@ -998,7 +1013,7 @@ export async function completeMfaLogin({ mfaChallenge, code, req }) {
         }
         throw createAuthError("INVALID_MFA_CODE", "Code MFA invalide.");
     }
-    if (!await consumeMfaChallenge(user, challenge)) throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
+    if (!await consumeMfaChallenge(user, challenge, totpStep)) throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
     if (recoveryIndex >= 0) user.mfaRecoveryCodeHashes.splice(recoveryIndex, 1);
     clearMfaChallenge(user);
     await user.save();

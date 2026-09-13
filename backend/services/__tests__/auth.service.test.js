@@ -109,7 +109,7 @@ const createRecoveryCodes = vi.fn();
 const decryptMfaSecret = vi.fn();
 const encryptMfaSecret = vi.fn();
 const hashRecoveryCode = vi.fn((code) => `hash:${code}`);
-const verifyTotp = vi.fn();
+const matchTotpStep = vi.fn();
 
 vi.mock("../auth/mfa.js", () => ({
     buildProvisioningUri: vi.fn(),
@@ -119,7 +119,7 @@ vi.mock("../auth/mfa.js", () => ({
     encryptMfaSecret,
     hashRecoveryCode,
     MFA_CHALLENGE_TTL_SECONDS: 300,
-    verifyTotp,
+    matchTotpStep,
 }));
 
 const {
@@ -196,7 +196,7 @@ beforeEach(() => {
     createRecoveryCodes.mockReturnValue(["recovery-code"]);
     decryptMfaSecret.mockReturnValue("mfa-secret");
     encryptMfaSecret.mockImplementation((secret) => `encrypted:${secret}`);
-    verifyTotp.mockReturnValue(true);
+    matchTotpStep.mockReturnValue(1000);
     hashRecoveryCode.mockImplementation((code) => `hash:${code}`);
     process.env.JWT_ACCESS_SECRET = "test-access-secret";
 });
@@ -1355,7 +1355,7 @@ describe("auth service", () => {
             expect.objectContaining({
                 $set: expect.objectContaining({ mfaChallengeId: null }),
             }),
-            { new: true }
+            { new: true, writeConcern: { w: "majority", j: true } }
         );
         expect(user.mfaChallengeId).toBeNull();
 
@@ -1364,6 +1364,109 @@ describe("auth service", () => {
             code: "123456",
             req: { headers: { "x-forwarded-for": "203.0.113.77" }, ip: "10.0.0.2" },
         })).rejects.toMatchObject({ code: "INVALID_MFA_CHALLENGE" });
+    });
+
+    describe("TOTP replay protection", () => {
+        function prepare(overrides = {}) {
+            const user = buildUser({
+                mfaEnabled: true,
+                mfaSecretEncrypted: "encrypted:mfa-secret",
+                mfaChallengeId: "fresh-challenge",
+                mfaChallengePurpose: "mfa-login",
+                mfaChallengeExpiresAt: new Date(Date.now() + 60_000),
+                ...overrides,
+            });
+            mockFindById.mockReturnValue({ select: vi.fn().mockResolvedValue(user) });
+            verify.mockReturnValue({ sub: user._id, purpose: user.mfaChallengePurpose, jti: user.mfaChallengeId });
+            sign.mockReturnValue("access-token");
+            return user;
+        }
+        const input = { mfaChallenge: "c".repeat(64), code: "123456", req: { headers: {}, ip: "127.0.0.1" } };
+
+        it.each([1000, 1001])("rejects a fresh challenge when step %s was already consumed", async (last) => {
+            const user = prepare({ mfaLastUsedTotpStep: last });
+            mockFindOneAndUpdate.mockResolvedValue(user);
+            await expect(completeMfaLogin(input)).rejects.toMatchObject({ code: "INVALID_MFA_CODE" });
+            expect(user.save).not.toHaveBeenCalled();
+            expect(recordAuthAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: "MFA_FAILED" }));
+        });
+
+        it.each([undefined, null, 999])("atomically consumes a fresh step for legacy or older counter %s", async (last) => {
+            const user = prepare({ mfaLastUsedTotpStep: last });
+            mockFindOneAndUpdate.mockResolvedValue(user);
+            await completeMfaLogin(input);
+            expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
+                expect.objectContaining({ mfaSecretEncrypted: user.mfaSecretEncrypted, $or: [
+                    { mfaLastUsedTotpStep: null }, { mfaLastUsedTotpStep: { $lt: 1000 } },
+                ] }),
+                { $set: expect.objectContaining({ mfaLastUsedTotpStep: 1000, mfaChallengeId: null }) },
+                { new: true, writeConcern: { w: "majority", j: true } }
+            );
+        });
+
+        it("does not issue a session when another request wins the atomic claim", async () => {
+            const user = prepare();
+            mockFindOneAndUpdate.mockResolvedValue(null);
+            await expect(completeMfaLogin(input)).rejects.toMatchObject({ code: "INVALID_MFA_CHALLENGE" });
+            expect(user.save).not.toHaveBeenCalled();
+            expect(sign).not.toHaveBeenCalled();
+        });
+
+        it("refuses the consumed code on a new challenge but accepts the next step", async () => {
+            const user = prepare();
+            mockFindOneAndUpdate.mockImplementation(async (_filter, update) => {
+                if (update.$set?.mfaLastUsedTotpStep != null) {
+                    user.mfaLastUsedTotpStep = update.$set.mfaLastUsedTotpStep;
+                }
+                return user;
+            });
+            await completeMfaLogin(input);
+            user.mfaChallengeId = "next-challenge";
+            user.mfaChallengePurpose = "mfa-login";
+            user.mfaChallengeExpiresAt = new Date(Date.now() + 60_000);
+            verify.mockReturnValue({ sub: user._id, purpose: "mfa-login", jti: "next-challenge" });
+            await expect(completeMfaLogin(input)).rejects.toMatchObject({ code: "INVALID_MFA_CODE" });
+            matchTotpStep.mockReturnValue(1001);
+            await expect(completeMfaLogin(input)).resolves.toBeDefined();
+            expect(user.mfaLastUsedTotpStep).toBe(1001);
+        });
+
+        it("fails closed if the atomic MongoDB write fails", async () => {
+            const user = prepare();
+            mockFindOneAndUpdate.mockRejectedValue(new Error("write unavailable"));
+            await expect(completeMfaLogin(input)).rejects.toThrow("write unavailable");
+            expect(user.save).not.toHaveBeenCalled();
+            expect(sign).not.toHaveBeenCalled();
+        });
+
+        it("allows only one of two concurrent claims to create a session", async () => {
+            const user = prepare();
+            mockFindOneAndUpdate.mockResolvedValueOnce(user).mockResolvedValueOnce(null);
+            const results = await Promise.allSettled([completeMfaLogin(input), completeMfaLogin(input)]);
+            expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
+            expect(results.filter(result => result.status === "rejected")).toHaveLength(1);
+        });
+
+        it("records the enrollment step so its code cannot be reused for login", async () => {
+            const user = prepare({ mfaChallengePurpose: "mfa-enroll", mfaPendingSecretEncrypted: "pending-secret",
+                mfaPendingExpiresAt: new Date(Date.now() + 60_000) });
+            createRecoveryCodes.mockReturnValue(["recovery"]);
+            mockFindOneAndUpdate.mockResolvedValue(user);
+            await completeMfaLogin(input);
+            expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
+                expect.objectContaining({ mfaPendingSecretEncrypted: "pending-secret" }),
+                { $set: expect.objectContaining({ mfaLastUsedTotpStep: 1000 }) }, expect.any(Object)
+            );
+        });
+
+        it("does not apply the TOTP counter to recovery codes", async () => {
+            const user = prepare({ mfaLastUsedTotpStep: 1001, mfaRecoveryCodeHashes: ["hash:recovery"] });
+            mockFindOneAndUpdate.mockResolvedValue(user);
+            await completeMfaLogin({ ...input, code: "recovery" });
+            expect(matchTotpStep).not.toHaveBeenCalled();
+            expect(user.mfaRecoveryCodeHashes).toEqual([]);
+            expect(mockFindOneAndUpdate.mock.calls[0][1].$set).not.toHaveProperty("mfaLastUsedTotpStep");
+        });
     });
 
     it("keeps two sessions and evicts the oldest when a third MFA session is created", async () => {
@@ -1437,7 +1540,7 @@ describe("auth service", () => {
             purpose: "mfa-login",
             jti: "challenge-456",
         });
-        verifyTotp.mockReturnValue(false);
+        matchTotpStep.mockReturnValue(null);
         mockFindOneAndUpdate.mockImplementation((filter, update) => {
             if (update.$inc) {
                 if (user.mfaChallengeAttempts >= filter.mfaChallengeAttempts.$lt) {
