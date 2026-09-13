@@ -57,6 +57,9 @@ import {
 import { logSafeError } from "../utils/requestLogSafety.js";
 import { getTrustedRequestIp } from "../utils/requestIp.js";
 
+// Explicit dependency injection for isolated harnesses; the application keeps
+// the default limiter. No request parameter or environment override is accepted.
+export function createAuthRouter({ loginLimiter = loginRateLimiter } = {}) {
 const router = express.Router();
 const enforceSensitiveAuthOrigin = enforceTrustedOrigin();
 
@@ -79,7 +82,7 @@ router.get("/app-status", async (_req, res) => {
     });
 });
 
-router.post("/login", loginRateLimiter, async (req, res) => {
+router.post("/login", loginLimiter, async (req, res) => {
     const { username, email, password } = req.body ?? {};
 
     try {
@@ -183,7 +186,7 @@ router.post("/login", loginRateLimiter, async (req, res) => {
     }
 });
 
-router.post("/login/mfa", loginRateLimiter, async (req, res) => {
+router.post("/login/mfa", loginLimiter, async (req, res) => {
     try {
         const data = await completeMfaLogin({
             mfaChallenge: req.body?.mfaChallenge,
@@ -208,7 +211,7 @@ router.post("/login/mfa", loginRateLimiter, async (req, res) => {
     }
 });
 
-router.post("/register-self", loginRateLimiter, async (req, res) => {
+router.post("/register-self", loginLimiter, async (req, res) => {
     if (process.env.CLINIA_ALLOW_SELF_REGISTRATION !== "true") {
         return res.status(403).json({
             error: {
@@ -1183,4 +1186,7 @@ router.post(
     }
 );
 
-export default router;
+return router;
+}
+
+export default createAuthRouter();

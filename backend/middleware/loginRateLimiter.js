@@ -14,7 +14,11 @@ const REFRESH_LIMITER_KEY = "auth_refresh";
 export function createLoginRateLimiter({
     RateLimitWindowModel = RateLimitWindow,
     now = () => Date.now(),
+    maxAttempts = LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
 } = {}) {
+    if (!Number.isSafeInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 1000000) {
+        throw new Error("Invalid login limiter ceiling");
+    }
     return async function loginRateLimiter(req, res, next) {
         const nowMs = now();
         const actorKey = `ip:${getTrustedRequestIp(req)}`;
@@ -46,7 +50,7 @@ export function createLoginRateLimiter({
                 { upsert: true, new: true }
             );
 
-            if (bucket.requestCount <= LOGIN_RATE_LIMIT_MAX_ATTEMPTS) {
+            if (bucket.requestCount <= maxAttempts) {
                 return next();
             }
 

@@ -30,6 +30,24 @@ function createModel() {
 }
 
 describe("loginRateLimiter middleware", () => {
+    it("supports an isolated injected ceiling without changing the application default", async () => {
+        const model = { findOneAndUpdate: vi.fn().mockResolvedValue({ requestCount: 101 }) };
+        const req = { ip: "127.0.0.1", headers: {} };
+        const next = vi.fn();
+        await createLoginRateLimiter({ RateLimitWindowModel: model, maxAttempts: 1000000 })(req, makeRes(), next);
+        expect(next).toHaveBeenCalledOnce();
+        const defaultRes = makeRes();
+        await createLoginRateLimiter({ RateLimitWindowModel: model })(req, defaultRes, next);
+        expect(defaultRes.status).toHaveBeenCalledWith(429);
+        model.findOneAndUpdate.mockResolvedValue({ requestCount: 1000001 });
+        const cappedRes = makeRes();
+        await createLoginRateLimiter({ RateLimitWindowModel: model, maxAttempts: 1000000 })(req, cappedRes, next);
+        expect(cappedRes.status).toHaveBeenCalledWith(429);
+        expect(LOGIN_RATE_LIMIT_MAX_ATTEMPTS).toBe(100);
+    });
+    it.each([0, -1, 1000001, NaN, 1.5])("rejects invalid injected ceiling %s", maxAttempts => {
+        expect(() => createLoginRateLimiter({ maxAttempts })).toThrow();
+    });
     it("allows normal shared-clinic traffic beyond ten requests without exempting SUPERADMIN", async () => {
         expect(LOGIN_RATE_LIMIT_MAX_ATTEMPTS).toBe(100);
         const limiter = createLoginRateLimiter({ RateLimitWindowModel: createModel(), now: () => 1000 });
