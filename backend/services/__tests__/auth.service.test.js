@@ -171,7 +171,9 @@ function buildUser(overrides = {}) {
 }
 
 beforeEach(() => {
-    vi.clearAllMocks();
+    // Clear implementations and queued responses as well as call history:
+    // a previous login must not make the next registration see an existing user.
+    vi.resetAllMocks();
     createRefreshTokenFamilyId.mockReturnValue("family-123");
     createRefreshTokenSession.mockResolvedValue(undefined);
     findRefreshTokenSession.mockResolvedValue(null);

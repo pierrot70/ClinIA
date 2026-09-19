@@ -29,6 +29,8 @@ jobs:
       - run: npm ci --no-audit
       - run: node ../scripts/verify-npm-audit.mjs
       - run: npm test -- --run
+      - name: Authentication service isolation (regression seed 3)
+        run: npm test -- --run services/__tests__/auth.service.test.js --sequence.shuffle --sequence.seed=3
       - name: Prepare disposable MongoDB integration image
         run: docker pull mongo:7
       - name: Walk-in capacity integration (41 arrivals and last-place race)

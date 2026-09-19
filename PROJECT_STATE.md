@@ -24,6 +24,17 @@ CI distant doit être vérifié pour le SHA exact publié dans GitHub Actions.
   Une erreur réelle du script manuel a été corrigée : une confirmation acceptée
   dans une autre session retourne maintenant un code d'échec 2, testé.
   Aucun délai de sécurité serveur n'a été raccourci.
+  Investigation ciblée du point 2 : les cinq anciens CI des changements auth
+  s'arrêtaient tous à l'audit npm avant les tests. Un défaut distinct d'isolation
+  de la suite `auth.service.test.js` a ensuite été reproduit avec
+  `--sequence.shuffle --sequence.seed=3` : le test de réception sans clinique
+  recevait `USER_EXISTS` au lieu de `INVALID_INPUT`, en héritant du mock d'un
+  test précédent. `vi.resetAllMocks()` remplace `vi.clearAllMocks()` dans la
+  préparation de cette suite ; les réponses et implémentations sont réinitialisées.
+  Les assertions et le code applicatif restent identiques. Le CI conserve
+  désormais cet ordre de régression, en plus des suites complètes et des 21
+  scénarios. Sans le journal initial, ce défaut confirmé ne peut pas être
+  assimilé avec certitude à l'instabilité de réauthentification évoquée au départ.
 - P0 STAGING auth : drill HTTP avec les vraies routes déployées et Mongo STAGING,
   dans un serveur et des collections isolés. Rejeu MFA refusé dans la même
   fenêtre TOTP (401), code frais accepté (200), cookie de réauth emprunté refusé
@@ -74,6 +85,12 @@ Validation: résultats finaux consignés ci-dessous ; pas de validation clinique
 
 ### Validation
 
+- Point 2 : cinq fichiers auth/réauth, 97 tests, réussis dans chacun des dix
+  ordres (seeds 1 à 10), soit 970 exécutions sans échec après correction.
+  Avant correction, seed 3 échouait également sur le seul fichier de service
+  (56/57). Après correction, 57/57 dans le conteneur STAGING avec seed 3,
+  modèles simulés et aucune requête aux collections applicatives.
+  Suite backend complète réexécutée après correction : 691/691.
 - Rebuild complet `./rebuild-local.sh staging` réussi après synchronisation des
   dépendances ; API 4002/4003 et frontend 5174 prêts, replica set sain
   (un PRIMARY, deux SECONDARY). Suites 691/1171 et intégrations 21/21 repassées.
