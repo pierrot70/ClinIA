@@ -91,6 +91,13 @@ Validation complète avant commit/push, depuis la racine :
 bash scripts/ci-local.sh
 ```
 
+`./rebuild-local.sh staging` appelle également cette validation complète, une
+seule fois, avant l'arrêt et la reconstruction des conteneurs. Un échec du CI
+interrompt le rebuild. Les anciens appels séparés aux tests unitaires et au
+rapport d'intégration après redémarrage sont remplacés par ce passage unique ;
+les contrôles de disponibilité STAGING et de l'état Mongo restent en place.
+Le rapport est écrit dans `validation-artifacts/`, monté dans les backends.
+
 Cette commande et GitHub Actions appellent les mêmes étapes versionnées :
 `npm ci`, audits (seuil high/critical), suites frontend/backend, régression auth,
 build frontend et les 21 scénarios sur MongoDB jetable. Prérequis : Node 24,
