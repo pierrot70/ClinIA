@@ -16,12 +16,12 @@ function Menu({ locale = "fr", mobile = false, onNavigate = () => {} }) {
     </MemoryRouter>;
 }
 describe("validation reports submenu", () => {
-    it.each([false, true])("hides the menu on remote production (mobile=%s)", mobile => {
+    it.each([false, true])("shows the menu on remote production (mobile=%s)", mobile => {
         vi.stubEnv("PROD", true);
         vi.stubGlobal("location", { hostname: "clinia.example.com" });
         const { container } = render(<Menu mobile={mobile} />);
-        expect(container.querySelector("details")).toBeNull();
-        expect(screen.queryByText("Rapports de validation")).not.toBeInTheDocument();
+        expect(container.querySelector("details")).toBeInTheDocument();
+        expect(screen.getByText("Rapports de validation")).toBeVisible();
     });
     it.each(["localhost", "127.0.0.1", "[::1]"])("keeps reports in local builds on %s", hostname => {
         vi.stubEnv("PROD", true);
