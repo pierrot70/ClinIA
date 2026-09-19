@@ -30,6 +30,7 @@ export interface ReceptionPatient {
     _id: string;
     nom: string;
     prenom: string;
+    bookingProof?: string;
     existingAppointments?: { _id: string; date: string; time: string }[];
 }
 
@@ -40,6 +41,7 @@ export interface CreateWalkInBookingPayload {
     time: string;
     slotType: "regular" | "walk_in";
     patientId?: string;
+    bookingProof?: string;
     replaceAppointmentId?: string;
     patient?: {
         nom: string;

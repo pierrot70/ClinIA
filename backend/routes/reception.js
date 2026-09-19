@@ -91,6 +91,7 @@ router.get("/walk-in-options", async (req, res) => {
 });
 
 router.get("/patient-lookup", async (req, res) => {
+    res.set("Cache-Control", "no-store");
     try {
         const data = await findReceptionPatientByRamq({
             clinicId: req.query.clinic,
@@ -108,6 +109,7 @@ router.get("/patient-lookup", async (req, res) => {
             meta: { source: "real", model: "mongo" },
         });
     } catch (err) {
+        if (err.code === "RECEPTION_LOOKUP_REQUIRED") return res.status(403).json({ error: { code: err.code, message: err.message, retryable: false } });
         if (err.code === "INVALID_INPUT" || err.code === "FORBIDDEN") {
             return res.status(err.code === "FORBIDDEN" ? 403 : 400).json({
                 error: { code: err.code, message: err.message, retryable: false },
@@ -183,6 +185,7 @@ router.post("/walk-in-bookings", async (req, res) => {
             ? await createWalkInAppointmentForExistingPatient({
                 ...booking,
                 patientId: existingPatientId,
+                bookingProof: req.body.bookingProof,
                 replaceAppointmentId: req.body.replaceAppointmentId,
             })
             : await createWalkInPatientAndAppointment({
@@ -209,6 +212,7 @@ router.post("/walk-in-bookings", async (req, res) => {
         if (
             [
                 "FORBIDDEN",
+                "RECEPTION_LOOKUP_REQUIRED",
                 "NO_AVAILABILITY",
                 "PATIENT_ALREADY_EXISTS",
                 "RECEIVING_PHYSICIAN_UNAVAILABLE",
@@ -218,7 +222,7 @@ router.post("/walk-in-bookings", async (req, res) => {
                 "MAXIMUM_APPOINTMENTS_REACHED",
             ].includes(err.code)
         ) {
-            return res.status(err.code === "FORBIDDEN" ? 403 : 409).json({
+            return res.status(["FORBIDDEN", "RECEPTION_LOOKUP_REQUIRED"].includes(err.code) ? 403 : 409).json({
                 error: { code: err.code, message: err.message, retryable: false },
             });
         }

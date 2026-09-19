@@ -1646,6 +1646,8 @@ export function ClinicalAnalyzePage() {
                     </div>
                     <ClinicalDemoResult
                         demoData={{
+                            alternatives: result?.alternatives,
+                            red_flags: result?.red_flags,
                             treatments:
                                 Array.isArray(result?.treatments) && result.treatments.length > 0
                                     ? (result.treatments as any[])

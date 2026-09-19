@@ -28,8 +28,10 @@ if(url.endsWith('/login')&&process.env.FIXTURE_SCENARIO!=='no-mfa'){
 }else if(url.endsWith('/login/mfa')&&session==='b'&&process.env.FIXTURE_SCENARIO==='bad-mfa'){
  status=401;body={error:{code:'INVALID_MFA_CODE'}};
 }else if(url.endsWith('/users/active')){
- const isB=header.endsWith('/b.header');status=isB?403:200;
- body=isB?{error:{code:'REAUTH_REQUIRED'}}:{data:[]};
+ const isB=header.endsWith('/b.header');
+ const borrowedConfirmation=isB&&get('--cookie').endsWith('/a.cookies');
+ status=isB&&!(borrowedConfirmation&&process.env.FIXTURE_SCENARIO==='vulnerable')?403:200;
+ body=status===403?{error:{code:'REAUTH_REQUIRED'}}:{data:[]};
 }
 if(out&&out!=='/dev/null')fs.writeFileSync(out,JSON.stringify(body));
 if(args.includes('--cookie-jar'))fs.writeFileSync(get('--cookie-jar'),'# synthetic cookie jar\\n');
@@ -57,6 +59,13 @@ describe("manual reauth script", () => {
         const result = run(["coolify"], "NON\n");
         expect(result.status).toBe(1);
         expect(result.calls).toHaveLength(0);
+    });
+    it("returns a failing exit code when another session accepts the borrowed confirmation", () => {
+        const result = run([], "test-admin\nfixture-password\n123456\n654321\n", "vulnerable");
+        expect(result.status).toBe(2);
+        expect(result.text).toContain("FAILLE REPRODUITE");
+        expect(result.text).not.toContain("PROTECTION CONFIRMEE");
+        expect(result.calls.filter(call => call.url.endsWith("/logout"))).toHaveLength(2);
     });
     it("handles two MFA challenges and keeps HTTPS on Coolify", () => {
         const result = run(["coolify"], "TESTER COOLIFY\ntest-admin\nfixture-password\n123456\n654321\n");

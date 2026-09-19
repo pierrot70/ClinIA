@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { issueReceptionBookingProof, consumeReceptionBookingProof } from "./receptionBookingProof.js";
 
 import { AdminUser } from "../models/AdminUser.js";
 import { Patient } from "../models/Patient.js";
@@ -269,6 +270,7 @@ export async function findReceptionPatientByRamq({ clinicId, ramq, authUser, aud
 
     return patient
         ? { _id: String(patient._id), nom: patient.nom, prenom: patient.prenom,
+            bookingProof: await issueReceptionBookingProof({ authUser, clinicId, patientId: patient._id }),
             existingAppointments: (await pendingAppointments(patient._id, clinicId)).map(({ _id, date, time }) => ({ _id: String(_id), date, time })) }
         : null;
 }
@@ -409,6 +411,7 @@ export async function createWalkInAppointmentForExistingPatient({
     time,
     slotType = "walk_in",
     replaceAppointmentId = null,
+    bookingProof,
     authUser,
     audit = {},
 }) {
@@ -423,6 +426,7 @@ export async function createWalkInAppointmentForExistingPatient({
         let result;
         await session.withTransaction(async () => {
             const receivingPhysicianUserId = await requireActiveReceivingPhysician(specialistId, clinicId, session);
+            await consumeReceptionBookingProof({ bookingProof, authUser, clinicId, patientId, session });
             // All reception bookings for this patient serialize on this document.
             // A transaction retried after a concurrent booking rechecks pending appointments.
             const patient = await Patient.findOneAndUpdate(

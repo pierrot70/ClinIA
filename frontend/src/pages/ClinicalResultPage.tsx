@@ -1,4 +1,5 @@
 import type { ClinicalAnalysis } from "../types/clinical";
+import { ClinicalSafetySections } from "../components/clinical/ClinicalSafetySections";
 
 type Props = {
     data: ClinicalAnalysis;
@@ -78,6 +79,7 @@ export function ClinicalResultPage({ data, serviceMode, targetLang }: PropsWithL
             )}
 
             <h2 className="text-xl font-semibold">{renderLabel(clinicalResultTitle, loadingClinicalResultTitle)}</h2>
+            <ClinicalSafetySections alternatives={alternatives} redFlags={red_flags} targetLang={lang} />
 
 
             <section>

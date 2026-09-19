@@ -2,6 +2,7 @@
 set -euo pipefail
 set +x
 [[ $# == 0 || ( $# == 1 && "$1" == --five-minutes ) ]] || { echo 'Usage: bash scripts/run-staging-reception-auth-load.sh [--five-minutes]'; exit 1; }
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 container=clinia_mongo_rs-backend-1
 endpoint="${DOCKER_HOST:-$(docker context inspect --format '{{.Endpoints.docker.Host}}')}"
 [[ "$endpoint" == unix://* ]] || { echo 'Docker local uniquement.'; exit 1; }
@@ -12,4 +13,6 @@ else
     echo 'Test staging : 10 RECEPTION, 120 secondes, vraies routes auth et limites conservees.'
 fi
 echo 'Collections temporaires isolees dans staging ; aucune donnee des comptes existants ne sera effacee.'
-exec docker exec -i -e CLINIA_AUTH_LOAD_TEST=1 "$container" node /app/scripts/reception-auth-load.mjs --run "$@"
+# Execute the reviewed runner from this checkout, against deployed auth routes.
+# No file or configuration in the running container is replaced.
+exec docker exec -i -w /app/scripts -e CLINIA_AUTH_LOAD_TEST=1 "$container" node --input-type=module - --run "$@" < "$root/backend/scripts/reception-auth-load.mjs"

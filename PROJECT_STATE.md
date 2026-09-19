@@ -1,5 +1,105 @@
 # État du projet ClinIA
 
+## État vérifié — 2026-09-19
+
+Cette section remplace les états historiques ci-dessous. Base de départ du lot :
+branche `coolify`, commit `519fd83d2e2ea232bed61b8d9cf64044187df8bc`.
+Le travail reste sur `coolify` : conserver et valider le lot actuel en STAGING,
+puis commit/push après succès. Le déploiement et le test Coolify reviennent à
+l'utilisateur. Reprendre les neuf points individuellement uniquement en cas de
+problème majeur ; aucune suppression de changements n'a été effectuée.
+Les résultats ci-dessous décrivent les validations locales/STAGING ; l'état du
+CI distant doit être vérifié pour le SHA exact publié dans GitHub Actions.
+
+### Priorités prises en charge
+
+- P0 dépendances : `nodemailer` épinglé à `9.1.0`, verrou backend régénéré.
+  Audits npm backend et frontend réussis (aucune alerte high/critical selon
+  le contrôle CI existant). CI configuré pour Node 24 et artefacts sur 30 jours.
+  Le rebuild STAGING synchronise désormais le volume partagé `node_modules`
+  avec `npm ci` pendant l'arrêt des deux backends, car un simple rebuild d'image
+  ne remplace pas ce volume. Version 9.1.0 vérifiée sur les deux instances
+  STAGING sous Node 20.20.2 ; connexion SMTP Mailpit réussie, sans envoi de mail.
+- P0 réauthentification : l'instabilité signalée n'a pas été reproduite.
+  Une erreur réelle du script manuel a été corrigée : une confirmation acceptée
+  dans une autre session retourne maintenant un code d'échec 2, testé.
+  Aucun délai de sécurité serveur n'a été raccourci.
+- P0 STAGING auth : drill HTTP avec les vraies routes déployées et Mongo STAGING,
+  dans un serveur et des collections isolés. Rejeu MFA refusé dans la même
+  fenêtre TOTP (401), code frais accepté (200), cookie de réauth emprunté refusé
+  (403), ancien JWT refusé immédiatement après logout (401), autre session
+  toujours valide (200), nettoyage confirmé. Voir
+  `scripts/run-staging-auth-security-drill.md`. Ne couvre pas le proxy, le
+  navigateur ou la concurrence entre les deux instances applicatives.
+- P0 RAMQ → réservation existante : preuve opaque à usage unique, hash seulement
+  en Mongo, expiration 10 minutes, liée au compte/session/clinique/patient.
+  Consommation dans la transaction de réservation ; rejeu concurrent refusé.
+  Une transaction annulée restitue la preuve. Frontend adapté. Le nouveau
+  modèle porte un index unique et un TTL, tous deux vérifiés dans STAGING après
+  rebuild ; vérifier aussi leur présence après le déploiement Coolify.
+- P1 résultats cliniques : alternatives thérapeutiques et `red_flags` affichés
+  immédiatement, labels issus de la source française et neuf langues couvertes.
+  Le contenu médical reçu n'est pas traduit dynamiquement par ces sections.
+- P1 Coolify : transmission `SOURCE_COMMIT` et volume de rapports déjà présents
+  dans le Compose/Dockerfile. Politique d'accès et conservation précisée dans
+  `docs/validation-reports-superadmin.md`. Activation dans Coolify, publication
+  des rapports et application de l'archivage restent à effectuer sur l'hôte cible.
+- P1 charge STAGING : premier essai interrompu après des timeouts HTTP ; une
+  écriture auth tardive a laissé une collection synthétique. Nettoyage exact
+  confirmé ensuite, sans modification des autres collections. Le runner est
+  corrigé pour attendre les traitements avant suppression et conserver les
+  collections si cette attente échoue. Second essai réussi : 10 comptes,
+  121 secondes mesurées, 150 connexions et 150 déconnexions, 10 refus 429
+  attendus, aucune erreur inattendue, audits 150/150, aucune session refresh
+  active et nettoyage confirmé. P95 login 5,83 s (délais volontaires et 429
+  inclus), logout 0,22 s. Le passage d'une fenêtre de quota a permis de dépasser
+  100 connexions au total. Serveur et générateur partagent le même processus ;
+  ces résultats ne mesurent pas un nombre d'utilisateurs réels supportés.
+- P1 restauration S3/basculement : non exécutés. Il manque la cible explicite,
+  l'archive, les références d'accès S3/clé de déchiffrement et le créneau.
+  AWS CLI absent localement. Le script de restauration existant cible la
+  production et utilise `mongorestore --drop` ; ne pas lui substituer une cible
+  supposée. Les procédures existent dans `docs/production-incident-runbook.md`.
+- P2 : état actualisé, Node 24 dans les deux jobs CI, attribution normalisée
+  des contributions/revues ajoutée à `AGENTS.md`.
+
+### Attribution
+
+```text
+Agent-Contribution: backend | preuve RAMQ transactionnelle, tests et nettoyage du drill de charge
+Agent-Contribution: frontend | alternatives thérapeutiques et red_flags, labels et tests
+Agent-Contribution: security | drill auth STAGING, code de sortie réauth et régression
+Validation: résultats finaux consignés ci-dessous ; pas de validation clinique humaine
+```
+
+### Validation
+
+- Rebuild complet `./rebuild-local.sh staging` réussi après synchronisation des
+  dépendances ; API 4002/4003 et frontend 5174 prêts, replica set sain
+  (un PRIMARY, deux SECONDARY). Suites 691/1171 et intégrations 21/21 repassées.
+  Rapport de ce rebuild :
+  `validation-artifacts/94349ab3-3f95-4dfa-a22b-da9f6b86f579.json`.
+  Drill auth relancé après rebuild : trois protections vérifiées, traitements
+  terminés avant suppression et nettoyage confirmé.
+- Frontend : 44 fichiers, 1171 tests réussis ; build Vite réussi, avertissement
+  de taille de bundle restant.
+- Backend : 95 fichiers, 691 tests réussis sous Node 24.14.0 avec
+  `TZ=America/Toronto npm test -- --run`, après `npm ci --no-audit`.
+  L'installation reproductible frontend a aussi été vérifiée.
+- Intégration : 21/21 scénarios réussis, y compris les assertions de preuve
+  RAMQ manquante/expirée/mal liée et de rejeu concurrent/séquentiel. Nettoyage
+  du conteneur MongoDB jetable confirmé. Rapport local :
+  `validation-artifacts/4dc255ea-b585-4a0c-8cab-b677db3d0f56.json`.
+- Un premier rapport a conservé deux échecs sur les scénarios historiques qui
+  omettaient encore la preuve RAMQ. Les fixtures ont été adaptées, puis les
+  21 scénarios ont été réexécutés avec succès ; aucune assertion de réservation
+  ou de contrôle d'accès n'a été retirée.
+- Les rapports locaux portent `dirty: true` : le SHA de base seul ne décrit
+  pas le code testé. Il faudra une exécution CI sur un commit propre pour
+  établir une correspondance avec une future image Coolify.
+- Le CI précédent, run `34765717569`, a été vérifié sur GitHub : frontend vert,
+  backend arrêté à l'audit npm, suites backend/intégration non exécutées.
+
 ## Mise à jour de reprise — 2026-08-08
 
 Cette section remplace l'état opérationnel du 31 juillet ci-dessous, qui est

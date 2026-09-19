@@ -21,14 +21,14 @@ function Page({ locale = "en-CA" }: { locale?: string }) {
 const original = { _id: "original", date: "2030-01-01", time: "08:00" };
 beforeEach(() => {
     vi.clearAllMocks();
-    api.lookup.mockResolvedValue({ data: { _id: "patient", prenom: "Test", nom: "Patient", existingAppointments: [original] } });
+    api.lookup.mockResolvedValue({ data: { _id: "patient", bookingProof: "lookup-proof", prenom: "Test", nom: "Patient", existingAppointments: [original] } });
     api.slots.mockResolvedValue({ data: { today: [{ specialist: { _id: "doctor", prenom: "Test", nom: "Doctor" }, date: "2030-01-01", slots: ["08:15"] }], future: [] } });
     api.book.mockResolvedValue({ data: { appointment: { _id: "new" } } });
 });
 afterEach(cleanup);
 describe("availability button label", () => {
     it.each(["fr", "en", "es", "ko", "vi", "no", "ja", "zh", "he"])("switches from view to refresh for existing patients in %s", async locale => {
-        api.lookup.mockResolvedValue({ data: { _id: "patient", prenom: "Test", nom: "Patient", existingAppointments: [] } });
+        api.lookup.mockResolvedValue({ data: { _id: "patient", bookingProof: "lookup-proof", prenom: "Test", nom: "Patient", existingAppointments: [] } });
         const { rerender } = render(<Page />);
         fireEvent.change(screen.getByRole("textbox"), { target: { value: "676767" } });
         fireEvent.click(screen.getByRole("button", { name: "Search for patient" }));
@@ -172,7 +172,15 @@ describe("reception rescheduling", () => {
         expect(api.book).not.toHaveBeenCalled();
         fireEvent.click(screen.getByRole("button", { name: "Confirm appointment replacement" }));
         await screen.findByText(receptionReplanLabels("en").success);
-        expect(api.book).toHaveBeenCalledWith(expect.objectContaining({ patientId: "patient", replaceAppointmentId: "original", time: "08:15" }));
+        expect(api.book).toHaveBeenCalledWith(expect.objectContaining({ patientId: "patient", bookingProof: "lookup-proof", replaceAppointmentId: "original", time: "08:15" }));
+    });
+    it("returns to patient lookup when the server rejects the booking proof", async () => {
+        api.book.mockResolvedValue({ error: { code: "RECEPTION_LOOKUP_REQUIRED", message: "RAW_SERVER_MESSAGE" } });
+        render(<Page />); await lookup(); await choose();
+        fireEvent.click(screen.getByRole("button", { name: "Confirm appointment replacement" }));
+        expect(await screen.findByRole("alert")).toHaveTextContent("Search for patient");
+        expect(screen.queryByText("RAW_SERVER_MESSAGE")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Confirm appointment replacement" })).not.toBeInTheDocument();
     });
     it("keeps a failed replacement on the confirmation screen without reporting success", async () => {
         api.book.mockResolvedValue({ error: { code: "RECEPTION_REPLAN_REQUIRED" } });
@@ -182,7 +190,7 @@ describe("reception rescheduling", () => {
         expect(screen.queryByText(receptionReplanLabels("en").success)).not.toBeInTheDocument();
     });
     it("blocks ambiguous existing duplicates without choosing one automatically", async () => {
-        api.lookup.mockResolvedValue({ data: { _id: "patient", prenom: "Test", nom: "Patient", existingAppointments: [original, { ...original, _id: "other" }] } });
+        api.lookup.mockResolvedValue({ data: { _id: "patient", bookingProof: "lookup-proof", prenom: "Test", nom: "Patient", existingAppointments: [original, { ...original, _id: "other" }] } });
         render(<Page />);
         fireEvent.change(screen.getByRole("textbox"), { target: { value: "676767" } });
         fireEvent.click(screen.getByRole("button", { name: "Search for patient" }));

@@ -1,4 +1,8 @@
 export const UI_LABELS_FR = {
+    clinicalSafety: {
+        alternatives: "Alternatives thérapeutiques",
+        redFlags: "Signaux d’alerte",
+    },
     validationReports: {
         title: "Rapports de validation", refresh: "Actualiser", version: "Commit de l’image backend", unknown: "Version inconnue — correspondance non vérifiable",
         empty: "Aucun rapport publié.", error: "Impossible de charger ou télécharger le rapport.",

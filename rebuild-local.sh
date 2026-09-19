@@ -198,6 +198,11 @@ if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
   [[ "$PULL" == "1" ]] && BUILD_ARGS+=(--pull)
   sdc build "${BUILD_ARGS[@]}" backend backend-replica
 
+  # The shared node_modules volume survives rebuilds and masks image contents.
+  # Synchronize it while both backends are stopped, without touching Mongo data.
+  headline "Synchronizing staging dependencies from the lockfile"
+  sdc run --rm --no-deps backend npm ci --no-audit
+
   headline "Starting Mongo replica set"
   sdc up -d mongo-rs-1 mongo-rs-2 mongo-rs-3
 

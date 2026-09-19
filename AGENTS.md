@@ -284,6 +284,23 @@ pas système de décision autonome
 
 # Collaboration entre agents
 
+## Attribution des contributions
+
+Dans chaque PR ou compte rendu de changement, utiliser un bloc uniforme :
+
+```text
+Agent-Contribution: backend | description du changement
+Agent-Contribution: frontend | description du changement
+Agent-Review: security | périmètre réellement vérifié et limites
+Validation: commande exécutée | résultat observé
+```
+
+N'inclure que les rôles intervenus (`backend`, `frontend`, `security`,
+`clinical`). Distinguer contribution et revue ; ne pas attribuer une validation
+clinique ou une approbation humaine à un agent qui n'a pas réalisé cette revue.
+Ces lignes peuvent aussi servir de trailers de commit. Elles ne remplacent
+ni l'auteur Git réel ni la revue humaine requise par le projet.
+
 backend
 
 - implémente API

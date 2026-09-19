@@ -4,6 +4,7 @@ import TreatmentCard from "./TreatmentCard";
 import QuestionCard from "./QuestionCard";
 import ClinicalRelevanceByAgeChart from "./ClinicalRelevanceByAgeChart";
 import ClinicalReferenceList from "./ClinicalReferenceList";
+import { ClinicalSafetySections } from "./clinical/ClinicalSafetySections";
 
 import { ClinicalAnalysis } from "../types/clinical";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
@@ -442,6 +443,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   if (normalizedTreatments.length === 0 && hasIADetails) {
     return (
       <div className="space-y-6">
+        <ClinicalSafetySections alternatives={demoData?.alternatives} redFlags={demoData?.red_flags} />
         <ResultAccordion title={summarySectionTitle} hint={summarySectionHint} defaultOpen={false}>
           <h2 className="text-lg font-semibold mb-2">{patientSummaryLabel}</h2>
           <TranslatedContentText
@@ -635,6 +637,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
 
   return (
     <div className="space-y-6">
+      <ClinicalSafetySections alternatives={demoData?.alternatives} redFlags={demoData?.red_flags} />
       <ResultAccordion title={summarySectionTitle} hint={summarySectionHint} defaultOpen={false}>
         <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold">{patientSummaryLabel}</h2>

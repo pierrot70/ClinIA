@@ -44,6 +44,9 @@ un serveur HTTP d'authentification sur un port local ephemere, les vraies routes
 middlewares, delais, bcrypt, JWT et le cluster MongoDB de staging. Il ne cible
 pas le serveur existant du port 4002, ni Coolify. Le generateur et le serveur
 de test partagent ce processus : ce n'est pas une mesure de capacite maximale.
+Le lanceur transmet le runner du checkout par stdin ; les routes utilisees
+restent celles deployees dans le conteneur. Aucun fichier du conteneur n'est
+remplace. Eviter les builds et autres suites intensives pendant cette mesure.
 
 Tous les modeles MongoDB, y compris ceux avec un nom de collection explicite,
 sont rediriges vers des collections dont le prefixe unique est affiche au
@@ -64,6 +67,11 @@ Une erreur inattendue arrete les nouvelles tentatives, puis nettoie le test.
 
 Le `finally` arrete le serveur et supprime uniquement les collections exactes
 du test : comptes, sessions, journaux, compteurs et collections auxiliaires.
+L'arret refuse d'abord de nouvelles admissions, puis attend jusqu'a 60 secondes
+la fin des traitements auth, meme si le client HTTP a deja expire. Si cette
+attente echoue, aucune collection n'est supprimee : le processus de test
+s'arrete en echec et affiche le prefixe a inspecter. Fermer une socket ne
+suffit pas a interrompre une ecriture MongoDB.
 Le script refuse d'adopter une collection preexistante. Il verifie leur absence
 et affiche `CLEANUP_OK`. Il ne supprime jamais la base staging ni un compteur
 partage avec les utilisateurs existants.

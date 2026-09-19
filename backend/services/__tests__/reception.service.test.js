@@ -1,6 +1,9 @@
 import mongoose from "mongoose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const issueReceptionBookingProof = vi.fn();
+const consumeReceptionBookingProof = vi.fn();
+vi.mock("../receptionBookingProof.js", () => ({ issueReceptionBookingProof, consumeReceptionBookingProof }));
 const adminUserFindOne = vi.fn();
 const adminUserFind = vi.fn();
 const specialistFindOne = vi.fn();
@@ -141,6 +144,8 @@ function resolvedLean(value) {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    issueReceptionBookingProof.mockResolvedValue("proof");
+    consumeReceptionBookingProof.mockResolvedValue();
     appointmentFind.mockReturnValue(resolvedLean([]));
     appointmentUpdateOne.mockResolvedValue({ modifiedCount: 1 });
     patientFindOneAndUpdate.mockImplementation(query => patientFindOne(query));
@@ -363,6 +368,7 @@ describe("listWalkInFamilyMedicineOptions", () => {
             nom: "Lasante",
             prenom: "Ginger",
             existingAppointments: [],
+            bookingProof: "proof",
         });
         expect(patientFindOne).toHaveBeenCalledWith(
             { healthInsuranceNumberSearch: "234567", archivedAt: null },
@@ -467,6 +473,13 @@ describe("createWalkInPatientAndAppointment", () => {
 });
 
 describe("createWalkInAppointmentForExistingPatient", () => {
+    it("refuses reservation before patient writes when the lookup proof is invalid", async () => {
+        consumeReceptionBookingProof.mockRejectedValueOnce({ code: "RECEPTION_LOOKUP_REQUIRED" });
+        await expect(createWalkInAppointmentForExistingPatient({ clinicId, specialistId, patientId: "507f1f77bcf86cd799439088", bookingProof: "forged", authUser: { userId: receptionId } })).rejects.toMatchObject({ code: "RECEPTION_LOOKUP_REQUIRED" });
+        expect(patientFindOneAndUpdate).not.toHaveBeenCalled();
+        expect(createAppointment).not.toHaveBeenCalled();
+        expect(consumeReceptionBookingProof).toHaveBeenCalledWith(expect.objectContaining({ bookingProof: "forged", clinicId, patientId: "507f1f77bcf86cd799439088", session: transactionSession }));
+    });
     it("creates a selected slot for an existing patient without creating a second dossier", async () => {
         patientFindOne.mockReturnValue(resolvedLean({
             _id: "507f1f77bcf86cd799439088",

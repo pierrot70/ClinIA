@@ -274,7 +274,7 @@ export function WalkInArrivalPage() {
             slotType: selectedSlot.slotType,
             ...(replacementId ? { replaceAppointmentId: replacementId } : {}),
             ...(selectedPatient
-                ? { patientId: selectedPatient._id }
+                ? { patientId: selectedPatient._id, bookingProof: selectedPatient.bookingProof }
                 : {
                     patient: {
                         prenom: newPatient.prenom.trim(),
@@ -290,6 +290,15 @@ export function WalkInArrivalPage() {
         setLoading(false);
 
         if (response.error) {
+            if (response.error.code === "RECEPTION_LOOKUP_REQUIRED") {
+                setSelectedSlot(null);
+                setSelectedPatient(null);
+                setPatients([]);
+                setReplacementId(undefined);
+                setWalkInAvailability(null);
+                setError(receptionLabel(locale, "searchPatient", source.searchPatient));
+                return;
+            }
             setError(response.error.code === "PATIENT_ALREADY_EXISTS" ? replan.patientExists : response.error.code === "MAXIMUM_APPOINTMENTS_REACHED" ? urgentologistLabels(locale).dailyLimitReached : response.error.code === "RECEPTION_REPLAN_REQUIRED" ? replan.conflict : response.error.code === "RECEIVING_PHYSICIAN_UNAVAILABLE"
                 ? receptionLabel(locale, "receivingPhysicianUnavailable", source.receivingPhysicianUnavailable)
                 : response.error.message);

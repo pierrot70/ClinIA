@@ -43,6 +43,7 @@ export function formatSummary(report, passed) {
         row('Journaux de deconnexion', journal(report.auditLogouts, m?.logout200)),
         row('Sessions refresh encore actives', number(report.remainingActiveRefreshSessions)),
         row('Nettoyage des donnees du test', report.cleanup === true ? 'CONFIRME' : 'NON CONFIRME !'),
+        ...(report.handlersDrained === false ? ['  Traitements encore actifs : collections conservees, nettoyage manuel requis.'] : []),
         ...(report.interrupted ? ['  Test interrompu : les resultats ne couvrent pas la duree prevue.'] : []),
         '============================================================',
         '  Perimetre : serveur auth et collections isoles dans staging.',
@@ -75,6 +76,67 @@ export function namespaceModels(mongoose, prefix) {
     mongoose.model = (name, schema, collection, ...options) => schema
         ? original(name, schema, `${prefix}_${collection || schema.options.collection || pluralize(name)}`, ...options)
         : original(name);
+}
+
+// Count handler promises rather than HTTP connections: an aborted client does
+// not cancel a login's MongoDB writes. Used only by this isolated test process.
+export function createHandlerDrain() {
+    let accepting = true, active = 0;
+    const listeners = new Set();
+    const done = () => { active--; if (active === 0) for (const notify of listeners) notify(true); };
+    return {
+        admit(_req, res, next) {
+            if (!accepting) return res.status(503).json({ error: { code: 'TEST_DRAINING' } });
+            next();
+        },
+        stop() { accepting = false; },
+        wrap(handler) {
+            return function trackedHandler(req, res, next) {
+                active++;
+                try {
+                    const result = handler(req, res, next);
+                    if (result && typeof result.then === 'function') {
+                        return Promise.resolve(result).catch(next).finally(done);
+                    }
+                    done();
+                    return result;
+                } catch (error) { done(); return next(error); }
+            };
+        },
+        async wait(timeoutMs = 60000) {
+            if (active === 0) return true;
+            return new Promise(resolve => {
+                const finish = result => { clearTimeout(timer); listeners.delete(finish); resolve(result); };
+                const timer = setTimeout(() => finish(false), timeoutMs);
+                listeners.add(finish);
+            });
+        },
+    };
+}
+
+export function trackAuthHandlers(router, drain) {
+    for (const layer of router.stack) {
+        // All auth route middleware are synchronous or return their work promise.
+        // Fail closed if this isolated runner encounters an unsupported router.
+        if (!layer.route) throw new Error('Unexpected auth router middleware');
+        for (const handler of layer.route.stack) {
+            if (handler.handle.length === 4) throw new Error('Unexpected auth error handler');
+            handler.handle = drain.wrap(handler.handle);
+        }
+    }
+}
+
+export async function stopAndDrainServer(server, drain, timeoutMs = 60000) {
+    drain.stop();
+    if (!server) return true;
+    const closed = new Promise(resolve => server.close(resolve));
+    const drained = await drain.wait(timeoutMs);
+    server.closeAllConnections();
+    const socketsClosed = await new Promise(resolve => {
+        const timer = setTimeout(() => resolve(false), Math.min(timeoutMs, 1000));
+        closed.then(() => { clearTimeout(timer); resolve(true); });
+    });
+    return drained && socketsClosed;
 }
 
 // Ten sequential sessions in parallel; no client retries that amplify failures.
@@ -141,6 +203,8 @@ async function main() {
     const { createAuthRouter } = await import('../routes/auth.js');
     const { createLoginRateLimiter } = await import('../middleware/loginRateLimiter.js');
     const authRouter = createAuthRouter({ loginLimiter: createLoginRateLimiter({ maxAttempts: profile.maxAttempts }) });
+    const handlerDrain = createHandlerDrain();
+    trackAuthHandlers(authRouter, handlerDrain);
     let server, connected = false, created = false, timer, stop = false, cleanup = false;
     let collectionNames = [];
     process.on('SIGINT', () => { stop = true; });
@@ -160,7 +224,7 @@ async function main() {
         for (const account of accounts) await AdminUser.create({ username: account.username, email: `${account.username}@load.invalid`, passwordHash: await bcrypt.hash(account.password, 12), role: 'RECEPTION', isActive: true, mfaRequired: false });
         const app = express();
         configureCoreMiddleware(app);
-        app.use('/api/auth', authRouter);
+        app.use('/api/auth', handlerDrain.admit, authRouter);
         app.use((_error, _req, res, _next) => res.status(500).json({ error: { code: 'TEST_ERROR' } }));
         server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
         const base = `http://127.0.0.1:${server.address().port}/api/auth/`;
@@ -182,6 +246,9 @@ async function main() {
         const latency = values => { const sorted = [...values].sort((a,b) => a-b); return { count: sorted.length, p95Ms: Math.round(sorted[Math.floor(sorted.length * .95)] || 0) }; };
         report.metrics = { ...metrics, loginMs: latency(metrics.loginMs), logoutMs: latency(metrics.logoutMs) };
         report.interrupted = stop;
+        report.handlersDrained = await stopAndDrainServer(server, handlerDrain);
+        server = undefined;
+        if (!report.handlersDrained) throw new Error('Handlers did not drain');
         report.auditLogins = await AuthAuditLog.countDocuments({ action: 'LOGIN', outcome: 'SUCCESS' });
         report.auditLogouts = await AuthAuditLog.countDocuments({ action: 'LOGOUT', outcome: 'SUCCESS' });
         report.remainingActiveRefreshSessions = await RefreshTokenSession.countDocuments({ status: 'ACTIVE', revokedAt: null, expiresAt: { $gt: new Date() } });
@@ -190,8 +257,8 @@ async function main() {
     } catch { report.error = 'Test failed; raw errors and secrets withheld'; process.exitCode = 1; }
     finally {
         clearInterval(timer);
-        if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
-        if (connected && created) {
+        if (server) report.handlersDrained = await stopAndDrainServer(server, handlerDrain);
+        if (connected && created && report.handlersDrained !== false) {
             try {
                 assertOwnedDatabase(dbName, dbName);
                 for (const name of collectionNames) {
@@ -202,13 +269,16 @@ async function main() {
                 cleanup = (await mongoose.connection.db.listCollections({ name: { $in: collectionNames } }).toArray()).length === 0;
             } catch { cleanup = false; }
         }
-        await mongoose.disconnect();
+        // On drain timeout, retain every run-owned collection and terminate the
+        // isolated process after reporting; never race a drop against live writes.
+        if (report.handlersDrained !== false) await mongoose.disconnect();
         report.cleanup = cleanup; report.finishedAt = new Date().toISOString();
         if (!cleanup) process.exitCode = 1;
         console.log(formatSummary(report, !process.exitCode));
         console.log(cleanup ? 'CLEANUP_OK : collections temporaires supprimees, comptes staging existants intacts.' : `NETTOYAGE NON CONFIRME : verifier uniquement les collections ${dbName}_*`);
+        if (report.handlersDrained === false) process.exit(1);
     }
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && (import.meta.url === pathToFileURL(process.argv[1]).href || (process.argv[1] === '-' && process.env.CLINIA_AUTH_LOAD_TEST === '1'))) {
     main().catch(() => { console.error('Test refuse ou initialisation impossible. Aucun detail sensible affiche.'); process.exitCode = 1; });
 }

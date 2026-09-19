@@ -109,6 +109,7 @@ check b "$temporary/a.cookies"
 echo "B avec la confirmation de A : HTTP $status ($code)"
 if [[ "$status" == 200 ]]; then
     echo 'FAILLE REPRODUITE : la confirmation est acceptee dans une autre session.'
+    exit 2
 elif [[ "$status" == 403 && "$code" == REAUTH_REQUIRED ]]; then
     echo 'PROTECTION CONFIRMEE : la confirmation empruntee est refusee.'
 else

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { assertLocalMongo, assertOwnedDatabase, namespaceModels, runWorkers, loadProfile, formatProgress, formatSummary } from '../../scripts/reception-auth-load.mjs';
+import { describe, expect, it, vi } from 'vitest';
+import { createHandlerDrain, trackAuthHandlers, stopAndDrainServer, assertLocalMongo, assertOwnedDatabase, namespaceModels, runWorkers, loadProfile, formatProgress, formatSummary } from '../../scripts/reception-auth-load.mjs';
 import mongoose from 'mongoose';
 
 describe('reception auth load safety', () => {
@@ -80,5 +80,63 @@ describe('reception auth load safety', () => {
     it('reports failed logout without retry storms', async () => {
         const result = await runWorkers({ accounts: [{}], request: async endpoint => endpoint === 'login' ? { status: 200, data: { accessToken: 'token' } } : { status: 500 } });
         expect(result).toMatchObject({ errors: 1, login200: 1, logout200: 0 });
+    });
+});
+
+
+describe('load runner handler drain', () => {
+    it('waits for the business promise even after the client disconnects and stops admission', async () => {
+        const drain = createHandlerDrain();
+        let finish, closeCallback;
+        const work = new Promise(resolve => { finish = resolve; });
+        let written = false;
+        const handler = drain.wrap(async () => { await work; written = true; });
+        const handlerResult = handler({}, {}, vi.fn());
+        const server = { close: vi.fn(callback => { closeCallback = callback; }), closeAllConnections: vi.fn(() => closeCallback()) };
+        let completed = false;
+        const stopping = stopAndDrainServer(server, drain).then(result => { completed = true; return result; });
+        const next = vi.fn();
+        const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+        drain.admit({}, res, next);
+        expect(res.status).toHaveBeenCalledWith(503);
+        expect(next).not.toHaveBeenCalled();
+        await Promise.resolve();
+        expect(completed).toBe(false);
+        expect(written).toBe(false);
+        finish();
+        await handlerResult;
+        expect(await stopping).toBe(true);
+        expect(written).toBe(true);
+    });
+    it('bounds the drain and marks unfinished writes unsafe for collection cleanup', async () => {
+        const drain = createHandlerDrain();
+        let finish;
+        const handler = drain.wrap(() => new Promise(resolve => { finish = resolve; }));
+        const work = handler({}, {}, vi.fn());
+        let callback;
+        const server = { close: done => { callback = done; }, closeAllConnections: () => callback() };
+        expect(await stopAndDrainServer(server, drain, 5)).toBe(false);
+        finish(); await work;
+        expect(await drain.wait(5)).toBe(true);
+        expect(formatSummary({ handlersDrained: false }, false)).toContain('collections conservees');
+    });
+    it('does not hang if the HTTP server never confirms closure', async () => {
+        const server = { close: vi.fn(), closeAllConnections: vi.fn() };
+        expect(await stopAndDrainServer(server, createHandlerDrain(), 5)).toBe(false);
+    });
+    it('tracks nested async middleware through next and forwards rejections', async () => {
+        const drain = createHandlerDrain();
+        let finish;
+        const error = new Error('test failure');
+        const next = vi.fn();
+        const router = { stack: [{ route: { stack: [{ handle: async (_req, _res, next) => next() }, { handle: async () => { await new Promise(resolve => { finish = resolve; }); throw error; } }] } }] };
+        trackAuthHandlers(router, drain);
+        const [first, second] = router.stack[0].route.stack;
+        let secondWork;
+        await first.handle({}, {}, () => { secondWork = second.handle({}, {}, next); });
+        expect(await drain.wait(5)).toBe(false);
+        finish(); await secondWork;
+        expect(next).toHaveBeenCalledWith(error);
+        expect(await drain.wait(5)).toBe(true);
     });
 });

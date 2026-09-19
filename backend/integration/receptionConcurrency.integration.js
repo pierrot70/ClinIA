@@ -18,6 +18,7 @@ import { Appointment } from "../models/Appointment.js";
 import { AppointmentBookingGuard } from "../models/AppointmentBookingGuard.js";
 import { PatientAuditLog } from "../models/PatientAuditLog.js";
 import { WriteOperationAuditLog } from "../models/WriteOperationAuditLog.js";
+import { ReceptionBookingProof } from "../models/ReceptionBookingProof.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 
 const day = "2099-01-15";
@@ -37,7 +38,16 @@ async function request(path, { token, body, method = body ? "POST" : "GET", gate
 }
 const patient = n => ({ nom: `SyntheticLast${n}`, prenom: `SyntheticFirst${n}`, num_assurance_maladie: `TEST${String(n).padStart(8, "0")}`, country: "CA", healthInsuranceJurisdiction: "QC", language: "fr" });
 const payload = (n, specialist = doctors[0], time = times[0]) => ({ clinic, specialist, date: day, time, slotType: "walk_in", patient: patient(n) });
-const book = (body, actor = 0, gate) => request("/api/reception/walk-in-bookings", { token: tokens[actor], body, gate });
+async function lookupProof(patientId, actor = 0) {
+    const record = await Patient.findById(patientId);
+    const lookup = await request(`/api/reception/patient-lookup?clinic=${clinic}&ramq=${record.num_assurance_maladie}`, { token: tokens[actor] });
+    expect(lookup.status).toBe(200);
+    return lookup.data.bookingProof;
+}
+async function book(body, actor = 0, gate) {
+    if (body.patientId && body.bookingProof === undefined) body = { ...body, bookingProof: await lookupProof(body.patientId, actor) };
+    return request("/api/reception/walk-in-bookings", { token: tokens[actor], body, gate });
+}
 async function race(left, right) {
     const key = randomUUID();
     const results = await Promise.all([left(key), right(key)]);
@@ -163,6 +173,23 @@ describe("2. Same patient, different slots", () => {
     it("serializes known-patient bookings even across different physicians", async () => {
         const patientId = await seedKnownPatient();
         const body = { clinic, patientId, date: day, slotType: "walk_in" };
+        const bookingProof = await lookupProof(patientId);
+        const valid = { ...body, specialist: doctors[0], time: times[1], bookingProof };
+        // The known-patient scenario also verifies the mandatory lookup boundary.
+        for (const [payload, actor] of [[{ ...valid, bookingProof: null }, 0], [valid, 1], [{ ...valid, patientId: String(new mongoose.Types.ObjectId()) }, 0]]) {
+            const denied = await book(payload, actor);
+            expect(denied.status).toBe(403);
+            expect(denied.error.code).toBe("RECEPTION_LOOKUP_REQUIRED");
+        }
+        const proofRecord = await ReceptionBookingProof.findOne({});
+        for (const change of [{ expiresAt: new Date(Date.now() - 1) }, { sessionId: "other-session" }, { clinicId: otherClinic }]) {
+            await ReceptionBookingProof.updateOne({ _id: proofRecord._id }, { $set: change });
+            const denied = await book(valid);
+            expect(denied.status).toBe(403);
+            expect(denied.error.code).toBe("RECEPTION_LOOKUP_REQUIRED");
+            await ReceptionBookingProof.updateOne({ _id: proofRecord._id }, { $set: { expiresAt: proofRecord.expiresAt, sessionId: proofRecord.sessionId, clinicId: proofRecord.clinicId } });
+        }
+        expect(await Appointment.countDocuments({ status: "scheduled" })).toBe(0);
         const results = await race(
             gate => book({ ...body, specialist: doctors[0], time: times[1] }, 0, gate),
             gate => book({ ...body, specialist: doctors[1], time: times[2] }, 1, gate),
@@ -172,6 +199,17 @@ describe("2. Same patient, different slots", () => {
         expect(await Patient.countDocuments()).toBe(1);
         expect(await Appointment.countDocuments({ patient: patientId, clinique: clinic, status: "scheduled" })).toBe(1);
         expect(await Appointment.countDocuments({ patient: patientId, status: "completed" })).toBe(1);
+        const scheduled = await Appointment.findOne({ patient: patientId, status: "scheduled" });
+        // Race the exact same proof for replacement; only one transaction may commit.
+        const sameProof = await lookupProof(patientId);
+        const replacement = { ...body, specialist: doctors[0], bookingProof: sameProof, replaceAppointmentId: String(scheduled._id) };
+        const proofRace = await race(gate => book({ ...replacement, time: times[3] }, 0, gate), gate => book({ ...replacement, time: times[4] }, 0, gate));
+        expect(proofRace.map(result => result.status).sort()).toEqual([201, 403]);
+        expect(proofRace.find(result => result.status === 403).error.code).toBe("RECEPTION_LOOKUP_REQUIRED");
+        const replay = await book({ ...replacement, time: times[5] });
+        expect(replay.status).toBe(403);
+        expect(replay.error.code).toBe("RECEPTION_LOOKUP_REQUIRED");
+        expect(await Appointment.countDocuments({ patient: patientId, status: "scheduled" })).toBe(1);
     });
     it("rejects duplicate simultaneous creation of the same new patient with a controlled conflict", async () => {
         const results = await race(

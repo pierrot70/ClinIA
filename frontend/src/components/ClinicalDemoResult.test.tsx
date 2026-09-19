@@ -32,6 +32,16 @@ vi.mock("./ClinicalRelevanceByAgeChart", () => ({
 }));
 
 describe("ClinicalDemoResult", () => {
+    it.each([{}, { clinical_summary: "Additional clinical details" }, { treatments: [{ name: "Treatment A" }] }])("shows alternatives and red flags immediately in every result layout: %j", layout => {
+        render(<HomeI18nContext.Provider value={{ locale: "en-CA" } as any}>
+            <ClinicalDemoResult demoData={{ ...layout, alternatives: [{ name: "Alternative A", reason: "Consider patient context." }], red_flags: ["Urgent assessment required."] } as any} />
+        </HomeI18nContext.Provider>);
+        expect(screen.getByRole("heading", { name: "Therapeutic alternatives" })).toBeVisible();
+        expect(screen.getByRole("heading", { name: "Red flags" })).toBeVisible();
+        expect(screen.getByText("Alternative A")).toBeVisible();
+        expect(screen.getByText("Consider patient context.")).toBeVisible();
+        expect(screen.getByText("Urgent assessment required.")).toBeVisible();
+    });
     it("renders result titles in Spanish", () => {
         render(
             <HomeI18nContext.Provider value={{ locale: "es" } as any}>

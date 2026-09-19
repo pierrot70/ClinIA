@@ -77,6 +77,33 @@ d'image pour faire disparaître cet avertissement.
 CI archive automatiquement le JSON avec `actions/upload-artifact`, y compris
 sur échec. Elle ne publie pas automatiquement de fichiers vers la production.
 
+## Conservation et accès
+
+Politique opérationnelle des preuves techniques (aucune donnée clinique) :
+
+- Artefacts GitHub Actions : 30 jours, configurés dans `ci.yml`. Le dépôt étant
+  public, considérer ces preuves techniques comme publiques : uniquement les
+  résultats minimisés des scénarios synthétiques, jamais de données de STAGING,
+  de production, de comptes réels ou de journaux bruts. Les archives privées et
+  audits d'exploitation ne doivent pas être joints aux artefacts de ce dépôt.
+- Rapports servis par Coolify : 90 jours en ligne, avec un plafond de 900 fichiers
+  pour garder une marge sous la limite technique de 1000. À chaque publication,
+  l'administrateur archive les plus anciens hors du répertoire servi si nécessaire.
+- Archives techniques : 365 jours après la fin du test, avec empreintes et
+  provenance CI conservées. Conserver les preuves du déploiement actif et du
+  précédent déploiement, ainsi que toute preuve sous gel d'incident, même si
+  cette durée est dépassée. Purger seulement après vérification de ces exceptions.
+- Audits de consultation/export : 365 jours, accessibles aux seuls responsables
+  sécurité autorisés. Les gels d'incident suspendent également leur purge.
+- Le volume applicatif reste en lecture seule pour UID/GID 10001 ; seul
+  l'administrateur de déploiement publie ou archive. SUPERADMIN lit/exporte via
+  les routes auditées, sans accès aux dossiers patients.
+
+Seule la durée des artefacts CI est automatisée ici. L'archivage Coolify et la
+purge des audits doivent être appliqués par l'exploitation avec une trace des
+identifiants d'exécution et empreintes concernés. Ces durées sont des choix
+d'exploitation, pas une affirmation de durée légale de conservation.
+
 ## Publication dans Coolify (administrateur de déploiement)
 
 1. Dans Advanced, activer **Include Source Commit in Build**. Le Compose transmet
@@ -129,8 +156,8 @@ node scripts/verify-validation-bundle.mjs /chemin/clinia-validation-UUID.json
   elles ne constituent pas une signature. La chaîne de confiance repose sur
   l'artefact CI/la provenance de l'exécution et le contrôle du répertoire publié.
 - Archives limitées à 1000 rapports par répertoire ; au-delà, API indisponible
-  explicitement, sans sélection silencieuse. Définir la politique de conservation
-  des rapports et des audits avant une utilisation réglementaire.
+  explicitement, sans sélection silencieuse. Appliquer la politique ci-dessus
+  avant d'atteindre ce plafond.
 - Rien n'a encore été configuré ni déployé sur Coolify par cette implémentation.
 
 ## Vérifications réalisées pendant le développement

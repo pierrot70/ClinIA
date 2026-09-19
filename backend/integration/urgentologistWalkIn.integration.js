@@ -75,7 +75,7 @@ beforeEach(async () => {
                 }], { session });
                 users.push(user);
             }
-            auth = { userId: String(users[0]._id), username: "reception_1", role: "RECEPTION" };
+            auth = { userId: String(users[0]._id), username: "reception_1", role: "RECEPTION", sessionId: "integration-session" };
             urgentologists = [];
             for (let i = 1; i <= 3; i++) {
                 const [doctor] = await Specialist.create([{ nom: users[i].username, prenom: "Fictif", numero_medecin: `TEST${i}`,
@@ -121,8 +121,10 @@ it.each([false, true])("a walk-in returns the same day using the same dossier (d
     const receivingAccount = await Specialist.findById(firstDoctor);
 
     // An unfinished booking must still trigger replacement, not a second booking.
+    const initialLookup = await request(`/patient-lookup?clinic=${clinic}&ramq=${identity(1).num_assurance_maladie}`);
+    expect(initialLookup.status).toBe(200);
     const premature = await request("/walk-in-bookings", {
-        clinic, specialist: secondDoctor, date: day, time: slots[1], patientId, slotType: "walk_in",
+        clinic, specialist: secondDoctor, date: day, time: slots[1], patientId, bookingProof: initialLookup.data.bookingProof, slotType: "walk_in",
     });
     expect(premature.status).toBe(409);
     expect(premature.error.code).toBe("RECEPTION_REPLAN_REQUIRED");
@@ -151,7 +153,7 @@ it.each([false, true])("a walk-in returns the same day using the same dossier (d
     expect(option).toBeDefined();
     expect(option.slots).not.toContain(first.time);
     const returned = await request("/walk-in-bookings", {
-        clinic, specialist: secondDoctor, date: day, time: option.slots[0], patientId, slotType: "walk_in",
+        clinic, specialist: secondDoctor, date: day, time: option.slots[0], patientId, bookingProof: lookup.data.bookingProof, slotType: "walk_in",
     });
     expect(returned.status).toBe(201);
     const visits = await Appointment.find({ patient: patientId, date: day }).sort({ time: 1 }).lean();
