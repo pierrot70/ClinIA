@@ -17,6 +17,13 @@ function readAuditReport() {
 }
 
 const report = readAuditReport();
+// npm can return JSON describing a registry/network error, not an audit.
+// An unavailable check must never be reported as a successful empty audit.
+if (report?.error || report?.auditReportVersion !== 2 ||
+    !report.vulnerabilities || typeof report.vulnerabilities !== "object" || Array.isArray(report.vulnerabilities)) {
+    console.error("AUDIT_UNAVAILABLE no valid npm audit report received");
+    process.exit(1);
+}
 const failures = [];
 
 for (const [packageName, vulnerability] of Object.entries(report.vulnerabilities ?? {})) {

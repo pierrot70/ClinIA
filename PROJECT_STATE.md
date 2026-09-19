@@ -85,6 +85,38 @@ Validation: résultats finaux consignés ci-dessous ; pas de validation clinique
 
 ### Validation
 
+Validation complète avant commit/push, depuis la racine :
+
+```bash
+bash scripts/ci-local.sh
+```
+
+Cette commande et GitHub Actions appellent les mêmes étapes versionnées :
+`npm ci`, audits (seuil high/critical), suites frontend/backend, régression auth,
+build frontend et les 21 scénarios sur MongoDB jetable. Prérequis : Node 24,
+npm, Bash, jq, Git, Docker local actif et accès aux registres npm/Docker.
+Backend en `America/Toronto`, frontend en `UTC`, `CI=true` dans les deux cas.
+Le succès complet affiche `CI_LOCAL_PASSED` ; une erreur interrompt la commande.
+Un audit réseau indisponible est désormais un échec, jamais un audit vide vert.
+Les `node_modules` locaux sont réinstallés ; les volumes STAGING ne sont pas
+modifiés. Le rapport d'intégration reste dans `validation-artifacts/`.
+Cela ne reproduit pas la VM GitHub, ses permissions, caches ou l'envoi des
+artefacts. Les contrôles STAGING pertinents restent distincts. Le CI distant
+est désormais manuel (`workflow_dispatch`) : aucun lancement automatique sur
+push ou pull request. Le feu vert avant déploiement repose sur la validation
+locale du code envoyé ; un contrôle distant reste disponible à la demande.
+Les hooks Git ne lancent pas
+automatiquement cette commande : l'exécuter avant chaque commit du lot testé.
+Validation locale complète du 19 septembre 2026 : code de sortie 0 et
+`CI_LOCAL_PASSED`, 1 171 tests frontend, 698 backend (dont les 7 tests du
+lanceur/audit), 57 tests de régression auth seed 3, build et deux audits verts
+au seuil high/critical. Les 21 scénarios d'intégration ont réussi et le
+nettoyage du MongoDB jetable est confirmé (`cleanup: true`). Rapport local :
+`validation-artifacts/43dc549b-824b-4afd-9d15-979373aeebce.json`.
+Cette exécution porte sur les changements locaux au-dessus de `fd5b956`
+(`dirty: true` dans le rapport), avant le changement des déclencheurs CI et
+la mise à jour documentaire ; elle ne constitue pas un contrôle GitHub distant.
+
 - Point 2 : cinq fichiers auth/réauth, 97 tests, réussis dans chacun des dix
   ordres (seeds 1 à 10), soit 970 exécutions sans échec après correction.
   Avant correction, seed 3 échouait également sur le seul fichier de service

@@ -1,8 +1,7 @@
 name: CI
 
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -26,15 +25,15 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: backend/package-lock.json
-      - run: npm ci --no-audit
-      - run: node ../scripts/verify-npm-audit.mjs
-      - run: npm test -- --run
+      - run: bash ../scripts/ci-local.sh backend install
+      - run: bash ../scripts/ci-local.sh backend audit
+      - run: bash ../scripts/ci-local.sh backend tests
       - name: Authentication service isolation (regression seed 3)
-        run: npm test -- --run services/__tests__/auth.service.test.js --sequence.shuffle --sequence.seed=3
+        run: bash ../scripts/ci-local.sh backend reauth
       - name: Prepare disposable MongoDB integration image
-        run: docker pull mongo:7
+        run: bash ../scripts/ci-local.sh backend mongo
       - name: Walk-in capacity integration (41 arrivals and last-place race)
-        run: npm run test:validation-report
+        run: bash ../scripts/ci-local.sh backend integration
       - name: Archive minimized validation evidence (also on failure)
         if: always()
         uses: actions/upload-artifact@v4
@@ -57,7 +56,7 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci --no-audit
-      - run: node ../scripts/verify-npm-audit.mjs
-      - run: npm test -- --run
-      - run: npm run build
+      - run: bash ../scripts/ci-local.sh frontend install
+      - run: bash ../scripts/ci-local.sh frontend audit
+      - run: bash ../scripts/ci-local.sh frontend tests
+      - run: bash ../scripts/ci-local.sh frontend build
