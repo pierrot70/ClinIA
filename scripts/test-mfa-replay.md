@@ -53,3 +53,55 @@ simulees :
 ```bash
 npm --prefix backend test -- --run services/__tests__/mfaReplayScript.test.js
 ```
+
+## Deux soumissions en parallele
+
+```bash
+bash scripts/test-mfa-replay.sh coolify --concurrent
+```
+
+Le script cree un seul challenge actif, puis demande un code frais. Deux
+processus curl en arriere-plan soumettent le meme challenge et le meme code
+avec des fichiers de requete et de cookies separes. Creer une seconde demande
+login avant cette paire invaliderait le premier challenge et fausserait le test. Aucune boucle de charge
+ni nouvelle tentative automatique n'est lancee. Un 200 et un 401
+`INVALID_MFA_CHALLENGE` (ou `INVALID_MFA_CODE`) sont attendus, quel que soit le gagnant. Deux 200 constituent
+un echec. Deux refus, une erreur reseau ou une limitation sont non concluants.
+
+Les intervalles des appels cote client doivent se chevaucher et les dates HTTP
+doivent rester dans la meme fenetre TOTP avec marge. Un nouveau code different
+doit ensuite reussir sur un nouveau challenge cree apres la paire, car le
+challenge partage a ete consomme. Ce controle ne reutilise pas le challenge
+refuse et ne remplace pas le test sequentiel de rejeu du code. Le marqueur
+`MFA_CONCURRENT_PASSED` exige aussi la deconnexion des sessions connues.
+Les workers sont attendus avant nettoyage des fichiers temporaires.
+
+Ce resultat ne prouve pas le chevauchement des operations critiques cote
+serveur ni leur repartition entre deux instances Coolify. Pour cibler les deux
+instances locales connues : utiliser `staging-pair --concurrent`. Les limites
+du navigateur, des horloges et des reponses reseau perdues restent applicables.
+
+## Deux instances Coolify via tunnels SSH
+
+Le mode `coolify-pair --concurrent` utilise exclusivement
+`http://localhost:4102` et `http://localhost:4103`. Ouvrir au prealable deux
+tunnels SSH ecoutes uniquement sur 127.0.0.1 vers les adresses privees des deux
+backends, port 4000. Verifier ces adresses apres chaque redeploiement. Le trajet
+poste-Droplet est chiffre par SSH ; le trajet Docker interne est HTTP et le
+proxy HTTPS public n'est pas traverse. Aucune configuration serveur ne change.
+
+Relever les `meta.instanceId` dans chaque conteneur, puis fournir ces deux
+valeurs distinctes au lanceur (les valeurs ci-dessous sont des exemples) :
+
+```bash
+CLINIA_EXPECTED_INSTANCE_A=instance-a \
+CLINIA_EXPECTED_INSTANCE_B=instance-b \
+  bash scripts/test-mfa-replay.sh coolify-pair --concurrent
+```
+
+La confirmation `TESTER COOLIFY` est obligatoire. Les identites et la readiness
+sont verifiees avant la saisie des identifiants et apres les controles MFA.
+Le marqueur `COOLIFY_MFA_PAIR_PASSED` exige les deux instances attendues et la
+deconnexion des sessions connues. Une seule acceptation de la paire est attendue.
+La verification ne prouve pas un chevauchement des operations critiques cote
+serveur. Garder les tunnels ouverts pendant le test, puis les fermer avec Ctrl+C.

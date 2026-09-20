@@ -131,6 +131,53 @@ automatiquement cette commande : l'exécuter avant chaque commit du lot testé.
 
 ### Dernières preuves disponibles au 20 septembre
 
+- CI local du 20 septembre pour les lanceurs Coolify/logout/MFA parallèle :
+  `bash scripts/ci-local.sh`, sortie 0 et `CI_LOCAL_PASSED` ; 1 171 tests
+  frontend, 733 backend, réexécution des 57 tests auth seed 3, build et deux
+  audits réussis. Intégration 21/21 et nettoyage confirmé. Journal local :
+  `/tmp/clinia-coolify-auth-ci-20260920.log`. Rapport d'intégration :
+  `f2f3283c-eab5-4795-a510-379a3102c0ca`, base `7df3f0a`, `dirty: true`
+  (lanceurs, tests et documentation non encore commités lors de l'exécution).
+  Ce CI utilise une base locale isolée ; les preuves Coolify suivent séparément.
+  Le bilan a été ajouté après exécution sans nouvelle modification de code.
+
+- Auth Coolify du 20 septembre : résultats fournis par l'utilisateur dans la
+  conversation, avec les lanceurs locaux en cours de modification et les deux
+  images backend au commit `7df3f0a3c227d9145723abea5e18e2352e04a1d2`
+  (fichiers `/app/build-revision.json` vérifiés dans chaque conteneur).
+  Ces preuves ne sont pas incluses dans l'archive S3 antérieure. Aucun mot de
+  passe, code MFA, jeton ou identifiant de compte n'est consigné ici.
+  - Santé après redéploiement : deux backends healthy, readiness publique 200,
+    MongoDB connecté. Replica set : un PRIMARY, deux SECONDARY, health 1,
+    même optime `2026-09-20T14:21:32.000Z`. L'alerte de 14:15:10 UTC avait
+    signalé une indisponibilité réelle (503) ; cette reprise ne prouve pas
+    l'absence d'interruption pendant le déploiement.
+  - `test-reauth-session-binding.sh coolify` : A confirmé accepté (200), B sans
+    confirmation puis avec celle de A refusé (403 REAUTH_REQUIRED). Après
+    logout A, ancien jeton refusé (401), B toujours valide (200).
+    `COOLIFY_AUTH_PASSED` et nettoyage des sessions confirmés.
+  - `test-mfa-replay.sh coolify` : premier code accepté (200), rejeu refusé
+    (401 INVALID_MFA_CODE), nouveau code accepté sur le même challenge (200).
+    Marqueur final de protection confirmé après nettoyage.
+  - Navigateur : l'utilisateur confirme le scénario de déconnexion dans un
+    onglet puis actualisation du second, sans accès protégé. Confirmation
+    manuelle, sans capture réseau ni preuve d'une réaction avant actualisation.
+  - `test-mfa-replay.sh coolify --concurrent` corrigé : même challenge et même
+    code soumis en parallèle, A refusé (401 INVALID_MFA_CHALLENGE), B accepté
+    (200), nouveau challenge A et code suivant acceptés (200).
+    `MFA_CONCURRENT_PASSED`, sessions déconnectées. Le premier scénario à deux
+    challenges était incorrect : une seconde connexion invalide le premier
+    challenge. Son résultat reste non concluant et n'est pas une preuve de faille.
+  - `test-mfa-replay.sh coolify-pair --concurrent` : tunnels SSH locaux 4102/4103
+    vers deux conteneurs distincts, identités vérifiées avant/après le test :
+    A `instance-0d972081`, B `instance-64f58909`. Même challenge/code : A 401
+    INVALID_MFA_CHALLENGE, B 200 ; nouveau challenge/code sur A 200.
+    `COOLIFY_MFA_PAIR_PASSED`, sessions déconnectées. Ce trajet contourne le
+    proxy HTTPS public, couvert séparément par les essais ci-dessus.
+  - Limites : chevauchement des appels observé côté client, pas des opérations
+    critiques côté serveur ; pas de garantie générale contre toutes les courses.
+    La fermeture des tunnels SSH a été demandée, mais n'est pas confirmée.
+
 - CI local du 20 septembre pour les lanceurs auth `staging-pair` :
   `bash scripts/ci-local.sh`, code de sortie 0 et `CI_LOCAL_PASSED`.
   1 171 tests frontend, 710 backend, 57 tests auth en ordre mélangé (seed 3),
@@ -244,9 +291,11 @@ création, avant cette copie S3 ; le présent paragraphe consigne l'étape suiva
 
 ### Vérifications encore ouvertes
 
-- Auth : trajet navigateur/proxy et concurrence simultanée restent à vérifier.
-  Liaison de réauthentification, révocation après logout et refus du rejeu MFA
-  vérifiés séquentiellement entre les deux instances STAGING le 20 septembre.
+- Auth : essais STAGING et Coolify décrits ci-dessus réussis, dont navigateur
+  après actualisation, trajet HTTPS et paire MFA sur deux instances explicites.
+  Le chevauchement interne côté serveur reste non observé. La liaison de
+  réauthentification et le logout ont été vérifiés entre instances en STAGING,
+  mais sans routage explicite entre deux instances pour ces deux essais Coolify.
 - RAMQ : index unique/TTL et parcours synthétique sur le déploiement Coolify.
 - Dépendances : version Nodemailer chargée et SMTP dans Coolify ; différence
   entre Node 24 pour les tests et Node 20 dans les images à prendre en compte.

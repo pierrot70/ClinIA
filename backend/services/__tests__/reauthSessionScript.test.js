@@ -27,10 +27,10 @@ let status=200, body={data:{accessToken:'synthetic-access',user:{role:'SUPERADMI
 if(url.endsWith('/health/ready')){
  body={data:{status:'ok',dependencies:{mongo:'connected'}},meta:{instanceId:process.env.FIXTURE_SCENARIO==='wrong-instance'?'wrong':url.includes(':4003/')?'mongo-rs-test-backend-replica':'mongo-rs-test-backend'}};
 }else if(url.endsWith('/session')){
- const revoked=header.endsWith('/a.header')&&previous.includes(':4002/api/auth/logout');
+ const revoked=header.endsWith('/a.header')&&previous.includes('/api/auth/logout');
  status=revoked&&process.env.FIXTURE_SCENARIO!=='logout-leak'?401:200;
  body=status===401?{error:{code:'UNAUTHORIZED'}}:{data:{user:{role:'SUPERADMIN'}}};
-}else if(url.endsWith('/logout')&&url.includes(':4003/')&&process.env.FIXTURE_SCENARIO==='cleanup-failure'){
+}else if(url.endsWith('/logout')&&header?.endsWith('/b.header')&&process.env.FIXTURE_SCENARIO==='cleanup-failure'){
  status=500;body={error:{code:'TEST_FAILURE'}};
 }else if(url.endsWith('/login')&&process.env.FIXTURE_SCENARIO!=='no-mfa'){
  status=202;body={data:{mfaRequired:true,mfaEnrollmentRequired:process.env.FIXTURE_SCENARIO==='enroll',mfaChallenge:'synthetic-challenge'}};
@@ -79,7 +79,9 @@ describe("manual reauth script", () => {
     it("handles two MFA challenges and keeps HTTPS on Coolify", () => {
         const result = run(["coolify"], "TESTER COOLIFY\ntest-admin\nfixture-password\n123456\n654321\n");
         expect(result.status).toBe(0);
-        expect(result.text).toContain("PROTECTION CONFIRMEE");
+        expect(result.text).toContain("COOLIFY_AUTH_PASSED");
+        expect(result.text).toContain("Ancien jeton A apres logout : HTTP 401");
+        expect(result.text).toContain("Session B toujours valide : HTTP 200");
         const mfa = result.calls.filter(call => call.url.endsWith("/login/mfa"));
         expect(mfa).toHaveLength(2);
         expect(mfa.every(call => JSON.stringify(call.fields) === JSON.stringify(["code", "mfaChallenge"]))).toBe(true);
@@ -116,6 +118,11 @@ describe("manual reauth script", () => {
         expect(result.status).toBe(code);
         expect(result.text).not.toContain("STAGING_PAIR_PASSED");
         if (scenario === "wrong-instance") expect(result.calls.every(c => c.url.endsWith("/health/ready"))).toBe(true);
+    });
+    it.each([["logout-leak", 2], ["cleanup-failure", 1]])("rejects Coolify success for %s", (scenario, code) => {
+        const result = run(["coolify"], "TESTER COOLIFY\ntest-admin\nfixture-password\n123456\n654321\n", scenario);
+        expect(result.status).toBe(code);
+        expect(result.text).not.toContain("COOLIFY_AUTH_PASSED");
     });
     it("refuses arbitrary destinations", () => {
         const result = run(["https://untrusted.invalid"], "");

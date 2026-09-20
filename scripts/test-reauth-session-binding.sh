@@ -45,7 +45,11 @@ cleanup() {
     # Exact private directory created above; no user-supplied deletion target.
     rm -rf -- "$temporary"
     if [[ "$result" == 0 && "$pair_passed" == true ]]; then
-        echo "STAGING_PAIR_PASSED : liaison de session et logout entre instances ; sessions de test deconnectees."
+        if [[ "$target" == staging-pair ]]; then
+            echo "STAGING_PAIR_PASSED : liaison de session et logout entre instances ; sessions de test deconnectees."
+        else
+            echo "COOLIFY_AUTH_PASSED : liaison de session et logout via HTTPS ; sessions de test deconnectees. Instances distinctes non garanties."
+        fi
     fi
     exit "$result"
 }
@@ -145,13 +149,13 @@ else
     exit 1
 fi
 
-if [[ "$target" == staging-pair ]]; then
+if [[ "$target" == staging-pair || "$target" == coolify ]]; then
     session_check() {
         local actor="$1" endpoint="$2"
         status="$(curl --silent --show-error --max-time 15 --output "$temporary/session-check.json" --write-out '%{http_code}' \
             --header "@$temporary/$actor.header" "$endpoint/session")"
     }
-    # Both tokens must work on the opposite instance before logout.
+    # Positive controls before logout; Coolify routing does not guarantee distinct instances.
     session_check a "$api_b"
     [[ "$status" == 200 ]] || { echo 'Controle positif session A sur B invalide.' >&2; exit 1; }
     session_check b "$api_a"
@@ -162,11 +166,11 @@ if [[ "$target" == staging-pair ]]; then
     [[ "$status" == 200 ]] || { echo 'Logout A non confirme.' >&2; exit 1; }
     touch "$temporary/a.closed"
     session_check a "$api_b"
-    echo "Ancien jeton A sur instance B apres logout : HTTP $status — attendu 401"
+    echo "Ancien jeton A apres logout : HTTP $status — attendu 401"
     [[ "$status" != 200 ]] || { echo 'FAILLE REPRODUITE : jeton accepte apres logout.' >&2; exit 2; }
     [[ "$status" == 401 ]] || { echo 'RESULTAT NON CONCLUANT pour logout.' >&2; exit 1; }
     session_check b "$api_a"
-    echo "Session B toujours valide sur instance A : HTTP $status — attendu 200"
+    echo "Session B toujours valide : HTTP $status — attendu 200"
     [[ "$status" == 200 ]] || { echo 'Session B non preservee.' >&2; exit 1; }
     pair_passed=true
 fi

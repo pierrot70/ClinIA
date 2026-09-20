@@ -84,3 +84,14 @@ qui doit etre accepte sur le meme challenge de B. Les deux sessions sont
 deconnectees avant le marqueur `STAGING_MFA_PAIR_PASSED`. Un echec de nettoyage
 interdit ce marqueur. Le code n'est jamais affiche et aucun MFA n'est enrole.
 Cet essai sequentiel ne prouve pas le refus de deux soumissions simultanees.
+
+## Verification via le proxy Coolify
+
+Depuis le poste local, `bash scripts/test-reauth-session-binding.sh coolify`
+demande une confirmation explicite avant les connexions distantes. Il verifie
+la liaison de reauthentification, puis la validite des deux sessions avant
+logout A, le refus de l'ancien jeton A (401) et le maintien de B (200).
+`COOLIFY_AUTH_PASSED` n'est affiche qu'apres deconnexion des sessions creees.
+Ce mode cible la production via HTTPS, sans garantir deux instances distinctes.
+Il ne couvre ni le navigateur ni les requetes simultanees. Utiliser un compte
+de test avec MFA ; ses sessions existantes peuvent etre remplacees.
