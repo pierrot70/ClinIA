@@ -1,6 +1,6 @@
 # État du projet ClinIA
 
-## État vérifié — 2026-09-19
+## État documentaire — 2026-09-20 (preuves des 19 et 20 septembre)
 
 Cette section remplace les états historiques ci-dessous. Base de départ du lot :
 branche `coolify`, commit `519fd83d2e2ea232bed61b8d9cf64044187df8bc`.
@@ -8,8 +8,13 @@ Le travail reste sur `coolify` : conserver et valider le lot actuel en STAGING,
 puis commit/push après succès. Le déploiement et le test Coolify reviennent à
 l'utilisateur. Reprendre les neuf points individuellement uniquement en cas de
 problème majeur ; aucune suppression de changements n'a été effectuée.
-Les résultats ci-dessous décrivent les validations locales/STAGING ; l'état du
-CI distant doit être vérifié pour le SHA exact publié dans GitHub Actions.
+Révision du code examinée : `3171013ce4d5d6b2957275f6e607d3e09bd986f4`.
+Les résultats ci-dessous distinguent les validations locales/STAGING des
+observations Coolify fournies par l'utilisateur le 19 septembre. Le CI local
+a été réexécuté le 20 septembre avant le commit documentaire ; aucun nouveau
+contrôle de santé distant n'a été exécuté pour cette mise à jour.
+Le CI complet est lancé localement avant commit/push ; GitHub Actions est
+désormais manuel (`workflow_dispatch`), conformément au choix de l'utilisateur.
 
 ### Priorités prises en charge
 
@@ -51,10 +56,16 @@ CI distant doit être vérifié pour le SHA exact publié dans GitHub Actions.
 - P1 résultats cliniques : alternatives thérapeutiques et `red_flags` affichés
   immédiatement, labels issus de la source française et neuf langues couvertes.
   Le contenu médical reçu n'est pas traduit dynamiquement par ces sections.
-- P1 Coolify : transmission `SOURCE_COMMIT` et volume de rapports déjà présents
-  dans le Compose/Dockerfile. Politique d'accès et conservation précisée dans
-  `docs/validation-reports-superadmin.md`. Activation dans Coolify, publication
-  des rapports et application de l'archivage restent à effectuer sur l'hôte cible.
+- P1 Coolify : option `Include Source Commit in Build` activée ; le SHA
+  `beb527c63c82cb7441396479d7a7ac3cf76fce29` a été lu dans les deux images backend.
+  Le montage des rapports a été vérifié en lecture seule (`RW=false`) sur les
+  deux backends, exécutés sous UID/GID 10001. Le rapport propre `55957d49…`
+  a été publié et consulté en SUPERADMIN, avec correspondance de version.
+  Après le déploiement de `3171013`, la capture de l'interface confirme ce
+  nouveau SHA et le menu rétabli ; l'ancien rapport indique correctement une
+  différence de version. La conservation et l'archivage restent à appliquer,
+  les exports PDF/JSON en production restent à confirmer. L'automatisation
+  de la publication est explicitement reportée.
 - P1 charge STAGING : premier essai interrompu après des timeouts HTTP ; une
   écriture auth tardive a laissé une collection synthétique. Nettoyage exact
   confirmé ensuite, sans modification des autres collections. Le runner est
@@ -66,13 +77,16 @@ CI distant doit être vérifié pour le SHA exact publié dans GitHub Actions.
   inclus), logout 0,22 s. Le passage d'une fenêtre de quota a permis de dépasser
   100 connexions au total. Serveur et générateur partagent le même processus ;
   ces résultats ne mesurent pas un nombre d'utilisateurs réels supportés.
-- P1 restauration S3/basculement : non exécutés. Il manque la cible explicite,
-  l'archive, les références d'accès S3/clé de déchiffrement et le créneau.
-  AWS CLI absent localement. Le script de restauration existant cible la
-  production et utilise `mongorestore --drop` ; ne pas lui substituer une cible
-  supposée. Les procédures existent dans `docs/production-incident-runbook.md`.
-- P2 : état actualisé, Node 24 dans les deux jobs CI, attribution normalisée
-  des contributions/revues ajoutée à `AGENTS.md`.
+- P1 restauration S3/basculement : essais réalisés le 19 septembre, détaillés
+  ci-dessous. Restauration dans un MongoDB local isolé, sans restauration sur
+  la production. Basculements backend, secondaire et primaire MongoDB exécutés
+  par l'utilisateur sur le Droplet ; retour à un état sain confirmé. Une requête
+  HTTP a expiré après 10 secondes pendant le basculement backend : aucune
+  garantie de continuité sans interruption ni mesure précise du temps de reprise.
+- P2 : Node 24 dans le CI local et les deux jobs GitHub ; attribution normalisée
+  dans `AGENTS.md`. Les Dockerfiles utilisent encore Node 20. Cette mise à jour
+  corrige l'état du projet ; une archive privée locale des preuves et une copie
+  chiffrée S3 sont créées et vérifiées. Leur conservation reste à organiser.
 
 ### Attribution
 
@@ -114,7 +128,110 @@ push ou pull request. Le feu vert avant déploiement repose sur la validation
 locale du code envoyé ; un contrôle distant reste disponible à la demande.
 Les hooks Git ne lancent pas
 automatiquement cette commande : l'exécuter avant chaque commit du lot testé.
-Validation locale complète du 19 septembre 2026 : code de sortie 0 et
+
+### Dernières preuves disponibles au 20 septembre
+
+- CI local du 20 septembre avant commit documentaire : `CI_LOCAL_PASSED`,
+  1 171 tests frontend, 698 backend, 57 tests auth seed 3, build et deux audits
+  réussis ; intégration 21/21 et nettoyage confirmé. Journal local :
+  `/tmp/clinia-docs-ci-20260920.log`. Rapport
+  `41888017-4db3-4646-a8a7-e8243dfb6d5c`, base `3171013`, `dirty: true`
+  (deux documents modifiés). Cette nouvelle preuve n'est pas incluse dans
+  l'archive chiffrée déjà envoyée à S3 ; le présent résultat a été consigné
+  après l'exécution, sans changement de code applicatif.
+- CI local avant le commit `3171013` : `CI_LOCAL_PASSED`, 1 171 tests frontend,
+  698 backend, 57 tests auth seed 3, build et deux audits au seuil high/critical
+  réussis. Les 57 tests auth sont une réexécution ciblée, pas 57 tests distincts
+  supplémentaires. Journal local : `/tmp/clinia-menu-ci.log`.
+  Rapport d'intégration `038072c6-0d67-4498-a34c-f91d54021199` : 21/21,
+  nettoyage confirmé, base `beb527c`, `dirty: true` car le changement de menu
+  n'était pas encore commité. Ce rapport ne constitue pas une preuve propre
+  rattachée au SHA `3171013`.
+- Rapport propre publié :
+  `validation-artifacts/55957d49-617f-4887-b68d-5b68509f9dde.json`,
+  commit `beb527c63c82cb7441396479d7a7ac3cf76fce29`, `dirty: false`, 21/21,
+  sortie 0 et nettoyage confirmé. Empreinte SHA-256 vérifiée avant publication :
+  `ee0991fd4b8a35122509fd01f8f88d686baaf23f7df4c5baa90fa0aa2163824b`.
+  La preuve porte sur l'intégration isolée ; ce n'est ni le rapport de toutes
+  les suites ni un test du déploiement Coolify.
+- Restauration : archive S3 du 19 septembre à 05:15:02 UTC, empreinte vérifiée,
+  déchiffrement `age` et flux gzip valides. Restauration locale dans un conteneur
+  sans réseau, sans port publié et avec données sur volumes temporaires en
+  mémoire. Comparaison au manifeste : 29 collections, 6 138 documents, aucun
+  écart de noms ou de comptage ; validation complète des collections réussie,
+  144 index recensés (pas de comparaison de leurs définitions au manifeste).
+  TTL désactivé pendant l'essai pour conserver l'état de la sauvegarde.
+  L'erreur intermédiaire de transfert du manifeste a été corrigée avant le
+  succès final. Conteneur et données restaurées supprimés, nettoyage confirmé.
+  Journal : `/tmp/clinia-isolated-restore-result.log` ; script d'essai :
+  `/tmp/clinia-isolated-restore-check.sh`. La clé privée est restée locale.
+- Basculement : journal du Droplet
+  `/root/clinia-failover-20260919-151028.log`, transmis par l'utilisateur.
+  Trois étapes `status=passed`, puis `DRILL PASSED`. Une requête a expiré
+  après 10 secondes lors de l'arrêt du backend ; l'API a ensuite répondu
+  pendant son arrêt. Lors de l'arrêt du primaire MongoDB, une réplique a pris
+  le rôle PRIMARY ; l'état final était un PRIMARY, deux SECONDARY sains et
+  un retard mesuré nul. Le dernier `docker ps` fourni confirme les deux
+  backends `healthy` et les trois conteneurs MongoDB démarrés. Aucune réservation
+  pendant la panne n'a été testée, ni reprise après perte complète du Droplet.
+
+Les six preuves disponibles ont été copiées sans modification le 20 septembre
+dans une archive privée locale hors du dépôt :
+`~/.local/state/clinia-evidence/2026-09-19-review-20260920T125023Z/`.
+Elle contient le journal CI, le résultat et le script de restauration isolée,
+les deux rapports JSON référencés ci-dessus et la transcription utilisateur du
+basculement. `manifest.json` décrit leur provenance ; `SHA256SUMS` couvre les
+six fichiers ainsi que le manifeste et le README. Les huit empreintes ont été
+vérifiées. Dossier en mode 700, fichiers en mode 600 ; aucun original supprimé.
+Les captures et le dernier état des conteneurs restent dans la conversation.
+Le journal original du Droplet n'a pas été récupéré à nouveau le 20 septembre.
+Ces empreintes ne constituent pas une signature.
+Aucune archive MongoDB, clé privée ou configuration secrète n'a été copiée
+dans ce dossier. Les journaux opérationnels restent hors du dépôt public.
+
+Le 20 septembre, les neuf fichiers de ce dossier (six preuves, README,
+manifeste et SHA256SUMS) ont été regroupés et chiffrés avec le destinataire
+public de la clé `age` existante. Déchiffrement local et comparaison de chacun
+des neuf fichiers aux sources réussis, sans fichier supplémentaire.
+Archive : `clinia-evidence-20260919-review-20260920T125023Z.tar.gz.age`.
+Empreinte SHA-256 :
+`d16cbc62e9ee3ee45d24da529337f2a0065471c84b0f9e337fa6e492a7a70299`.
+L'utilisateur a confirmé le transfert au Droplet, puis l'envoi de l'archive et
+de son empreinte sous `technical-evidence/2026-09-19/` dans le stockage S3
+existant, avec ACL privée demandée. Retéléchargement de l'archive depuis S3
+et comparaison à l'empreinte locale de référence réussis. Cette preuve atteste
+une copie hors du poste ; aucune règle de rétention ni protection contre la
+suppression n'a été configurée ou vérifiée lors de cet envoi.
+
+Une copie de secours de la clé privée, chiffrée par phrase secrète sur support
+USB, a été déchiffrée et comparée à l'original avec succès par l'utilisateur.
+Une première copie dont la phrase avait été divulguée a été remplacée, puis
+supprimée selon sa confirmation ; l'effacement physique sur mémoire flash
+n'est pas garanti. Aucune phrase secrète ni clé privée n'est consignée ici.
+La conservation séparée de la nouvelle phrase et la mise en lieu sûr du
+support restent des actions de l'utilisateur, non vérifiées par ces tests.
+Le manifeste de l'archive reste inchangé : il décrit l'état local lors de sa
+création, avant cette copie S3 ; le présent paragraphe consigne l'étape suivante.
+
+### Vérifications encore ouvertes
+
+- Auth : trajet navigateur/proxy et fonctionnement entre les deux instances.
+- RAMQ : index unique/TTL et parcours synthétique sur le déploiement Coolify.
+- Dépendances : version Nodemailer chargée et SMTP dans Coolify ; différence
+  entre Node 24 pour les tests et Node 20 dans les images à prendre en compte.
+- Rapports : exports PDF/JSON en production, application de la conservation
+  et de l'archivage. Publication automatisée reportée par l'utilisateur.
+- Résultats cliniques : vérification visuelle en production ; les tests
+  d'affichage ne constituent pas une validation scientifique du contenu.
+- CI : le build Vite ne lance pas de contrôle TypeScript global `tsc --noEmit`.
+  L'exécution complète avant push reste manuelle, sans blocage automatique
+  dans les hooks Git.
+- Preuves : application de la conservation des copies locales et S3 ; aucune
+  purge ni protection contre la suppression n'est configurée par cette opération.
+
+### Résultats historiques du lot initial
+
+Validation locale complète antérieure du 19 septembre 2026 : code de sortie 0 et
 `CI_LOCAL_PASSED`, 1 171 tests frontend, 698 backend (dont les 7 tests du
 lanceur/audit), 57 tests de régression auth seed 3, build et deux audits verts
 au seuil high/critical. Les 21 scénarios d'intégration ont réussi et le
@@ -150,9 +267,9 @@ la mise à jour documentaire ; elle ne constitue pas un contrôle GitHub distant
   omettaient encore la preuve RAMQ. Les fixtures ont été adaptées, puis les
   21 scénarios ont été réexécutés avec succès ; aucune assertion de réservation
   ou de contrôle d'accès n'a été retirée.
-- Les rapports locaux portent `dirty: true` : le SHA de base seul ne décrit
-  pas le code testé. Il faudra une exécution CI sur un commit propre pour
-  établir une correspondance avec une future image Coolify.
+- Ces rapports du lot initial portent `dirty: true` : le SHA de base seul ne
+  décrit pas le code testé. Le rapport propre `55957d49…`, produit ensuite sur
+  `beb527c`, est distingué dans les dernières preuves ci-dessus.
 - Le CI précédent, run `34765717569`, a été vérifié sur GitHub : frontend vert,
   backend arrêté à l'audit npm, suites backend/intégration non exécutées.
 

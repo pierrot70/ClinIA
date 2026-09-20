@@ -4,6 +4,8 @@
 
 Navigation SUPERADMIN : **Rapports de validation → Tests de concurrence → Prise de rendez-vous Walk-In**,
 sur ordinateur et mobile, avec labels versionnés dans les neuf langues.
+Depuis le commit `3171013`, ce menu est également visible en production distante
+pour SUPERADMIN. La restriction de rôle sur les routes et l'API est conservée.
 La catégorie actuelle utilise `/admin/validation-reports/concurrency/walk-in` ; les anciens
 chemins `/admin/validation-reports` et `/admin/validation-reports/concurrency` y redirigent. Toutes ces routes restent protégées
 SUPERADMIN. Cette catégorie conserve tous les rapports walk-in existants ; aucun
@@ -36,7 +38,20 @@ les noms de tests libres, les chemins locaux, les requêtes ou les jetons.
 
 ## Génération locale ou CI
 
-Le rebuild staging lance automatiquement la génération après les tests unitaires :
+La validation complète se lance depuis la racine, avant commit/push :
+
+```bash
+bash scripts/ci-local.sh
+```
+
+Elle exécute les installations verrouillées, audits au seuil high/critical,
+suites frontend/backend, régression auth, build frontend et intégration sur
+MongoDB jetable. Elle exige Node 24, Docker local et l'accès aux registres.
+Le rapport JSON porte uniquement sur les 21 scénarios d'intégration, même
+lorsqu'il est produit par ce CI complet.
+
+Le rebuild staging appelle ce même CI une seule fois, avant l'arrêt et la
+reconstruction des conteneurs :
 
 ```bash
 ./rebuild-local.sh staging
@@ -47,6 +62,8 @@ les backends staging. Dans le UI : SUPERADMIN → Rapports de validation → Act
 Un échec de validation arrête le script avec un code non nul, sans annoncer
 « Staging ready » ; le rapport d'échec reste consultable s'il a pu être écrit.
 Si une étape précédente du rebuild échoue, cette génération n'est pas atteinte.
+Les contrôles de disponibilité après redémarrage restent distincts du CI.
+Les hooks Git ne lancent pas automatiquement la validation complète.
 
 Pour générer uniquement un rapport, sans reconstruire staging :
 
@@ -74,8 +91,12 @@ lecture seule. Les images de développement n'embarquent pas de commit de
 production : une version inconnue y est normale. Ne pas fabriquer un hash
 d'image pour faire disparaître cet avertissement.
 
-CI archive automatiquement le JSON avec `actions/upload-artifact`, y compris
-sur échec. Elle ne publie pas automatiquement de fichiers vers la production.
+GitHub Actions est déclenché uniquement manuellement (`workflow_dispatch`) :
+les push et pull requests ne lancent plus ce workflow. Lorsqu'il est lancé,
+il appelle les mêmes étapes et archive le JSON disponible avec
+`actions/upload-artifact`, y compris sur échec. Une exécution locale ne produit
+pas d'artefact GitHub. Aucun de ces chemins ne publie automatiquement vers
+Coolify ; cette automatisation est reportée par l'utilisateur.
 
 ## Conservation et accès
 
@@ -99,10 +120,44 @@ Politique opérationnelle des preuves techniques (aucune donnée clinique) :
   l'administrateur de déploiement publie ou archive. SUPERADMIN lit/exporte via
   les routes auditées, sans accès aux dossiers patients.
 
-Seule la durée des artefacts CI est automatisée ici. L'archivage Coolify et la
+Seule la durée des artefacts GitHub produits par le workflow manuel est
+automatisée ici. L'archivage Coolify et la
 purge des audits doivent être appliqués par l'exploitation avec une trace des
 identifiants d'exécution et empreintes concernés. Ces durées sont des choix
 d'exploitation, pas une affirmation de durée légale de conservation.
+
+### Copie privée des preuves hors du poste
+
+Le 20 septembre 2026, un ensemble de preuves du 19 septembre a été archivé
+hors du dépôt, puis sauvegardé sous forme de tar.gz chiffré avec `age` dans
+le préfixe S3 `technical-evidence/2026-09-19/`, distinct des sauvegardes MongoDB.
+Il comprend six preuves (journal CI, résultat et script de restauration isolée,
+deux rapports JSON et transcription utilisateur du basculement), un README,
+un manifeste de provenance et un fichier d'empreintes. Les neuf fichiers ont
+été comparés aux sources après déchiffrement local. L'utilisateur a confirmé
+l'envoi avec ACL privée et le retéléchargement depuis S3 avec empreinte conforme.
+Les identifiants de rapports et l'empreinte de l'archive sont consignés dans
+[PROJECT_STATE.md](../PROJECT_STATE.md).
+
+Cette archive privée contient des informations d'exploitation ; elle ne doit
+pas être publiée dans GitHub ni placée dans le répertoire de rapports servi
+par l'application. Aucun fichier de sauvegarde MongoDB, clé privée ou fichier
+de configuration secrète n'y a été inclus. Les originaux ont été conservés.
+Le journal de basculement est une transcription fournie par l'utilisateur,
+pas une nouvelle récupération du journal original sur le Droplet.
+
+La clé de déchiffrement est conservée séparément. Une copie USB de cette clé,
+chiffrée par phrase secrète, a été déchiffrée et comparée à l'original avec
+succès par l'utilisateur. La phrase doit rester récupérable sans le poste,
+séparément du support. Aucune clé ni phrase secrète ne doit être consignée
+dans la documentation, le dépôt ou les journaux.
+
+La copie S3 vérifiée protège contre la perte du seul poste. Elle ne prouve
+pas une protection contre la suppression ou la compromission du compte S3.
+Aucune règle de conservation ni protection contre la suppression n'a été
+configurée ou vérifiée lors de cet envoi. L'application de la politique
+ci-dessus reste ouverte ; ne pas purger automatiquement sans tenir compte
+des versions active/précédente et des gels d'incident.
 
 ## Publication dans Coolify (administrateur de déploiement)
 
@@ -126,6 +181,11 @@ d'exploitation, pas une affirmation de durée légale de conservation.
    avec celui du déploiement Coolify. La correspondance de code et le succès des
    tests sont affichés séparément : un rapport en échec peut concerner le même
    commit. Le frontend ne fournit pas le hash au backend.
+
+Après un nouveau déploiement, un ancien rapport peut afficher « version déployée
+non couverte ». C'est une différence de commit, pas un échec des tests : conserver
+le rapport historique et produire/publier séparément une preuve propre du
+nouveau commit. Ne pas modifier le SHA d'un ancien rapport pour le faire correspondre.
 
 Documentation Coolify :
 https://coolify.io/docs/applications/build-packs/docker-compose
@@ -158,9 +218,23 @@ node scripts/verify-validation-bundle.mjs /chemin/clinia-validation-UUID.json
 - Archives limitées à 1000 rapports par répertoire ; au-delà, API indisponible
   explicitement, sans sélection silencieuse. Appliquer la politique ci-dessus
   avant d'atteindre ce plafond.
-- Rien n'a encore été configuré ni déployé sur Coolify par cette implémentation.
+- La consultation et le menu ont été vérifiés dans Coolify le 19 septembre ;
+  les téléchargements PDF/JSON et le contrôle d'accès avec d'autres rôles
+  en production ne sont pas confirmés par ces observations.
 
-## Vérifications réalisées pendant le développement
+## Observations opérationnelles des 19 et 20 septembre 2026
+
+- Option de construction du SHA activée ; `beb527c` lu dans les deux images
+  backend. Montage des rapports `RW=false`, processus sous UID/GID 10001.
+- Rapport `55957d49-617f-4887-b68d-5b68509f9dde` publié après comparaison
+  d'empreinte, consulté en SUPERADMIN avec correspondance à `beb527c` : 21/21,
+  `dirty: false`, nettoyage confirmé.
+- Après déploiement de `3171013`, menu visible et nouveau SHA affiché ; ancien
+  rapport conservé avec avertissement de différence de version.
+- Copie chiffrée des preuves retéléchargée depuis S3 et vérifiée le 20 septembre.
+  Ces observations ne constituent pas un nouveau test de santé de la production.
+
+## Vérifications historiques réalisées pendant le développement initial
 
 - Exécution isolée réelle : 21/21 tests, nettoyage confirmé, rapport marqué dirty.
 - Échec de préparation simulé : rapport incomplet conservé, sortie non nulle.
