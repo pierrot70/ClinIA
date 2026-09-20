@@ -15,14 +15,18 @@ function run(scenario = "protected", target = [], input = "test-user\nfixture-pa
     const trace = path.join(directory, "trace");
     writeFileSync(path.join(directory, "curl"), `#!${process.execPath}
 const fs=require('node:fs'), path=require('node:path');
-const args=process.argv.slice(2), url=args.at(-1), get=k=>args[args.indexOf(k)+1];
+const args=process.argv.slice(2), url=args.at(-1), get=k=>args.includes(k)?args[args.indexOf(k)+1]:undefined;
 const out=get('--output'), scenario=process.env.FIXTURE_SCENARIO;
 const session=path.basename(out).startsWith('b.')?'b':'a';
 const calls=fs.existsSync(process.env.FIXTURE_TRACE)?fs.readFileSync(process.env.FIXTURE_TRACE,'utf8').trim().split('\\n').map(JSON.parse):[];
 const number=calls.filter(c=>c.url.endsWith('/login/mfa')).length;
 const payload=args.includes('--data-binary')?JSON.parse(fs.readFileSync(get('--data-binary').slice(1),'utf8')):{};
 let status=200, body={data:{accessToken:'synthetic-access',user:{role:'SUPERADMIN'}}};
-if(url.endsWith('/login')&&scenario!=='no-mfa'){
+if(url.endsWith('/health/ready')){
+ body={data:{status:'ok',dependencies:{mongo:'connected'}},meta:{instanceId:scenario==='wrong-instance'?'wrong':url.includes(':4003/')?'mongo-rs-test-backend-replica':'mongo-rs-test-backend'}};
+}else if(url.endsWith('/logout')&&scenario==='cleanup-failure'){
+ status=500;body={error:{code:'TEST_FAILURE'}};
+}else if(url.endsWith('/login')&&scenario!=='no-mfa'){
  status=202;body={data:{mfaRequired:true,mfaEnrollmentRequired:scenario==='enroll',mfaChallenge:'synthetic-challenge-'+session.repeat(40)}};
 }else if(url.endsWith('/login/mfa')){
  if(number===1&&scenario!=='vulnerable'){status=scenario==='rate-limit'?429:401;body={error:{code:scenario==='rate-limit'?'RATE_LIMITED':'INVALID_MFA_CODE'}};}
@@ -89,6 +93,26 @@ describe("manual MFA replay script (simulated HTTP only)", () => {
             expect(call.args).not.toContain('--insecure');
             expect(call.args).not.toContain('--location');
         }
+    });
+    it("rejects replay on the other staging instance and cleans up both sessions", () => {
+        const result = run('protected', ['staging-pair']);
+        expect(result.status).toBe(0);
+        expect(result.text).toContain('STAGING_MFA_PAIR_PASSED');
+        expect(result.calls.filter(c => c.url.endsWith('/login/mfa')).map(c => c.url)).toEqual([
+            'http://localhost:4002/api/auth/login/mfa',
+            'http://localhost:4003/api/auth/login/mfa',
+            'http://localhost:4003/api/auth/login/mfa',
+        ]);
+        expect(result.calls.filter(c => c.url.endsWith('/logout')).map(c => c.url)).toEqual([
+            'http://localhost:4002/api/auth/logout', 'http://localhost:4003/api/auth/logout',
+        ]);
+    });
+    it.each(['expired', 'no-date', 'wrong-instance', 'cleanup-failure', 'bad-next', 'vulnerable'])("does not certify cross-instance protection for %s", scenario => {
+        const result = run(scenario, ['staging-pair']);
+        expect(result.status).toBe(scenario === 'vulnerable' ? 2 : 1);
+        expect(result.text).not.toContain('STAGING_MFA_PAIR_PASSED');
+        expect(result.text).not.toContain('PROTECTION CONFIRMEE');
+        if (scenario === 'wrong-instance') expect(result.calls.every(c => c.url.endsWith('/health/ready'))).toBe(true);
     });
     it("refuses arbitrary destinations", () => {
         const result = run('protected', ['https://untrusted.invalid']);

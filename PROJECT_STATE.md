@@ -131,6 +131,35 @@ automatiquement cette commande : l'exécuter avant chaque commit du lot testé.
 
 ### Dernières preuves disponibles au 20 septembre
 
+- CI local du 20 septembre pour les lanceurs auth `staging-pair` :
+  `bash scripts/ci-local.sh`, code de sortie 0 et `CI_LOCAL_PASSED`.
+  1 171 tests frontend, 710 backend, 57 tests auth en ordre mélangé (seed 3),
+  build et deux audits réussis ; intégration 21/21, nettoyage confirmé.
+  Journal : `/tmp/clinia-auth-pair-ci-20260920.log`. Rapport :
+  `f191f14a-9fdb-4662-b8f6-3dba854d0334`, base `7183ff6`, `dirty: true`
+  (changements locaux des lanceurs, tests et documentation). Cette preuve
+  n'est pas incluse dans l'archive S3 antérieure et ne valide pas Coolify.
+
+- Auth STAGING entre instances : exécution interactive par l'utilisateur de
+  `bash scripts/test-reauth-session-binding.sh staging-pair`, le 20 septembre,
+  avec la version locale non commitée du lanceur. Instances 4002 et 4003
+  identifiées avant connexion. Deux connexions MFA réussies ; confirmation
+  de A créée sur 4002 et acceptée pour A sur 4003 (200), refusée pour B
+  (403 `REAUTH_REQUIRED`). Après logout A sur 4002, ancien jeton A refusé
+  sur 4003 (401) tandis que B reste valide sur 4002 (200).
+  Résultat fourni : `STAGING_PAIR_PASSED`, déconnexion des sessions de test
+  confirmée par le lanceur. Preuve issue de la sortie collée dans la
+  conversation, non incluse dans l'archive S3 antérieure. Ce test HTTP direct
+  ne couvre ni le navigateur, ni le proxy Coolify, ni le rejeu MFA inter-instance.
+- Rejeu MFA STAGING entre instances : exécution interactive par l'utilisateur de
+  `bash scripts/test-mfa-replay.sh staging-pair`, le 20 septembre, avec la
+  version locale non commitée du lanceur. Instances 4002 et 4003 identifiées
+  avant connexion. Premier code accepté dans A (200), même code refusé dans
+  B (401 `INVALID_MFA_CODE`), puis nouveau code accepté dans B sur le même
+  challenge (200). Résultat fourni : `STAGING_MFA_PAIR_PASSED`, sessions de
+  test déconnectées. Preuve issue de la sortie collée dans la conversation,
+  non incluse dans l'archive S3 antérieure. Ce test séquentiel HTTP direct
+  ne couvre ni des tentatives simultanées, ni le navigateur, ni le proxy Coolify.
 - CI local du 20 septembre avant commit documentaire : `CI_LOCAL_PASSED`,
   1 171 tests frontend, 698 backend, 57 tests auth seed 3, build et deux audits
   réussis ; intégration 21/21 et nettoyage confirmé. Journal local :
@@ -215,7 +244,9 @@ création, avant cette copie S3 ; le présent paragraphe consigne l'étape suiva
 
 ### Vérifications encore ouvertes
 
-- Auth : trajet navigateur/proxy et fonctionnement entre les deux instances.
+- Auth : trajet navigateur/proxy et concurrence simultanée restent à vérifier.
+  Liaison de réauthentification, révocation après logout et refus du rejeu MFA
+  vérifiés séquentiellement entre les deux instances STAGING le 20 septembre.
 - RAMQ : index unique/TTL et parcours synthétique sur le déploiement Coolify.
 - Dépendances : version Nodemailer chargée et SMTP dans Coolify ; différence
   entre Node 24 pour les tests et Node 20 dans les images à prendre en compte.

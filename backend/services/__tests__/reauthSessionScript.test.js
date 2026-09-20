@@ -16,14 +16,23 @@ function run(target, input, scenario = "mfa") {
     // Fake curl only: no network calls or application credentials in these tests.
     writeFileSync(path.join(directory, "curl"), `#!${process.execPath}
 const fs=require('node:fs'),path=require('node:path');
-const args=process.argv.slice(2), url=args.at(-1), get=k=>args[args.indexOf(k)+1];
+const args=process.argv.slice(2), url=args.at(-1), get=k=>args.includes(k)?args[args.indexOf(k)+1]:undefined;
+const previous=fs.existsSync(process.env.FIXTURE_TRACE)?fs.readFileSync(process.env.FIXTURE_TRACE,'utf8'):'';
 const out=get('--output'), header=args.filter((x,i)=>args[i-1]==='--header').find(x=>x.startsWith('@'));
 const session=path.basename(out||'').startsWith('b.')?'b':'a';
 const dataIndex=args.indexOf('--data-binary');
 const fields=dataIndex<0?[]:Object.keys(JSON.parse(fs.readFileSync(args[dataIndex+1].slice(1),'utf8'))).sort();
 fs.appendFileSync(process.env.FIXTURE_TRACE,JSON.stringify({url,firstArg:args[0],protocol:get('--proto'),fields,temporary:header?path.dirname(header.slice(1)):null})+'\\n');
 let status=200, body={data:{accessToken:'synthetic-access',user:{role:'SUPERADMIN'}}};
-if(url.endsWith('/login')&&process.env.FIXTURE_SCENARIO!=='no-mfa'){
+if(url.endsWith('/health/ready')){
+ body={data:{status:'ok',dependencies:{mongo:'connected'}},meta:{instanceId:process.env.FIXTURE_SCENARIO==='wrong-instance'?'wrong':url.includes(':4003/')?'mongo-rs-test-backend-replica':'mongo-rs-test-backend'}};
+}else if(url.endsWith('/session')){
+ const revoked=header.endsWith('/a.header')&&previous.includes(':4002/api/auth/logout');
+ status=revoked&&process.env.FIXTURE_SCENARIO!=='logout-leak'?401:200;
+ body=status===401?{error:{code:'UNAUTHORIZED'}}:{data:{user:{role:'SUPERADMIN'}}};
+}else if(url.endsWith('/logout')&&url.includes(':4003/')&&process.env.FIXTURE_SCENARIO==='cleanup-failure'){
+ status=500;body={error:{code:'TEST_FAILURE'}};
+}else if(url.endsWith('/login')&&process.env.FIXTURE_SCENARIO!=='no-mfa'){
  status=202;body={data:{mfaRequired:true,mfaEnrollmentRequired:process.env.FIXTURE_SCENARIO==='enroll',mfaChallenge:'synthetic-challenge'}};
 }else if(url.endsWith('/login/mfa')&&session==='b'&&process.env.FIXTURE_SCENARIO==='bad-mfa'){
  status=401;body={error:{code:'INVALID_MFA_CODE'}};
@@ -88,6 +97,25 @@ describe("manual reauth script", () => {
         const result = run(["coolify"], "TESTER COOLIFY\ntest-admin\nfixture-password\n", "enroll");
         expect(result.status).toBe(1);
         expect(result.calls).toHaveLength(1);
+    });
+    it("validates reauth on the other instance and revocation after logout", () => {
+        const result = run(["staging-pair"], "test-admin\nfixture-password\n123456\n654321\n");
+        expect(result.status).toBe(0);
+        expect(result.text).toContain("STAGING_PAIR_PASSED");
+        expect(result.calls.filter(c => c.url.endsWith("/login")).map(c => c.url)).toEqual([
+            "http://localhost:4002/api/auth/login", "http://localhost:4003/api/auth/login",
+        ]);
+        expect(result.calls.filter(c => c.url.endsWith("/users/active")).every(c => c.url.includes(":4003/"))).toBe(true);
+        expect(result.calls.find(c => c.url.endsWith("/reauth")).url).toContain(":4002/");
+        expect(result.calls.filter(c => c.url.endsWith("/logout"))).toHaveLength(2);
+    });
+    it.each([
+        ["wrong-instance", 1], ["vulnerable", 2], ["logout-leak", 2], ["cleanup-failure", 1],
+    ])("does not claim success for %s", (scenario, code) => {
+        const result = run(["staging-pair"], "test-admin\nfixture-password\n123456\n654321\n", scenario);
+        expect(result.status).toBe(code);
+        expect(result.text).not.toContain("STAGING_PAIR_PASSED");
+        if (scenario === "wrong-instance") expect(result.calls.every(c => c.url.endsWith("/health/ready"))).toBe(true);
     });
     it("refuses arbitrary destinations", () => {
         const result = run(["https://untrusted.invalid"], "");

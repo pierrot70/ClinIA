@@ -3,15 +3,20 @@
 set -euo pipefail
 set +x
 umask 077
-[[ $# -le 1 ]] || { echo 'Usage: bash scripts/test-mfa-replay.sh [staging|coolify]' >&2; exit 1; }
+[[ $# -le 1 ]] || { echo 'Usage: bash scripts/test-mfa-replay.sh [staging|staging-pair|coolify]' >&2; exit 1; }
 target="${1:-staging}"
 case "$target" in
     staging) api=http://localhost:4002/api/auth; protocol='=http'; origin=http://localhost:5174 ;;
+    staging-pair) api=http://localhost:4002/api/auth; protocol='=http'; origin=http://localhost:5174 ;;
     coolify) api=https://clinique-ai.ca/api/auth; protocol='=https'; origin=https://clinique-ai.ca ;;
-    *) echo 'Cible invalide : staging ou coolify uniquement.' >&2; exit 1 ;;
+    *) echo 'Cible invalide : staging, staging-pair ou coolify uniquement.' >&2; exit 1 ;;
 esac
+api_a="$api"
+api_b="$api"
+[[ "$target" != staging-pair ]] || api_b=http://localhost:4003/api/auth
+mfa_passed=false
 for dependency in curl jq date awk cmp; do command -v "$dependency" >/dev/null; done
-curl() { command curl -q --proto "$protocol" "$@"; }
+curl() { command curl -q --proto "$protocol" --noproxy "*" --connect-timeout 5 "$@"; }
 echo "Cible : $target ($origin)"
 echo 'Utiliser un compte de test avec MFA deja configure. Deux sessions peuvent remplacer des sessions existantes.'
 echo 'Un refus MFA volontaire sera inscrit dans les journaux. Aucun patient ne sera consulte.'
@@ -21,22 +26,43 @@ if [[ "$target" == coolify ]]; then
 fi
 temporary="$(mktemp -d /tmp/clinia-mfa-replay.XXXXXXXX)"
 cleanup() {
+    local result=$? session logout_api logout_status
+    trap - EXIT
     for session in a b; do
+        logout_api="$api_a"
+        [[ "$session" != b ]] || logout_api="$api_b"
         if [[ -s "$temporary/$session.header" ]]; then
             if ! logout_status="$(curl --silent --show-error --max-time 15 --output /dev/null --write-out '%{http_code}' \
                 --request POST --header "Origin: $origin" --header "@$temporary/$session.header" \
-                --cookie "$temporary/$session.cookies" "$api/logout")" || [[ "$logout_status" != 200 ]]; then
+                --cookie "$temporary/$session.cookies" "$logout_api/logout")" || [[ "$logout_status" != 200 ]]; then
                 echo "Attention : deconnexion de la session $session non confirmee." >&2
+                [[ "$result" -ne 0 ]] || result=1
             fi
         fi
     done
     # Only the exact private directory created above is removed.
     rm -rf -- "$temporary"
+    if [[ "$result" == 0 && "$mfa_passed" == true ]]; then
+        echo 'PROTECTION CONFIRMEE : code reutilise refuse, nouveau code accepte sur le meme challenge.'
+        if [[ "$target" == staging-pair ]]; then
+            echo 'STAGING_MFA_PAIR_PASSED : rejeu MFA refuse entre instances ; sessions de test deconnectees.'
+        fi
+    fi
+    exit "$result"
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 stop() { echo "RESULTAT NON CONCLUANT : $1" >&2; exit 1; }
+if [[ "$target" == staging-pair ]]; then
+    for instance in a b; do
+        endpoint="$api_a"; expected=mongo-rs-test-backend
+        if [[ "$instance" == b ]]; then endpoint="$api_b"; expected=mongo-rs-test-backend-replica; fi
+        curl --fail --silent --show-error --max-time 10 --output "$temporary/ready.json" "${endpoint%/auth}/health/ready"
+        jq -e --arg expected "$expected" '.data.status == "ok" and .data.dependencies.mongo == "connected" and .meta.instanceId == $expected' "$temporary/ready.json" >/dev/null || stop 'Instances STAGING attendues non confirmees ; aucun identifiant envoye.'
+    done
+    echo 'Instances STAGING 4002 et 4003 confirmees. Aucun test navigateur ou proxy Coolify.'
+fi
 read -r -p "Identifiant du compte de test $target : " identifier
 read -r -s -p 'Mot de passe (masque) : ' password
 printf '\n'
@@ -47,7 +73,8 @@ jq -n --rawfile identifier "$temporary/identifier" --rawfile password "$temporar
     '{username:$identifier,password:$password}' > "$temporary/login.json"
 
 request() {
-    local session="$1" payload="$2" endpoint="$3"
+    local session="$1" payload="$2" endpoint="$3" api="$api_a"
+    [[ "$session" != b ]] || api="$api_b"
     status="$(curl --silent --show-error --max-time 20 --output "$temporary/$session.response" \
         --dump-header "$temporary/$session.response-headers" --write-out '%{http_code}' \
         --header 'Content-Type: application/json' --header "Origin: $origin" --header 'Cache-Control: no-store' \
@@ -117,4 +144,4 @@ cmp -s "$temporary/first-code" "$temporary/next-code" && stop 'Le deuxieme code 
 mfa b next-code
 echo "Nouveau code dans B : HTTP $status — attendu 200"
 [[ "$status" == 200 ]] || stop 'Le nouveau code a ete refuse. Aucun nouvel essai automatique.'
-echo 'PROTECTION CONFIRMEE : code reutilise refuse, nouveau code accepte sur le meme challenge.'
+mfa_passed=true
