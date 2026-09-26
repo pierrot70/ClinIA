@@ -1,5 +1,50 @@
 # État du projet ClinIA
 
+## Reprise du 26 septembre 2026
+
+Base propre : `coolify`, `3dc782b73ee62637989329c3662b774db43d127c`.
+Cette section remplace les indications précédentes sur les dépendances,
+les déclencheurs CI, les images Node et la conservation des archives techniques.
+Le déploiement reste manuel dans Coolify, effectué par l'utilisateur.
+
+- Express 4.22.3, Nodemailer 9.1.1 et Vitest 4.1.11 (backend/frontend),
+  versions exactes et verrous régénérés.
+- CI automatique rétabli pour les push sur `coolify` et les PR ciblant cette
+  branche ; lancement manuel conservé. Les six Dockerfiles passent à Node 24.
+- CI local complet réussi : 1 171 tests frontend, 733 backend, régression
+  auth 57/57, build et audits au seuil high/critical réussis. L'installation
+  signale encore deux vulnérabilités moderate backend et une low frontend :
+  le seuil CI réussi ne signifie pas absence de toute vulnérabilité.
+- Intégration 21/21, `cleanup: true`, `CI_LOCAL_PASSED`. Rapport
+  `validation-artifacts/a7e488c0-e2f6-4aad-926c-b19e658543f9.json`,
+  base `3dc782b`, `dirty: true` : il couvre le lot local avant commit.
+  Journal : `/tmp/clinia-priorities-ci-20260926.log`.
+- Images backend/frontend de production construites localement. Backend
+  vérifié sans réseau : Node 24.21.0, UID 10001, versions demandées chargées.
+  Image de test sans SHA de publication. Nginx `-t` réussi avec résolution
+  locale du nom backend ; le premier essai isolé sans cette résolution échouait.
+  Le build Vite conserve son avertissement historique de taille de bundle.
+- Archives techniques S3 : six mois calendaires demandés par l'utilisateur,
+  avec exceptions actif/précédent et gels d'incident. Politique documentaire
+  mise à jour ; aucune règle distante ni purge appliquée.
+- GitHub interrogé : aucune exécution sur `3dc782b` ; branche distante
+  `protected: false`. Modification des protections inaccessible (403),
+  lancement manuel non disponible via le connecteur présent.
+
+Restent ouverts : exécution GitHub et protection effective, publication et
+déploiement du nouveau SHA sur les deux backends, index RAMQ et parcours
+synthétique en production, exports et inspection visuelle, revue clinique
+humaine, basculement sous trafic avec mesures RTO/RPO, comparaison des index
+restaurés, reconstruction sur hôte isolé et configuration S3 effective.
+Procédure : [priorités et contrôles distants](docs/priority-validation-20260926.md).
+
+```text
+Agent-Contribution: backend | dépendances, verrous, images Node 24 et déclencheurs CI
+Agent-Contribution: frontend | Vitest, verrou et images de build Node 24
+Validation: bash scripts/ci-local.sh | CI_LOCAL_PASSED, 21 intégrations et nettoyage confirmés
+Validation: docker build et contrôles isolés des images | backend Node 24 et nginx -t réussis
+```
+
 ## État documentaire — 2026-09-20 (preuves des 19 et 20 septembre)
 
 Cette section remplace les états historiques ci-dessous. Base de départ du lot :

@@ -1,6 +1,10 @@
 name: CI
 
 on:
+  push:
+    branches: [coolify]
+  pull_request:
+    branches: [coolify]
   workflow_dispatch:
 
 permissions:

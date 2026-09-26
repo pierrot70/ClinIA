@@ -91,8 +91,8 @@ lecture seule. Les images de développement n'embarquent pas de commit de
 production : une version inconnue y est normale. Ne pas fabriquer un hash
 d'image pour faire disparaître cet avertissement.
 
-GitHub Actions est déclenché uniquement manuellement (`workflow_dispatch`) :
-les push et pull requests ne lancent plus ce workflow. Lorsqu'il est lancé,
+GitHub Actions est déclenché sur les push vers `coolify` et les pull requests
+qui ciblent `coolify`, ainsi que manuellement (`workflow_dispatch`). Lorsqu'il est lancé,
 il appelle les mêmes étapes et archive le JSON disponible avec
 `actions/upload-artifact`, y compris sur échec. Une exécution locale ne produit
 pas d'artefact GitHub. Aucun de ces chemins ne publie automatiquement vers
@@ -110,7 +110,8 @@ Politique opérationnelle des preuves techniques (aucune donnée clinique) :
 - Rapports servis par Coolify : 90 jours en ligne, avec un plafond de 900 fichiers
   pour garder une marge sous la limite technique de 1000. À chaque publication,
   l'administrateur archive les plus anciens hors du répertoire servi si nécessaire.
-- Archives techniques : 365 jours après la fin du test, avec empreintes et
+- Archives techniques : six mois calendaires après la fin du test (choix de
+  l'utilisateur du 26 septembre 2026), avec empreintes et
   provenance CI conservées. Conserver les preuves du déploiement actif et du
   précédent déploiement, ainsi que toute preuve sous gel d'incident, même si
   cette durée est dépassée. Purger seulement après vérification de ces exceptions.
@@ -120,7 +121,7 @@ Politique opérationnelle des preuves techniques (aucune donnée clinique) :
   l'administrateur de déploiement publie ou archive. SUPERADMIN lit/exporte via
   les routes auditées, sans accès aux dossiers patients.
 
-Seule la durée des artefacts GitHub produits par le workflow manuel est
+Seule la durée des artefacts GitHub produits par le workflow CI est
 automatisée ici. L'archivage Coolify et la
 purge des audits doivent être appliqués par l'exploitation avec une trace des
 identifiants d'exécution et empreintes concernés. Ces durées sont des choix
