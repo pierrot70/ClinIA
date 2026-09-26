@@ -1,3 +1,4 @@
+import { getMockForDiagnosis } from "../mockLoader.js";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -10,7 +11,50 @@ import {
     validateClinicalProfileBounds,
 } from "../requestSafety.js";
 
+const ENGLISH_DIABETES_CONTEXT = {
+    cardiovascular_risk: "Moderate to high",
+    renal_function: "Preserved or mildly reduced",
+    fragility: "Low",
+    tolerance: "Metformin well tolerated",
+    glycemic_goals: "HbA1c < 7% if safe and realistic",
+};
+
 describe("requestSafety", () => {
+    it.each(["Metformin well tolerated", "Current combination well tolerated"])(
+        "accepts the bounded English diabetes context with %s", (tolerance) => {
+            const context = { ...ENGLISH_DIABETES_CONTEXT, tolerance };
+            const assessment = assessCloudClinicalPayload({ diagnosis: "Type 2 diabetes", diabetes_context: context });
+            expect(assessment.approved).toBe(true);
+            expect(assessment.rejectedFields).toEqual([]);
+            expect(assessment.cloudPayload.diabetes_context).toEqual(
+                Object.fromEntries(Object.entries(context).map(([field, value]) => [field, value.toLowerCase()]))
+            );
+        }
+    );
+
+    it.each([
+        ["Hypertension", "Hypertension arterielle"],
+        ["Gastric cancer", "Cancer de l'estomac"],
+        ["Infectious mononucleosis", "Mononucleose infectieuse"],
+        ["Cataract", "Cataracte"],
+        ["Major depressive disorder", "Trouble depressif majeur"],
+        ["Type 2 diabetes", "Diabete de type 2"],
+    ])("preserves the mock selected for example %s", (diagnosis, previousDiagnosis) => {
+        expect(getMockForDiagnosis(diagnosis))
+            .toEqual(getMockForDiagnosis(previousDiagnosis));
+    });
+
+    it("rejects arbitrary text appended to the approved English diabetes context", () => {
+        for (const [field, value] of Object.entries(ENGLISH_DIABETES_CONTEXT)) {
+            const assessment = assessCloudClinicalPayload({
+                diagnosis: "Type 2 diabetes",
+                diabetes_context: { ...ENGLISH_DIABETES_CONTEXT, [field]: `${value} unrelated private text` },
+            });
+            expect(assessment.approved).toBe(false);
+            expect(assessment.rejectedFields).toEqual([`diabetes_context.${field}`]);
+            expect(assessment.cloudPayload.diabetes_context[field]).toBeUndefined();
+        }
+    });
     it("rejects unknown analyze DTO fields, including nested fields", () => {
         expect(
             validateAnalyzeRequestShape({

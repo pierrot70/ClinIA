@@ -6,7 +6,9 @@ import ClinicalRelevanceByAgeChart from "./ClinicalRelevanceByAgeChart";
 import ClinicalReferenceList from "./ClinicalReferenceList";
 import { ClinicalSafetySections } from "./clinical/ClinicalSafetySections";
 
-import { ClinicalAnalysis } from "../types/clinical";
+import { ClinicalAnalysis, type ClinicalPayload } from "../types/clinical";
+import { SubmittedClinicalContext } from "./clinical/SubmittedClinicalContext";
+import { clinicalReviewLabels } from "../i18n/clinicalReviewLabels";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { getClinicalResultStrings } from "../i18n/clinicalResultStrings";
 import { labels } from "../i18n/uiLabels";
@@ -44,6 +46,7 @@ interface ClinicalDemoResultProps {
   sourceMode?: string;
   realAI?: boolean;
   patientDisplayName?: string;
+  patientContext?: ClinicalPayload | null;
   canReverify?: boolean;
   onReverify?: () => void;
   reverifyLoading?: boolean;
@@ -315,6 +318,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   sourceMode,
   realAI,
   patientDisplayName,
+  patientContext,
   canReverify,
   onReverify,
   reverifyLoading,
@@ -324,6 +328,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
 }) => {
   const i18n = useContext(HomeI18nContext) || { locale: "fr" };
   const targetLang = i18n.locale;
+  const reviewLabels = clinicalReviewLabels(targetLang);
   const baseTargetLang = targetLang.toLowerCase().split("-")[0];
   const hasReviewedResultStrings = ["fr", "en", "es", "ja", "zh", "he", "ko", "vi", "no"].includes(baseTargetLang);
   const resultStrings = getClinicalResultStrings(targetLang);
@@ -404,6 +409,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
         </div>
 
         <ResultAccordion title={summarySectionTitle} hint={summarySectionHint}>
+          <SubmittedClinicalContext context={patientContext} locale={targetLang} />
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold">{patientSummaryLabel}</h2>
@@ -417,7 +423,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                 onClick={onCopyRequest}
                 className="shrink-0 rounded border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-900 transition hover:bg-sky-100"
               >
-                Copier la requete JSON
+                {reviewLabels.copyRequest}
               </button>
             ) : null}
           </div>
@@ -445,9 +451,10 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
       <div className="space-y-6">
         <ClinicalSafetySections alternatives={demoData?.alternatives} redFlags={demoData?.red_flags} />
         <ResultAccordion title={summarySectionTitle} hint={summarySectionHint} defaultOpen={false}>
+          <SubmittedClinicalContext context={patientContext} locale={targetLang} />
           <h2 className="text-lg font-semibold mb-2">{patientSummaryLabel}</h2>
           <TranslatedContentText
-            text={summary || patientSummaryLabel}
+            text={summary}
             language={contentLanguage}
             className="text-gray-700 text-sm mb-4"
           />
@@ -639,6 +646,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
     <div className="space-y-6">
       <ClinicalSafetySections alternatives={demoData?.alternatives} redFlags={demoData?.red_flags} />
       <ResultAccordion title={summarySectionTitle} hint={summarySectionHint} defaultOpen={false}>
+          <SubmittedClinicalContext context={patientContext} locale={targetLang} />
         <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold">{patientSummaryLabel}</h2>
           <div className="flex flex-col gap-2 sm:items-end">
@@ -649,7 +657,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                   onClick={onCopyRequest}
                   className="rounded border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-900 transition hover:bg-sky-100"
                 >
-                  Copier la requete JSON
+                  {reviewLabels.copyRequest}
                 </button>
               ) : null}
               {canReverify ? (
@@ -671,7 +679,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
           </div>
         </div>
         <TranslatedContentText
-          text={summary || patientSummaryLabel}
+          text={summary}
           language={contentLanguage}
           className="text-gray-700 text-sm mb-4"
         />

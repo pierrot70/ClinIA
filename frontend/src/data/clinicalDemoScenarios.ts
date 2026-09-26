@@ -605,7 +605,8 @@ function matchScenarioKey(payload?: Partial<ClinicalPayload> | null) {
     if (
         haystack.includes("trouble depressif majeur") ||
         haystack.includes("depression majeure") ||
-        haystack.includes("major depression")
+        haystack.includes("major depression") ||
+        haystack.includes("major depressive disorder")
     ) {
         return "majorDepression";
     }

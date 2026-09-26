@@ -4,6 +4,8 @@ import { MemoryRouter } from "react-router-dom";
 
 const analyzeMock = vi.fn();
 const clinicalFormSpy = vi.fn();
+const clinicalResultSpy = vi.fn();
+const copyToClipboardMock = vi.fn();
 const hookSlots: any[] = [];
 let useClinicalAnalysisCallIndex = 0;
 let authUser: any = null;
@@ -74,7 +76,17 @@ vi.mock("../components/clinical/ClinicalForm", () => ({
 }));
 
 vi.mock("../components/ClinicalDemoResult", () => ({
-    default: () => <div data-testid="clinical-demo-result" />,
+    default: (props: any) => {
+        clinicalResultSpy(props);
+        return <div data-testid="clinical-demo-result">
+            <button type="button" onClick={props.onCopyRequest}>copy-request</button>
+            {props.copyRequestFeedback && <p>{props.copyRequestFeedback}</p>}
+        </div>;
+    },
+}));
+
+vi.mock("../utils/copyToClipboard", () => ({
+    copyToClipboard: (...args: unknown[]) => copyToClipboardMock(...args),
 }));
 
 vi.mock("../hooks/useClinicalAnalysis", () => ({
@@ -142,6 +154,8 @@ import { ClinicalAnalyzePage } from "./ClinicalAnalyzePage";
 describe("ClinicalAnalyzePage", () => {
     beforeEach(() => {
         authUser = null;
+        clinicalResultSpy.mockClear();
+        copyToClipboardMock.mockReset().mockResolvedValue(undefined);
     });
 
     function configureClinicalAnalysisSlots(...slots: any[]) {
@@ -149,6 +163,17 @@ describe("ClinicalAnalyzePage", () => {
         hookSlots.length = 0;
         hookSlots.push(...slots);
     }
+
+    it.each(["mock", "real", undefined])("does not claim an OpenAI call while analysis is pending (%s)", source => {
+        authUser = { role: "MEDECIN" };
+        analyzeMock.mockReset();
+        const idle = { result: null, loading: false, error: null, errorCode: null, analyze: analyzeMock, resetAnalysis: vi.fn() };
+        configureClinicalAnalysisSlots({ ...idle, loading: true, responseMeta: { source } }, { ...idle }, { ...idle });
+        render(<MemoryRouter><ClinicalAnalyzePage /></MemoryRouter>);
+        fireEvent.click(screen.getByRole("button", { name: "submit-clinical-form" }));
+        expect(screen.getByRole("status")).toHaveTextContent("Analyse clinique en cours…");
+        expect(screen.getByRole("status")).not.toHaveTextContent(/OpenAI|GPT/i);
+    });
 
     it("submits the exact user payload without injecting the demo case", () => {
         analyzeMock.mockReset();
@@ -207,17 +232,21 @@ describe("ClinicalAnalyzePage", () => {
         });
     });
 
-    it("requires acknowledgement before displaying a reused clinical analysis", () => {
+    it.each(["button", "Escape"])("opens a reused result without attesting review via %s", async (dismissMethod) => {
         authUser = { role: "MEDECIN" };
+        analyzeMock.mockReset().mockImplementation(() => {
+            hookSlots[0].result = { hypothesis: "Hypertension" };
+            hookSlots[0].responseMeta = { cacheHit: true, source: "real", model: "gpt-4.1-mini" };
+        });
         configureClinicalAnalysisSlots(
             {
-                result: { hypothesis: "Hypertension" },
+                result: null,
                 loading: false,
                 error: null,
                 errorCode: null,
                 errorFields: [],
-                responseMeta: { cacheHit: true, source: "real", model: "gpt-4.1-mini" },
-                analyze: vi.fn(),
+                responseMeta: null,
+                analyze: analyzeMock,
                 resetAnalysis: vi.fn(),
             },
             {
@@ -248,17 +277,32 @@ describe("ClinicalAnalyzePage", () => {
             </MemoryRouter>
         );
 
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "submit-clinical-form" }));
+        });
+
         expect(screen.getByRole("dialog")).toHaveTextContent(
             "Analyse equivalente deja disponible"
         );
 
-        fireEvent.click(
-            screen.getByRole("button", {
-                name: "J'ai pris connaissance du resultat reutilise",
-            })
-        );
+        const viewResult = screen.getByRole("button", { name: "Consulter le résultat" });
+        expect(viewResult).toHaveFocus();
+        expect(screen.queryByRole("button", { name: /pris connaissance/ })).not.toBeInTheDocument();
+        fireEvent.keyDown(document, { key: "Tab" });
+        expect(screen.getByRole("button", { name: "Modifier les parametres cliniques" })).toHaveFocus();
+        fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+        expect(viewResult).toHaveFocus();
+        const callsBeforeDismiss = analyzeMock.mock.calls.length;
+        if (dismissMethod === "Escape") {
+            fireEvent.keyDown(document, { key: "Escape" });
+        } else {
+            fireEvent.click(viewResult);
+        }
+        expect(analyzeMock).toHaveBeenCalledTimes(callsBeforeDismiss);
 
         expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+        expect(screen.getByTestId("clinical-demo-result")).toBeInTheDocument();
+        expect(clinicalResultSpy.mock.lastCall?.[0].patientContext).toEqual(analyzeMock.mock.calls[0][0]);
     });
 
     it("replays the same clinical payload with the acknowledged incident ID", async () => {
@@ -357,6 +401,23 @@ describe("ClinicalAnalyzePage", () => {
             2,
             expect.objectContaining({ incidentAckId: "incident-123" })
         );
+        expect(clinicalResultSpy.mock.lastCall?.[0].patientContext).toEqual(replayAnalyze.mock.calls[1][0]);
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "copy-request" }));
+        });
+        const copiedRequest = JSON.parse(copyToClipboardMock.mock.calls[0][0]);
+        expect(copiedRequest).toEqual({
+            age: 55,
+            sex: "male",
+            diagnosis: "cancer gastrique",
+            symptoms: [],
+            medical_history: ["cancer", "cancer de l'estomac"],
+            current_medications: [],
+        });
+        for (const transientKey of ["incidentAckId", "forceReal", "openaiModel", "reverifyRequested"]) {
+            expect(copiedRequest).not.toHaveProperty(transientKey);
+        }
+        expect(screen.getByText("Requête JSON copiée dans le presse-papiers.")).toBeInTheDocument();
     });
 
     it("returns to the form and focuses the first rejected cloud-bound field", async () => {
@@ -641,5 +702,7 @@ describe("ClinicalAnalyzePage", () => {
         );
 
         authUser = null;
+        clinicalResultSpy.mockClear();
+        copyToClipboardMock.mockReset().mockResolvedValue(undefined);
     });
 });

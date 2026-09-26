@@ -1,5 +1,27 @@
 # État du projet ClinIA
 
+## Corrections après essais UI staging — 26 septembre 2026
+
+Lot basé sur `6b5c19b`, demandé après les essais guidés RECEPTION, MEDECIN et
+SUPERADMIN. Les corrections et leurs limites sont consignées dans
+[le compte rendu UI](docs/staging-ui-review-20260926.md).
+
+- Exemples médicaux en anglais, résumé des paramètres soumis visible,
+  dialogue de résultat réutilisé « Consulter le résultat » et fermeture Échap.
+- Libellés de copie JSON, bouton d'analyse et chargement versionnés dans neuf
+  langues. Le chargement n'affirme plus un appel OpenAI avant connaissance
+  de la source. Le rappel médical d'urgence reste anglais à la demande de
+  l'utilisateur.
+- Backend : cinq formulations anglaises exactes de contexte diabète acceptées,
+  texte arbitraire toujours refusé. Copie JSON sans contrôle `incidentAckId`.
+- Essais utilisateur : réservation RECEPTION retrouvée par nouvelle recherche ;
+  exemples anglais, paramètres du résumé et fermeture Échap confirmés.
+  Le dernier correctif bouton/spinner a également été confirmé par l'utilisateur.
+- Exports : les demandes auditées correspondaient au deuxième rapport ; aucune
+  confusion reproduite. Régressions JSON/PDF et fichiers distincts ajoutées.
+- Le déploiement Coolify reste manuel. La revue scientifique humaine et les
+  validations de continuité/rétention distantes restent ouvertes.
+
 ## Reprise du 26 septembre 2026
 
 Base propre : `coolify`, `3dc782b73ee62637989329c3662b774db43d127c`.

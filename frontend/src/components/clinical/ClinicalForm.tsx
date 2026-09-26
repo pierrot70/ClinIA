@@ -1,3 +1,5 @@
+import { analysisStatusLabels } from "../../i18n/analysisStatusLabels";
+import { DEFAULT_DIABETES_CONTEXT, EXAMPLE_CASES, COMPARISON_CASE_ONE, COMPARISON_CASE_TWO, COMPARISON_MEDICATION_OPTIONS } from "../../data/clinicalExampleCases";
 import { useEffect, useState, useContext } from "react";
 import { useTranslation } from "../../hooks/useTranslation";
 import { useAuth } from "../../hooks/useAuth";
@@ -15,7 +17,6 @@ import { InfoTooltip } from "../system/InfoTooltip";
 import { createClinicalTermRequest, listApprovedClinicalTerms, type ApprovedClinicalTerm } from "../../services/clinicalTermsApi";
 import type {
     ClinicalPayload,
-    DiabetesClinicalContext,
     PatientEthnicity,
     Sex,
 } from "../../types/clinical";
@@ -55,82 +56,6 @@ const EMPTY_FORM: ClinicalPayload = {
     current_medications: [],
 };
 
-const DEFAULT_DIABETES_CONTEXT: DiabetesClinicalContext = {
-    cardiovascular_risk: "Modere a eleve",
-    renal_function: "Preservee ou legerement reduite",
-    fragility: "Faible",
-    tolerance: "Bonne tolerance a la metformine",
-    glycemic_goals: "HbA1c < 7 % si securitaire et realiste",
-};
-
-const EXAMPLE_CASES: Record<string, ClinicalPayload> = {
-    hypertension55: {
-        age: 55,
-        sex: "male",
-        diagnosis: "Hypertension arterielle",
-        weight: 92,
-        height: 175,
-        blood_pressure: {
-            systolic: 145,
-            diastolic: 92,
-        },
-        symptoms: ["Cephalee", "Pression arterielle elevee"],
-        medical_history: ["Dyslipidemie"],
-        current_medications: ["Aucune"],
-    },
-    gastricCancer59: {
-        age: 59,
-        sex: "female",
-        diagnosis: "Cancer de l'estomac",
-        weight: 63,
-        height: 165,
-        symptoms: ["Douleur epigastrique", "Perte de poids", "Nausees"],
-        medical_history: ["Anemie"],
-        current_medications: ["Pantoprazole"],
-    },
-    mononucleosis35: {
-        age: 35,
-        sex: "female",
-        diagnosis: "Mononucleose infectieuse",
-        weight: 60,
-        height: 168,
-        symptoms: ["Fatigue intense", "Fievre", "Adenopathies cervicales"],
-        medical_history: [],
-        current_medications: ["Aucune"],
-    },
-    cataract72: {
-        age: 72,
-        sex: "female",
-        diagnosis: "Cataracte",
-        weight: 68,
-        height: 162,
-        symptoms: ["Vision floue progressive", "Eblouissements", "Baisse de l'acuite visuelle"],
-        medical_history: ["Diabete de type 2"],
-        current_medications: ["Metformine"],
-    },
-    majorDepression42: {
-        age: 42,
-        sex: "male",
-        diagnosis: "Trouble depressif majeur",
-        weight: 81,
-        height: 178,
-        symptoms: ["Humeur depressive", "Insomnie", "Perte d'interet", "Fatigue"],
-        medical_history: ["Anxiete generalisee"],
-        current_medications: ["Aucune"],
-    },
-    diabetesType255: {
-        age: 55,
-        sex: "male",
-        diagnosis: "Diabete de type 2",
-        weight: 94,
-        height: 176,
-        symptoms: ["Polydipsie", "Polyurie", "Fatigue"],
-        medical_history: ["Hypertension arterielle"],
-        current_medications: ["Metformine"],
-        diabetes_context: { ...DEFAULT_DIABETES_CONTEXT },
-    },
-};
-
 type ClinicalField =
     | "generalMedicine"
     | "oncology"
@@ -146,50 +71,6 @@ const EXAMPLE_CASE_FIELDS: Record<string, ClinicalField> = {
     cataract72: "ophthalmology",
     majorDepression42: "mentalHealth",
     diabetesType255: "endocrinology",
-};
-
-const COMPARISON_CASE_ONE: ClinicalPayload = {
-    age: 58,
-    sex: "male",
-    country: "CA",
-    ethnicity: "caucasian",
-    diagnosis: "Diabete de type 2",
-    symptoms: ["Hyperglycemie persistante", "Prise de poids progressive", "Fatigue"],
-    medical_history: [
-        "Hypertension arterielle",
-        "Dyslipidemie",
-        "Maladie cardiovasculaire aterosclerotique",
-    ],
-    current_medications: ["Metformine"],
-    diabetes_context: {
-        cardiovascular_risk: "Eleve",
-        renal_function: "Preservee ou legerement reduite",
-        fragility: "Faible",
-        tolerance: "Bonne tolerance a la metformine",
-        glycemic_goals: "HbA1c < 7 % si securitaire et realiste",
-    },
-};
-
-const COMPARISON_CASE_TWO: ClinicalPayload = {
-    age: 58,
-    sex: "male",
-    country: "CA",
-    ethnicity: "caucasian",
-    diagnosis: "Diabete de type 2",
-    symptoms: ["Hyperglycemie persistante", "Prise de poids progressive", "Fatigue"],
-    medical_history: [
-        "Hypertension arterielle",
-        "Dyslipidemie",
-        "Maladie cardiovasculaire aterosclerotique",
-    ],
-    current_medications: ["Metformine", "Empagliflozine"],
-    diabetes_context: {
-        cardiovascular_risk: "Eleve",
-        renal_function: "Preservee ou legerement reduite",
-        fragility: "Faible",
-        tolerance: "Bonne tolerance a la combinaison actuelle",
-        glycemic_goals: "HbA1c < 7 % si securitaire et realiste",
-    },
 };
 
 function clonePayload(payload: ClinicalPayload): ClinicalPayload {
@@ -966,12 +847,6 @@ export function ClinicalForm({
     const clinicalParametersHelpLabel = reviewedStrings.clinicalParametersHelp;
     const { translated: incompleteDataLabel } = useTranslation({ text: "Données cliniques incomplètes", targetLang });
     const { translated: exampleCaseTooltipLabel } = useTranslation({ text: commentLabels.exampleCaseTooltip, targetLang });
-    const { translated: patient1Label } = useTranslation({ text: "Hypertension", targetLang });
-    const { translated: patient2Label } = useTranslation({ text: "Cancer de l'estomac", targetLang });
-    const { translated: patient3Label } = useTranslation({ text: "Mononucleose", targetLang });
-    const { translated: patient4Label } = useTranslation({ text: "Cataracte", targetLang });
-    const { translated: patient5Label } = useTranslation({ text: "Trouble depressif majeur", targetLang });
-    const { translated: patient6Label } = useTranslation({ text: "Diabete Type 2", targetLang });
     const { translated: ageLabel } = useTranslation({ text: "Age du patient", targetLang });
     const { translated: sexLabel } = useTranslation({ text: "Sexe", targetLang });
     const { translated: countryLabel } = useTranslation({
@@ -1067,26 +942,6 @@ export function ClinicalForm({
     });
     const { translated: comparisonMedicationHelpLabel } = useTranslation({
         text: clinicalFormLabels.comparisonMedicationHelp,
-        targetLang,
-    });
-    const { translated: comparisonMedicationMetforminLabel } = useTranslation({
-        text: clinicalFormLabels.comparisonMedicationOptions.metformin,
-        targetLang,
-    });
-    const { translated: comparisonMedicationGliclazideLabel } = useTranslation({
-        text: clinicalFormLabels.comparisonMedicationOptions.gliclazide,
-        targetLang,
-    });
-    const { translated: comparisonMedicationEmpagliflozinLabel } = useTranslation({
-        text: clinicalFormLabels.comparisonMedicationOptions.empagliflozin,
-        targetLang,
-    });
-    const { translated: comparisonMedicationSitagliptinLabel } = useTranslation({
-        text: clinicalFormLabels.comparisonMedicationOptions.sitagliptin,
-        targetLang,
-    });
-    const { translated: comparisonMedicationSemaglutideLabel } = useTranslation({
-        text: clinicalFormLabels.comparisonMedicationOptions.semaglutide,
         targetLang,
     });
     const { translated: comparisonActionLabel } = useTranslation({
@@ -1186,7 +1041,7 @@ export function ClinicalForm({
     const { translated: symptomsHelpLabel } = useTranslation({ text: "Separez chaque symptome par une virgule, exemple: fatigue, polydipsie", targetLang });
     const { translated: medicalHistoryHelpLabel } = useTranslation({ text: "Conditions ou diagnostics connus, separes par des virgules", targetLang });
     const { translated: medicationsHelpLabel } = useTranslation({ text: "Noms des medicaments en cours, separes par des virgules", targetLang });
-    const { translated: analyzeButtonLabel } = useTranslation({ text: "Analyser", targetLang });
+    const analyzeButtonLabel = analysisStatusLabels(targetLang).analyze;
     const { translated: analyzingButtonLabel } = useTranslation({ text: "Analyse…", targetLang });
     const { translated: clearPatientDataLabel } = useTranslation({ text: "Effacer les donnees patient", targetLang });
     const { translated: termRequestSentLabel } = useTranslation({ text: labels.clinicalTermRequest.sent, targetLang, translationKey: "clinicalTermRequest.sent" });
@@ -1263,13 +1118,6 @@ export function ClinicalForm({
         { value: "other", label: otherLabel },
         { value: "prefer_not_to_say", label: preferNotToSayLabel },
     ];
-    const comparisonMedicationOptions = [
-        comparisonMedicationMetforminLabel,
-        comparisonMedicationGliclazideLabel,
-        comparisonMedicationEmpagliflozinLabel,
-        comparisonMedicationSitagliptinLabel,
-        comparisonMedicationSemaglutideLabel,
-    ];
     const clinicalFieldOptions: Array<{
         value: ClinicalField;
         label: string;
@@ -1297,12 +1145,12 @@ export function ClinicalForm({
         },
     ];
     const exampleCaseOptions = [
-        { value: "hypertension55", label: patient1Label },
-        { value: "gastricCancer59", label: patient2Label },
-        { value: "mononucleosis35", label: patient3Label },
-        { value: "cataract72", label: patient4Label },
-        { value: "majorDepression42", label: patient5Label },
-        { value: "diabetesType255", label: patient6Label },
+        { value: "hypertension55", label: EXAMPLE_CASES.hypertension55.diagnosis },
+        { value: "gastricCancer59", label: EXAMPLE_CASES.gastricCancer59.diagnosis },
+        { value: "mononucleosis35", label: EXAMPLE_CASES.mononucleosis35.diagnosis },
+        { value: "cataract72", label: EXAMPLE_CASES.cataract72.diagnosis },
+        { value: "majorDepression42", label: EXAMPLE_CASES.majorDepression42.diagnosis },
+        { value: "diabetesType255", label: EXAMPLE_CASES.diabetesType255.diagnosis },
     ].filter(
         (option) => EXAMPLE_CASE_FIELDS[option.value] === selectedClinicalField
     );
@@ -2350,7 +2198,7 @@ export function ClinicalForm({
                                             )
                                         }
                                     >
-                                        {comparisonMedicationOptions.map((option) => (
+                                        {COMPARISON_MEDICATION_OPTIONS.map((option) => (
                                             <option key={option} value={option}>
                                                 {option}
                                             </option>

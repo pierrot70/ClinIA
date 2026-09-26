@@ -81,6 +81,28 @@ describe("validation reports page", () => {
         fireEvent.click(screen.getByRole("button", { name: t.pdf }));
         await waitFor(() => expect(api.download).toHaveBeenCalledWith("run", "pdf"));
     });
+    it("keeps each sorted run selected when downloading JSON followed by PDF", async () => {
+        api.list.mockResolvedValue({ deployment: { commit: report.commit }, rejected: 0, reports: [
+            { ...report, runId: "older-run", finishedAt: "2026-09-26T14:03:00Z" },
+            { ...report, runId: "newer-run", finishedAt: "2026-09-26T14:12:00Z" },
+        ] });
+        const { container } = render(<Page locale="en-CA" />);
+        await screen.findAllByText(report.commit);
+        fireEvent.click(container.querySelector("summary")!);
+        const runs = screen.getAllByRole("article");
+        const labels = validationReportLabels("en-CA");
+        for (const [index, runId] of ["newer-run", "older-run"].entries()) {
+            expect(within(runs[index]).getByRole("heading")).toHaveTextContent(runId);
+            for (const [offset, format] of (["bundle", "pdf"] as const).entries()) {
+                const button = within(runs[index]).getByRole("button", { name: labels[format] });
+                await waitFor(() => expect(button).toBeEnabled());
+                fireEvent.click(button);
+                await waitFor(() => expect(api.download).toHaveBeenNthCalledWith(index * 2 + offset + 1, runId, format));
+                await waitFor(() => expect(button).toBeEnabled());
+            }
+        }
+        expect(api.download).toHaveBeenCalledTimes(4);
+    });
     it.each(["unknown", "dirty", "mismatch"])("does not claim a match for %s", async correspondence => {
         api.list.mockResolvedValue({ deployment: { commit: null }, reports: [{ ...report, correspondence }], rejected: 0 });
         render(<Page />); await screen.findByText(UI_LABELS_FR.validationReports.failed);

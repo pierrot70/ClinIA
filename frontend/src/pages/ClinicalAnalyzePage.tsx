@@ -1,4 +1,5 @@
-import { useEffect, useState, useContext } from "react";
+import { analysisStatusLabels } from "../i18n/analysisStatusLabels";
+import { useEffect, useState, useContext, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
     lookupClinicianReplies,
@@ -20,6 +21,8 @@ import { useTranslation } from "../hooks/useTranslation";
 import { getClinicalDemoScenario } from "../data/clinicalDemoScenarios";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { labels } from "../i18n/uiLabels";
+import { clinicalReviewLabels } from "../i18n/clinicalReviewLabels";
+import { getCachedResultNoticeLabels } from "../i18n/cachedResultNoticeLabels";
 import { getClinicalResultStrings } from "../i18n/clinicalResultStrings";
 
 import type { ClinicalPayload } from "../types/clinical";
@@ -53,10 +56,10 @@ export function ClinicalAnalyzePage() {
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
     const clinicalResultStrings = getClinicalResultStrings(targetLang);
+    const reviewLabels = clinicalReviewLabels(targetLang);
     const clinicalIntroLabels = labels.clinicalDemo.intro;
-    const cachedResultNoticeLabels = labels.clinicalDemo.cachedResultNotice;
+    const cachedResultNoticeLabels = getCachedResultNoticeLabels(targetLang);
     const navigationLabels = labels.clinicalDemo.navigation;
-    const loadingLabels = labels.clinicalDemo.loading;
     const cloudContentGuardLabels = labels.clinicalDemo.cloudContentGuard;
     const requestBoundaryLabels = cloudContentGuardLabels.requestBoundary;
     const [openaiModel, setOpenaiModel] = useState<OpenAIModel>(DEFAULT_OPENAI_MODEL);
@@ -106,9 +109,12 @@ export function ClinicalAnalyzePage() {
     const [serviceMode, setServiceMode] =
         useState<"real" | "mock" | "degraded" | null>(null);
     const [reverifyLoading, setReverifyLoading] = useState(false);
-    const [copyRequestFeedback, setCopyRequestFeedback] = useState<string | null>(null);
+    const [copyRequestFeedback, setCopyRequestFeedback] = useState<"copied" | "copyFailed" | null>(null);
     const [cachedResultNoticeVisible, setCachedResultNoticeVisible] =
         useState(false);
+
+    const cachedResultDialogRef = useRef<HTMLDivElement>(null);
+    const viewCachedResultRef = useRef<HTMLButtonElement>(null);
 
     const [forceReal, setForceReal] = useState(false);
 
@@ -139,41 +145,13 @@ export function ClinicalAnalyzePage() {
         targetLang,
         translationKey: "clinicalDemo.intro.subtitle",
     });
-    const { translated: cachedResultNoticeTitle } = useTranslation({
-        text: cachedResultNoticeLabels.title,
-        targetLang,
-        translationKey: "clinicalDemo.cachedResultNotice.title",
-    });
-    const { translated: cachedResultNoticeDescription } = useTranslation({
-        text: cachedResultNoticeLabels.description,
-        targetLang,
-        translationKey: "clinicalDemo.cachedResultNotice.description",
-    });
-    const { translated: cachedResultNoticeConfirmation } = useTranslation({
-        text: cachedResultNoticeLabels.confirmation,
-        targetLang,
-        translationKey: "clinicalDemo.cachedResultNotice.confirmation",
-    });
-    const { translated: cachedResultRefreshHint } = useTranslation({
-        text: cachedResultNoticeLabels.refreshHint,
-        targetLang,
-        translationKey: "clinicalDemo.cachedResultNotice.refreshHint",
-    });
-    const { translated: editClinicalParametersAction } = useTranslation({
-        text: cachedResultNoticeLabels.editParametersAction,
-        targetLang,
-        translationKey: "clinicalDemo.cachedResultNotice.editParametersAction",
-    });
     const { translated: backToClinicalDemoLabel } = useTranslation({
         text: navigationLabels.backToClinicalDemo,
         targetLang,
         translationKey: "clinicalDemo.navigation.backToClinicalDemo",
     });
-    const { translated: openAiRequestInProgressLabel } = useTranslation({
-        text: loadingLabels.openAiRequestInProgress,
-        targetLang,
-        translationKey: "clinicalDemo.loading.openAiRequestInProgress",
-    });
+    // The provider is not known while the request is pending (cache, mock or live).
+    const analysisInProgressLabel = analysisStatusLabels(targetLang).inProgress;
 
     useEffect(() => {
         clearLegacyClinicalBrowserStorage();
@@ -196,6 +174,37 @@ export function ClinicalAnalyzePage() {
 
         setCachedResultNoticeVisible(true);
     }, [result, responseMeta?.cacheHit]);
+
+    useEffect(() => {
+        if (!cachedResultNoticeVisible) return;
+        const previousFocus = document.activeElement instanceof HTMLElement
+            ? document.activeElement : null;
+        viewCachedResultRef.current?.focus();
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                setCachedResultNoticeVisible(false);
+            }
+            if (event.key === "Tab") {
+                const buttons = cachedResultDialogRef.current?.querySelectorAll<HTMLButtonElement>("button");
+                if (!buttons?.length) return;
+                const first = buttons[0];
+                const last = buttons[buttons.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            }
+        };
+        document.addEventListener("keydown", handleKeyDown);
+        return () => {
+            document.removeEventListener("keydown", handleKeyDown);
+            if (previousFocus?.isConnected) previousFocus.focus();
+        };
+    }, [cachedResultNoticeVisible]);
 
     useEffect(() => {
         if (shouldRestoreFormForCorrection) {
@@ -480,16 +489,15 @@ export function ClinicalAnalyzePage() {
             forceReal: _forceReal,
             openaiModel: _openaiModel,
             reverifyRequested: _reverifyRequested,
+            incidentAckId: _incidentAckId,
             ...debugPayload
         } = lastPayload;
 
         try {
             await copyToClipboard(JSON.stringify(debugPayload, null, 2));
-            setCopyRequestFeedback("Requete JSON copiee dans le presse-papiers.");
+            setCopyRequestFeedback("copied");
         } catch {
-            setCopyRequestFeedback(
-                "Impossible de copier automatiquement. Reessayez ou contactez un SUPERADMIN."
-            );
+            setCopyRequestFeedback("copyFailed");
         }
     }
 
@@ -846,6 +854,7 @@ export function ClinicalAnalyzePage() {
             {cachedResultNoticeVisible && (
                 <div
                     className="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-950/75 px-4"
+                    ref={cachedResultDialogRef}
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="cached-analysis-title"
@@ -855,13 +864,13 @@ export function ClinicalAnalyzePage() {
                             id="cached-analysis-title"
                             className="text-2xl font-semibold text-slate-950"
                         >
-                            {cachedResultNoticeTitle}
+                            {cachedResultNoticeLabels.title}
                         </h2>
                         <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-700">
-                            {cachedResultNoticeDescription}
+                            {cachedResultNoticeLabels.description}
                         </p>
                         <p className="mx-auto mt-5 max-w-xl rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
-                            {cachedResultRefreshHint}
+                            {cachedResultNoticeLabels.refreshHint}
                         </p>
                         <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
                             <button
@@ -869,14 +878,15 @@ export function ClinicalAnalyzePage() {
                                 onClick={handleBackToClinicalDemo}
                                 className="inline-flex min-h-12 items-center justify-center rounded-lg border border-blue-300 bg-white px-6 py-3 text-base font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 focus:outline-none focus:ring-4 focus:ring-blue-200"
                             >
-                                {editClinicalParametersAction}
+                                {cachedResultNoticeLabels.editParametersAction}
                             </button>
                             <button
                                 type="button"
+                                ref={viewCachedResultRef}
                                 onClick={() => setCachedResultNoticeVisible(false)}
                                 className="inline-flex min-h-12 items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200"
                             >
-                                {cachedResultNoticeConfirmation}
+                                {cachedResultNoticeLabels.viewResultAction}
                             </button>
                         </div>
                     </section>
@@ -1256,8 +1266,8 @@ export function ClinicalAnalyzePage() {
                     </div>
                     <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-lime-200 bg-lime-50/80 p-10 text-center">
                         <div className="clinia-neon-loader" aria-hidden="true" />
-                        <div className="clinia-neon-text text-sm font-semibold uppercase tracking-[0.2em]">
-                            {openAiRequestInProgressLabel}
+                        <div role="status" className="clinia-neon-text text-sm font-semibold uppercase tracking-[0.2em]">
+                            {analysisInProgressLabel}
                         </div>
                     </div>
                 </div>
@@ -1645,6 +1655,7 @@ export function ClinicalAnalyzePage() {
                         </button>
                     </div>
                     <ClinicalDemoResult
+                        patientContext={lastPayload}
                         demoData={{
                             alternatives: result?.alternatives,
                             red_flags: result?.red_flags,
@@ -1672,7 +1683,7 @@ export function ClinicalAnalyzePage() {
                         reverifyLoading={reverifyLoading}
                         canCopyRequest={Boolean(lastPayload)}
                         onCopyRequest={handleCopyClinicalRequest}
-                        copyRequestFeedback={copyRequestFeedback}
+                        copyRequestFeedback={copyRequestFeedback ? reviewLabels[copyRequestFeedback] : null}
                     />
                 </div>
             )}

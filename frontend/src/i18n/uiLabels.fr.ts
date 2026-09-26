@@ -1,4 +1,17 @@
 export const UI_LABELS_FR = {
+    analysisStatus: {
+        analyze: "Analyser",
+        inProgress: "Analyse clinique en cours…",
+    },
+    clinicalReview: {
+        submitted: "Paramètres soumis à l’analyse",
+        age: "Âge (années)", sex: "Sexe", diagnosis: "Diagnostic ou motif clinique",
+        weight: "Poids (kg)", height: "Taille (cm)",
+        symptoms: "Symptômes", history: "Antécédents", medications: "Médicaments actuels",
+        missing: "Non renseigné", male: "Masculin", female: "Féminin", other: "Autre",
+        copyRequest: "Copier la requête JSON", copied: "Requête JSON copiée dans le presse-papiers.",
+        copyFailed: "Impossible de copier automatiquement. Réessayez ou contactez un SUPERADMIN.",
+    },
     clinicalSafety: {
         alternatives: "Alternatives thérapeutiques",
         redFlags: "Signaux d’alerte",
@@ -719,8 +732,7 @@ export const UI_LABELS_FR = {
             title: "Analyse equivalente deja disponible",
             description:
                 "ClinIA a trouve une analyse clinique equivalente deja enregistree. Aucun nouvel appel a OpenAI n'a ete necessaire.",
-            confirmation:
-                "J'ai pris connaissance du resultat reutilise",
+            viewResultAction: "Consulter le résultat",
             refreshHint:
                 "Pour declencher une nouvelle analyse, revenez aux parametres, mettez a jour les renseignements cliniques pertinents, puis cliquez de nouveau sur Analyser. Une relance identique forcee doit etre demandee a un SUPERADMIN.",
             editParametersAction: "Modifier les parametres cliniques",

@@ -121,11 +121,11 @@ const APPROVED_CLOUD_CLINICAL_TERMS = {
 };
 
 const APPROVED_DIABETES_CONTEXT = {
-    cardiovascular_risk: ["low", "moderate", "high", "modere a eleve", "eleve"],
-    renal_function: ["preserved", "mild impairment", "preservee ou legerement reduite", "legere atteinte"],
+    cardiovascular_risk: ["low", "moderate", "high", "modere a eleve", "eleve", "moderate to high"],
+    renal_function: ["preserved", "mild impairment", "preservee ou legerement reduite", "legere atteinte", "preserved or mildly reduced"],
     fragility: ["low", "moderate", "high", "faible"],
-    tolerance: ["good", "bonne", "bonne tolerance a la metformine", "bonne tolerance a la combinaison actuelle"],
-    glycemic_goals: ["hba1c < 7 %", "hba1c < 7 % si securitaire et realiste"],
+    tolerance: ["good", "bonne", "bonne tolerance a la metformine", "bonne tolerance a la combinaison actuelle", "metformin well tolerated", "current combination well tolerated"],
+    glycemic_goals: ["hba1c < 7 %", "hba1c < 7 % si securitaire et realiste", "hba1c < 7% if safe and realistic"],
 };
 
 const PROMPT_INJECTION_PATTERNS = [

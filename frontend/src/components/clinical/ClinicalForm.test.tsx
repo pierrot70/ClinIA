@@ -1,6 +1,9 @@
+import { analysisStatusLabels } from "../../i18n/analysisStatusLabels";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { HomeI18nContext } from "../../contexts/HomeI18nContext";
+import { HOME_STRINGS_FR } from "../../i18n/homeStrings";
 import { ClinicalForm } from "./ClinicalForm";
 
 vi.mock("../../hooks/useTranslation", () => ({
@@ -40,6 +43,29 @@ describe("ClinicalForm", () => {
     beforeEach(() => {
         window.localStorage.clear();
     });
+
+    it.each(["fr-CA", "en-CA", "ja", "zh", "he", "es", "ko-KR", "vi", "no-NO"])(
+        "keeps the hypertension example medical terms in English for %s", (locale) => {
+            const { container } = render(
+                <HomeI18nContext.Provider value={{ locale, strings: HOME_STRINGS_FR, isTranslating: false,
+                    setLocaleFromDropdown: vi.fn(), setLocaleFromVoice: vi.fn() }}>
+                    <ClinicalForm onSubmit={() => {}} loading={false} />
+                </HomeI18nContext.Provider>
+            );
+            fireEvent.change(container.querySelector("#clinical-field")!, {
+                target: { value: "generalMedicine" },
+            });
+            expect(screen.getByRole("option", { name: "Hypertension" })).toBeInTheDocument();
+            fireEvent.change(container.querySelector("#clinical-example-case")!, {
+                target: { value: "hypertension55" },
+            });
+            expect(screen.getByLabelText("Diagnostic / motif clinique principal")).toHaveValue("Hypertension");
+            expect(screen.getByLabelText("Symptomes principaux")).toHaveValue("Headache, Elevated blood pressure");
+            expect(screen.getByLabelText("Antecedents medicaux")).toHaveValue("Dyslipidemia");
+            expect(screen.getByLabelText("Medication actuelle")).toHaveValue("None");
+            expect(screen.getByRole("button", { name: analysisStatusLabels(locale).analyze })).toBeVisible();
+        }
+    );
 
     it("shows only the example case picker before a selection is made", () => {
         const onSubmit = vi.fn();
@@ -204,9 +230,9 @@ describe("ClinicalForm", () => {
         expect(screen.getByLabelText("Age du patient")).toHaveValue(59);
         expect(screen.getByLabelText("Sexe")).toHaveValue("female");
         expect(screen.getByLabelText("Diagnostic / motif clinique principal")).toHaveValue(
-            "Cancer de l'estomac"
+            "Gastric cancer"
         );
-        expect(screen.getByLabelText("Antecedents medicaux")).toHaveValue("Anemie");
+        expect(screen.getByLabelText("Antecedents medicaux")).toHaveValue("Anemia");
     });
 
     it("imports a clinical payload from a pasted JSON object", () => {
@@ -360,6 +386,7 @@ describe("ClinicalForm", () => {
         const caseOneDialog = screen.getByRole("dialog");
         const medicationSelect = within(caseOneDialog).getByRole("listbox");
         expect(medicationSelect).toBeInTheDocument();
+        expect(within(caseOneDialog).getByRole("option", { name: "Metformin" })).toHaveProperty("selected", true);
         fireEvent.change(within(caseOneDialog).getByRole("spinbutton", { name: "Age du patient" }), {
             target: { value: "61" },
         });
@@ -373,7 +400,7 @@ describe("ClinicalForm", () => {
         );
         const medicationOptions = within(caseOneDialog).getAllByRole("option");
         const metforminOption = medicationOptions.find(
-            (option) => (option as HTMLOptionElement).value === "Metformine"
+            (option) => (option as HTMLOptionElement).value === "Metformin"
         ) as HTMLOptionElement;
         const semaglutideOption = medicationOptions.find(
             (option) => (option as HTMLOptionElement).value === "Semaglutide"
@@ -403,7 +430,7 @@ describe("ClinicalForm", () => {
         ).toContain('"current_medications": [');
         expect(
             (screen.getByLabelText("JSON cas 2") as HTMLTextAreaElement).value
-        ).toContain('"Empagliflozine"');
+        ).toContain('"Empagliflozin"');
         expect(
             (screen.getByLabelText("JSON cas 1") as HTMLTextAreaElement).value
         ).toContain('"Semaglutide"');
@@ -429,12 +456,12 @@ describe("ClinicalForm", () => {
 
         expect(screen.getByLabelText("Age du patient")).toHaveValue(55);
         expect(screen.getByLabelText("Diagnostic / motif clinique principal")).toHaveValue(
-            "Diabete de type 2"
+            "Type 2 diabetes"
         );
         expect(screen.getByLabelText("Antecedents medicaux")).toHaveValue(
-            "Hypertension arterielle"
+            "Hypertension"
         );
-        expect(screen.getByLabelText("Medication actuelle")).toHaveValue("Metformine");
+        expect(screen.getByLabelText("Medication actuelle")).toHaveValue("Metformin");
         expect(
             screen.getByText(
                 "Pre-remplissez rapidement les parametres cliniques utiles au diabete de type 2."
@@ -478,7 +505,7 @@ describe("ClinicalForm", () => {
 
         expect(screen.getAllByLabelText("Poids du patient (kg)")[1]).toHaveValue(94);
         expect(screen.getByLabelText("Risque cardiovasculaire")).toHaveValue(
-            "Modere a eleve"
+            "Moderate to high"
         );
 
         fireEvent.change(screen.getByLabelText("Tolerance"), {
@@ -493,7 +520,7 @@ describe("ClinicalForm", () => {
                 expect.objectContaining({
                     weight: 94,
                     diabetes_context: expect.objectContaining({
-                        cardiovascular_risk: "Modere a eleve",
+                        cardiovascular_risk: "Moderate to high",
                         tolerance: "Tolerance digestive a reevaluer",
                     }),
                 })

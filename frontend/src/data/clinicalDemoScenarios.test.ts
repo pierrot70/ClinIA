@@ -3,6 +3,12 @@ import { describe, expect, it } from "vitest";
 import { getClinicalDemoScenario } from "./clinicalDemoScenarios";
 
 describe("clinical demo scenarios", () => {
+    it("matches the English depression example instead of the hypertension fallback", () => {
+        expect(getClinicalDemoScenario({ diagnosis: "Major depressive disorder" }))
+            .toEqual(getClinicalDemoScenario({ diagnosis: "Trouble depressif majeur" }));
+        expect(getClinicalDemoScenario({ diagnosis: "Major depressive disorder" }))
+            .not.toEqual(getClinicalDemoScenario({ diagnosis: "Hypertension" }));
+    });
     it("returns the type 2 diabetes scenario for a diabetes payload", () => {
         const scenario = getClinicalDemoScenario({
             diagnosis: "Diabete de type 2",

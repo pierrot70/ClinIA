@@ -163,7 +163,7 @@ describe("ClinicalDemoResult", () => {
         ).toBeInTheDocument();
         expect(
             screen.getByRole("button", {
-                name: "Copier la requete JSON",
+                name: "Copier la requête JSON",
             })
         ).toBeInTheDocument();
     });
@@ -237,7 +237,7 @@ describe("ClinicalDemoResult", () => {
         ).toHaveAttribute("aria-expanded", "true");
 
         fireEvent.click(
-            screen.getByRole("button", { name: "Copier la requete JSON" })
+            screen.getByRole("button", { name: "Copier la requête JSON" })
         );
         expect(onCopyRequest).toHaveBeenCalledTimes(1);
     });
