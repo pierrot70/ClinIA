@@ -2,6 +2,11 @@
 # Disposable local MongoDB only. Never loads .env or connects to an application DB.
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+test_config=vitest.walkin.config.js
+if [[ "${1:-}" == --reception-smoke ]]; then
+    test_config=vitest.receptionSmoke.config.js
+    shift
+fi
 [[ "${NODE_ENV:-}" != production ]] || { echo 'Refusing production mode.' >&2; exit 1; }
 endpoint="${DOCKER_HOST:-$(docker context inspect --format '{{.Endpoints.docker.Host}}')}"
 [[ "$endpoint" == unix://* ]] || { echo 'A local Docker Unix socket is required.' >&2; exit 1; }
@@ -45,4 +50,4 @@ port="${BASH_REMATCH[1]}"
 cd "$ROOT_DIR/backend"
 TZ=America/Toronto NODE_ENV=test \
     CLINIA_WALKIN_TEST_URI="mongodb://127.0.0.1:$port/clinia_walkin_integration?directConnection=true&replicaSet=walkin_test" \
-    ./node_modules/.bin/vitest run --config vitest.walkin.config.js "$@"
+    ./node_modules/.bin/vitest run --config "$test_config" "$@"
