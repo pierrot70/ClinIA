@@ -19,7 +19,7 @@ const QuickMode: React.FC = () => {
         </p>
       </header>
 
-      <section lang="en" dir="ltr" translate="no" aria-labelledby="quick-recommendation-title" className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-2">
+      <section lang="en" dir="ltr" translate="no" aria-labelledby="quick-recommendation-title" className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs space-y-2">
         <p id="quick-recommendation-title" className="text-xs text-gray-500 uppercase tracking-wide">
           {panel.title}
         </p>

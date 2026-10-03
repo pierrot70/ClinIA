@@ -20,7 +20,7 @@ const PasswordResetRequiredPage: React.FC = () => {
 
     return (
         <div className="mx-auto max-w-2xl px-4 py-12">
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-xs">
                 <h1 className="text-2xl font-semibold text-amber-950">
                     {title}
                 </h1>

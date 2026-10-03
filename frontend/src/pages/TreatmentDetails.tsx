@@ -164,7 +164,7 @@ const TreatmentDetails: React.FC = () => {
       </div>
 
       <section className="grid sm:grid-cols-3 gap-4 text-sm">
-        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-xs">
           <div className="text-xs text-gray-500">Pertinence clinique</div>
           <div className="text-lg font-semibold text-primary">
             {relevanceLabel}
@@ -173,7 +173,7 @@ const TreatmentDetails: React.FC = () => {
             Repere qualitatif derive du niveau de preuve, de la surveillance et des contre-indications.
           </p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-xs">
           <div className="text-xs text-gray-500">Surveillance</div>
           <div className="text-sm font-semibold text-amber-600">
             {surveillanceLabel}
@@ -184,7 +184,7 @@ const TreatmentDetails: React.FC = () => {
               : "Aucun point de surveillance detaille fourni."}
           </p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-xs">
           <div className="text-xs text-gray-500">Source du contenu</div>
           <div className="text-sm font-semibold text-gray-900">
             {sourceLabel}
@@ -195,7 +195,7 @@ const TreatmentDetails: React.FC = () => {
         </div>
       </section>
 
-      <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm text-sm text-gray-700 space-y-3">
+      <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs text-sm text-gray-700 space-y-3">
         <h2 className="text-sm font-semibold text-gray-800">
           Comment interpréter ces informations ?
         </h2>
@@ -224,7 +224,7 @@ const TreatmentDetails: React.FC = () => {
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2">
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
           <h2 className="text-sm font-semibold text-gray-800 mb-2">
             Contre-indications
           </h2>
@@ -241,7 +241,7 @@ const TreatmentDetails: React.FC = () => {
           )}
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
           <h2 className="text-sm font-semibold text-gray-800 mb-2">
             Points de surveillance
           </h2>

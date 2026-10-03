@@ -92,7 +92,7 @@ const DemoPage: React.FC = () => {
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-      <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-cyan-50 p-6 shadow-sm sm:p-8">
+      <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-cyan-50 p-6 shadow-xs sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700">clinique-ai.ca/demo</p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
           {pageTitle}
@@ -119,7 +119,7 @@ const DemoPage: React.FC = () => {
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {steps.map((step) => (
-          <article key={step.minute} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <article key={step.minute} className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
             <p className="text-xs font-semibold uppercase tracking-wide text-cyan-700">{step.minute}</p>
             <h2 className="mt-2 text-lg font-semibold text-slate-900">{step.title}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-700">{step.detail}</p>

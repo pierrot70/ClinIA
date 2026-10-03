@@ -319,7 +319,7 @@ export function OpenAILogsPage() {
                 </p>
             </header>
 
-            <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+            <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs space-y-4">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
                     <label className="text-sm text-gray-700">
                         {pageLabels.action}
@@ -598,7 +598,7 @@ export function OpenAILogsPage() {
                 )}
             </section>
 
-            <section className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <section className="rounded-xl border border-gray-200 bg-white shadow-xs overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="min-w-full text-left text-sm">
                         <thead className="bg-gray-50 text-gray-600">

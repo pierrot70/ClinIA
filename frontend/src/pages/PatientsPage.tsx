@@ -1093,7 +1093,7 @@ export function PatientsPage() {
                         {loading && <p className="rounded border bg-white p-4 text-sm text-gray-500">{ui.tableLoading}</p>}
                         {!loading && patients.length === 0 && <p className="rounded border bg-white p-4 text-sm text-gray-500">{ui.empty}</p>}
                         {!loading && patients.map((p) => (
-                            <article key={p._id} className="rounded border bg-white p-3 shadow-sm">
+                            <article key={p._id} className="rounded border bg-white p-3 shadow-xs">
                                 <div className="flex items-start justify-between gap-3">
                                     <h2 className="font-semibold text-gray-900">{p.prenom} {p.nom}</h2>
                                     {viewMode === "archived" && <span className="text-xs text-amber-800">{ui.archivedLabel}</span>}
@@ -1108,13 +1108,13 @@ export function PatientsPage() {
                                 </dl>
                                 <div className="mt-3 grid grid-cols-2 gap-2">
                                     {viewMode === "archived" ? (
-                                        <button className="col-span-2 min-h-11 rounded border border-emerald-600 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 shadow-sm" disabled={busyIds[p._id]} onClick={() => handleRestore(p._id)}>{ui.restoreLabel}</button>
+                                        <button className="col-span-2 min-h-11 rounded border border-emerald-600 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 shadow-xs" disabled={busyIds[p._id]} onClick={() => handleRestore(p._id)}>{ui.restoreLabel}</button>
                                     ) : (<>
-                                        <button type="button" className="col-span-2 min-h-11 rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700" onClick={() => navigate("/appointments", { state: { patientId: p._id } })}>{ui.createAppointment}</button>
-                                        <button className="min-h-11 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50" onClick={() => handleEdit(p)}>{ui.edit}</button>
-                                        <button className="min-h-11 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50" onClick={() => handleOpenClinicalNotes(p._id)}>{ui.clinicalNotesOpen}</button>
-                                        {user?.role === "MEDECIN" && <button type="button" className="col-span-2 min-h-11 rounded border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 shadow-sm disabled:opacity-60" disabled={supportRequestPatientIds.has(p._id)} onClick={() => void handleRequestSupport(p)}>{supportRequestPatientIds.has(p._id) ? ui.supportRequestPending : ui.requestSupport}</button>}
-                                        <button className="col-span-2 min-h-11 rounded border border-amber-400 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 shadow-sm" disabled={busyIds[p._id]} onClick={() => handleArchive(p._id)}>{ui.archiveLabel}</button>
+                                        <button type="button" className="col-span-2 min-h-11 rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-blue-700" onClick={() => navigate("/appointments", { state: { patientId: p._id } })}>{ui.createAppointment}</button>
+                                        <button className="min-h-11 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-xs hover:bg-slate-50" onClick={() => handleEdit(p)}>{ui.edit}</button>
+                                        <button className="min-h-11 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-xs hover:bg-slate-50" onClick={() => handleOpenClinicalNotes(p._id)}>{ui.clinicalNotesOpen}</button>
+                                        {user?.role === "MEDECIN" && <button type="button" className="col-span-2 min-h-11 rounded border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 shadow-xs disabled:opacity-60" disabled={supportRequestPatientIds.has(p._id)} onClick={() => void handleRequestSupport(p)}>{supportRequestPatientIds.has(p._id) ? ui.supportRequestPending : ui.requestSupport}</button>}
+                                        <button className="col-span-2 min-h-11 rounded border border-amber-400 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 shadow-xs" disabled={busyIds[p._id]} onClick={() => handleArchive(p._id)}>{ui.archiveLabel}</button>
                                     </>)}
                                 </div>
                                 </>}

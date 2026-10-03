@@ -106,7 +106,7 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
   }
 
   return (
-    <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+    <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
       <div className="flex flex-col gap-2 mb-4">
         <h2 className="text-sm font-semibold text-gray-900">{displayedTitle}</h2>
         <p className="text-xs text-gray-600">{displayedSubtitle}</p>

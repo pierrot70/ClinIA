@@ -1,5 +1,34 @@
 # État du projet ClinIA
 
+## Brevo et maintenance des dépendances — 3 octobre 2026
+
+- Brevo : commit `a1f4e1a` déployé par l'utilisateur sur les deux backends ;
+  authentification SMTP avec STARTTLS vérifiée, réception du courriel et
+  changement de mot de passe confirmés par l'utilisateur. Les secrets restent
+  dans Coolify. Cette preuve concerne Nodemailer 9.1.1 avant cette maintenance.
+- Maintenance : Nodemailer 10.0.14, body-parser 1.20.8, qs 6.16.0 ;
+  Tailwind et son plugin PostCSS 4.3.3, undici 7.30.0. Suppression de Nodemon
+  et Autoprefixer pour retirer notamment la chaîne vulnérable `braces`.
+- Le développement backend utilise `node --watch` sous Node 24. Le redémarrage
+  sur modification d'un module importé a été vérifié localement. Le polling
+  `nodemon -L` n'est plus disponible ; les notifications des bind mounts Docker
+  Desktop restent à vérifier. Un changement de `.env` nécessite un redémarrage.
+- Tailwind : palette et principaux styles v3 conservés, utilitaires renommés,
+  compilation CSS couverte par un test. Navigateurs minimum : Safari 16.4,
+  Chrome 111, Firefox 128. Revue visuelle du navigateur encore à effectuer.
+- CI identique déclenché aussi sur `maintenance/**`, pour vérifier le SHA avant
+  son transfert vers `coolify`, sans PR ni contournement des contrôles requis.
+- Le déploiement reste manuel : Coolify suit encore `config/brevo-smtp` jusqu'au
+  changement de branche effectué par l'utilisateur. Les tests SMTP locaux
+  exercent Nodemailer réel, envoi et refus destinataire, sans email externe.
+- Validation locale complète : `bash scripts/ci-local.sh`, `CI_LOCAL_PASSED` ;
+  1 221 tests frontend, 744 backend, 57 régressions auth et 21 intégrations.
+  Nettoyage confirmé ; rapport `67ab152d-95b6-4984-a348-e4ddca6f5e57`, base
+  `a1f4e1a`, `dirty: true` (lot avant commit). Audits npm : zéro vulnérabilité
+  signalée. Build Docker frontend Alpine réussi. Journaux locaux :
+  `/tmp/clinia-dependencies-ci-20261003.log` et
+  `/tmp/clinia-deps-frontend-docker.log`.
+
 ## Corrections après essais UI staging — 26 septembre 2026
 
 Lot basé sur `6b5c19b`, demandé après les essais guidés RECEPTION, MEDECIN et

@@ -1443,7 +1443,7 @@ const Header: React.FC = () => {
                     </div>
                 </div>
 
-                <nav className="mt-3 hidden items-center gap-4 text-sm lg:fixed lg:inset-y-0 lg:left-0 lg:mt-0 lg:flex lg:w-64 lg:flex-col lg:items-stretch lg:gap-1 lg:overflow-y-auto lg:border-r lg:border-slate-200 lg:bg-slate-50 lg:px-3 lg:py-5 lg:shadow-sm">
+                <nav className="mt-3 hidden items-center gap-4 text-sm lg:fixed lg:inset-y-0 lg:left-0 lg:mt-0 lg:flex lg:w-64 lg:flex-col lg:items-stretch lg:gap-1 lg:overflow-y-auto lg:border-r lg:border-slate-200 lg:bg-slate-50 lg:px-3 lg:py-5 lg:shadow-xs">
                     {showFullHeaderNav && canAccessAdmin && <VoiceNavButton />}
 
                     <Link to="/" className={linkClass("/")}>

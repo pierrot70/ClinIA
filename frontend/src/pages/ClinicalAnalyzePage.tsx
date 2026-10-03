@@ -876,7 +876,7 @@ export function ClinicalAnalyzePage() {
                             <button
                                 type="button"
                                 onClick={handleBackToClinicalDemo}
-                                className="inline-flex min-h-12 items-center justify-center rounded-lg border border-blue-300 bg-white px-6 py-3 text-base font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 focus:outline-none focus:ring-4 focus:ring-blue-200"
+                                className="inline-flex min-h-12 items-center justify-center rounded-lg border border-blue-300 bg-white px-6 py-3 text-base font-semibold text-blue-700 shadow-xs transition hover:bg-blue-50 focus:outline-hidden focus:ring-4 focus:ring-blue-200"
                             >
                                 {cachedResultNoticeLabels.editParametersAction}
                             </button>
@@ -884,7 +884,7 @@ export function ClinicalAnalyzePage() {
                                 type="button"
                                 ref={viewCachedResultRef}
                                 onClick={() => setCachedResultNoticeVisible(false)}
-                                className="inline-flex min-h-12 items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200"
+                                className="inline-flex min-h-12 items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-xs transition hover:bg-blue-700 focus:outline-hidden focus:ring-4 focus:ring-blue-200"
                             >
                                 {cachedResultNoticeLabels.viewResultAction}
                             </button>
@@ -996,13 +996,13 @@ export function ClinicalAnalyzePage() {
                         </div>
                         <form onSubmit={handleLookupReplies} className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
                             <input
-                                className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                                className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm outline-hidden transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
                                 placeholder={namePlaceholderLabel}
                                 value={replyLookupName}
                                 onChange={(event) => setReplyLookupName(event.target.value)}
                             />
                             <input
-                                className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm uppercase outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                                className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm uppercase outline-hidden transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
                                 placeholder={trackingCodePlaceholderLabel}
                                 value={replyLookupCode}
                                 onChange={(event) => setReplyLookupCode(event.target.value.toUpperCase())}
@@ -1298,7 +1298,7 @@ export function ClinicalAnalyzePage() {
                             ) : null}
                         </div>
                     </div>
-                    <section className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm md:block hidden">
+                    <section className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-xs md:block hidden">
                         <h2 className="text-lg font-semibold text-gray-900">
                             {comparisonLabels.quickViewTitle}
                         </h2>
@@ -1353,7 +1353,7 @@ export function ClinicalAnalyzePage() {
                             ))}
                         </div>
                     </section>
-                    <section className="rounded-xl border border-sky-200 bg-white p-5 shadow-sm md:hidden">
+                    <section className="rounded-xl border border-sky-200 bg-white p-5 shadow-xs md:hidden">
                         <div className="space-y-3">
                             <article className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
                                 <button
@@ -1473,7 +1473,7 @@ export function ClinicalAnalyzePage() {
                             </article>
                         </div>
                     </section>
-                    <section className="hidden rounded-xl border border-sky-200 bg-white p-5 shadow-sm md:block">
+                    <section className="hidden rounded-xl border border-sky-200 bg-white p-5 shadow-xs md:block">
                         <h2 className="text-lg font-semibold text-gray-900">
                             {comparisonLabels.generatedSummaryTitle}
                         </h2>
@@ -1573,7 +1573,7 @@ export function ClinicalAnalyzePage() {
                     </section>
                     {comparisonScenarioOne.relevanceByAgeChart &&
                         comparisonScenarioTwo.relevanceByAgeChart && (
-                            <section className="hidden rounded-xl border border-sky-200 bg-white p-5 shadow-sm md:block">
+                            <section className="hidden rounded-xl border border-sky-200 bg-white p-5 shadow-xs md:block">
                                 <h2 className="text-lg font-semibold text-gray-900">
                                     {comparisonLabels.relevanceChartTitle}
                                 </h2>

@@ -48,7 +48,7 @@ const QuestionCard: React.FC<Props> = ({ question, answer, language = "fr" }) =>
     : answerTranslation.translated;
 
   return (
-    <details className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+    <details className="bg-white border border-gray-200 rounded-xl p-3 shadow-xs">
       <summary className="flex items-center justify-between gap-2 cursor-pointer">
         <span className="text-sm font-medium text-gray-800">
           {displayedQuestion}

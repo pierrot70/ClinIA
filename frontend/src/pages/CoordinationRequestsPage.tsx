@@ -136,7 +136,7 @@ export function CoordinationRequestsPage() {
                 <h1 className="text-2xl font-semibold text-gray-900">{text.title}</h1>
                 <p className="mt-1 text-sm text-gray-600">{text.description}</p>
             </div>
-            <div className="flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-xs">
                 <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
                     {text.status}
                     <select value={status} onChange={(event) => updateStatus(event.target.value)} className="min-w-48 rounded border border-gray-300 bg-white px-3 py-2 font-normal">
@@ -157,7 +157,7 @@ export function CoordinationRequestsPage() {
             {loading ? <p className="text-sm text-gray-600">{text.loading}</p> : entries.length === 0 ? (
                 <div className="rounded border border-gray-200 bg-white p-6 text-sm text-gray-600">{text.empty}</div>
             ) : (
-                <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-xs">
                     <table className="min-w-full divide-y divide-gray-200 text-left text-sm">
                         <thead className="bg-gray-50 text-gray-700"><tr>{[text.createdAt, text.patient, text.specialty, text.requestedBy, text.status, text.action].map((heading) => <th key={heading} className="px-4 py-3 font-semibold">{heading}</th>)}</tr></thead>
                         <tbody className="divide-y divide-gray-100">

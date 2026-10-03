@@ -337,7 +337,7 @@ export function WalkInArrivalPage() {
 
                 {error && <p role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
 
-                <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-xs">
                     <p className="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-slate-800">
                         {receptionLabel(locale, "selectedSlot", source.selectedSlot)
                             .replace("{specialist}", `${selectedSlot.specialist.prenom} ${selectedSlot.specialist.nom}`)
@@ -406,7 +406,7 @@ export function WalkInArrivalPage() {
             {(message || messageKind) && <p role="status" className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{messageKind === "bookingCreated" ? receptionLabel(locale, "existingBookingCreated", source.existingBookingCreated) : messageKind === "noPatient" || isReceptionLabel(message, "noPatient", source.noPatient) ? receptionLabel(locale, "noPatient", source.noPatient) : message}</p>}
             {error && <p role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{(isReceptionLabel(error, "noPatient", source.noPatient) || /active patient.*health insurance/i.test(error)) ? receptionLabel(locale, "noPatient", source.noPatient) : error}</p>}
 
-            <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-xs">
                 <label className="mb-1 block text-sm font-medium text-slate-800" htmlFor="walk-in-ramq">{receptionLabel(locale, "ramqLabel", source.ramqLabel)}</label>
                 <div className="flex gap-2">
                     <input id="walk-in-ramq" value={ramq} onChange={(event) => { clearSelection(); setRamq(event.target.value); }} placeholder={source.ramqPlaceholder} className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2" />

@@ -160,7 +160,7 @@ function SummaryStrip({ summary }: { summary: WriteOperationAuditSummary | null 
     const replicaSummary = summary?.byReplicaStatus || {};
 
     return (
-        <section className="rounded-lg border border-gray-200 bg-white shadow-sm">
+        <section className="rounded-lg border border-gray-200 bg-white shadow-xs">
             <div className="grid grid-cols-1 divide-y divide-gray-100 md:grid-cols-4 md:divide-x md:divide-y-0">
                 <div className="p-4">
                     <div className="text-xs font-medium uppercase text-gray-500">{pageLabels.summary.total}</div>
@@ -385,7 +385,7 @@ export function WriteOperationAuditsPage() {
 
             <SummaryStrip summary={summary} />
 
-            <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-xs">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
                     <label className="text-sm text-gray-700">
                         {pageLabels.filters.collection}
@@ -609,7 +609,7 @@ export function WriteOperationAuditsPage() {
                 )}
             </section>
 
-            <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-xs">
                 <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
                     <div>
                         <button
@@ -778,7 +778,7 @@ export function WriteOperationAuditsPage() {
                 )}
             </section>
 
-            <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+            <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xs">
                 <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
                     <button
                         type="button"

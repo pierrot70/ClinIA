@@ -74,7 +74,7 @@ function ResultAccordion({
 
   return (
     <section
-      className="rounded-xl border border-gray-200 bg-white shadow-sm"
+      className="rounded-xl border border-gray-200 bg-white shadow-xs"
       onMouseEnter={supportsHover ? () => setOpen(true) : undefined}
       onMouseLeave={supportsHover ? () => setOpen(false) : undefined}
     >
@@ -478,7 +478,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
 
         {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring) && (
           <ResultAccordion title={recommendationsSectionTitle} hint={recommendationsSectionHint} defaultOpen={false}>
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-sm">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-xs">
             <h2 className="text-md font-semibold text-emerald-900 mb-2">{contentStrings.aiRecommendations}</h2>
             {/* Bloc générique pour recommendations */}
             {recommendations && (
@@ -592,7 +592,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
 
         {other_ai_fields && Object.keys(other_ai_fields).length > 0 && (
           <ResultAccordion title={questionsSectionTitle} hint={questionsSectionHint} defaultOpen={false}>
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-xs">
             <h2 className="text-md font-semibold text-blue-900 mb-2">{contentStrings.otherAiRecommendations}</h2>
             {Object.entries(other_ai_fields).map(([key, value]) => (
               <div key={key} className="mb-2">
@@ -698,7 +698,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
       {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring || mappedTreatments.length > 0) && (
         <ResultAccordion title={recommendationsSectionTitle} hint={recommendationsSectionHint} defaultOpen={false}>
         {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring) && (
-        <section className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-sm mb-4">
+        <section className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-xs mb-4">
           <h2 className="text-md font-semibold text-emerald-900 mb-2">{contentStrings.aiRecommendations}</h2>
           {recommendations && (
             <div className="mb-2">
@@ -772,7 +772,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
 
       {mappedTreatments.length > 0 && !hasIADetails && (
         <>
-          <section className="bg-white border rounded-xl p-4 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-start">
+          <section className="bg-white border rounded-xl p-4 shadow-xs flex flex-col sm:flex-row gap-4 justify-between items-start">
             <div>
               <h2 className="text-sm font-semibold text-gray-800 mb-1">{contentStrings.suggestedTreatment}</h2>
               <p className="text-sm text-gray-700">

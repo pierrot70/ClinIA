@@ -190,7 +190,7 @@ function CoolifyLandingPage() {
                     <Link
                         to="/clinical-demo"
                         className={
-                            "block rounded-xl border bg-sky-50 p-5 shadow-sm transition hover:border-sky-300 hover:bg-sky-100 " +
+                            "block rounded-xl border bg-sky-50 p-5 shadow-xs transition hover:border-sky-300 hover:bg-sky-100 " +
                             (showDemoTooltip
                                 ? "border-emerald-500 ring-2 ring-emerald-200"
                                 : "border-sky-200")
@@ -207,7 +207,7 @@ function CoolifyLandingPage() {
 
                 <Link
                     to="/login"
-                    className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-gray-300 hover:bg-gray-50"
+                    className="rounded-xl border border-gray-200 bg-white p-5 shadow-xs transition hover:border-gray-300 hover:bg-gray-50"
                 >
                     <div className="text-lg font-semibold text-gray-900">
                         {doctorLoginTitle}
@@ -219,7 +219,7 @@ function CoolifyLandingPage() {
 
                 <Link
                     to="/admin/login"
-                    className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm transition hover:border-amber-300 hover:bg-amber-100"
+                    className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-xs transition hover:border-amber-300 hover:bg-amber-100"
                 >
                     <div className="text-lg font-semibold text-amber-950">
                         {adminLoginTitle}

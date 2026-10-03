@@ -7,7 +7,7 @@ const Home: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 sm:py-10 flex flex-col items-center gap-8 sm:gap-10">
-      <section className="relative w-full overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
+      <section className="relative w-full overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-xs">
         <div className="absolute -top-24 -left-24 h-56 w-56 rounded-full bg-sky-100 blur-3xl opacity-60" />
         <div className="absolute -bottom-24 -right-24 h-56 w-56 rounded-full bg-indigo-100 blur-3xl opacity-60" />
 
@@ -36,19 +36,19 @@ const Home: React.FC = () => {
       </section>
 
       <section className="grid sm:grid-cols-3 gap-4 w-full">
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs hover:shadow-md transition-shadow">
           <h3 className="font-semibold text-sm mb-2">{strings.home.cardReadTitle}</h3>
           <p className="text-xs text-gray-600 leading-relaxed">
             {strings.home.cardReadBody}
           </p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs hover:shadow-md transition-shadow">
           <h3 className="font-semibold text-sm mb-2">{strings.home.cardChartsTitle}</h3>
           <p className="text-xs text-gray-600 leading-relaxed">
             {strings.home.cardChartsBody}
           </p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs hover:shadow-md transition-shadow">
           <h3 className="font-semibold text-sm mb-2">{strings.home.cardQuestionsTitle}</h3>
           <p className="text-xs text-gray-600 leading-relaxed">
             {strings.home.cardQuestionsBody}

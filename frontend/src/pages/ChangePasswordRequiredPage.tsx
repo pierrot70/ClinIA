@@ -72,7 +72,7 @@ const ChangePasswordRequiredPage: React.FC = () => {
 
     return (
         <div className="mx-auto max-w-xl px-4 py-12">
-            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-6 shadow-sm">
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-6 shadow-xs">
                 <h1 className="text-2xl font-semibold text-sky-950">{title}</h1>
                 <p className="mt-3 text-sm text-sky-950">{description}</p>
                 <p className="mt-3 text-sm text-sky-900">{helper}</p>

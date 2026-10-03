@@ -30,7 +30,7 @@ const ChartCard: React.FC<Props> = ({ treatments }) => {
 
   return (
     <div className="grid md:grid-cols-2 gap-4">
-      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
         <h3 className="text-sm font-semibold text-gray-800 mb-2">
           Efficacité comparative (simulée)
         </h3>
@@ -46,7 +46,7 @@ const ChartCard: React.FC<Props> = ({ treatments }) => {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
         <h3 className="text-sm font-semibold text-gray-800 mb-2">
           Profil d&apos;effets secondaires (score simulé)
         </h3>

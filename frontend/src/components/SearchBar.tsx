@@ -713,7 +713,7 @@ const SearchBar: React.FC = () => {
   ]);
 
   const containerClass =
-    "bg-white shadow-sm rounded-xl px-4 py-3 flex items-center gap-3 border " +
+    "bg-white shadow-xs rounded-xl px-4 py-3 flex items-center gap-3 border " +
     (isWaitingDictation ? "border-red-500" : "border-black");
   const attestationMissing = !privacyAttestation;
   const isAwaitingVoiceOnly = isWaitingDictation && !clinicalNotes.trim();
@@ -724,13 +724,13 @@ const SearchBar: React.FC = () => {
 
   return (
     <div className="w-full max-w-2xl space-y-3">
-      <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-left shadow-sm">
+      <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-left shadow-xs">
         <label className="text-xs text-gray-600 block">
           Patient
           <select
             value={selectedPatientId}
             onChange={(e) => void handlePatientSelection(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-primary"
+            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-hidden focus:border-primary"
           >
             <option value="">
               {patientsLoading
@@ -755,7 +755,7 @@ const SearchBar: React.FC = () => {
               <input
                 value={patientNameDraft}
                 onChange={(e) => setPatientNameDraft(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-primary"
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-hidden focus:border-primary"
                 placeholder="Ex: Jean Tremblay"
               />
             </label>
@@ -842,7 +842,7 @@ const SearchBar: React.FC = () => {
             <select
               value={objective}
               onChange={(e) => setObjective(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-hidden focus:border-primary"
             >
               {objectives.map((option) => (
                 <option key={option} value={option}>
@@ -857,7 +857,7 @@ const SearchBar: React.FC = () => {
             <input
               value={sex}
               onChange={(e) => setSex(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-hidden focus:border-primary"
               placeholder="Ex: Female"
             />
           </label>
@@ -867,7 +867,7 @@ const SearchBar: React.FC = () => {
             <input
               value={age}
               onChange={(e) => setAge(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-hidden focus:border-primary"
               placeholder="Ex: 54"
             />
           </label>
@@ -879,7 +879,7 @@ const SearchBar: React.FC = () => {
             <textarea
               value={currentMedications}
               onChange={(e) => setCurrentMedications(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary resize-none min-h-[72px]"
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-hidden focus:border-primary resize-none min-h-[72px]"
               placeholder={strings.search.currentMedicationsPlaceholder}
             />
           </label>
@@ -891,7 +891,7 @@ const SearchBar: React.FC = () => {
             <select
               value={clinicalScope}
               onChange={(e) => setClinicalScope(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-hidden focus:border-primary"
             >
               {clinicalScopes.map((option) => (
                 <option key={option} value={option}>
@@ -928,7 +928,7 @@ const SearchBar: React.FC = () => {
             <select
               value={ageGroup}
               onChange={(e) => setAgeGroup(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-hidden focus:border-primary"
             >
               {ageGroups.map((option) => (
                 <option key={option} value={option}>
@@ -946,7 +946,7 @@ const SearchBar: React.FC = () => {
                 setSymptomProfile(e.target.value);
                 if (e.target.value !== "Cancer") setCancerType("");
               }}
-              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-hidden focus:border-primary"
             >
               {symptomProfiles.map((option) => (
                 <option key={option} value={option}>
@@ -956,7 +956,7 @@ const SearchBar: React.FC = () => {
             </select>
             {symptomProfile === "Cancer" && (
               <select
-                className="mt-2 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary animate-fadein"
+                className="mt-2 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700 outline-hidden focus:border-primary animate-fadein"
                 value={cancerType}
                 onChange={e => setCancerType(e.target.value)}
               >
@@ -974,7 +974,7 @@ const SearchBar: React.FC = () => {
             <select
               value={duration}
               onChange={(e) => setDuration(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-hidden focus:border-primary"
             >
               {durations.map((option) => (
                 <option key={option} value={option}>
@@ -989,7 +989,7 @@ const SearchBar: React.FC = () => {
             <select
               value={severity}
               onChange={(e) => setSeverity(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-hidden focus:border-primary"
             >
               {severityLevels.map((option) => (
                 <option key={option} value={option}>
@@ -1004,7 +1004,7 @@ const SearchBar: React.FC = () => {
             <select
               value={redFlagStatus}
               onChange={(e) => setRedFlagStatus(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-hidden focus:border-primary"
             >
               {redFlagStatuses.map((option) => (
                 <option key={option} value={option}>
@@ -1019,7 +1019,7 @@ const SearchBar: React.FC = () => {
             <select
               value={comorbidityContext}
               onChange={(e) => setComorbidityContext(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-primary"
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-hidden focus:border-primary"
             >
               {comorbidityContexts.map((option) => (
                 <option key={option} value={option}>
@@ -1050,7 +1050,7 @@ const SearchBar: React.FC = () => {
                 : null
             );
           }}
-          className="flex-1 outline-none text-sm sm:text-base text-gray-800 placeholder:text-gray-400 bg-transparent resize-none min-h-[56px]"
+          className="flex-1 outline-hidden text-sm sm:text-base text-gray-800 placeholder:text-gray-400 bg-transparent resize-none min-h-[56px]"
         />
         <button
           onClick={handleSearch}

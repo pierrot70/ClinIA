@@ -845,7 +845,7 @@ export function SpecialistsPage() {
                 <div
                     className={`grid grid-cols-1 gap-4 border rounded p-4 transition duration-150 ${
                         editingId
-                            ? "bg-gradient-to-r from-yellow-50 via-white to-white border-yellow-300 shadow-sm"
+                            ? "bg-gradient-to-r from-yellow-50 via-white to-white border-yellow-300 shadow-xs"
                             : "bg-gray-50 border-gray-200"
                     }`}
                 >

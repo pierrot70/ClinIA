@@ -4,7 +4,7 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon --watch . -r dotenv/config index.js",
+    "dev": "node --watch -r dotenv/config index.js",
     "start": "node -r dotenv/config index.js",
     "test": "vitest",
     "test:walkin": "bash ../scripts/run-urgentologist-walk-in-integration.sh",
@@ -17,11 +17,10 @@
     "express": "4.22.3",
     "jsonwebtoken": "9.0.2",
     "mongoose": "9.7.4",
-    "nodemailer": "9.1.1",
+    "nodemailer": "10.0.14",
     "openai": "6.9.0"
   },
   "devDependencies": {
-    "nodemon": "3.1.14",
     "vitest": "4.1.11"
   }
 }

@@ -129,7 +129,7 @@ export function ClinicianInboxModal({
                 <div className="h-[100dvh] w-full overflow-y-auto bg-white p-5 shadow-2xl sm:h-auto sm:max-h-[calc(100vh-3rem)] sm:rounded-xl">
                     <div
                         data-testid="clinician-inbox-sticky-header"
-                        className="sticky top-0 z-20 -mx-5 -mt-5 mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 bg-white px-5 py-4 shadow-sm"
+                        className="sticky top-0 z-20 -mx-5 -mt-5 mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 bg-white px-5 py-4 shadow-xs"
                     >
                         <div>
                             <h2 className="text-lg font-semibold text-gray-900">
@@ -150,7 +150,7 @@ export function ClinicianInboxModal({
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-100"
+                                className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-xs hover:bg-gray-100"
                             >
                                 {labels.close}
                             </button>
@@ -311,7 +311,7 @@ export function ClinicianInboxModal({
                                                                     value={replyMessage}
                                                                     onChange={(event) => onReplyMessageChange(event.target.value)}
                                                                     placeholder={labels.replyPlaceholder}
-                                                                    className="min-h-[120px] w-full rounded border border-gray-300 bg-white px-3 py-3 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                                                                    className="min-h-[120px] w-full rounded border border-gray-300 bg-white px-3 py-3 text-sm outline-hidden transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                                                                     maxLength={500}
                                                                 />
                                                                 <div className="flex gap-3">

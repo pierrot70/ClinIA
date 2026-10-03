@@ -119,7 +119,7 @@ function MetricCard({
     detail?: string;
 }) {
     return (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-xs">
             <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-slate-700">
                     {icon}
@@ -167,7 +167,7 @@ function ReplicaMemberCard({ member }: { member: DbStatusPayload["replicaSet"]["
     const syncTone = standalone ? "not-applicable" : member.syncStatus;
 
     return (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-xs">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <div className="truncate text-sm font-semibold text-gray-950">{member.name}</div>
@@ -620,7 +620,7 @@ export function DbStatusPage() {
             </div>
 
             {replicaSet?.summary && (
-                <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xs">
                     <div className="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                             <div className="flex items-center gap-2">
@@ -708,7 +708,7 @@ export function DbStatusPage() {
                             {displayedReplicaReadings.map((reading, index) => (
                                 <div
                                     key={reading.id}
-                                    className="min-w-[13rem] rounded-md border border-gray-200 bg-white p-3 text-xs shadow-sm"
+                                    className="min-w-[13rem] rounded-md border border-gray-200 bg-white p-3 text-xs shadow-xs"
                                 >
                                     <div className="mb-2 flex items-center justify-between gap-2">
                                         <TonePill
@@ -760,7 +760,7 @@ export function DbStatusPage() {
             )}
 
             {writeSafetyDrill && (
-                <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-xs">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                             <div className="flex items-center gap-2">
@@ -815,7 +815,7 @@ export function DbStatusPage() {
                 </div>
             )}
 
-            <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+            <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xs">
                 <div className="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <div className="flex items-center gap-2">
@@ -946,7 +946,7 @@ export function DbStatusPage() {
                 </div>
             )}
 
-            <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+            <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xs">
                 <div className="border-b border-gray-200 px-4 py-3">
                     <h2 className="text-base font-semibold text-gray-950">Collections Mongo</h2>
                 </div>

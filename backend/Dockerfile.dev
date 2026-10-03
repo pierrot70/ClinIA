@@ -9,5 +9,5 @@ COPY . .
 
 EXPOSE 4000
 
-# Nodemon est une devDependency verrouillée; aucune installation globale n'est requise.
-CMD ["npx", "--no-install", "nodemon", "-L", "index.js"]
+# Node 24 fournit le redémarrage sur modification sans dépendance externe.
+CMD ["node", "--watch", "-r", "dotenv/config", "index.js"]

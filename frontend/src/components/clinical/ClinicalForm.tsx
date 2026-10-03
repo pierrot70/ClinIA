@@ -1452,7 +1452,7 @@ export function ClinicalForm({
                     </div>
                     </div>
                     {hasSelectedExampleCase && isType2DiabetesContext() && (
-                        <div className="w-full md:w-[30rem] rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 shadow-sm">
+                        <div className="w-full md:w-[30rem] rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 shadow-xs">
                             <p className="text-sm font-semibold text-emerald-950">
                                 {diabetesParamsTitleLabel}
                             </p>

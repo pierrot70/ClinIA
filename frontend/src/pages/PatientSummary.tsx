@@ -16,7 +16,7 @@ const PatientSummary: React.FC = () => {
         </p>
       </header>
 
-      <section lang="en" dir="ltr" translate="no" aria-labelledby="patient-summary-example-title" className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm text-sm space-y-3">
+      <section lang="en" dir="ltr" translate="no" aria-labelledby="patient-summary-example-title" className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs text-sm space-y-3">
         <div>
           <h2 id="patient-summary-example-title" className="text-sm font-semibold text-gray-800 mb-1">
             {panel.title}

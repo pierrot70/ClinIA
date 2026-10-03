@@ -868,7 +868,7 @@ export function AppointmentsPage() {
                         ) : (
                             <button
                                 type="button"
-                                className="w-full sm:w-fit rounded-lg bg-blue-700 px-5 py-3 text-base font-semibold text-white shadow-lg ring-2 ring-blue-300 transition hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="w-full sm:w-fit rounded-lg bg-blue-700 px-5 py-3 text-base font-semibold text-white shadow-lg ring-2 ring-blue-300 transition hover:bg-blue-800 focus:outline-hidden focus:ring-4 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-50"
                                 onClick={() => {
                                     void handleCoordinationRequest();
                                 }}

@@ -20,7 +20,7 @@ export function InfoTooltip({ label, children }: InfoTooltipProps) {
         >
             <button
                 type="button"
-                className="ml-1 inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-sky-300 bg-sky-50 text-xs font-bold text-sky-800 hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                className="ml-1 inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-sky-300 bg-sky-50 text-xs font-bold text-sky-800 hover:bg-sky-100 focus:outline-hidden focus:ring-2 focus:ring-sky-400"
                 aria-label={label}
                 aria-expanded={isOpen}
                 onClick={() => setIsOpen((current) => !current)}

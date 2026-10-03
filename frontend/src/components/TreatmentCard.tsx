@@ -121,7 +121,7 @@ const TreatmentCard: React.FC<Props> = ({ treatment, sourceMode, realAI, languag
   );
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+    <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3 shadow-xs">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="font-semibold text-base text-gray-900">

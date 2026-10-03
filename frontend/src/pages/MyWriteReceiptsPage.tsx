@@ -177,7 +177,7 @@ export function MyWriteReceiptsPage() {
                 </button>
             </header>
 
-            <section className="border border-gray-200 bg-white p-4 shadow-sm">
+            <section className="border border-gray-200 bg-white p-4 shadow-xs">
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     <div className="relative text-sm text-gray-700">
                         <span>{pageLabels.filters.patient}</span>
@@ -222,7 +222,7 @@ export function MyWriteReceiptsPage() {
                 </div>
             </section>
 
-            <section lang="en-CA" dir="ltr" className="border border-gray-200 bg-white shadow-sm md:hidden">
+            <section lang="en-CA" dir="ltr" className="border border-gray-200 bg-white shadow-xs md:hidden">
                 {error && <p className="m-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
                 {loading ? <p className="p-6 text-sm text-gray-600">{receiptLabels.status.loading}</p> : receipts.length === 0 ? <p className="p-6 text-sm text-gray-600">{receiptLabels.status.empty}</p> : (
                     <div className="divide-y divide-gray-100">
@@ -254,7 +254,7 @@ export function MyWriteReceiptsPage() {
                 </div>
             </section>
 
-            <section lang="en-CA" dir="ltr" className="hidden overflow-x-auto border border-gray-200 bg-white shadow-sm md:block">
+            <section lang="en-CA" dir="ltr" className="hidden overflow-x-auto border border-gray-200 bg-white shadow-xs md:block">
                 {error && <p className="m-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
                 {loading ? <p className="p-6 text-sm text-gray-600">{receiptLabels.status.loading}</p> : receipts.length === 0 ? <p className="p-6 text-sm text-gray-600">{receiptLabels.status.empty}</p> : (
                     <table className="min-w-full text-left text-sm">

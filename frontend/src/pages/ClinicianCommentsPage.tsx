@@ -340,7 +340,7 @@ export function ClinicianCommentsPage() {
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
                 <form
                     onSubmit={handleSubmit}
-                    className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+                    className="rounded-xl border border-gray-200 bg-white p-5 shadow-xs"
                 >
                     <label
                         htmlFor="clinician-comment"
@@ -358,7 +358,7 @@ export function ClinicianCommentsPage() {
                             </label>
                             <input
                                 id="clinician-comment-name"
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-hidden transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                                 placeholder={ui.namePlaceholder}
                                 value={guestDisplayName}
                                 onChange={(event) => setGuestDisplayName(event.target.value)}
@@ -373,7 +373,7 @@ export function ClinicianCommentsPage() {
                                 </label>
                                 <input
                                     id="clinician-tracking-code"
-                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase outline-hidden transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                                     placeholder={ui.trackingCodePlaceholder}
                                     value={trackingCode}
                                     onChange={(event) => setTrackingCode(event.target.value.toUpperCase())}
@@ -394,7 +394,7 @@ export function ClinicianCommentsPage() {
                         </label>
                         <select
                             id="clinician-comment-category"
-                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-hidden transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                             value={category}
                             onChange={(event) =>
                                 setCategory(
@@ -416,7 +416,7 @@ export function ClinicianCommentsPage() {
                         id="clinician-comment"
                         aria-describedby="clinician-comment-language-hint"
                         lang="en"
-                        className="min-h-[220px] w-full rounded-lg border border-gray-300 px-3 py-3 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                        className="min-h-[220px] w-full rounded-lg border border-gray-300 px-3 py-3 text-sm outline-hidden transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                         placeholder={ui.commentPlaceholder}
                         value={comment}
                         onChange={(event) => setComment(event.target.value)}
@@ -460,7 +460,7 @@ export function ClinicianCommentsPage() {
                     </div>
                 </form>
 
-                <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
                     <div className="mb-4 flex items-center justify-between gap-3">
                         <div>
                             <h2 className="text-lg font-semibold text-gray-900">
@@ -549,7 +549,7 @@ export function ClinicianCommentsPage() {
                                             </div>
                                         )}
                                         <textarea
-                                            className="min-h-[120px] rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                                            className="min-h-[120px] rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm outline-hidden transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                                             placeholder={ui.replyPlaceholder}
                                             value={replyMessage}
                                             onChange={(event) => setReplyMessage(event.target.value)}

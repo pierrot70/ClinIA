@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [coolify]
+    branches: [coolify, 'maintenance/**']
   pull_request:
     branches: [coolify]
   workflow_dispatch:
