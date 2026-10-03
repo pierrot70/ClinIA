@@ -85,7 +85,7 @@ export async function verifyJWT(req, res, next) {
         }
 
         const user = await AdminUser.findById(payload.sub)
-            .select("_id username role isActive authTokenInvalidBefore activeSessionId activeSessionIds sessionStartedAt lastActivityAt refreshTokenHash refreshTokenExpiresAt lastLogoutAt passwordResetRequired mustChangePasswordOnNextLogin");
+            .select("_id username role isActive authVersion authTokenInvalidBefore activeSessionId activeSessionIds sessionStartedAt lastActivityAt refreshTokenHash refreshTokenExpiresAt lastLogoutAt passwordResetRequired mustChangePasswordOnNextLogin");
 
         if (!user || user.isActive === false) {
             return res.status(401).json({

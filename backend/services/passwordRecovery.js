@@ -5,6 +5,7 @@ import { recordAuthAuditEvent } from "../audit/authAudit.js";
 import { revokeRefreshTokenFamiliesForUser } from "./auth/refreshTokenFamilies.js";
 import { logSafeError } from "../utils/requestLogSafety.js";
 import { AdminUser } from "../models/AdminUser.js";
+import { CLINICAL_WRITE_CONCERN, CLINICAL_QUERY_WRITE_OPTIONS } from "../db/clinicalWriteConcern.js";
 import { getPasswordPolicyViolation } from "../security/passwordPolicy.js";
 import {
     sendPasswordChangedConfirmation,
@@ -70,28 +71,26 @@ export async function requestPasswordRecoveryCode({ email, now = new Date() }) {
         return { accepted: true };
     }
 
-    const user = await AdminUser.findOne({
-        email: normalizedEmail,
-        isActive: true,
-    }).select(
-        "+passwordRecoveryCodeHash +passwordRecoveryCodeExpiresAt +passwordRecoveryCodeAttempts +passwordRecoveryRequestedAt"
+    const code = generateRecoveryCode();
+    const codeHash = hashPasswordRecoveryCode(code);
+    const requestId = crypto.randomUUID();
+    const user = await AdminUser.findOneAndUpdate(
+        { email: normalizedEmail, isActive: true },
+        { $set: {
+            passwordRecoveryCodeHash: codeHash,
+            passwordRecoveryCodeExpiresAt: new Date(now.getTime() + PASSWORD_RECOVERY_CODE_TTL_MS),
+            passwordRecoveryCodeAttempts: 0,
+            passwordRecoveryRequestedAt: now,
+            passwordRecoveryRequestId: requestId,
+            passwordRecoveryGrantHash: null,
+            passwordRecoveryGrantExpiresAt: null,
+        } },
+        { ...CLINICAL_QUERY_WRITE_OPTIONS, returnDocument: "after" },
     );
 
     if (!user) {
         return { accepted: true };
     }
-
-    const code = generateRecoveryCode();
-    user.passwordRecoveryCodeHash = hashPasswordRecoveryCode(code);
-    user.passwordRecoveryCodeExpiresAt = new Date(
-        now.getTime() + PASSWORD_RECOVERY_CODE_TTL_MS
-    );
-    user.passwordRecoveryCodeAttempts = 0;
-    user.passwordRecoveryRequestedAt = now;
-    user.passwordRecoveryGrantHash = null;
-    user.passwordRecoveryGrantExpiresAt = null;
-    await revokeRefreshTokenFamiliesForUser(user._id, "PASSWORD_RECOVERY");
-    await user.save();
 
     try {
         await sendPasswordRecoveryCode({
@@ -99,10 +98,14 @@ export async function requestPasswordRecoveryCode({ email, now = new Date() }) {
             code,
         });
     } catch (err) {
-        user.passwordRecoveryCodeHash = null;
-        user.passwordRecoveryCodeExpiresAt = null;
-        user.passwordRecoveryCodeAttempts = 0;
-        await user.save();
+        // A delayed failure must not erase a newer request (even if its random
+        // six-digit code happens to be identical) or an already issued grant.
+        await AdminUser.updateOne(
+            { _id: user._id, passwordRecoveryRequestId: requestId, passwordRecoveryCodeHash: codeHash },
+            { $set: { passwordRecoveryCodeHash: null, passwordRecoveryCodeExpiresAt: null,
+                passwordRecoveryCodeAttempts: 0, passwordRecoveryRequestId: null } },
+            CLINICAL_QUERY_WRITE_OPTIONS,
+        );
         logSafeError("PASSWORD_RECOVERY_DELIVERY_FAILED", err, {
             component: "email",
         });
@@ -118,8 +121,9 @@ export async function requestPasswordRecoveryCode({ email, now = new Date() }) {
 export async function verifyPasswordRecoveryCode({
     email,
     code,
-    now = new Date(),
+    now,
 }) {
+    const currentTime = () => now ?? new Date();
     const normalizedEmail = normalizeEmail(email);
     const normalizedCode = String(code || "").trim();
     if (!normalizedEmail || !/^\d{6}$/.test(normalizedCode)) {
@@ -133,13 +137,13 @@ export async function verifyPasswordRecoveryCode({
         email: normalizedEmail,
         isActive: true,
     }).select(
-        "+passwordRecoveryCodeHash +passwordRecoveryCodeExpiresAt +passwordRecoveryCodeAttempts +passwordRecoveryGrantHash +passwordRecoveryGrantExpiresAt"
+        "+passwordRecoveryCodeHash +passwordRecoveryCodeExpiresAt +passwordRecoveryCodeAttempts +passwordRecoveryRequestId"
     );
 
     if (
         !user?.passwordRecoveryCodeHash ||
         !user.passwordRecoveryCodeExpiresAt ||
-        now >= new Date(user.passwordRecoveryCodeExpiresAt) ||
+        currentTime() >= new Date(user.passwordRecoveryCodeExpiresAt) ||
         Number(user.passwordRecoveryCodeAttempts || 0) >=
             PASSWORD_RECOVERY_MAX_CODE_ATTEMPTS
     ) {
@@ -149,11 +153,18 @@ export async function verifyPasswordRecoveryCode({
         );
     }
 
+    const claimedAt = currentTime();
     const submittedHash = hashPasswordRecoveryCode(normalizedCode);
+    const filter = {
+        _id: user._id,
+        isActive: true,
+        passwordRecoveryRequestId: user.passwordRecoveryRequestId ?? null,
+        passwordRecoveryCodeHash: user.passwordRecoveryCodeHash,
+        passwordRecoveryCodeExpiresAt: { $gt: claimedAt },
+        passwordRecoveryCodeAttempts: { $lt: PASSWORD_RECOVERY_MAX_CODE_ATTEMPTS },
+    };
     if (!valuesMatch(user.passwordRecoveryCodeHash, submittedHash)) {
-        user.passwordRecoveryCodeAttempts =
-            Number(user.passwordRecoveryCodeAttempts || 0) + 1;
-        await user.save();
+        await AdminUser.updateOne(filter, { $inc: { passwordRecoveryCodeAttempts: 1 } }, CLINICAL_QUERY_WRITE_OPTIONS);
         throw createPasswordRecoveryError(
             "INVALID_RECOVERY_CODE",
             "Le code est invalide ou expire."
@@ -161,14 +172,17 @@ export async function verifyPasswordRecoveryCode({
     }
 
     const grant = crypto.randomBytes(32).toString("base64url");
-    user.passwordRecoveryGrantHash = hashPasswordRecoveryGrant(grant);
-    user.passwordRecoveryGrantExpiresAt = new Date(
-        now.getTime() + PASSWORD_RECOVERY_GRANT_TTL_MS
-    );
-    user.passwordRecoveryCodeHash = null;
-    user.passwordRecoveryCodeExpiresAt = null;
-    user.passwordRecoveryCodeAttempts = 0;
-    await user.save();
+    const claimed = await AdminUser.findOneAndUpdate(filter, { $set: {
+        passwordRecoveryGrantHash: hashPasswordRecoveryGrant(grant),
+        passwordRecoveryGrantExpiresAt: new Date(claimedAt.getTime() + PASSWORD_RECOVERY_GRANT_TTL_MS),
+        passwordRecoveryCodeHash: null,
+        passwordRecoveryCodeExpiresAt: null,
+        passwordRecoveryCodeAttempts: 0,
+        passwordRecoveryRequestId: null,
+    } }, { ...CLINICAL_QUERY_WRITE_OPTIONS, returnDocument: "after" });
+    if (!claimed) {
+        throw createPasswordRecoveryError("INVALID_RECOVERY_CODE", "Le code est invalide ou expire.");
+    }
 
     return {
         verified: true,
@@ -181,8 +195,9 @@ export async function completePasswordRecovery({
     recoveryGrant,
     newPassword,
     ip = null,
-    now = new Date(),
+    now,
 }) {
+    const currentTime = () => now ?? new Date();
     const normalizedEmail = normalizeEmail(email);
     const normalizedGrant = String(recoveryGrant || "").trim();
     const passwordViolation = getPasswordPolicyViolation(newPassword);
@@ -197,7 +212,7 @@ export async function completePasswordRecovery({
         );
     }
 
-    const user = await AdminUser.findOne({
+    const snapshot = await AdminUser.findOne({
         email: normalizedEmail,
         isActive: true,
     }).select(
@@ -205,11 +220,11 @@ export async function completePasswordRecovery({
     );
 
     if (
-        !user?.passwordRecoveryGrantHash ||
-        !user.passwordRecoveryGrantExpiresAt ||
-        now >= new Date(user.passwordRecoveryGrantExpiresAt) ||
+        !snapshot?.passwordRecoveryGrantHash ||
+        !snapshot.passwordRecoveryGrantExpiresAt ||
+        currentTime() >= new Date(snapshot.passwordRecoveryGrantExpiresAt) ||
         !valuesMatch(
-            user.passwordRecoveryGrantHash,
+            snapshot.passwordRecoveryGrantHash,
             hashPasswordRecoveryGrant(normalizedGrant)
         )
     ) {
@@ -219,21 +234,39 @@ export async function completePasswordRecovery({
         );
     }
 
-    user.passwordHash = await bcrypt.hash(newPassword, 12);
-    user.refreshTokenHash = null;
-    user.refreshTokenExpiresAt = null;
-    user.sessionStartedAt = null;
-    user.lastActivityAt = null;
-    user.lastLogoutAt = now;
-    user.authTokenInvalidBefore = now;
-    user.passwordResetRequired = false;
-    user.mustChangePasswordOnNextLogin = false;
-    user.passwordRecoveryCodeHash = null;
-    user.passwordRecoveryCodeExpiresAt = null;
-    user.passwordRecoveryCodeAttempts = 0;
-    user.passwordRecoveryGrantHash = null;
-    user.passwordRecoveryGrantExpiresAt = null;
-    await user.save();
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    // Password, one-use grant, session generation and refresh-family revocation
+    // commit together. No email/audit side effect inside a retriable transaction.
+    const user = await AdminUser.db.transaction(async (session) => {
+        const completedAt = currentTime();
+        const changed = await AdminUser.findOneAndUpdate({
+            _id: snapshot._id,
+            isActive: true,
+            passwordHash: snapshot.passwordHash,
+            passwordRecoveryGrantHash: snapshot.passwordRecoveryGrantHash,
+            passwordRecoveryGrantExpiresAt: { $gt: completedAt },
+        }, {
+            $inc: { authVersion: 1 },
+            $set: {
+                passwordHash, refreshTokenHash: null, refreshTokenExpiresAt: null,
+                activeSessionId: null, activeSessionIds: [],
+                sessionStartedAt: null, lastActivityAt: null, lastLogoutAt: completedAt,
+                authTokenInvalidBefore: completedAt, passwordResetRequired: false,
+                mustChangePasswordOnNextLogin: false,
+                passwordRecoveryCodeHash: null, passwordRecoveryCodeExpiresAt: null,
+                passwordRecoveryCodeAttempts: 0, passwordRecoveryRequestId: null,
+                passwordRecoveryGrantHash: null, passwordRecoveryGrantExpiresAt: null,
+                mfaChallengeId: null, mfaChallengePurpose: null,
+                mfaChallengeExpiresAt: null, mfaChallengeAttempts: 0,
+                mfaPendingSecretEncrypted: null, mfaPendingExpiresAt: null,
+            },
+        }, { session, returnDocument: "after" });
+        if (!changed) {
+            throw createPasswordRecoveryError("INVALID_PASSWORD_RECOVERY", "La demande de reinitialisation est invalide ou expiree.");
+        }
+        await revokeRefreshTokenFamiliesForUser(changed._id, "PASSWORD_RECOVERY_COMPLETED", completedAt, { session });
+        return changed;
+    }, { writeConcern: CLINICAL_WRITE_CONCERN });
 
     await recordAuthAuditEvent({
         action: "PASSWORD_CHANGE",

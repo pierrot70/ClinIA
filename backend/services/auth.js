@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { hasCurrentAuthVersion } from "../auth/sessionAccess.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 
@@ -105,6 +106,7 @@ function signAccessToken(user, sessionId = user.activeSessionId) {
             role: user.role,
             username: user.username,
             sid: sessionId || null,
+            av: user.authVersion ?? 0,
         },
         getJwtAccessSecret(),
         {
@@ -155,7 +157,7 @@ function createMfaChallenge(user, purpose) {
 }
 
 function signMfaChallenge(user, purpose, challengeId) {
-    return jwt.sign({ purpose, role: user.role }, getJwtAccessSecret(), {
+    return jwt.sign({ purpose, role: user.role, av: user.authVersion ?? 0 }, getJwtAccessSecret(), {
         subject: String(user._id), algorithm: "HS256", expiresIn: MFA_CHALLENGE_TTL_SECONDS,
         issuer: "clinia-backend", audience: "clinia-mfa", jwtid: challengeId,
     });
@@ -182,6 +184,7 @@ function buildActiveMfaChallengeFilter(userId, challenge, now = new Date()) {
 
 function hasActiveMfaChallenge(user, challenge, now = new Date()) {
     return (
+        hasCurrentAuthVersion(user, challenge?.av) &&
         typeof challenge?.jti === "string" &&
         user?.mfaChallengeId === challenge.jti &&
         user?.mfaChallengePurpose === challenge.purpose &&
@@ -527,6 +530,22 @@ function assertRegisterInput({ username, password, role }) {
     return normalizedUsername;
 }
 
+// Reject writes from login/MFA/refresh operations read before a password reset.
+async function saveWithCurrentCredentials(user) {
+    const previousWhere = user.$where;
+    user.$where = { ...previousWhere, passwordHash: user.passwordHash, isActive: true };
+    try {
+        await user.save();
+    } catch (error) {
+        if (["DocumentNotFoundError", "VersionError"].includes(error?.name)) {
+            throw createAuthError("SESSION_REPLACED", "Cette session n’est plus active. Veuillez vous reconnecter.");
+        }
+        throw error;
+    } finally {
+        user.$where = previousWhere;
+    }
+}
+
 async function setRotatedRefreshToken(
     user,
     familyId = createRefreshTokenFamilyId(),
@@ -540,6 +559,7 @@ async function setRotatedRefreshToken(
         userId: user._id,
         familyId,
         sessionId,
+        authVersion: user.authVersion ?? 0,
         tokenHash,
         expiresAt,
     });
@@ -548,7 +568,12 @@ async function setRotatedRefreshToken(
     // before refresh-token family tracking was introduced.
     user.refreshTokenHash = tokenHash;
     user.refreshTokenExpiresAt = expiresAt;
-    await user.save();
+    try {
+        await saveWithCurrentCredentials(user);
+    } catch (error) {
+        await revokeRefreshTokenFamily(familyId, "AUTH_STATE_CHANGED");
+        throw error;
+    }
 
     return refreshToken;
 }
@@ -580,6 +605,7 @@ async function completeAuthenticatedSession(user, ip, mfaAction = null) {
     const activeSessionIds = [
         ...getKnownActiveSessionIds(user),
         ...activeSessions
+            .filter((session) => hasCurrentAuthVersion(user, session?.authVersion))
             .map((session) => session?.sessionId)
             .filter((value) => typeof value === "string" && value),
     ].filter((value, index, values) => values.indexOf(value) === index);
@@ -933,7 +959,7 @@ export async function login({ username, email, password, req }) {
 
     if (user.mfaLockedUntil) {
         user.mfaLockedUntil = null;
-        await user.save();
+        await saveWithCurrentCredentials(user);
     }
 
     if (!user.mfaEnabled) {
@@ -944,7 +970,7 @@ export async function login({ username, email, password, req }) {
             user,
             replacesExistingSession ? "mfa-concurrent-enroll" : "mfa-enroll"
         );
-        await user.save();
+        await saveWithCurrentCredentials(user);
         return {
             mfaRequired: true, mfaEnrollmentRequired: true,
             mfaChallenge,
@@ -954,7 +980,7 @@ export async function login({ username, email, password, req }) {
     }
 
     const mfaChallenge = createMfaChallenge(user, "mfa-login");
-    await user.save();
+    await saveWithCurrentCredentials(user);
     return { mfaRequired: true, mfaEnrollmentRequired: false, mfaChallenge };
 }
 
@@ -995,7 +1021,7 @@ export async function completeMfaLogin({ mfaChallenge, code, req }) {
             user.mfaRequired = true;
         }
         clearMfaChallenge(user);
-        await user.save();
+        await saveWithCurrentCredentials(user);
         const session = await completeAuthenticatedSession(user, ip, "MFA_ENROLLED");
         return { ...session, recoveryCodes };
     }
@@ -1016,7 +1042,7 @@ export async function completeMfaLogin({ mfaChallenge, code, req }) {
     if (!await consumeMfaChallenge(user, challenge, totpStep)) throw createAuthError("INVALID_MFA_CHALLENGE", "Verification MFA invalide ou expiree.");
     if (recoveryIndex >= 0) user.mfaRecoveryCodeHashes.splice(recoveryIndex, 1);
     clearMfaChallenge(user);
-    await user.save();
+    await saveWithCurrentCredentials(user);
     return completeAuthenticatedSession(user, ip, recoveryIndex >= 0 ? "MFA_RECOVERY_CODE_USED" : "MFA_LOGIN");
 }
 
@@ -1065,6 +1091,10 @@ export async function refresh({ refreshToken, req }) {
             "INVALID_REFRESH_TOKEN",
             "Refresh token invalide."
         );
+    }
+
+    if (!hasCurrentAuthVersion(user, tokenSession.authVersion)) {
+        throw createAuthError("INVALID_REFRESH_TOKEN", "Refresh token invalide.");
     }
 
     const sessionId = tokenSession.sessionId || user.activeSessionId || null;

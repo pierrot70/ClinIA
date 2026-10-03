@@ -1,5 +1,22 @@
 # État du projet ClinIA
 
+## Récupération et sessions — branche du 3 octobre 2026
+
+- Correction isolée dans `maintenance/auth-recovery-hardening`, issue de
+  `coolify` (`a8ceda9`) : codes et grants à usage unique, budget de tentatives
+  atomique, récupération transactionnelle et génération persistante des sessions.
+- La simple demande de code conserve désormais les sessions. La récupération
+  réussie invalide les anciens JWT, refresh tokens et challenges MFA, y compris
+  après une nouvelle connexion. Le MFA déjà activé est conservé.
+- Détails, compatibilité et validation :
+  [récupération et sessions](docs/auth-recovery-hardening.md).
+- Validation locale complète : `CI_LOCAL_PASSED` (1 221 tests frontend,
+  778 backend, 57 auth réexécutés, 15 intégrations récupération, 3 quota et
+  21 réservation ; build, audits et nettoyages réussis).
+- Branche de correction non fusionnée ; ces protections ne sont pas encore
+  vérifiées en production. Les compteurs d'échecs de login et la limite bcrypt
+  restent deux chantiers séparés.
+
 ## Plafond des courriels — 3 octobre 2026
 
 - Limite fixe de 150 tentatives d'envoi par jour UTC, commune aux codes de
@@ -20,8 +37,9 @@
   depuis Brevo et les autres applications ne sont pas comptabilisés. Ce plafond
   porte sur les réservations UTC, pas une fenêtre glissante de 24 heures ni
   l'heure effective de livraison chez le fournisseur.
-- Comportement existant conservé : une demande de récupération peut révoquer
-  les sessions avant l'échec d'envoi ; le quota ne change pas ce mécanisme.
+- Comportement lors du commit du quota : une demande de récupération pouvait
+  révoquer les sessions avant l'échec d'envoi. La branche de récupération
+  décrite ci-dessus corrige séparément ce mécanisme.
 - Test de concurrence dans un MongoDB jetable :
   `bash scripts/run-urgentologist-walk-in-integration.sh --email-quota`.
   Il est inclus dans `bash scripts/ci-local.sh backend` ; aucun courriel externe.

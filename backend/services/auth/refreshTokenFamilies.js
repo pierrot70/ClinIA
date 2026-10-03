@@ -15,6 +15,7 @@ export async function createRefreshTokenSession({
     userId,
     familyId,
     sessionId = null,
+    authVersion = 0,
     tokenHash,
     expiresAt,
     status = REFRESH_TOKEN_SESSION_STATUS.ACTIVE,
@@ -24,6 +25,7 @@ export async function createRefreshTokenSession({
         userId,
         familyId,
         sessionId,
+        authVersion,
         tokenHash,
         expiresAt,
         status,
@@ -72,7 +74,7 @@ export async function listActiveRefreshTokenSessionsForUser(
         expiresAt: { $gt: now },
     })
         .sort({ createdAt: 1 })
-        .select("familyId sessionId createdAt")
+        .select("familyId sessionId authVersion createdAt")
         .lean();
 }
 
@@ -153,17 +155,19 @@ export async function revokeRefreshTokenFamily(
 export async function revokeRefreshTokenFamiliesForUser(
     userId,
     reason,
-    now = new Date()
+    now = new Date(),
+    options = {}
 ) {
     if (!userId) return;
 
-    return revokeRefreshTokenFamiliesForUsers([userId], reason, now);
+    return revokeRefreshTokenFamiliesForUsers([userId], reason, now, options);
 }
 
 export async function revokeRefreshTokenFamiliesForUsers(
     userIds,
     reason,
-    now = new Date()
+    now = new Date(),
+    options = {}
 ) {
     const validUserIds = Array.isArray(userIds)
         ? userIds.filter(Boolean)
@@ -186,6 +190,7 @@ export async function revokeRefreshTokenFamiliesForUsers(
                 revokedAt: now,
                 revocationReason: reason,
             },
-        }
+        },
+        options
     );
 }

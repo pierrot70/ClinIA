@@ -81,6 +81,9 @@ const AdminUserSchema = new mongoose.Schema({
         default: null,
         index: true,
     },
+    // Missing means generation zero for existing accounts. No default: stale
+    // hydrated documents must never write zero over a committed increment.
+    authVersion: { type: Number, min: 0 },
     // Legacy single-session value retained while older issued tokens expire.
     activeSessionId: {
         type: String,
@@ -141,6 +144,7 @@ const AdminUserSchema = new mongoose.Schema({
         default: null,
         select: false,
     },
+    passwordRecoveryRequestId: { type: String, default: null, select: false },
     passwordRecoveryGrantHash: {
         type: String,
         default: null,

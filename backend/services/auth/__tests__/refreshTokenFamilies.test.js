@@ -56,6 +56,7 @@ describe("refresh token families", () => {
             tokenHash: "a".repeat(64),
             expiresAt,
             status: "ACTIVE",
+            authVersion: 0,
             rotatedAt: null,
         });
     });
@@ -119,7 +120,8 @@ describe("refresh token families", () => {
                     revokedAt: now,
                     revocationReason: "SCHEDULED_SHUTDOWN",
                 },
-            }
+            },
+            {}
         );
     });
 
