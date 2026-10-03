@@ -13,9 +13,13 @@
 - Validation locale complète : `CI_LOCAL_PASSED` (1 221 tests frontend,
   778 backend, 57 auth réexécutés, 15 intégrations récupération, 3 quota et
   21 réservation ; build, audits et nettoyages réussis).
-- Branche de correction non fusionnée ; ces protections ne sont pas encore
-  vérifiées en production. Les compteurs d'échecs de login et la limite bcrypt
-  restent deux chantiers séparés.
+- Déploiement de la branche annoncé par l'utilisateur ; le parcours complet
+  de récupération n'a pas encore été vérifié sur les instances de production.
+  Les compteurs d'échecs de login et la limite bcrypt restent deux chantiers
+  séparés.
+- Lanceur VS Code : `bash scripts/test-auth-recovery-local.sh`, 16 scénarios
+  réussis avec MongoDB jetable, courriels simulés et nettoyage confirmé.
+  Il inclut le parcours HTTP curl ; il ne vérifie pas le déploiement Coolify.
 
 ## Plafond des courriels — 3 octobre 2026
 

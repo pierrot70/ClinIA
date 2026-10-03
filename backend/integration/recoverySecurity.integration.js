@@ -4,6 +4,14 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
+import express from "express";
+import { once } from "node:events";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { mkdtemp, writeFile, readFile, copyFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { createAuthRouter } from "../routes/auth.js";
 import { sendPasswordRecoveryCode, sendPasswordChangedConfirmation } from "../services/passwordRecoveryEmail.js";
 import { AdminUser } from "../models/AdminUser.js";
 import { RefreshTokenSession } from "../models/RefreshTokenSession.js";
@@ -14,6 +22,7 @@ import { isTokenFromInactiveSession } from "../auth/sessionAccess.js";
 import { verifyJWT } from "../middleware/verifyJWT.js";
 
 vi.mock("../services/passwordRecoveryEmail.js", () => ({
+    isPasswordRecoveryDeliveryConfigured: () => true,
     sendPasswordRecoveryCode: vi.fn().mockResolvedValue(undefined),
     sendPasswordChangedConfirmation: vi.fn().mockResolvedValue(undefined),
 }));
@@ -303,4 +312,71 @@ it("refuses an MFA write suspended after challenge consumption across recovery",
     const current = await AdminUser.findById(user._id).select("+mfaRecoveryCodeHashes");
     expect(current.mfaRecoveryCodeHashes).toEqual([hashRecoveryCode(code)]);
     expect(current.mfaEnabled).toBe(true);
+});
+
+// Real HTTP/curl path, cookie rotation and route guards. SMTP remains mocked:
+// this test cannot invoke Nodemailer or consume the production email budget.
+it("validates the complete recovery HTTP workflow with curl and synthetic email", async () => {
+    const work = await mkdtemp(path.join(tmpdir(), "clinia-recovery-http-"));
+    const app = express();
+    app.use(express.json());
+    const server = app.listen(0, "127.0.0.1");
+    try {
+        await once(server, "listening");
+        const base = `http://127.0.0.1:${server.address().port}`;
+        vi.stubEnv("CLINIA_ALLOWED_ORIGINS", base);
+        app.use("/api/auth", createAuthRouter());
+        const file = name => path.join(work, name);
+        const curl = promisify(execFile);
+        async function request(route, expected, {body, auth, cookies, saveCookies} = {}) {
+            const args = ["--disable", "--noproxy", "*", "--silent", "--show-error", "--connect-timeout", "3", "--max-time", "15",
+                "--output", file("response"), "--write-out", "%{http_code}", "--header", `Origin: ${base}`];
+            if (body !== undefined) {
+                await writeFile(file("body"), JSON.stringify(body), {mode: 0o600});
+                args.push("--header", "Content-Type: application/json", "--data-binary", `@${file("body")}`);
+            }
+            if (auth) args.push("--header", `@${file(auth)}`);
+            if (cookies) args.push("--cookie", file(cookies));
+            if (saveCookies) args.push("--cookie-jar", file(saveCookies));
+            args.push(`${base}/api/auth/${route}`);
+            const {stdout} = await curl("curl", args);
+            expect(Number(stdout), `${route}: expected HTTP ${expected}`).toBe(expected);
+            return JSON.parse(await readFile(file("response"), "utf8"));
+        }
+        async function saveAccess(response, name) {
+            expect(typeof response.data.accessToken).toBe("string");
+            await writeFile(file(name), `Authorization: Bearer ${response.data.accessToken}\n`, {mode: 0o600});
+        }
+        const credentials = {username: user.username, password: "Original-synthetic-password!"};
+        await saveAccess(await request("login", 200, {body: credentials, saveCookies: "old-cookies"}), "old-access");
+        await request("session", 200, {auth: "old-access"});
+        await request("password-recovery/request", 202, {body: {email}});
+        expect(sendPasswordRecoveryCode).toHaveBeenCalledOnce();
+        const code = vi.mocked(sendPasswordRecoveryCode).mock.calls[0][0].code;
+        // Merely requesting recovery must preserve the existing session/refresh.
+        await request("session", 200, {auth: "old-access"});
+        await request("refresh", 200, {body: {}, cookies: "old-cookies", saveCookies: "rotated-old-cookies"});
+        await copyFile(file("rotated-old-cookies"), file("old-cookies"));
+        const verified = await request("password-recovery/verify", 200, {body: {email, code}});
+        expect((await request("password-recovery/verify", 400, {body: {email, code}})).error.code).toBe("INVALID_RECOVERY_CODE");
+        const completion = {email, recoveryGrant: verified.data.recoveryGrant, newPassword};
+        expect((await request("password-recovery/complete", 200, {body: completion})).data.success).toBe(true);
+        expect(sendPasswordChangedConfirmation).toHaveBeenCalledOnce();
+        expect((await request("password-recovery/complete", 400, {body: completion})).error.code).toBe("INVALID_PASSWORD_RECOVERY");
+        await request("session", 401, {auth: "old-access"});
+        expect((await request("refresh", 401, {body: {}, cookies: "old-cookies"})).error.code).toBe("INVALID_REFRESH_TOKEN");
+        expect((await request("login", 401, {body: credentials})).error.code).toBe("INVALID_CREDENTIALS");
+        await saveAccess(await request("login", 200, {body: {...credentials, password: newPassword}, saveCookies: "new-cookies"}), "new-access");
+        await request("session", 200, {auth: "new-access"});
+        await request("session", 401, {auth: "old-access"});
+        await request("refresh", 401, {body: {}, cookies: "old-cookies"});
+        await saveAccess(await request("refresh", 200, {body: {}, cookies: "new-cookies", saveCookies: "current-cookies"}), "new-access");
+        await request("logout", 200, {body: {}, auth: "new-access", cookies: "current-cookies"});
+        await request("session", 401, {auth: "new-access"});
+        console.log("AUTH_HTTP_OK login recovery single_use old_sessions_refused new_login refresh logout email=simulated");
+    } finally {
+        server.closeAllConnections();
+        await new Promise(resolve => server.close(resolve));
+        await rm(work, {recursive: true, force: true});
+    }
 });
