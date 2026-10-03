@@ -36,7 +36,7 @@ jobs:
         run: bash ../scripts/ci-local.sh backend reauth
       - name: Prepare disposable MongoDB integration image
         run: bash ../scripts/ci-local.sh backend mongo
-      - name: Walk-in capacity integration (41 arrivals and last-place race)
+      - name: Disposable MongoDB integration (email quota and booking concurrency)
         run: bash ../scripts/ci-local.sh backend integration
       - name: Archive minimized validation evidence (also on failure)
         if: always()

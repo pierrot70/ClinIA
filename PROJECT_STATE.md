@@ -1,5 +1,36 @@
 # État du projet ClinIA
 
+## Plafond des courriels — 3 octobre 2026
+
+- Limite fixe de 150 tentatives d'envoi par jour UTC, commune aux codes de
+  récupération et confirmations de changement de mot de passe. Aucun paramètre
+  d'environnement ni entrée API ne permet de relever cette limite.
+- Compteur MongoDB `emaildailyquotas`, clé unique `_id` au format `YYYY-MM-DD`,
+  incrément conditionnel atomique avec écriture majoritaire journalisée avant
+  tout appel SMTP. Partagé entre les backends et conservé après redémarrage.
+  Uniquement la date et le nombre : aucune adresse ou donnée de message.
+- Un échec SMTP consomme sa réservation. Une erreur de base bloque l'envoi.
+  Nouveau budget à minuit UTC ; les compteurs précédents ne sont pas effacés.
+  Ne pas supprimer/modifier ces compteurs pour débloquer des envois.
+- La réponse publique de récupération reste générique ; les erreurs portent
+  les codes sûrs `EMAIL_DAILY_LIMIT_REACHED` ou `EMAIL_QUOTA_UNAVAILABLE`.
+  Une confirmation non envoyée n'annule pas un changement de mot de passe réussi.
+- Portée : envois de cette application utilisant cette base, à partir du
+  déploiement de la garde. Les courriels antérieurs, ceux envoyés directement
+  depuis Brevo et les autres applications ne sont pas comptabilisés. Ce plafond
+  porte sur les réservations UTC, pas une fenêtre glissante de 24 heures ni
+  l'heure effective de livraison chez le fournisseur.
+- Comportement existant conservé : une demande de récupération peut révoquer
+  les sessions avant l'échec d'envoi ; le quota ne change pas ce mécanisme.
+- Test de concurrence dans un MongoDB jetable :
+  `bash scripts/run-urgentologist-walk-in-integration.sh --email-quota`.
+  Il est inclus dans `bash scripts/ci-local.sh backend` ; aucun courriel externe.
+- Validation : `CI_COMPONENT_PASSED: backend` (752 tests, 57 régressions auth,
+  3 intégrations quota et 21 intégrations réservation ; nettoyage confirmé).
+  Dernier test quota après adaptation de l'option Mongoose : 3/3 réussis.
+  Journaux : `/tmp/clinia-email-quota-ci.log`, `/tmp/clinia-email-quota-final.log`.
+  Garde validée localement, pas encore déployée en production.
+
 ## Brevo et maintenance des dépendances — 3 octobre 2026
 
 - Brevo : commit `a1f4e1a` déployé par l'utilisateur sur les deux backends ;

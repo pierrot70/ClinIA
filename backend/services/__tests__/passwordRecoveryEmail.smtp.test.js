@@ -2,6 +2,9 @@ import net from "node:net";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendPasswordRecoveryCode, sendPasswordChangedConfirmation } from "../passwordRecoveryEmail.js";
 
+// Quota concurrency is exercised separately against disposable MongoDB.
+vi.mock("../emailDailyQuota.js", () => ({ reserveEmailAttempt: vi.fn().mockResolvedValue(undefined) }));
+
 // Real Nodemailer against a loopback-only SMTP sink; no external delivery.
 describe("password recovery SMTP compatibility", () => {
     let server;

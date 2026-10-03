@@ -33,7 +33,10 @@ run_step() (
         tests) npm test -- --run ;;
         reauth) npm test -- --run services/__tests__/auth.service.test.js --sequence.shuffle --sequence.seed=3 ;;
         mongo) check_docker; docker pull mongo:7 ;;
-        integration) npm run test:validation-report ;;
+        integration)
+            bash "$root/scripts/run-urgentologist-walk-in-integration.sh" --email-quota
+            npm run test:validation-report
+            ;;
         build) npm run build ;;
     esac
 )

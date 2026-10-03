@@ -1,8 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { reserveEmailAttempt } from "../emailDailyQuota.js";
+
+vi.mock("../emailDailyQuota.js", () => ({ reserveEmailAttempt: vi.fn() }));
 
 const sendMailMock = vi.fn();
 const createTransportMock = vi.fn(() => ({
     sendMail: sendMailMock,
+    close: vi.fn(),
 }));
 
 vi.mock("nodemailer", () => ({
@@ -21,6 +25,34 @@ describe("password recovery email service", () => {
         vi.stubEnv("SMTP_PASSWORD", "");
         createTransportMock.mockClear();
         sendMailMock.mockReset().mockResolvedValue(undefined);
+        vi.mocked(reserveEmailAttempt).mockReset().mockResolvedValue(undefined);
+    });
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("rejects recipient lists without consuming quota or contacting SMTP", async () => {
+        const { sendPasswordRecoveryCode } = await import("../passwordRecoveryEmail.js");
+        await expect(sendPasswordRecoveryCode({ email: "one@example.invalid,two@example.invalid", code: "123456" }))
+            .rejects.toMatchObject({ code: "EMAIL_RECIPIENT_INVALID" });
+        expect(reserveEmailAttempt).not.toHaveBeenCalled();
+        expect(createTransportMock).not.toHaveBeenCalled();
+    });
+
+    it.each(["EMAIL_DAILY_LIMIT_REACHED", "EMAIL_QUOTA_UNAVAILABLE"])("blocks both email types before SMTP when %s", async (code) => {
+        vi.mocked(reserveEmailAttempt).mockRejectedValue(Object.assign(new Error("blocked"), { code }));
+        const { sendPasswordRecoveryCode, sendPasswordChangedConfirmation } = await import("../passwordRecoveryEmail.js");
+        await expect(sendPasswordRecoveryCode({ email: "synthetic@example.invalid", code: "123456" })).rejects.toMatchObject({ code });
+        await expect(sendPasswordChangedConfirmation({ email: "synthetic@example.invalid" })).rejects.toMatchObject({ code });
+        expect(createTransportMock).not.toHaveBeenCalled();
+        expect(sendMailMock).not.toHaveBeenCalled();
+    });
+
+    it("reserves before SMTP and propagates a delivery failure", async () => {
+        sendMailMock.mockImplementation(async () => {
+            expect(reserveEmailAttempt).toHaveBeenCalledTimes(1);
+            throw new Error("synthetic SMTP failure");
+        });
+        const { sendPasswordRecoveryCode } = await import("../passwordRecoveryEmail.js");
+        await expect(sendPasswordRecoveryCode({ email: "synthetic@example.invalid", code: "123456" })).rejects.toThrow("synthetic SMTP failure");
     });
 
     it("sends the six-digit code through the configured SMTP server", async () => {

@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { reserveEmailAttempt } from "./emailDailyQuota.js";
 
 export function isPasswordRecoveryDeliveryConfigured() {
     const host = String(process.env.SMTP_HOST || "").trim();
@@ -38,13 +39,27 @@ function getSmtpConfig() {
     };
 }
 
+async function sendLimitedEmail(message) {
+    // Nodemailer accepts recipient lists: explicitly allow only one mailbox.
+    if (typeof message.to !== "string" || !/^[^\s@,;<>:"()\\]+@[^\s@,;<>:"()\\]+$/.test(message.to)) {
+        throw Object.assign(new Error("Invalid email recipient"), { code: "EMAIL_RECIPIENT_INVALID" });
+    }
+    const config = getSmtpConfig();
+    await reserveEmailAttempt();
+    const transporter = nodemailer.createTransport(config);
+    try {
+        await transporter.sendMail(message);
+    } finally {
+        transporter.close();
+    }
+}
+
 export async function sendPasswordRecoveryCode({ email, code }) {
-    const transporter = nodemailer.createTransport(getSmtpConfig());
     const from =
         String(process.env.SMTP_FROM || "").trim() ||
         "ClinIA <securite@clinique-ai.ca>";
 
-    await transporter.sendMail({
+    await sendLimitedEmail({
         from,
         to: email,
         subject: "Votre code de verification ClinIA",
@@ -60,12 +75,11 @@ export async function sendPasswordRecoveryCode({ email, code }) {
 }
 
 export async function sendPasswordChangedConfirmation({ email }) {
-    const transporter = nodemailer.createTransport(getSmtpConfig());
     const from =
         String(process.env.SMTP_FROM || "").trim() ||
         "ClinIA <securite@clinique-ai.ca>";
 
-    await transporter.sendMail({
+    await sendLimitedEmail({
         from,
         to: email,
         subject: "Votre mot de passe ClinIA a ete modifie",
