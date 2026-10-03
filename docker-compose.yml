@@ -91,6 +91,14 @@ services:
       CLINIA_TRUST_PROXY_CIDRS: "${CLINIA_TRUST_PROXY_CIDRS:-loopback}"
       # Required in production. Generate with: openssl rand -base64 48
       MFA_ENCRYPTION_KEY: "${MFA_ENCRYPTION_KEY}"
+      # Runtime SMTP settings, inherited by backend-replica. Keep keys in Coolify.
+      PASSWORD_RECOVERY_ENABLED: "${PASSWORD_RECOVERY_ENABLED:-true}"
+      SMTP_HOST: "${SMTP_HOST:-}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_SECURE: "${SMTP_SECURE:-false}"
+      SMTP_USERNAME: "${SMTP_USERNAME:-}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      SMTP_FROM: "${SMTP_FROM:-ClinIA <securite@clinique-ai.ca>}"
       MONGO_BACKUP_DIR: /var/backups/clinia/mongo
       MONGO_BACKUP_KEEP_DIR: /var/backups/clinia/mongo-keep
       MONGO_BACKUP_RETENTION_DAYS: "7"
