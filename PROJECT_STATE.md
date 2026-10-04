@@ -1,5 +1,33 @@
 # État du projet ClinIA
 
+## Échecs de connexion concurrents — branche du 4 octobre 2026
+
+- Branche `maintenance/auth-login-throttle`, issue de `coolify` (`79056ad`).
+  Écriture conditionnelle du compteur par compte/source : une requête dont
+  l'état lu a changé recommence au lieu d'écraser une tentative concurrente.
+- Création concurrente arbitrée par l'index unique existant `user_ip_hash_unique`.
+  Les écritures de compteur sont majoritaires et journalisées. Les erreurs
+  MongoDB et l'épuisement des reprises restent des refus, sans autorisation
+  de connexion par défaut.
+- Seuil de cinq échecs et délais 1/5/15 minutes conservés ; aucune prolongation
+  pendant un blocage actif. Un historique expiré est ignoré même avant son
+  effacement TTL. La décision de créer un incident est unique par nouveau
+  niveau, mais la livraison de cet incident n'est pas transactionnelle.
+- Huit intégrations MongoDB jetables réussies : création/mise à jour en rafale,
+  seuil, délais, séparation des comptes/sources, login réel, expiration et
+  remise à zéro concurrente. Aucun test d'écriture en production.
+- Validation : `bash scripts/ci-local.sh backend`, `CI_COMPONENT_PASSED` :
+  779 tests backend, 57 auth réexécutés, 8 intégrations compteur, 16 récupération,
+  3 quota et 21 réservation ; audit réussi et nettoyages confirmés. Journal :
+  `/tmp/clinia-throttle-backend-ci.log`. Frontend inchangé, non réexécuté ici.
+  Le rapport réservation `d2ca9eb1-01d5-474d-bb94-b64bace256be` valide l'arbre
+  avant commit (`dirty: true`), pas le déploiement du SHA de base.
+- Rejouer le contrôle ciblé :
+  `bash scripts/run-urgentologist-walk-in-integration.sh --login-throttle`.
+- Agent-Contribution: backend | compteur conditionnel et tests de concurrence
+- Agent-Review: security | concurrence, expiration, erreurs et limites des incidents ; revue statique
+- La limite de longueur bcrypt reste le prochain point séparé.
+
 ## Récupération et sessions — branche du 3 octobre 2026
 
 - Correction isolée dans `maintenance/auth-recovery-hardening`, issue de
@@ -13,10 +41,11 @@
 - Validation locale complète : `CI_LOCAL_PASSED` (1 221 tests frontend,
   778 backend, 57 auth réexécutés, 15 intégrations récupération, 3 quota et
   21 réservation ; build, audits et nettoyages réussis).
-- Déploiement de la branche annoncé par l'utilisateur ; le parcours complet
-  de récupération n'a pas encore été vérifié sur les instances de production.
-  Les compteurs d'échecs de login et la limite bcrypt restent deux chantiers
-  séparés.
+- `79056ad` confirmé sur les deux backends en lecture seule le 4 octobre.
+  Test manuel utilisateur à 8 h 35 : ancienne session refusée après récupération
+  et toujours déconnectée après reconnexion dans l'autre navigateur. Ce scénario
+  est validé en production ; il ne constitue pas une validation de tous les
+  scénarios concurrents ni de tous les parcours de changement de mot de passe.
 - Lanceur VS Code : `bash scripts/test-auth-recovery-local.sh`, 16 scénarios
   réussis avec MongoDB jetable, courriels simulés et nettoyage confirmé.
   Il inclut le parcours HTTP curl ; il ne vérifie pas le déploiement Coolify.

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
     getLoginFailureThrottle,
@@ -14,13 +14,21 @@ function createModel() {
 
     return {
         async findOne(query) {
-            return records.get(keyFor(query)) || null;
+            const record = records.get(keyFor(query));
+            return record ? {...record} : null;
         },
         async findOneAndUpdate(query, update) {
             const key = keyFor(query);
-            const next = { ...(records.get(key) || {}), ...update.$set };
+            const current = records.get(key);
+            if (update.$setOnInsert) {
+                if (current) return {...current};
+                records.set(key, {_id: key, ...update.$setOnInsert});
+                return null;
+            }
+            if (!current || Object.entries(query).some(([field, value]) => String(current[field]) !== String(value))) return null;
+            const next = { ...current, ...update.$set };
             records.set(key, next);
-            return next;
+            return {...next};
         },
         async deleteOne(query) {
             records.delete(keyFor(query));
@@ -88,4 +96,12 @@ describe("login failure throttle", () => {
         expect(lockedAgain.blockedUntil).toEqual(new Date(secondWindow.getTime() + LOGIN_FAILURE_DELAYS_MS[1]));
         expect(hashLoginFailureIp(ip)).not.toContain(ip);
     });
+});
+
+it("fails closed on write failure and exhausted compare-and-set conflicts", async () => {
+    const record = {_id: "one", userId: "user-1", failureCount: 1, penaltyLevel: 0};
+    const model = {findOne: vi.fn().mockResolvedValue(record), findOneAndUpdate: vi.fn().mockRejectedValue(new Error("write failed"))};
+    await expect(recordLoginFailure({userId: "user-1", ip: "127.0.0.1", LoginFailureThrottleModel: model})).rejects.toThrow("write failed");
+    model.findOneAndUpdate.mockResolvedValue(null);
+    await expect(recordLoginFailure({userId: "user-1", ip: "127.0.0.1", LoginFailureThrottleModel: model})).rejects.toMatchObject({code: "LOGIN_FAILURE_THROTTLE_UNAVAILABLE"});
 });
