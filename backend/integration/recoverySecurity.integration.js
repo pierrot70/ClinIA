@@ -17,7 +17,8 @@ import { AdminUser } from "../models/AdminUser.js";
 import { RefreshTokenSession } from "../models/RefreshTokenSession.js";
 import { completePasswordRecovery, requestPasswordRecoveryCode, verifyPasswordRecoveryCode, hashPasswordRecoveryCode, hashPasswordRecoveryGrant } from "../services/passwordRecovery.js";
 import { login, refresh, completeMfaLogin, reauthenticate, resetUserPassword, completeForcedPasswordChange } from "../services/auth.js";
-import { hashRecoveryCode } from "../services/auth/mfa.js";
+import { createMfaSecret, encryptMfaSecret, hashRecoveryCode } from "../services/auth/mfa.js";
+import { run as runAdminResetSmoke } from "../../scripts/auth-admin-reset-smoke.mjs";
 import { isTokenFromInactiveSession } from "../auth/sessionAccess.js";
 import { verifyJWT } from "../middleware/verifyJWT.js";
 
@@ -378,6 +379,69 @@ it("validates the complete recovery HTTP workflow with curl and synthetic email"
         server.closeAllConnections();
         await new Promise(resolve => server.close(resolve));
         await rm(work, {recursive: true, force: true});
+    }
+});
+
+it.each([false, true])("runs the administrative reset terminal script with MFA and cleanup (injected failure=%s)", async failReset => {
+    vi.stubEnv("MFA_ENCRYPTION_KEY", "synthetic-terminal-test-encryption-key-only");
+    const password = "Synthetic-terminal-admin-password!";
+    const recoveryCode = "A1234B5678";
+    const administrator = await AdminUser.create({
+        username: "synthetic-terminal-admin", email: "terminal-admin@example.invalid",
+        role: "SUPERADMIN", isActive: true, passwordHash: await bcrypt.hash(password, 4),
+        mfaEnabled: true, mfaSecretEncrypted: encryptMfaSecret(createMfaSecret()),
+        mfaRecoveryCodeHashes: [hashRecoveryCode(recoveryCode)],
+    });
+    const initialIds = (await AdminUser.find({}).select("_id").lean()).map(doc => String(doc._id)).sort();
+    const app = express();
+    app.use(express.json());
+    app.get("/api/health/ready", (_req, res) => res.json({data: {status: "ok", dependencies: {mongo: "connected"}}}));
+    const server = app.listen(0, "127.0.0.1");
+    const responses = [administrator.username, password, recoveryCode];
+    const report = vi.fn();
+    const prompt = vi.fn(async () => {
+        if (!responses.length) throw new Error("Unexpected terminal prompt");
+        return responses.shift();
+    });
+    try {
+        await once(server, "listening");
+        const base = `http://127.0.0.1:${server.address().port}`;
+        vi.stubEnv("CLINIA_ALLOWED_ORIGINS", base);
+        let fixtureId;
+        let rejected = false;
+        app.post("/api/auth/users/:userId/reset-password", (req, res, next) => {
+            if (!failReset || rejected) return next();
+            rejected = true;
+            fixtureId = req.params.userId;
+            return res.status(400).json({error: {code: "SYNTHETIC_FAILURE"}});
+        });
+        app.use("/api/auth", createAuthRouter());
+        const outcome = runAdminResetSmoke({base, prompt, report});
+        let result;
+        if (failReset) {
+            await expect(outcome).rejects.toThrow("HTTP 400");
+            result = {userId: fixtureId};
+        } else result = await outcome;
+        expect(prompt).toHaveBeenCalledTimes(3);
+        expect(responses).toEqual([]);
+        if (failReset) expect(report).not.toHaveBeenCalledWith("AUTH_ADMIN_RESET_PASSED");
+        else expect(report).toHaveBeenCalledWith("AUTH_ADMIN_RESET_PASSED");
+        expect(report).toHaveBeenCalledWith(expect.stringMatching(/^CLEANUP_OK\b/));
+        expect(await AdminUser.findById(result.userId)).toBeNull();
+        expect((await AdminUser.find({}).select("_id").lean()).map(doc => String(doc._id)).sort()).toEqual(initialIds);
+        expect(await RefreshTokenSession.countDocuments({userId: result.userId, status: "ACTIVE"})).toBe(0);
+        const currentAdmin = await AdminUser.findById(administrator._id).select("+mfaRecoveryCodeHashes");
+        expect(currentAdmin.mfaEnabled).toBe(true);
+        expect(currentAdmin.mfaRecoveryCodeHashes).toEqual([]);
+        expect(sendPasswordRecoveryCode).not.toHaveBeenCalled();
+        expect(sendPasswordChangedConfirmation).not.toHaveBeenCalled();
+        // Neither the terminal reports nor prompt labels may echo credentials.
+        const output = JSON.stringify([...report.mock.calls, ...prompt.mock.calls]);
+        expect(output).not.toContain(password);
+        expect(output).not.toContain(recoveryCode);
+    } finally {
+        server.closeAllConnections();
+        await new Promise(resolve => server.close(resolve));
     }
 });
 

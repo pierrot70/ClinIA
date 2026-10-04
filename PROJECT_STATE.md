@@ -12,11 +12,29 @@
   Voir [preuves et portée](docs/auth-admin-reset-review-20261004.md).
   Correction sur `maintenance/auth-admin-reset-hardening` : révocation atomique
   par génération sur les deux parcours, MFA inscrit préservé, requêtes tardives
-  refusées. Aucun push ni validation de production pour ce nouveau correctif.
+  refusées. Correctif `84f42da` publié dans `coolify` et confirmé sur les deux
+  backends en production (healthy, readiness HTTP 200, MongoDB connecté).
 - Validation de ce correctif : `CI_LOCAL_PASSED`, 1 245 tests frontend,
   790 backend, 59 auth réexécutés, 8 compteur, 31 récupération, 3 quota,
   21 réservation ; build, audits et nettoyages réussis. Rapport local
   `592997f6-048f-4c5e-9de6-1949c214c49a` (arbre modifié avant commit).
+
+## Client terminal et validation en production — 4 octobre 2026
+
+- Client local `bash scripts/test-auth-admin-reset-production.sh`, API HTTPS,
+  connexion SUPERADMIN avec MFA et réauthentification normale, compte USER
+  synthétique unique, aucun SSH ni accès direct MongoDB ni envoi SMTP.
+- Validation locale du même client : 33/33 tests de récupération réussis,
+  incluant le parcours MFA et le nettoyage après une erreur HTTP injectée ;
+  MongoDB jetable supprimé (`AUTH_RECOVERY_LOCAL_PASSED`).
+- Exécution en production confirmée par la sortie fournie par l'utilisateur :
+  `RESET_OK`, `FORCED_CHANGE_OK`, `CLEANUP_OK`, `AUTH_ADMIN_RESET_PASSED`.
+  Réinitialisation administrative, refus des anciens accès/renouvellements
+  après reconnexion, changement obligatoire, renouvellement et déconnexion
+  validés. Compte temporaire supprimé ; audits conservés, métadonnées de
+  renouvellement révoquées et compteurs soumis aux TTL existants.
+- Cette validation ne couvre pas la concurrence en production ni l'ensemble
+  de la sécurité de l'application. Voir le [mode d'emploi du client](scripts/test-auth-admin-reset-production.md).
 
 ## Échecs de connexion concurrents — branche du 4 octobre 2026
 
