@@ -65,6 +65,17 @@ describe("LoginPage MFA recovery codes", () => {
         });
     });
 
+    it("passes an existing password over 72 bytes to login unchanged", async () => {
+        const password = "é".repeat(64);
+        render(<MemoryRouter><LoginPage /></MemoryRouter>);
+        fireEvent.change(screen.getByLabelText("Identifiant (courriel ou nom d'utilisateur)"), {
+            target: { value: "legacy@clinia.test" },
+        });
+        fireEvent.change(screen.getByLabelText("Mot de passe"), { target: { value: password } });
+        fireEvent.click(screen.getByRole("button", { name: "Se connecter" }));
+        await waitFor(() => expect(auth.login).toHaveBeenCalledWith({ email: "legacy@clinia.test", password }));
+    });
+
     it("shows a full-screen explanation when a newer sign-in replaced this session", async () => {
         window.sessionStorage.setItem(
             "clinia.auth.security_notice",

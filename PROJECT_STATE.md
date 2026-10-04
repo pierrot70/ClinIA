@@ -26,7 +26,37 @@
   `bash scripts/run-urgentologist-walk-in-integration.sh --login-throttle`.
 - Agent-Contribution: backend | compteur conditionnel et tests de concurrence
 - Agent-Review: security | concurrence, expiration, erreurs et limites des incidents ; revue statique
-- La limite de longueur bcrypt reste le prochain point séparé.
+- Correction réunie avec la limite bcrypt dans la fusion du 4 octobre ci-dessous.
+
+## Limite des nouveaux mots de passe — 4 octobre 2026
+
+- Branche indépendante `maintenance/auth-password-bytes`, issue de `coolify`
+  (`79056ad`). Les nouveaux mots de passe sont limités à 72 octets UTF-8,
+  avant bcrypt, sur les créations et tous les parcours de remplacement.
+  Aucune troncature ou normalisation n'est appliquée.
+- Les formulaires affichent un message statique dans les neuf langues,
+  dérivé de la source française versionnée. Un caractère accentué ou un
+  émoji peut occuper plusieurs octets.
+- Les connexions et réauthentifications existantes restent compatibles.
+  Les anciens hashes bcrypt ne permettent pas de retrouver la longueur
+  originale : leur comportement de troncature demeure jusqu'au remplacement
+  du mot de passe. Aucune migration automatique des comptes n'est effectuée.
+- MongoDB jetable : 17 scénarios récupération réussis, dont connexion et
+  réauthentification avec un ancien mot de passe de 80 octets, refus de le
+  réutiliser comme nouveau mot de passe, puis remplacement conforme réussi.
+  Courriels simulés et nettoyage confirmé ; aucune écriture en production.
+- Développement indépendant des compteurs de connexion ; les deux corrections
+  sont réunies dans `coolify` le 4 octobre pour validation combinée.
+- Validation complète : `CI_LOCAL_PASSED`, 1 245 tests frontend, 786 backend,
+  59 auth réexécutés, 17 intégrations récupération, 3 quota et 21 réservation.
+  Build, audits et nettoyages réussis. Rapport local :
+  `4d56bafc-9285-4489-81ca-8abb6965304d` (arbre modifié testé avant commit).
+- Validation en production à effectuer après déploiement de la fusion.
+
+Agent-Contribution: backend | limite UTF-8 avant hash et compatibilité des anciennes connexions
+Agent-Contribution: frontend | gardes des formulaires et messages dans neuf langues
+Agent-Review: security | revue statique des chemins de création, remplacement et compatibilité ; pas de validation production
+Validation: bash scripts/ci-local.sh | CI_LOCAL_PASSED le 4 octobre 2026
 
 ## Récupération et sessions — branche du 3 octobre 2026
 

@@ -1,3 +1,5 @@
+import { exceedsNewPasswordByteLimit } from "../auth/passwordPolicy";
+import { passwordPolicyLabels } from "../i18n/passwordPolicyLabels";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { getDefaultRouteForRole, isAdminRole, type UserRole } from "../auth/roles";
@@ -66,6 +68,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
         passwordResetRequired,
         mustChangePasswordOnNextLogin,
     } = useAuth();
+    const { locale } = useHomeI18n();
+    const passwordTooLong = passwordPolicyLabels(locale).tooLong;
     const loginLabels = labels.loginPage;
     const titleAdmin = useLoginLabel(loginLabels.title.admin, "login.title.admin");
     const titleRegister = useLoginLabel(loginLabels.title.register, "login.title.register");
@@ -160,6 +164,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
+        if (registerMode && !adminOnly && exceedsNewPasswordByteLimit(password)) {
+            setError(passwordTooLong);
+            return;
+        }
         setLoading(true);
         setError(null);
         setSecurityNotice(null);
@@ -275,6 +283,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                 return;
             }
 
+            if (exceedsNewPasswordByteLimit(newPassword)) {
+                setError(passwordTooLong);
+                return;
+            }
             if (newPassword !== confirmPassword) {
                 setError(recoveryPasswordsMismatchLabel);
                 return;
@@ -447,7 +459,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                                     id="recovery-new-password"
                                     type="password"
                                     minLength={12}
-                                    maxLength={128}
                                     className="w-full rounded-lg border px-3 py-2 text-sm"
                                     value={newPassword}
                                     onChange={(event) => setNewPassword(event.target.value)}
@@ -463,7 +474,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                                     id="recovery-confirm-password"
                                     type="password"
                                     minLength={12}
-                                    maxLength={128}
                                     className="w-full rounded-lg border px-3 py-2 text-sm"
                                     value={confirmPassword}
                                     onChange={(event) => setConfirmPassword(event.target.value)}

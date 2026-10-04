@@ -1,3 +1,5 @@
+import { exceedsNewPasswordByteLimit } from "../auth/passwordPolicy";
+import { passwordPolicyLabels } from "../i18n/passwordPolicyLabels";
 import React, { useContext, useState } from "react";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { useAuth } from "../hooks/useAuth";
@@ -33,6 +35,10 @@ const ChangePasswordRequiredPage: React.FC = () => {
         setError(null);
         setDone(null);
 
+        if (exceedsNewPasswordByteLimit(newPassword)) {
+            setError(passwordPolicyLabels(targetLang).tooLong);
+            return;
+        }
         if (newPassword !== confirmPassword) {
             setError(mismatch);
             return;

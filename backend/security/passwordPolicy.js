@@ -1,5 +1,5 @@
 export const PASSWORD_MIN_LENGTH = 12;
-export const PASSWORD_MAX_LENGTH = 128;
+export const PASSWORD_MAX_BYTES = 72;
 
 // This local denylist catches common breached-password patterns without sending
 // a password or a password-derived value to a third party.
@@ -27,8 +27,10 @@ export function getPasswordPolicyViolation(password) {
         return "Le mot de passe doit contenir au moins 12 caracteres ou etre une phrase de passe.";
     }
 
-    if (password.length > PASSWORD_MAX_LENGTH) {
-        return "Le mot de passe ne peut pas depasser 128 caracteres.";
+    // bcrypt silently ignores bytes beyond this boundary. Reject new values
+    // rather than truncate or normalize them; existing login remains compatible.
+    if (Buffer.byteLength(password, "utf8") > PASSWORD_MAX_BYTES) {
+        return "Le mot de passe ne peut pas dépasser 72 octets UTF-8. Les caractères accentués et les émojis peuvent compter pour plusieurs octets.";
     }
 
     if (COMPROMISED_PASSWORDS.has(normalizeForCompromisedPasswordCheck(password))) {

@@ -1,4 +1,7 @@
-import React, { useEffect, useState } from "react";
+import { HomeI18nContext } from "../contexts/HomeI18nContext";
+import { exceedsNewPasswordByteLimit } from "../auth/passwordPolicy";
+import { passwordPolicyLabels } from "../i18n/passwordPolicyLabels";
+import React, { useContext, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useSensitiveReauthDialog } from "../hooks/useSensitiveReauthDialog";
@@ -81,6 +84,8 @@ const UserRegisterPage: React.FC = () => {
 
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
+    const i18n = useContext(HomeI18nContext);
+    const passwordTooLong = passwordPolicyLabels(i18n?.locale || "fr").tooLong;
     const [password, setPassword] = useState("");
     const [role, setRole] = useState<NewUserRole>("MEDECIN");
     const [mfaRequired, setMfaRequired] = useState(false);
@@ -417,6 +422,12 @@ const UserRegisterPage: React.FC = () => {
             return;
         }
 
+        if (exceedsNewPasswordByteLimit(resetPassword)) {
+            setEditSaveStatus("error");
+            setEditSaveMessage(passwordTooLong);
+            setError(passwordTooLong);
+            return;
+        }
         if (resetPasswordTooShort) {
             const message = labels.auth.userManagement.passwordMinLength;
             setEditSaveStatus("error");
@@ -538,6 +549,10 @@ const UserRegisterPage: React.FC = () => {
 
     const onSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
+        if (exceedsNewPasswordByteLimit(password)) {
+            setError(passwordTooLong);
+            return;
+        }
         if (role === "RECEPTION" && assignedClinics.length === 0) {
             setError(labels.auth.userManagement.receptionClinicsRequired);
             return;
@@ -1059,7 +1074,6 @@ const UserRegisterPage: React.FC = () => {
                             onChange={(event) => setResetPassword(event.target.value)}
                             className="w-full rounded-lg border px-3 py-2 text-sm"
                             minLength={PASSWORD_MIN_LENGTH}
-                            maxLength={128}
                             aria-describedby="reset-password-help"
                             placeholder={labels.auth.userManagement.passwordPlaceholder}
                         />
