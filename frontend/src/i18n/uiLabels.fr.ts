@@ -124,6 +124,9 @@ export const UI_LABELS_FR = {
         copy: "Copier",
     },
     auth: {
+        passwordPolicy: {
+            tooLong: "Le nouveau mot de passe ne doit pas dépasser 72 octets UTF-8. Les caractères accentués et les émojis peuvent compter pour plusieurs octets.",
+        },
         userManagement: {
             mfaRequiredLabel: "Exiger la verification a deux facteurs (MFA)",
             mfaRequiredHelp:

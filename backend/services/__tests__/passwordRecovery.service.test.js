@@ -252,6 +252,7 @@ describe("password recovery service", () => {
 
     it.each([
         { newPassword: "passwordpassword" }, { recoveryGrant: "short" }, { email: "" },
+        { newPassword: "a".repeat(73) }, { newPassword: "é".repeat(37) },
     ])("rejects invalid input before looking up a grant: %j", async (overrides) => {
         await expect(completePasswordRecovery({ ...completionInput, ...overrides })).rejects.toMatchObject(invalidGrant);
         expect(mocks.findOne).not.toHaveBeenCalled();

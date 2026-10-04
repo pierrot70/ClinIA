@@ -16,7 +16,7 @@ import { sendPasswordRecoveryCode, sendPasswordChangedConfirmation } from "../se
 import { AdminUser } from "../models/AdminUser.js";
 import { RefreshTokenSession } from "../models/RefreshTokenSession.js";
 import { completePasswordRecovery, requestPasswordRecoveryCode, verifyPasswordRecoveryCode, hashPasswordRecoveryCode, hashPasswordRecoveryGrant } from "../services/passwordRecovery.js";
-import { login, refresh, completeMfaLogin } from "../services/auth.js";
+import { login, refresh, completeMfaLogin, reauthenticate } from "../services/auth.js";
 import { hashRecoveryCode } from "../services/auth/mfa.js";
 import { isTokenFromInactiveSession } from "../auth/sessionAccess.js";
 import { verifyJWT } from "../middleware/verifyJWT.js";
@@ -379,4 +379,16 @@ it("validates the complete recovery HTTP workflow with curl and synthetic email"
         await new Promise(resolve => server.close(resolve));
         await rm(work, {recursive: true, force: true});
     }
+});
+
+it("keeps legacy long credentials usable but requires a compliant replacement", async () => {
+    const legacyPassword = "é".repeat(40); // 80 UTF-8 bytes, accepted by the old policy.
+    await AdminUser.updateOne({_id:user._id}, {$set:{passwordHash:await bcrypt.hash(legacyPassword,4)}});
+    const session = await login({username:user.username,password:legacyPassword,req});
+    const payload = jwt.decode(session.accessToken);
+    await expect(reauthenticate({authUser:{userId:String(user._id),sessionId:payload.sid},password:legacyPassword,req})).resolves.toEqual(expect.any(String));
+    await expect(completePasswordRecovery({email,recoveryGrant:grant,newPassword:legacyPassword})).rejects.toMatchObject({code:"INVALID_PASSWORD_RECOVERY"});
+    await completePasswordRecovery({email,recoveryGrant:grant,newPassword});
+    await expect(login({username:user.username,password:legacyPassword,req})).rejects.toMatchObject({code:"INVALID_CREDENTIALS"});
+    await expect(login({username:user.username,password:newPassword,req})).resolves.toHaveProperty("accessToken");
 });

@@ -1,5 +1,35 @@
 # État du projet ClinIA
 
+## Limite des nouveaux mots de passe — 4 octobre 2026
+
+- Branche indépendante `maintenance/auth-password-bytes`, issue de `coolify`
+  (`79056ad`). Les nouveaux mots de passe sont limités à 72 octets UTF-8,
+  avant bcrypt, sur les créations et tous les parcours de remplacement.
+  Aucune troncature ou normalisation n'est appliquée.
+- Les formulaires affichent un message statique dans les neuf langues,
+  dérivé de la source française versionnée. Un caractère accentué ou un
+  émoji peut occuper plusieurs octets.
+- Les connexions et réauthentifications existantes restent compatibles.
+  Les anciens hashes bcrypt ne permettent pas de retrouver la longueur
+  originale : leur comportement de troncature demeure jusqu'au remplacement
+  du mot de passe. Aucune migration automatique des comptes n'est effectuée.
+- MongoDB jetable : 17 scénarios récupération réussis, dont connexion et
+  réauthentification avec un ancien mot de passe de 80 octets, refus de le
+  réutiliser comme nouveau mot de passe, puis remplacement conforme réussi.
+  Courriels simulés et nettoyage confirmé ; aucune écriture en production.
+- Cette branche ne contient pas la correction distincte des compteurs de
+  connexion de `maintenance/auth-login-throttle`.
+- Validation complète : `CI_LOCAL_PASSED`, 1 245 tests frontend, 786 backend,
+  59 auth réexécutés, 17 intégrations récupération, 3 quota et 21 réservation.
+  Build, audits et nettoyages réussis. Rapport local :
+  `4d56bafc-9285-4489-81ca-8abb6965304d` (arbre modifié testé avant commit).
+- Non fusionnée dans `coolify` et non validée en production à ce stade.
+
+Agent-Contribution: backend | limite UTF-8 avant hash et compatibilité des anciennes connexions
+Agent-Contribution: frontend | gardes des formulaires et messages dans neuf langues
+Agent-Review: security | revue statique des chemins de création, remplacement et compatibilité ; pas de validation production
+Validation: bash scripts/ci-local.sh | CI_LOCAL_PASSED le 4 octobre 2026
+
 ## Récupération et sessions — branche du 3 octobre 2026
 
 - Correction isolée dans `maintenance/auth-recovery-hardening`, issue de
@@ -13,10 +43,11 @@
 - Validation locale complète : `CI_LOCAL_PASSED` (1 221 tests frontend,
   778 backend, 57 auth réexécutés, 15 intégrations récupération, 3 quota et
   21 réservation ; build, audits et nettoyages réussis).
-- Déploiement de la branche annoncé par l'utilisateur ; le parcours complet
-  de récupération n'a pas encore été vérifié sur les instances de production.
-  Les compteurs d'échecs de login et la limite bcrypt restent deux chantiers
-  séparés.
+- `79056ad` confirmé sur les deux backends en lecture seule le 4 octobre.
+  Test manuel utilisateur à 8 h 35 : ancienne session refusée après récupération
+  et toujours déconnectée après reconnexion dans l'autre navigateur. Ce scénario
+  est validé en production ; il ne constitue pas une validation de tous les
+  scénarios concurrents ni de tous les parcours de changement de mot de passe.
 - Lanceur VS Code : `bash scripts/test-auth-recovery-local.sh`, 16 scénarios
   réussis avec MongoDB jetable, courriels simulés et nettoyage confirmé.
   Il inclut le parcours HTTP curl ; il ne vérifie pas le déploiement Coolify.

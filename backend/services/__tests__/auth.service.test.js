@@ -650,6 +650,23 @@ describe("auth service", () => {
         expect(out).toBe("hashed");
     });
 
+    it.each(["a".repeat(73), "é".repeat(37)])("rejects an overlong new password before hashing or updating a user", async password => {
+        await expect(hashPassword(password)).rejects.toMatchObject({code: "INVALID_INPUT"});
+        await expect(resetUserPassword({
+            userId: "507f1f77bcf86cd799439011", newPassword: password,
+            authUser: {role: "SUPERADMIN"}, req: {headers: {}},
+        })).rejects.toMatchObject({code: "INVALID_INPUT"});
+        await expect(completeForcedPasswordChange({
+            authUser: {userId: "507f1f77bcf86cd799439011"}, newPassword: password, req: {headers: {}},
+        })).rejects.toMatchObject({code: "INVALID_INPUT"});
+        await expect(register({username: "synthetic", email: "synthetic@example.invalid", password, role: "USER",
+            authUser: {role: "SUPERADMIN"}, req: {headers: {}},
+        })).rejects.toMatchObject({code: "INVALID_INPUT"});
+        await expect(registerSelf({email: "synthetic@example.invalid", password, req: {headers: {}}}))
+            .rejects.toMatchObject({code: "INVALID_INPUT"});
+        expect(hash).not.toHaveBeenCalled();
+    });
+
     it("rejects a compromised password during account creation", async () => {
         await expect(
             register({
