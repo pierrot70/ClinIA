@@ -27,18 +27,20 @@ vérification du code, refus de son rejeu, changement du mot de passe, refus du
 rejeu du grant, refus de l'ancien mot de passe et des anciennes sessions avant
 et après reconnexion, nouvelle session/refresh, puis déconnexion.
 
-Les 16 scénarios complémentaires vérifient notamment les opérations
+Les 30 scénarios complémentaires vérifient notamment les opérations
 concurrentes, le rollback MongoDB, les expirations et les écritures MFA tardives.
 Ils couvrent aussi la connexion et la réauthentification avec un ancien mot de
 passe dépassant 72 octets UTF-8, puis son remplacement par un mot de passe
 conforme. Les nouveaux mots de passe dépassant cette limite sont refusés sans
-consommer le grant de récupération.
+consommer le grant de récupération. Les réinitialisations administratives et
+changements obligatoires couvrent aussi révocation permanente, concurrence,
+rollback et conservation du MFA inscrit.
 Les tokens et réponses HTTP restent dans un dossier temporaire privé supprimé
 en fin de test. La base et le conteneur sont supprimés à la sortie du lanceur.
 Un arrêt brutal de la machine ou SIGKILL peut empêcher ce nettoyage ; ne jamais
 utiliser une purge Docker globale pour le reprendre.
 
-Résultat attendu : `17 passed`, puis :
+Résultat attendu : `31 passed`, puis :
 
 ```text
 CLEANUP_OK disposable MongoDB container removed (no persistent data volume).
@@ -55,3 +57,5 @@ Agent-Contribution: backend | lanceur local et parcours curl sur base jetable
 Agent-Review: security | isolation MongoDB/SMTP, fichiers temporaires, curl sans proxy et limites de portée ; revue statique
 Validation: bash scripts/test-auth-recovery-local.sh | 16/16 réussis, CLEANUP_OK, AUTH_RECOVERY_LOCAL_PASSED le 3 octobre 2026
 Validation: bash scripts/ci-local.sh | suite récupération étendue à 17/17, CLEANUP_OK et CI_LOCAL_PASSED le 4 octobre 2026
+
+Validation: bash scripts/ci-local.sh | suite étendue à 31/31 avec resets administratifs, CLEANUP_OK et CI_LOCAL_PASSED le 4 octobre 2026

@@ -1706,7 +1706,6 @@ export async function resetUserPassword({ userId, newPassword, authUser, req }) 
             makeTemporaryPassword,
             getRequestIp,
             hashPassword,
-            revokeAccessTokens,
             mapPublicUser,
         },
     });
@@ -1720,7 +1719,6 @@ export async function completeForcedPasswordChange({ authUser, newPassword, req 
         deps: {
             getRequestIp,
             hashPassword,
-            revokeAccessTokens,
         },
     });
 }

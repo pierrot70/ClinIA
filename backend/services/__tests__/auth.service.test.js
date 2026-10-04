@@ -29,6 +29,7 @@ const recordLoginFailure = vi.fn();
 
 vi.mock("../../models/AdminUser.js", () => ({
     AdminUser: {
+        db: { transaction: async callback => callback({ syntheticTransaction: true }) },
         findOne: mockFindOne,
         findById: mockFindById,
         findOneAndUpdate: mockFindOneAndUpdate,
@@ -1066,6 +1067,11 @@ describe("auth service", () => {
         });
         hash.mockResolvedValue("new-hash");
         mockFindById.mockResolvedValue(user);
+        mockFindOneAndUpdate.mockImplementation(async (_filter, update) => {
+            Object.assign(user, update.$set);
+            user.authVersion = (user.authVersion ?? 0) + update.$inc.authVersion;
+            return user;
+        });
 
         const result = await resetUserPassword({
             userId: user._id,
@@ -1083,7 +1089,10 @@ describe("auth service", () => {
         expect(user.passwordResetRequired).toBe(false);
         expect(user.mustChangePasswordOnNextLogin).toBe(false);
         expect(user.authTokenInvalidBefore).toBeInstanceOf(Date);
-        expect(user.save).toHaveBeenCalledTimes(1);
+        expect(user.save).not.toHaveBeenCalled();
+        expect(user.authVersion).toBe(1);
+        expect(user.activeSessionIds).toEqual([]);
+        expect(revokeRefreshTokenFamiliesForUser).toHaveBeenCalledWith(user._id, expect.any(String), expect.any(Date), { session: { syntheticTransaction: true } });
         expect(result.user.passwordResetRequired).toBe(false);
         expect(recordAuthAuditEvent).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -1102,6 +1111,11 @@ describe("auth service", () => {
         });
         hash.mockResolvedValue("temp-hash");
         mockFindById.mockResolvedValue(user);
+        mockFindOneAndUpdate.mockImplementation(async (_filter, update) => {
+            Object.assign(user, update.$set);
+            user.authVersion = (user.authVersion ?? 0) + update.$inc.authVersion;
+            return user;
+        });
 
         const result = await resetUserPassword({
             userId: user._id,
@@ -1135,11 +1149,17 @@ describe("auth service", () => {
         });
         hash.mockResolvedValue("final-hash");
         mockFindById.mockResolvedValue(user);
+        mockFindOneAndUpdate.mockImplementation(async (_filter, update) => {
+            Object.assign(user, update.$set);
+            user.authVersion = (user.authVersion ?? 0) + update.$inc.authVersion;
+            return user;
+        });
 
         const result = await completeForcedPasswordChange({
             authUser: {
                 userId: user._id,
                 username: user.username,
+                sessionId: "old-session",
                 role: user.role,
             },
             newPassword: "brandnewpass123",
@@ -1150,7 +1170,10 @@ describe("auth service", () => {
         expect(user.passwordHash).toBe("final-hash");
         expect(user.mustChangePasswordOnNextLogin).toBe(false);
         expect(user.authTokenInvalidBefore).toBeInstanceOf(Date);
-        expect(user.save).toHaveBeenCalledTimes(1);
+        expect(user.save).not.toHaveBeenCalled();
+        expect(user.authVersion).toBe(1);
+        expect(user.activeSessionIds).toEqual([]);
+        expect(revokeRefreshTokenFamiliesForUser).toHaveBeenCalledWith(user._id, expect.any(String), expect.any(Date), { session: { syntheticTransaction: true } });
         expect(recordAuthAuditEvent).toHaveBeenCalledWith(
             expect.objectContaining({
                 action: "PASSWORD_CHANGE",

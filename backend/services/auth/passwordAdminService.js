@@ -2,7 +2,55 @@ import { recordAuthAuditEvent } from "../../audit/authAudit.js";
 import { AdminUser } from "../../models/AdminUser.js";
 import { assertSuperAdmin, createAuthError } from "./shared.js";
 import { revokeRefreshTokenFamiliesForUser } from "./refreshTokenFamilies.js";
+import { hasCurrentAuthVersion } from "../../auth/sessionAccess.js";
+import { CLINICAL_WRITE_CONCERN } from "../../db/clinicalWriteConcern.js";
 import { getPasswordPolicyViolation } from "../../security/passwordPolicy.js";
+
+// Commit the password and every revocation together. Keep the snapshot filter
+// across transaction retries so a stale request cannot overwrite a newer reset.
+async function replacePassword(snapshot, passwordHash, temporary, reason, authUser = null) {
+    const filter = {
+        _id: snapshot._id,
+        passwordHash: snapshot.passwordHash,
+        authVersion: snapshot.authVersion ?? { $exists: false },
+    };
+    if (authUser) {
+        if (!hasCurrentAuthVersion(snapshot, authUser.authVersion)) {
+            throw createAuthError("UNAUTHORIZED", "Session invalide. Reconnectez-vous.");
+        }
+        if (typeof authUser.sessionId !== "string" || !authUser.sessionId.trim()) {
+            throw createAuthError("UNAUTHORIZED", "Session invalide. Reconnectez-vous.");
+        }
+        Object.assign(filter, {
+            isActive: true,
+            mustChangePasswordOnNextLogin: true,
+            $or: [{ activeSessionId: authUser.sessionId }, { activeSessionIds: authUser.sessionId }],
+        });
+    }
+    return AdminUser.db.transaction(async session => {
+        const now = new Date();
+        const changed = await AdminUser.findOneAndUpdate(filter, {
+            $inc: { authVersion: 1 },
+            $set: {
+                passwordHash, mustChangePasswordOnNextLogin: temporary,
+                passwordResetRequired: false, massDownloadRestrictedUntil: null,
+                refreshTokenHash: null, refreshTokenExpiresAt: null,
+                activeSessionId: null, activeSessionIds: [],
+                sessionStartedAt: null, lastActivityAt: null, lastLogoutAt: now,
+                authTokenInvalidBefore: now,
+                passwordRecoveryCodeHash: null, passwordRecoveryCodeExpiresAt: null,
+                passwordRecoveryCodeAttempts: 0, passwordRecoveryRequestId: null,
+                passwordRecoveryGrantHash: null, passwordRecoveryGrantExpiresAt: null,
+                mfaChallengeId: null, mfaChallengePurpose: null,
+                mfaChallengeExpiresAt: null, mfaChallengeAttempts: 0,
+                mfaPendingSecretEncrypted: null, mfaPendingExpiresAt: null,
+            },
+        }, { session, returnDocument: "after" });
+        if (!changed) throw createAuthError("UNAUTHORIZED", "La session ou le mot de passe a changé. Recommencez la demande.");
+        await revokeRefreshTokenFamiliesForUser(changed._id, reason, now, { session });
+        return changed;
+    }, { writeConcern: CLINICAL_WRITE_CONCERN });
+}
 
 export async function resetUserPassword({
     userId,
@@ -33,20 +81,13 @@ export async function resetUserPassword({
     }
 
     const ip = deps.getRequestIp(req);
-    const user = await AdminUser.findById(userId);
+    let user = await AdminUser.findById(userId);
     if (!user) {
         throw createAuthError("USER_NOT_FOUND", "Utilisateur introuvable.");
     }
 
-    user.passwordHash = await deps.hashPassword(nextPassword);
-    user.refreshTokenHash = null;
-    user.refreshTokenExpiresAt = null;
-    user.massDownloadRestrictedUntil = null;
-    user.passwordResetRequired = false;
-    user.mustChangePasswordOnNextLogin = shouldGenerateTemporaryPassword;
-    deps.revokeAccessTokens(user);
-    await revokeRefreshTokenFamiliesForUser(user._id, "PASSWORD_RESET");
-    await user.save();
+    const passwordHash = await deps.hashPassword(nextPassword);
+    user = await replacePassword(user, passwordHash, shouldGenerateTemporaryPassword, "PASSWORD_RESET");
 
     await recordAuthAuditEvent({
         action: "USER_MANAGEMENT",
@@ -82,7 +123,7 @@ export async function completeForcedPasswordChange({
     }
 
     const ip = deps.getRequestIp(req);
-    const user = await AdminUser.findById(authUser.userId);
+    let user = await AdminUser.findById(authUser.userId);
     if (!user || user.isActive === false) {
         throw createAuthError(
             "ACCOUNT_INACTIVE",
@@ -97,13 +138,8 @@ export async function completeForcedPasswordChange({
         );
     }
 
-    user.passwordHash = await deps.hashPassword(newPassword);
-    user.mustChangePasswordOnNextLogin = false;
-    user.passwordResetRequired = false;
-    user.massDownloadRestrictedUntil = null;
-    deps.revokeAccessTokens(user);
-    await revokeRefreshTokenFamiliesForUser(user._id, "FORCED_PASSWORD_CHANGE");
-    await user.save();
+    const passwordHash = await deps.hashPassword(newPassword);
+    user = await replacePassword(user, passwordHash, false, "FORCED_PASSWORD_CHANGE", authUser);
 
     await recordAuthAuditEvent({
         action: "PASSWORD_CHANGE",

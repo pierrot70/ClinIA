@@ -74,6 +74,16 @@ describe("verifyJWT middleware", () => {
         expect(Boolean(optionalReq.auth)).toBe(accepted);
         expect(optionalNext).toHaveBeenCalledTimes(1);
     });
+    it("passes the authenticated token generation to password-change services", async () => {
+        verify.mockReturnValue({ sub: "user-1", role: "USER", sid: "current", av: 3, iat: Math.floor(Date.now() / 1000) });
+        findById.mockReturnValue({ select: async () => ({ _id: "user-1", username: "synthetic", role: "USER", isActive: true,
+            authVersion: 3, activeSessionIds: ["current"], authTokenInvalidBefore: null }) });
+        const req = { headers: { authorization: "Bearer synthetic" } };
+        const next = vi.fn();
+        await verifyJWT(req, makeRes(), next);
+        expect(next).toHaveBeenCalledOnce();
+        expect(req.auth).toMatchObject({ sessionId: "current", authVersion: 3 });
+    });
     it("rejects missing bearer token", async () => {
         const req = { headers: {} };
         const res = makeRes();
@@ -120,6 +130,7 @@ describe("verifyJWT middleware", () => {
             role: "ADMIN",
             username: "admin",
             sessionId: "current-session",
+            authVersion: 0,
             passwordResetRequired: false,
             mustChangePasswordOnNextLogin: false,
         });
@@ -256,6 +267,7 @@ describe("verifyJWT middleware", () => {
             role: "ADMIN",
             username: "admin",
             sessionId: "current-session",
+            authVersion: 0,
             passwordResetRequired: true,
             mustChangePasswordOnNextLogin: false,
         });

@@ -1,5 +1,23 @@
 # État du projet ClinIA
 
+## Vérifications du 4 octobre et prochain point
+
+- `f63c817` confirmé en lecture seule sur les deux backends.
+- Tests manuels confirmés par l'utilisateur : récupération refusée à 73 octets
+  et acceptée à 72 ; après cinq mauvais mots de passe sur le même compte/source,
+  le bon est refusé immédiatement puis accepté après 70 secondes. Ces essais
+  ne constituent pas des tests de concurrence en production.
+- Point suivant reproduit localement : ancien JWT réaccepté après reconnexion
+  pour les réinitialisations administratives et changements obligatoires.
+  Voir [preuves et portée](docs/auth-admin-reset-review-20261004.md).
+  Correction sur `maintenance/auth-admin-reset-hardening` : révocation atomique
+  par génération sur les deux parcours, MFA inscrit préservé, requêtes tardives
+  refusées. Aucun push ni validation de production pour ce nouveau correctif.
+- Validation de ce correctif : `CI_LOCAL_PASSED`, 1 245 tests frontend,
+  790 backend, 59 auth réexécutés, 8 compteur, 31 récupération, 3 quota,
+  21 réservation ; build, audits et nettoyages réussis. Rapport local
+  `592997f6-048f-4c5e-9de6-1949c214c49a` (arbre modifié avant commit).
+
 ## Échecs de connexion concurrents — branche du 4 octobre 2026
 
 - Branche `maintenance/auth-login-throttle`, issue de `coolify` (`79056ad`).

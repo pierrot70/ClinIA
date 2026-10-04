@@ -182,6 +182,7 @@ export async function verifyJWT(req, res, next) {
             role: user.role,
             username: user.username,
             sessionId: payload.sid || null,
+            authVersion: payload.av ?? 0,
             passwordResetRequired: user.passwordResetRequired === true,
             mustChangePasswordOnNextLogin:
                 user.mustChangePasswordOnNextLogin === true,

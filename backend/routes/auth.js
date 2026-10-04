@@ -540,6 +540,10 @@ router.post("/complete-password-reset", enforceSensitiveAuthOrigin, verifyJWT, a
             },
         });
     } catch (err) {
+        if (err.code === "UNAUTHORIZED") {
+            return res.status(401).json({ error: { code: err.code, message: err.message, retryable: false } });
+        }
+
         if (err.code === "INVALID_INPUT") {
             return res.status(400).json({
                 error: {
@@ -998,6 +1002,10 @@ router.post(
                 },
             });
         } catch (err) {
+            if (err.code === "UNAUTHORIZED") {
+                return res.status(401).json({ error: { code: err.code, message: err.message, retryable: false } });
+            }
+
             if (err.code === "INVALID_INPUT") {
                 return res.status(400).json({
                     error: {

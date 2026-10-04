@@ -16,7 +16,7 @@ import { sendPasswordRecoveryCode, sendPasswordChangedConfirmation } from "../se
 import { AdminUser } from "../models/AdminUser.js";
 import { RefreshTokenSession } from "../models/RefreshTokenSession.js";
 import { completePasswordRecovery, requestPasswordRecoveryCode, verifyPasswordRecoveryCode, hashPasswordRecoveryCode, hashPasswordRecoveryGrant } from "../services/passwordRecovery.js";
-import { login, refresh, completeMfaLogin, reauthenticate } from "../services/auth.js";
+import { login, refresh, completeMfaLogin, reauthenticate, resetUserPassword, completeForcedPasswordChange } from "../services/auth.js";
 import { hashRecoveryCode } from "../services/auth/mfa.js";
 import { isTokenFromInactiveSession } from "../auth/sessionAccess.js";
 import { verifyJWT } from "../middleware/verifyJWT.js";
@@ -391,4 +391,180 @@ it("keeps legacy long credentials usable but requires a compliant replacement", 
     await completePasswordRecovery({email,recoveryGrant:grant,newPassword});
     await expect(login({username:user.username,password:legacyPassword,req})).rejects.toMatchObject({code:"INVALID_CREDENTIALS"});
     await expect(login({username:user.username,password:newPassword,req})).resolves.toHaveProperty("accessToken");
+});
+
+it.each(["administrator", "forced"])("permanently rejects old JWTs after %s password replacement and a new login", async mode => {
+    const oldToken = jwt.sign({ role: "USER", sid: "old-session", iat: Math.floor(Date.now() / 1000) - 60 }, process.env.JWT_ACCESS_SECRET, {
+        subject: String(user._id), issuer: "clinia-backend", audience: "clinia-app", expiresIn: "15m", algorithm: "HS256",
+    });
+    const request = () => ({ headers: { authorization: `Bearer ${oldToken}` }, originalUrl: "/api/auth/session", method: "GET" });
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
+    const next = vi.fn();
+    await verifyJWT(request(), res, next);
+    expect(next).toHaveBeenCalledOnce();
+    next.mockClear();
+    const req = { ip: "127.0.0.1", headers: {} };
+    if (mode === "administrator") {
+        await resetUserPassword({ userId: String(user._id), newPassword, authUser: { role: "SUPERADMIN", userId: String(new mongoose.Types.ObjectId()), username: "synthetic-admin" }, req });
+    } else {
+        await AdminUser.updateOne({ _id: user._id }, { $set: { mustChangePasswordOnNextLogin: true } });
+        await completeForcedPasswordChange({ authUser: { userId: String(user._id), sessionId: "old-session" }, newPassword, req });
+    }
+    await verifyJWT(request(), res, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(401);
+    await login({ username: user.username, password: newPassword, req });
+    await verifyJWT(request(), res, next);
+    expect(next).not.toHaveBeenCalled();
+    expect((await AdminUser.findById(user._id)).authVersion).toBe(1);
+});
+
+
+const syntheticAdmin = () => ({ role: "SUPERADMIN", userId: String(new mongoose.Types.ObjectId()), username: "synthetic-admin" });
+async function preparePasswordReplacement(mode) {
+    if (mode === "forced") {
+        await AdminUser.updateOne({_id: user._id}, {$set: {mustChangePasswordOnNextLogin: true}});
+    }
+}
+function replacePassword(mode, password = newPassword) {
+    return mode === "administrator"
+        ? resetUserPassword({userId: String(user._id), newPassword: password, authUser: syntheticAdmin(), req})
+        : completeForcedPasswordChange({authUser: {userId: String(user._id), sessionId: "old-session"}, newPassword: password, req});
+}
+async function seedPendingAndEnrolledMfa() {
+    const jti = "synthetic-admin-reset-challenge";
+    await AdminUser.updateOne({_id: user._id}, {$set: {
+        mfaEnabled: true, mfaSecretEncrypted: "synthetic-enrolled-secret",
+        mfaRecoveryCodeHashes: [hashRecoveryCode("synthetic-enrolled-recovery-code")],
+        mfaPendingSecretEncrypted: "synthetic-pending-secret", mfaPendingExpiresAt: new Date(Date.now() + 300000),
+        mfaChallengeId: jti, mfaChallengePurpose: "mfa-login", mfaChallengeExpiresAt: new Date(Date.now() + 300000),
+    }});
+    return jwt.sign({purpose: "mfa-login", role: "USER", av: 0}, process.env.JWT_ACCESS_SECRET, {
+        subject: String(user._id), jwtid: jti, issuer: "clinia-backend", audience: "clinia-mfa", expiresIn: "5m",
+    });
+}
+const securityFields = "+passwordRecoveryGrantHash +passwordRecoveryCodeHash +mfaSecretEncrypted +mfaRecoveryCodeHashes +mfaPendingSecretEncrypted +mfaPendingExpiresAt +mfaChallengeId +mfaChallengeExpiresAt";
+
+it.each(["administrator", "forced"])("invalidates refresh, recovery grants and pending MFA while preserving enrolled MFA on %s replacement", async mode => {
+    await preparePasswordReplacement(mode);
+    const refreshToken = await seedRefresh();
+    const challenge = await seedPendingAndEnrolledMfa();
+    await replacePassword(mode);
+    const current = await AdminUser.findById(user._id).select(securityFields);
+    expect(current.authVersion).toBe(1);
+    expect(current.activeSessionIds).toEqual([]);
+    expect(current.activeSessionId).toBeNull();
+    expect(current.passwordRecoveryGrantHash).toBeNull();
+    expect(current.passwordRecoveryCodeHash).toBeNull();
+    expect(current.mfaPendingSecretEncrypted).toBeNull();
+    expect(current.mfaPendingExpiresAt).toBeNull();
+    expect(current.mfaChallengeId).toBeNull();
+    expect(current.mfaChallengeExpiresAt).toBeNull();
+    expect(current.mfaEnabled).toBe(true);
+    expect(current.mfaSecretEncrypted).toBe("synthetic-enrolled-secret");
+    expect(current.mfaRecoveryCodeHashes).toEqual([hashRecoveryCode("synthetic-enrolled-recovery-code")]);
+    expect((await RefreshTokenSession.findOne({userId: user._id})).status).toBe("REVOKED");
+    await expect(refresh({refreshToken, req})).rejects.toMatchObject({code: "INVALID_REFRESH_TOKEN"});
+    await expect(completePasswordRecovery({email, recoveryGrant: grant, newPassword})).rejects.toMatchObject({code: "INVALID_PASSWORD_RECOVERY"});
+    await expect(verifyPasswordRecoveryCode({email, code: "123456"})).rejects.toMatchObject({code: "INVALID_RECOVERY_CODE"});
+    await expect(completeMfaLogin({mfaChallenge: challenge, code: "123456", req})).rejects.toMatchObject({code: "INVALID_MFA_CHALLENGE"});
+});
+
+it.each(["administrator", "forced"])("allows only one concurrent %s replacement even when both choose the same password", async mode => {
+    await preparePasswordReplacement(mode);
+    const original = bcrypt.hash.bind(bcrypt);
+    const wait = barrier(2);
+    vi.spyOn(bcrypt, "hash").mockImplementation(async (...args) => {
+        const hashed = await original(...args);
+        await wait();
+        return hashed;
+    });
+    const results = await Promise.allSettled([replacePassword(mode), replacePassword(mode)]);
+    expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter(result => result.status === "rejected")).toHaveLength(1);
+    const current = await AdminUser.findById(user._id);
+    expect(current.authVersion).toBe(1);
+    expect(await bcrypt.compare(newPassword, current.passwordHash)).toBe(true);
+    expect(current.activeSessionIds).toEqual([]);
+    expect(current.mustChangePasswordOnNextLogin).toBe(false);
+});
+
+it.each(["administrator", "forced"])("rolls back all %s replacement state if family revocation fails", async mode => {
+    await preparePasswordReplacement(mode);
+    await seedRefresh();
+    await seedPendingAndEnrolledMfa();
+    const before = await AdminUser.findById(user._id).select(securityFields).lean();
+    vi.spyOn(RefreshTokenSession, "updateMany").mockRejectedValueOnce(new Error("synthetic admin revocation failure"));
+    await expect(replacePassword(mode)).rejects.toThrow("synthetic admin revocation failure");
+    const after = await AdminUser.findById(user._id).select(securityFields).lean();
+    for (const field of ["passwordHash", "authVersion", "authTokenInvalidBefore", "activeSessionIds", "activeSessionId",
+        "mustChangePasswordOnNextLogin", "passwordRecoveryGrantHash", "passwordRecoveryCodeHash",
+        "mfaPendingSecretEncrypted", "mfaPendingExpiresAt", "mfaChallengeId", "mfaChallengeExpiresAt",
+        "mfaEnabled", "mfaSecretEncrypted", "mfaRecoveryCodeHashes"]) {
+        expect(after[field], field).toEqual(before[field]);
+    }
+    expect((await RefreshTokenSession.findOne({userId: user._id})).status).toBe("ACTIVE");
+});
+
+it.each(["administrator", "forced"])("rejects an old-password login suspended across %s replacement", async mode => {
+    await preparePasswordReplacement(mode);
+    const entered = deferred(); const release = deferred();
+    const original = bcrypt.compare.bind(bcrypt);
+    vi.spyOn(bcrypt, "compare").mockImplementationOnce(async (...args) => {
+        const matches = await original(...args);
+        entered.resolve(); await release.promise; return matches;
+    });
+    const outcome = Promise.allSettled([login({username: user.username, password: "Original-synthetic-password!", req})]);
+    await entered.promise;
+    try { await replacePassword(mode); }
+    finally { release.resolve(); }
+    expect((await outcome)[0]).toMatchObject({status: "rejected", reason: {code: "SESSION_REPLACED"}});
+    expect((await AdminUser.findById(user._id)).activeSessionIds).toEqual([]);
+    expect(await RefreshTokenSession.countDocuments({userId: user._id, status: "ACTIVE"})).toBe(0);
+});
+
+it.each([undefined, "inactive-session"])("refuses a forced replacement without its active session (%s)", async sessionId => {
+    await preparePasswordReplacement("forced");
+    await expect(completeForcedPasswordChange({authUser: {userId: String(user._id), sessionId}, newPassword, req})).rejects.toBeDefined();
+    const current = await AdminUser.findById(user._id);
+    expect(current.passwordHash).toBe(user.passwordHash);
+    expect(current.authVersion ?? 0).toBe(0);
+    expect(current.mustChangePasswordOnNextLogin).toBe(true);
+});
+
+it("rejects a stale forced-change generation even if its old session id is restored", async () => {
+    await AdminUser.updateOne({_id: user._id}, {$set: {authVersion: 1, activeSessionIds: ["old-session"],
+        activeSessionId: "old-session", mustChangePasswordOnNextLogin: true}});
+    await expect(completeForcedPasswordChange({authUser: {userId: String(user._id), sessionId: "old-session", authVersion: 0},
+        newPassword, req})).rejects.toMatchObject({code: "UNAUTHORIZED"});
+    const current = await AdminUser.findById(user._id);
+    expect(current.passwordHash).toBe(user.passwordHash);
+    expect(current.authVersion).toBe(1);
+    expect(current.mustChangePasswordOnNextLogin).toBe(true);
+});
+
+it("supports generated temporary password login, mandatory replacement and a fresh session", async () => {
+    const reset = await resetUserPassword({userId: String(user._id), authUser: syntheticAdmin(), req});
+    expect(typeof reset.temporaryPassword).toBe("string");
+    expect(reset.temporaryPassword.length).toBeGreaterThan(0);
+    expect((await AdminUser.findById(user._id)).mustChangePasswordOnNextLogin).toBe(true);
+    const temporarySession = await login({username: user.username, password: reset.temporaryPassword, req});
+    const temporaryClaims = jwt.decode(temporarySession.accessToken);
+    expect(temporaryClaims.av).toBe(1);
+    await expect(completeForcedPasswordChange({authUser: {userId: String(user._id), sessionId: temporaryClaims.sid,
+        authVersion: temporaryClaims.av}, newPassword, req})).resolves.toEqual({success: true});
+    const current = await AdminUser.findById(user._id);
+    expect(current.authVersion).toBe(2);
+    expect(current.mustChangePasswordOnNextLogin).toBe(false);
+    expect(current.activeSessionIds).toEqual([]);
+    const res = {status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis()};
+    const next = vi.fn();
+    await verifyJWT({headers: {authorization: `Bearer ${temporarySession.accessToken}`}, originalUrl: "/api/auth/session", method: "GET"}, res, next);
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+    await expect(refresh({refreshToken: temporarySession.refreshToken, req})).rejects.toMatchObject({code: "INVALID_REFRESH_TOKEN"});
+    const fresh = await login({username: user.username, password: newPassword, req});
+    expect(jwt.decode(fresh.accessToken).av).toBe(2);
+    await verifyJWT({headers: {authorization: `Bearer ${fresh.accessToken}`}, originalUrl: "/api/auth/session", method: "GET"}, res, next);
+    expect(next).toHaveBeenCalledOnce();
 });

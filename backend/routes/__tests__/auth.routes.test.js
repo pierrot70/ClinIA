@@ -39,7 +39,7 @@ vi.mock("../../services/appShutdown.js", () => ({
 }));
 
 import router from "../auth.js";
-import { reauthenticate } from "../../services/auth.js";
+import { reauthenticate, resetUserPassword, completeForcedPasswordChange } from "../../services/auth.js";
 import { verifyJWT } from "../../middleware/verifyJWT.js";
 import { reauthRateLimiter } from "../../middleware/reauthRateLimiter.js";
 
@@ -250,4 +250,15 @@ describe("POST /login/mfa", () => {
             },
         });
     });
+});
+
+it.each([
+    ["/users/:userId/reset-password", resetUserPassword],
+    ["/complete-password-reset", completeForcedPasswordChange],
+])("returns 401 for an invalidated password replacement at %s", async (path, service) => {
+    service.mockRejectedValueOnce({ code: "UNAUTHORIZED", message: "Session invalide." });
+    const res = makeRes();
+    await getLastRouteHandler("post", path)({ body: { newPassword: "Synthetic-long-passphrase!" }, params: { userId: "synthetic" }, auth: {}, headers: {} }, res);
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: { code: "UNAUTHORIZED", message: "Session invalide.", retryable: false } });
 });
