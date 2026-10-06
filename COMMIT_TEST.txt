@@ -1,0 +1,1 @@
+Test de création d’un commit local depuis cet environnement.
