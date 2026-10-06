@@ -14,6 +14,15 @@ function run(code) {
     const root = mkdtempSync(path.join(tmpdir(), "clinia staging test "));
     directories.push(root);
     mkdirSync(path.join(root, "scripts"));
+    mkdirSync(path.join(root, "scripts/lib"));
+    // These tests cover CI/report ordering. Environment probes are independently
+    // exercised by scripts/test-rebuild-environment.sh; never probe real Docker here.
+    writeFileSync(path.join(root, "scripts/lib/rebuild-environment.sh"), `
+rebuild_in_container() { return 1; }
+rebuild_check_tools() { return 0; }
+rebuild_check_container_access() { return 0; }
+rebuild_check_frontend_port() { return 0; }
+`);
     mkdirSync(path.join(root, "bin"));
     copyFileSync(new URL("../../../rebuild-local.sh", import.meta.url), path.join(root, "rebuild-local.sh"));
     writeFileSync(path.join(root, "scripts/ci-local.sh"), `printf 'CI REPORT_DIR:%s\\n' "$CLINIA_VALIDATION_REPORT_DIR" >> "$TRACE"

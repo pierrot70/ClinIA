@@ -14,6 +14,13 @@ if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
   set -euo pipefail
 
   ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  # Compose and its .env must always come from this checkout, not the caller.
+  cd "$ROOT_DIR"
+  source "$ROOT_DIR/scripts/lib/rebuild-environment.sh"
+  [[ $# -le 2 && ( $# -lt 2 || "$2" == "--check" ) ]] || {
+    echo 'Usage: ./rebuild-local.sh staging [--check]'
+    exit 2
+  }
   STAGING_COMPOSE_FILE="${STAGING_COMPOSE_FILE:-$ROOT_DIR/docker-compose-mongo-rs-local.yml}"
   STAGING_PROJECT_NAME="${STAGING_PROJECT_NAME:-clinia_mongo_rs}"
   WIPE_VOLUMES="${WIPE_VOLUMES:-0}"
@@ -55,7 +62,13 @@ if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
       return 0
     fi
 
-    echo "INFO Docker n'est pas disponible depuis cette session WSL."
+    if rebuild_in_container; then
+      echo 'ERREUR Docker inaccessible dans le DevContainer.'
+      echo 'Voir docs/devcontainer-staging.md : CLI Docker et socket de l’hôte requis.'
+      return 1
+    fi
+
+    echo "INFO Docker n'est pas disponible depuis cette session WSL/Linux."
 
     if [[ "$START_DOCKER_DESKTOP" == "1" ]] && \
       docker_desktop_exe="$(find_docker_desktop_executable 2>/dev/null)"; then
@@ -128,7 +141,7 @@ if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
     (
       cd "$ROOT_DIR/frontend"
       VITE_API_URL="$STAGING_FRONTEND_API_URL" \
-        nohup npm run dev -- --host "$STAGING_FRONTEND_HOST" --port "$STAGING_FRONTEND_PORT" \
+        nohup npm run dev -- --host "$STAGING_FRONTEND_HOST" --port "$STAGING_FRONTEND_PORT" --strictPort \
           >"$STAGING_FRONTEND_LOG_FILE" 2>&1 &
     )
   }
@@ -138,10 +151,9 @@ if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
   ensure_docker_desktop || {
     exit 1
   }
-  command -v curl >/dev/null 2>&1 || {
-    echo "ERREUR curl introuvable"
-    exit 1
-  }
+  rebuild_check_tools
+  rebuild_check_container_access
+  rebuild_check_frontend_port
 
   echo "Compose file : $STAGING_COMPOSE_FILE"
   echo "Project name : $STAGING_PROJECT_NAME"
@@ -153,6 +165,10 @@ if [[ "${EARLY_MODE^^}" == "STAGING" || "${EARLY_MODE^^}" == "DEV_RS" ]]; then
 
   headline "Validating staging compose"
   sdc config --quiet
+  if [[ "${2:-}" == --check ]]; then
+    echo 'REBUILD_PREFLIGHT_OK — aucune reconstruction ni CI lancee.'
+    exit 0
+  fi
   # Create as the current user before Docker can create a root-owned bind source.
   mkdir -p "$ROOT_DIR/validation-artifacts"
 
