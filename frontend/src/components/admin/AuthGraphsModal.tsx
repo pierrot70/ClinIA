@@ -1,3 +1,4 @@
+import { UiMessage } from "../i18n/UiMessage";
 import React from "react";
 import {
     Bar,
@@ -143,7 +144,7 @@ export function AuthGraphsModal({
                         </div>
                     ) : error ? (
                         <div className="rounded bg-red-50 p-3 text-sm text-red-700">
-                            {error}
+                            <UiMessage message={error} />
                         </div>
                     ) : graphPoints.length === 0 ? (
                         <p className="text-sm text-gray-500">{renderLabel(headerLabels.authGraphsModal.emptyRange)}</p>

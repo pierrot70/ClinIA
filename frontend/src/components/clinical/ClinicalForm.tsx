@@ -1,3 +1,5 @@
+import { useUiLabelTree } from "../../hooks/useUiLabels";
+import { UiMessage } from "../i18n/UiMessage";
 import { analysisStatusLabels } from "../../i18n/analysisStatusLabels";
 import { DEFAULT_DIABETES_CONTEXT, EXAMPLE_CASES, COMPARISON_CASE_ONE, COMPARISON_CASE_TWO, COMPARISON_MEDICATION_OPTIONS } from "../../data/clinicalExampleCases";
 import { useEffect, useState, useContext } from "react";
@@ -424,6 +426,8 @@ function Field({
 // --------------------
 // Component
 // --------------------
+const sourceUiLabels = labels;
+
 export function ClinicalForm({
                                  onSubmit,
                                  onCompareSubmit,
@@ -446,6 +450,7 @@ export function ClinicalForm({
     initialData?: ClinicalPayload | null;
     restoreInitialDataForCorrection?: boolean;
 }) {
+    const labels = useUiLabelTree(sourceUiLabels);
     const { isAuthenticated, user } = useAuth();
     const [form, setForm] = useState<ClinicalPayload>(
         initialData ?? EMPTY_FORM
@@ -1375,7 +1380,7 @@ export function ClinicalForm({
                                 </>
                             )}
                             {patientSaveError && (
-                                <p className="text-sm text-red-700">{patientSaveError}</p>
+                                <p className="text-sm text-red-700"><UiMessage message={patientSaveError} /></p>
                             )}
                         </div>
                     )}
@@ -1845,9 +1850,9 @@ export function ClinicalForm({
                         }
                     />
                     {showSymptomSuggestions && (
-                        <div className="rounded border border-blue-200 bg-blue-50 p-3" aria-label="Suggestions de symptômes">
+                        <div className="rounded border border-blue-200 bg-blue-50 p-3" aria-label={labels.clinicalTermRequest.suggestionsTitle}>
                             <p className="mb-2 text-xs font-medium text-blue-950">{labels.clinicalTermRequest.suggestionsTitle}</p>
-                            {symptomSuggestionsError ? <p role="alert" className="text-xs text-red-700">{symptomSuggestionsError}</p> : symptomSuggestions.length === 0 ? <p className="text-xs text-gray-600">{labels.clinicalTermRequest.suggestionsLoading}</p> : visibleSymptomSuggestions.length === 0 ? <p className="text-xs text-gray-600">{labels.clinicalTermRequest.suggestionsEmpty}</p> : <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">{visibleSymptomSuggestions.map((suggestion) => { const displayLabel = displaySymptomLabel(suggestion.canonicalValue, targetLang); return <button key={suggestion.canonicalValue} type="button" onClick={() => addSymptomSuggestion(displayLabel)} className="rounded border border-blue-300 bg-white px-2 py-1 text-xs text-blue-800 hover:bg-blue-100">{displayLabel}</button>; })}</div>}
+                            {symptomSuggestionsError ? <p role="alert" className="text-xs text-red-700"><UiMessage message={symptomSuggestionsError} /></p> : symptomSuggestions.length === 0 ? <p className="text-xs text-gray-600">{labels.clinicalTermRequest.suggestionsLoading}</p> : visibleSymptomSuggestions.length === 0 ? <p className="text-xs text-gray-600">{labels.clinicalTermRequest.suggestionsEmpty}</p> : <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">{visibleSymptomSuggestions.map((suggestion) => { const displayLabel = displaySymptomLabel(suggestion.canonicalValue, targetLang); return <button key={suggestion.canonicalValue} type="button" onClick={() => addSymptomSuggestion(displayLabel)} className="rounded border border-blue-300 bg-white px-2 py-1 text-xs text-blue-800 hover:bg-blue-100">{displayLabel}</button>; })}</div>}
                         </div>
                     )}
                     {user?.role === "MEDECIN" && listInputs.symptoms.trim() && <p className="text-xs text-gray-500">{termRequestPrivacyLabel}</p>}

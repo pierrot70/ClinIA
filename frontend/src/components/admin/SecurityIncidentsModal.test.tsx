@@ -1,10 +1,18 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render as baseRender, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { SecurityIncidentsModal } from "./SecurityIncidentsModal";
+import { HomeI18nContext } from "../../contexts/HomeI18nContext";
+import { HOME_STRINGS_EN } from "../../i18n/homeStrings";
+function render(element: React.ReactElement) {
+    return baseRender(<HomeI18nContext.Provider value={{ locale: "en-CA", strings: HOME_STRINGS_EN, isTranslating: false, setLocaleFromDropdown: vi.fn(async () => {}), setLocaleFromVoice: vi.fn(async () => ({ voiceAck: "", dictationInstruction: "" })) }}>{element}</HomeI18nContext.Provider>);
+}
 
 const labels = {
     securityIncidentsModal: {
+        loginFailureThrottledWhatHappened: "Repeated sign-in failures from one network origin.",
+        loginFailureThrottledWhatWasBlocked: "New attempts from that origin were slowed.",
+        loginFailureThrottledNextStep: "Wait for the delay or investigate account activity.",
         title: "Incidents de securite",
         description: "Suivi des incidents detectes.",
         refresh: "Rafraichir",
@@ -122,7 +130,7 @@ describe("SecurityIncidentsModal", () => {
         expect(screen.getByText("Incidents de securite")).toBeInTheDocument();
         expect(screen.getByText("Aucun incident.")).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole("button", { name: "Rafraichir" }));
+        fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
         expect(onRefresh).toHaveBeenCalledTimes(1);
     });
 

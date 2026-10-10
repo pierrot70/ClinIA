@@ -1,3 +1,5 @@
+import { useUiLabels } from "../hooks/useUiLabels";
+import { UiMessage } from "../components/i18n/UiMessage";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
@@ -212,6 +214,7 @@ export function PatientsPage() {
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
     const ui = usePatientsPageLabels(targetLang);
+    const { t } = useUiLabels();
     const [patients, setPatients] = useState<Patient[]>([]);
     const [supportRequestPatientIds, setSupportRequestPatientIds] = useState<Set<string>>(() => new Set());
     const [loading, setLoading] = useState(false);
@@ -490,11 +493,11 @@ export function PatientsPage() {
         setLastWriteVerification(null);
         setSaveFeedback({
             type: "info",
-            message: editingId ? ui.statusUpdating : ui.statusCreating,
+            message: editingId ? labels.patientsPage.status.updating : labels.patientsPage.status.creating,
         });
         setFormSaving(true);
 
-        let savedMessage = editingId ? ui.statusUpdated : ui.statusCreated;
+        let savedMessage = editingId ? labels.patientsPage.status.updated : labels.patientsPage.status.created;
         let writeVerification: WriteVerificationMeta | null = null;
 
         if (editingId) {
@@ -580,10 +583,7 @@ export function PatientsPage() {
         await loadPatients();
         setSaveFeedback({
             type: "success",
-            message: formatWriteVerificationMessage(
-                savedMessage,
-                writeVerification
-            ),
+            message: savedMessage,
         });
         setLastWriteVerification(writeVerification);
         setFormSaving(false);
@@ -635,7 +635,7 @@ export function PatientsPage() {
             setSaveFeedback({ type: "error", message: response.error.message || ui.supportRequestFailed });
             return;
         }
-        setSaveFeedback({ type: "success", message: ui.supportRequested });
+        setSaveFeedback({ type: "success", message: labels.patientsPage.table.supportRequested });
         setSupportRequestPatientIds((current) => new Set(current).add(patient._id));
     }
 
@@ -659,7 +659,7 @@ export function PatientsPage() {
         setLastWriteVerification(null);
         setSaveFeedback({
             type: "info",
-            message: ui.statusArchiving,
+            message: labels.patientsPage.status.archiving,
         });
 
         const response = await archivePatient(id, reason);
@@ -678,10 +678,7 @@ export function PatientsPage() {
         const writeVerification = response.meta.writeVerification ?? null;
         setSaveFeedback({
             type: "success",
-            message: formatWriteVerificationMessage(
-                ui.statusArchived,
-                writeVerification
-            ),
+            message: labels.patientsPage.status.archived,
         });
         setLastWriteVerification(writeVerification);
     }
@@ -701,7 +698,7 @@ export function PatientsPage() {
         setBusyIds((p) => ({ ...p, [id]: true }));
         setError(null);
         setLastWriteVerification(null);
-        setSaveFeedback({ type: "info", message: ui.statusRestoring });
+        setSaveFeedback({ type: "info", message: labels.patientsPage.status.restoring });
 
         const response = await restorePatient(id, reason);
         if ("error" in response) {
@@ -719,10 +716,7 @@ export function PatientsPage() {
         const writeVerification = response.meta.writeVerification ?? null;
         setSaveFeedback({
             type: "success",
-            message: formatWriteVerificationMessage(
-                ui.statusRestored,
-                writeVerification
-            ),
+            message: labels.patientsPage.status.restored,
         });
         setLastWriteVerification(writeVerification);
     }
@@ -803,7 +797,7 @@ export function PatientsPage() {
 
             {visibleErrorMessage && (
                 <div className="text-sm text-red-600">
-                    {visibleErrorMessage}
+                    <UiMessage message={visibleErrorMessage} />
                 </div>
             )}
 
@@ -811,11 +805,13 @@ export function PatientsPage() {
                 <div>
                     <SaveFeedback
                         type={saveFeedback.type}
-                        message={saveFeedback.message}
+                        message={saveFeedback.type === "success"
+                            ? formatWriteVerificationMessage(t(saveFeedback.message), lastWriteVerification, t(labels.pageUi.verificationNumber))
+                            : saveFeedback.message}
                     />
                     <WriteVerificationReceipt
                         verification={lastWriteVerification}
-                        labels={labels.writeVerification}
+                        labels={ { title: t(labels.pageUi.verificationNumber), unavailable: t(labels.writeVerification.unavailable), copy: t(labels.writeVerification.copy) } }
                     />
                 </div>
             )}

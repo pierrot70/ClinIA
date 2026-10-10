@@ -69,7 +69,7 @@ describe("approved UI translation seeder", () => {
     });
 
     it("does not translate entries already present in the local cache", async () => {
-        const UiTranslationCache = createCache({ existing: { _id: "cached" } });
+        const UiTranslationCache = createCache({ existing: { _id: "cached", payload: { text: "ClinIA" } } });
         const translate = vi.fn();
         const seed = createApprovedUiTranslationSeeder({
             UiTranslationCache,
@@ -107,5 +107,27 @@ describe("approved UI translation seeder", () => {
         expect(logger.log).toHaveBeenCalledWith(
             expect.stringContaining("reason=already_created")
         );
+    });
+
+    it("does not silently skip an invalid cached payload or repair it by calling AI", async () => {
+        const UiTranslationCache = createCache({ existing: { payload: { text: "  " } } });
+        const translate = vi.fn();
+        const seed = createApprovedUiTranslationSeeder({
+            UiTranslationCache, catalog: [catalog[0]], translate, logger: { log: vi.fn() },
+        });
+        await expect(seed({ targetLang: "en", dryRun: true })).rejects.toThrow("invalid_cached_approved_translation");
+        expect(translate).not.toHaveBeenCalled();
+        expect(UiTranslationCache.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects translated text that loses named source parameters before writing", async () => {
+        const UiTranslationCache = createCache();
+        const seed = createApprovedUiTranslationSeeder({
+            UiTranslationCache,
+            catalog: [{ namespace: "approved-test", text: "{count} / {limit} tentatives" }],
+            translate: vi.fn().mockResolvedValue("Attempts remaining"), logger: { log: vi.fn() },
+        });
+        await expect(seed({ targetLang: "en", dryRun: false })).rejects.toThrow("invalid_approved_translation_placeholders");
+        expect(UiTranslationCache.create).not.toHaveBeenCalled();
     });
 });

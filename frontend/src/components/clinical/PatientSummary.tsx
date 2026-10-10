@@ -1,6 +1,9 @@
+import { labels } from "../../i18n/uiLabels";
+import { useUiLabels } from "../../hooks/useUiLabels";
 import { useState } from "react";
 
 export function PatientSummary({ summary }: { summary: any }) {
+    const { locale: uiLocale, t } = useUiLabels();
     const [mode, setMode] = useState<"plain" | "clinical">("plain");
 
     return (
@@ -14,8 +17,7 @@ export function PatientSummary({ summary }: { summary: any }) {
                     }`}
                     onClick={() => setMode("plain")}
                 >
-                    Patient
-                </button>
+                    {t(labels.pageUi.patient)}</button>
                 <button
                     className={`px-3 py-1 text-sm rounded ${
                         mode === "clinical"
@@ -24,8 +26,7 @@ export function PatientSummary({ summary }: { summary: any }) {
                     }`}
                     onClick={() => setMode("clinical")}
                 >
-                    Clinique
-                </button>
+                    {t(labels.componentUi.clinique)}</button>
             </div>
 
             <p className="text-sm text-gray-700">

@@ -11,13 +11,14 @@ type WriteVerificationReceiptProps = {
 
 export function formatWriteVerificationMessage(
     baseMessage: string,
-    verification?: WriteVerificationMeta | null
+    verification?: WriteVerificationMeta | null,
+    verificationTitle = "No verification"
 ) {
     if (verification?.status !== "CONFIRMED" || !verification.verificationId) {
         return baseMessage;
     }
 
-    return `${baseMessage} No verification: ${verification.verificationId}`;
+    return `${baseMessage} ${verificationTitle}: ${verification.verificationId}`;
 }
 
 export function WriteVerificationReceipt({

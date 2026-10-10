@@ -1,3 +1,5 @@
+import { localizeUiLabel } from "../i18n/localUiTranslations";
+import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 import React from "react";
 import { fireEvent, render, screen, waitFor, cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -53,4 +55,21 @@ describe("clinician comments language policy", () => {
             expect(api.translate).not.toHaveBeenCalled();
         }
     );
+    it.each(["en-CA", "es", "ko-KR", "vi", "no-NO", "ja", "zh", "he"])(
+        "updates an existing save notice in %s and preserves its tracking code", async locale => {
+            const { rerender } = render(<Page locale="fr-CA" />);
+            await screen.findByText("The schedule does not load.");
+            fireEvent.change(screen.getByRole("textbox", { name: commentsPageFrench.newCommentLabel }),
+                { target: { value: "Synthetic comment, unchanged." } });
+            fireEvent.click(screen.getByRole("button", { name: commentsPageFrench.submit }));
+            await screen.findByText(/DEMO1234/);
+            rerender(<Page locale={locale} />);
+            const source = UI_LABELS_FR.commentsPage.status;
+            const notice = `${localizeUiLabel(source.saved, locale)} ${localizeUiLabel(source.trackingCodePrefix, locale)} DEMO1234`;
+            expect(screen.getByText(notice)).toBeInTheDocument();
+            expect(screen.getByText("The schedule does not load.")).toBeInTheDocument();
+            expect(api.translate).not.toHaveBeenCalled();
+        }
+    );
+
 });

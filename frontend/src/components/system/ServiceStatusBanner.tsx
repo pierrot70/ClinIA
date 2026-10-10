@@ -1,3 +1,6 @@
+import { UiMessage } from "../i18n/UiMessage";
+import { labels } from "../../i18n/uiLabels";
+import { useUiLabels } from "../../hooks/useUiLabels";
 import type { ApiError } from "../../types/api";
 
 interface Props {
@@ -6,6 +9,7 @@ interface Props {
 }
 
 export function ServiceStatusBanner({ error, onRetry }: Props) {
+    const { locale: uiLocale, t } = useUiLabels();
     const isDegraded = error.code === "AI_DEGRADED";
     const isUnavailable = error.code === "AI_UNAVAILABLE";
 
@@ -19,19 +23,18 @@ export function ServiceStatusBanner({ error, onRetry }: Props) {
         >
             <p className="font-medium mb-1">
                 {isUnavailable
-                    ? "Service temporairement indisponible"
-                    : "Service en mode dégradé"}
+                    ? t(labels.componentUi.serviceTemporairementIndisponible)
+                    : t(labels.componentUi.serviceEnModeDegrade)}
             </p>
 
-            <p className="mb-2">{error.message}</p>
+            <p className="mb-2"><UiMessage message={error.message} /></p>
 
             {error.retryable && onRetry && (
                 <button
                     onClick={onRetry}
                     className="text-xs underline font-medium"
                 >
-                    Réessayer maintenant
-                </button>
+                    {t(labels.componentUi.reessayerMaintenant)}</button>
             )}
         </div>
     );

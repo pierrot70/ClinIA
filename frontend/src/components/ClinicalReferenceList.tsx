@@ -1,3 +1,5 @@
+import { labels } from "../i18n/uiLabels";
+import { useUiLabels } from "../hooks/useUiLabels";
 import React, { useState } from "react";
 
 type ClinicalReference = {
@@ -18,6 +20,7 @@ const ClinicalReferenceList: React.FC<ClinicalReferenceListProps> = ({
   hint,
   language = "fr",
 }) => {
+    const { locale: uiLocale, t } = useUiLabels(language);
   const english = language === "en";
   const [activeSource, setActiveSource] = useState<ClinicalReference | null>(null);
 
@@ -28,7 +31,7 @@ const ClinicalReferenceList: React.FC<ClinicalReferenceListProps> = ({
   return (
     <>
       <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-        <h3 className="text-xs font-semibold text-gray-800">{title}</h3>
+        <h3 className="text-xs font-semibold text-gray-800">{t(title)}</h3>
         {hint ? <p className="mt-1 text-[11px] text-gray-500">{hint}</p> : null}
         <ul className="mt-2 space-y-1 text-[11px] text-gray-600">
           {sources.map((source) => (
@@ -58,9 +61,7 @@ const ClinicalReferenceList: React.FC<ClinicalReferenceListProps> = ({
                   {activeSource.label}
                 </h2>
                 <p className="mt-1 text-xs text-gray-500">
-                  {english
-                    ? "Close this window to return immediately to ClinIA."
-                    : "Fermez cette fenetre pour revenir immediatement a ClinIA."}
+                  {t(labels.componentUi.fermezCetteFenetrePourRevenirImmediatementAClinIA)}
                 </p>
               </div>
               <div className="ml-4 flex items-center gap-2">
@@ -70,14 +71,14 @@ const ClinicalReferenceList: React.FC<ClinicalReferenceListProps> = ({
                   rel="noreferrer"
                   className="rounded border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-900 transition hover:bg-sky-100"
                 >
-                  {english ? "Open in a new tab" : "Ouvrir dans un nouvel onglet"}
+                  {t(labels.componentUi.ouvrirDansUnNouvelOnglet)}
                 </a>
                 <button
                   type="button"
                   onClick={() => setActiveSource(null)}
                   className="rounded border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
                 >
-                  {english ? "Close" : "Fermer"}
+                  {t(labels.pageUi.close)}
                 </button>
               </div>
             </div>

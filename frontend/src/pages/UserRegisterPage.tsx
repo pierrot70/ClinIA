@@ -1,3 +1,6 @@
+import { UiMessage } from "../components/i18n/UiMessage";
+import { useUiLabels } from "../hooks/useUiLabels";
+import { translateUiLabelTree } from "../i18n/pageUiLabels";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { exceedsNewPasswordByteLimit } from "../auth/passwordPolicy";
 import { passwordPolicyLabels } from "../i18n/passwordPolicyLabels";
@@ -78,6 +81,7 @@ type UsersListResponse = {
 };
 
 const UserRegisterPage: React.FC = () => {
+    const { locale: uiLocale, t } = useUiLabels();
     const navigate = useNavigate();
     const { authFetch, user: authUser } = useAuth();
     const { requestSensitiveReauth, sensitiveReauthModal } = useSensitiveReauthDialog();
@@ -179,7 +183,7 @@ const UserRegisterPage: React.FC = () => {
                     }
                     return;
                 }
-                setError(payload?.error?.message || "Impossible de lister les utilisateurs.");
+                setError(payload?.error?.message || labels.pageUi.impossibleDeListerLesUtilisateurs);
                 return;
             }
 
@@ -195,7 +199,7 @@ const UserRegisterPage: React.FC = () => {
                 navigate("/admin/login", { replace: true });
                 return;
             }
-            setError("Erreur reseau lors du chargement des utilisateurs.");
+            setError(labels.pageUi.erreurReseauLorsDuChargementDesUtilisateurs);
         } finally {
             setLoadingUsers(false);
         }
@@ -305,13 +309,13 @@ const UserRegisterPage: React.FC = () => {
 
         if (editRole === "RECEPTION" && editAssignedClinics.length === 0) {
             setEditSaveStatus("error");
-            setEditSaveMessage(labels.auth.userManagement.receptionClinicsRequired);
+            setEditSaveMessage(translateUiLabelTree(labels.auth.userManagement.receptionClinicsRequired, t));
             return;
         }
 
         setSaving(true);
         setEditSaveStatus("saving");
-        setEditSaveMessage("Sauvegarde en cours...");
+        setEditSaveMessage(labels.pageUi.sauvegardeEnCours);
         setError(null);
         setSuccess(null);
 
@@ -341,14 +345,14 @@ const UserRegisterPage: React.FC = () => {
 
             const payload = (await response.json().catch(() => ({}))) as RegisterResponse;
             if (!response.ok) {
-                const failureMessage = payload?.error?.message || "Impossible de modifier l'utilisateur.";
+                const failureMessage = payload?.error?.message || labels.pageUi.impossibleDeModifierLUtilisateur;
                 setEditSaveStatus("error");
-                setEditSaveMessage(`Echec de la sauvegarde: ${failureMessage}`);
+                setEditSaveMessage(labels.pageUi.saveFailed.replace("{message}", failureMessage));
                 setError(failureMessage);
                 return;
             }
 
-            const successMessage = `Sauvegarde reussie pour ${editedUsername || "cet utilisateur"}.`;
+            const successMessage = labels.pageUi.saveSucceeded.replace("{name}", editedUsername || labels.pageUi.cetUtilisateur);
             setEditSaveStatus("success");
             setEditSaveMessage(successMessage);
             setSuccess(successMessage);
@@ -365,8 +369,8 @@ const UserRegisterPage: React.FC = () => {
                 return;
             }
             setEditSaveStatus("error");
-            setEditSaveMessage("Echec de la sauvegarde: erreur reseau.");
-            setError("Erreur reseau.");
+            setEditSaveMessage(labels.pageUi.echecDeLaSauvegardeErreurReseau);
+            setError(labels.pageUi.erreurReseau);
         } finally {
             setSaving(false);
         }
@@ -396,14 +400,14 @@ const UserRegisterPage: React.FC = () => {
 
             const payload = (await response.json().catch(() => ({}))) as RegisterResponse;
             if (!response.ok) {
-                setError(payload?.error?.message || "Impossible de changer le statut.");
+                setError(payload?.error?.message || labels.pageUi.impossibleDeChangerLeStatut);
                 return;
             }
 
             setSuccess(
                 !managedUser.isActive
-                    ? "Utilisateur active."
-                    : "Utilisateur rendu inactif."
+                    ? labels.pageUi.utilisateurActive
+                    : labels.pageUi.utilisateurRenduInactif
             );
             await loadUsers(usersPage);
         } catch (err) {
@@ -411,7 +415,7 @@ const UserRegisterPage: React.FC = () => {
                 navigate("/admin/login", { replace: true });
                 return;
             }
-            setError("Erreur reseau.");
+            setError(labels.pageUi.erreurReseau);
         } finally {
             setSaving(false);
         }
@@ -429,7 +433,7 @@ const UserRegisterPage: React.FC = () => {
             return;
         }
         if (resetPasswordTooShort) {
-            const message = labels.auth.userManagement.passwordMinLength;
+            const message = translateUiLabelTree(labels.auth.userManagement.passwordMinLength, t);
             setEditSaveStatus("error");
             setEditSaveMessage(message);
             setError(message);
@@ -438,7 +442,7 @@ const UserRegisterPage: React.FC = () => {
 
         setSaving(true);
         setEditSaveStatus("saving");
-        setEditSaveMessage("Reinitialisation du mot de passe en cours...");
+        setEditSaveMessage(labels.pageUi.reinitialisationDuMotDePasseEnCours);
         setError(null);
         setSuccess(null);
         setTemporaryPasswordResult(null);
@@ -466,9 +470,9 @@ const UserRegisterPage: React.FC = () => {
             if (!response.ok) {
                 const failureMessage =
                     payload?.error?.message ||
-                    "Impossible de reinitialiser le mot de passe.";
+                    labels.pageUi.impossibleDeReinitialiserLeMotDePasse;
                 setEditSaveStatus("error");
-                setEditSaveMessage(`Echec de la reinitialisation: ${failureMessage}`);
+                setEditSaveMessage(labels.pageUi.resetFailed.replace("{message}", failureMessage));
                 setError(failureMessage);
                 return;
             }
@@ -479,14 +483,14 @@ const UserRegisterPage: React.FC = () => {
                 null;
             if (temporaryPassword) {
                 const successMessage =
-                    `Mot de passe temporaire genere: ${temporaryPassword}. ` +
-                    "L'utilisateur devra le remplacer a la premiere connexion.";
+                    labels.pageUi.temporaryPassword.replace("{password}", temporaryPassword) +
+                    labels.pageUi.lUtilisateurDevraLeRemplacerALaPremiereConnexion;
                 setTemporaryPasswordResult(temporaryPassword);
                 setEditSaveStatus("success");
                 setEditSaveMessage(successMessage);
                 setSuccess(successMessage);
             } else {
-                const successMessage = labels.auth.userManagement.passwordResetCompleted;
+                const successMessage = translateUiLabelTree(labels.auth.userManagement.passwordResetCompleted, t);
                 setEditSaveStatus("success");
                 setEditSaveMessage(successMessage);
                 setSuccess(successMessage);
@@ -498,15 +502,15 @@ const UserRegisterPage: React.FC = () => {
                 return;
             }
             setEditSaveStatus("error");
-            setEditSaveMessage("Echec de la reinitialisation: erreur reseau.");
-            setError("Erreur reseau.");
+            setEditSaveMessage(labels.pageUi.echecDeLaReinitialisationErreurReseau);
+            setError(labels.pageUi.erreurReseau);
         } finally {
             setSaving(false);
         }
     };
 
     const removeUser = async (managedUser: ManagedUser) => {
-        if (!window.confirm(`Supprimer l'utilisateur ${managedUser.username} ?`)) {
+        if (!window.confirm(t(labels.pageUi.deleteUser).replace("{name}", managedUser.username))) {
             return;
         }
 
@@ -527,11 +531,11 @@ const UserRegisterPage: React.FC = () => {
 
             const payload = (await response.json().catch(() => ({}))) as RegisterResponse;
             if (!response.ok) {
-                setError(payload?.error?.message || "Impossible de supprimer l'utilisateur.");
+                setError(payload?.error?.message || labels.pageUi.impossibleDeSupprimerLUtilisateur);
                 return;
             }
 
-            setSuccess("Utilisateur supprime.");
+            setSuccess(labels.pageUi.utilisateurSupprime);
             if (selectedUserId === managedUser.id) {
                 setSelectedUserId(null);
             }
@@ -541,7 +545,7 @@ const UserRegisterPage: React.FC = () => {
                 navigate("/admin/login", { replace: true });
                 return;
             }
-            setError("Erreur reseau.");
+            setError(labels.pageUi.erreurReseau);
         } finally {
             setSaving(false);
         }
@@ -554,7 +558,7 @@ const UserRegisterPage: React.FC = () => {
             return;
         }
         if (role === "RECEPTION" && assignedClinics.length === 0) {
-            setError(labels.auth.userManagement.receptionClinicsRequired);
+            setError(translateUiLabelTree(labels.auth.userManagement.receptionClinicsRequired, t));
             return;
         }
         setSaving(true);
@@ -588,13 +592,13 @@ const UserRegisterPage: React.FC = () => {
             if (!response.ok) {
                 setError(
                     payload?.error?.message ||
-                        "Impossible de creer l'utilisateur."
+                        labels.pageUi.impossibleDeCreerLUtilisateur
                 );
                 return;
             }
 
             setSuccess(
-                `Utilisateur ${payload?.data?.user?.username || username} cree avec succes.`
+                labels.pageUi.userCreated.replace("{name}", payload?.data?.user?.username || username)
             );
             setUsername("");
             setEmail("");
@@ -609,7 +613,7 @@ const UserRegisterPage: React.FC = () => {
                 return;
             }
 
-            setError("Erreur reseau. Reessayez.");
+            setError(labels.pageUi.erreurReseauReessayez);
         } finally {
             setSaving(false);
         }
@@ -620,43 +624,38 @@ const UserRegisterPage: React.FC = () => {
         <div className="max-w-2xl mx-auto px-4 py-8">
             <div className="mb-4 flex items-center justify-between">
                 <h1 className="text-2xl font-semibold text-gray-900">
-                    Creation d'un utilisateur
-                </h1>
+                    {t(labels.pageUi.creationDUnUtilisateur)}</h1>
                 <Link
                     to="/mock-studio"
                     className="text-sm text-blue-600 hover:text-blue-700"
                 >
-                    Retour Mock Studio
-                </Link>
+                    {t(labels.pageUi.retourMockStudio)}</Link>
             </div>
 
             <p className="mb-6 text-sm text-gray-600">
-                Gestion utilisateurs reservee au SUPERADMIN: lister, editer, rendre inactif, reinitialiser ou supprimer.
-            </p>
+                {t(labels.pageUi.gestionUtilisateursReserveeAuSUPERADMINListerEditerRendreInactifReinit)}</p>
 
             {authUser?.role !== "SUPERADMIN" && (
                 <div className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">
-                    Cette page est reservee au SUPERADMIN.
-                </div>
+                    {t(labels.pageUi.cettePageEstReserveeAuSUPERADMIN)}</div>
             )}
 
             {error && (
                 <div className="clinia-fade-feedback mb-4 rounded bg-red-50 p-3 text-sm text-red-700">
-                    {error}
+                    <UiMessage message={error} />
                 </div>
             )}
 
             {success && (
                 <div className="clinia-fade-feedback mb-4 rounded bg-green-50 p-3 text-sm text-green-700">
-                    {success}
+                    {t(success)}
                 </div>
             )}
 
             <form onSubmit={onSubmit} className="space-y-4 rounded-xl border bg-white p-5">
                 <div>
                     <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="username">
-                        Nom d'utilisateur
-                    </label>
+                        {t(labels.pageUi.nomDUtilisateur)}</label>
                     <input
                         id="username"
                         type="text"
@@ -670,8 +669,7 @@ const UserRegisterPage: React.FC = () => {
 
                 <div>
                     <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="email">
-                        Courriel (optionnel)
-                    </label>
+                        {t(labels.pageUi.courrielOptionnel)}</label>
                     <input
                         id="email"
                         type="email"
@@ -684,8 +682,7 @@ const UserRegisterPage: React.FC = () => {
 
                 <div>
                     <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="password">
-                        Mot de passe
-                    </label>
+                        {t(labels.pageUi.motDePasse)}</label>
                     <input
                         id="password"
                         type="password"
@@ -699,8 +696,7 @@ const UserRegisterPage: React.FC = () => {
 
                 <div>
                     <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="role">
-                        Role
-                    </label>
+                        {t(labels.pageUi.role)}</label>
                     <select
                         id="role"
                         value={role}
@@ -721,8 +717,8 @@ const UserRegisterPage: React.FC = () => {
 
                 {role === "RECEPTION" && (
                     <fieldset className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                        <legend className="px-1 text-sm font-medium text-gray-800">{labels.auth.userManagement.receptionClinicsLabel}</legend>
-                        <p className="mb-2 text-xs text-gray-600">{labels.auth.userManagement.receptionClinicsHelp}</p>
+                        <legend className="px-1 text-sm font-medium text-gray-800">{translateUiLabelTree(labels.auth.userManagement.receptionClinicsLabel, t)}</legend>
+                        <p className="mb-2 text-xs text-gray-600">{translateUiLabelTree(labels.auth.userManagement.receptionClinicsHelp, t)}</p>
                         <div className="space-y-1">
                             {clinics.map((clinic) => (
                                 <label key={clinic._id} className="flex items-center gap-2 text-sm text-gray-800">
@@ -744,12 +740,12 @@ const UserRegisterPage: React.FC = () => {
                             onChange={(event) => setMfaRequired(event.target.checked)}
                             className="mt-0.5 h-4 w-4"
                         />
-                        <span>{labels.auth.userManagement.mfaRequiredLabel}</span>
+                        <span>{translateUiLabelTree(labels.auth.userManagement.mfaRequiredLabel, t)}</span>
                     </label>
                     <p className="mt-1 text-xs text-gray-600">
                         {isMfaLockedForRole(role)
-                            ? labels.auth.userManagement.mfaPrivilegedRequired
-                            : labels.auth.userManagement.mfaRequiredHelp}
+                            ? translateUiLabelTree(labels.auth.userManagement.mfaPrivilegedRequired, t)
+                            : translateUiLabelTree(labels.auth.userManagement.mfaRequiredHelp, t)}
                     </p>
                 </div>
 
@@ -758,13 +754,13 @@ const UserRegisterPage: React.FC = () => {
                     disabled={saving}
                     className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                 >
-                    {saving ? "Creation..." : "Creer l'utilisateur"}
+                    {saving ? t(labels.pageUi.creating) : t(labels.pageUi.creerLUtilisateur)}
                 </button>
             </form>
 
             <div className="mt-8 rounded-xl border bg-white p-5">
                 <div className="mb-3 flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-gray-900">Utilisateurs</h2>
+                    <h2 className="text-lg font-semibold text-gray-900">{t(labels.pageUi.utilisateurs)}</h2>
                     <button
                         type="button"
                         onClick={() => {
@@ -772,13 +768,12 @@ const UserRegisterPage: React.FC = () => {
                         }}
                         className="rounded bg-gray-100 px-3 py-1 text-xs text-gray-700 hover:bg-gray-200"
                     >
-                        Rafraichir
-                    </button>
+                        {t(labels.pageUi.rafraichir)}</button>
                 </div>
 
                 <div className="mb-3 flex items-center justify-between gap-3 text-xs text-gray-500">
-                    <span>{usersTotal} utilisateur{usersTotal > 1 ? "s" : ""}</span>
-                    <span>Page {usersPage} / {Math.max(1, usersTotalPages)}</span>
+                    <span>{t(labels.pageUi.userCount).replace("{count}", usersTotal.toLocaleString(uiLocale))}</span>
+                    <span>{t(labels.pageUi.page)} {usersPage} / {Math.max(1, usersTotalPages)}</span>
                 </div>
 
                 <form
@@ -790,22 +785,20 @@ const UserRegisterPage: React.FC = () => {
                 >
                     <div>
                         <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="users-search">
-                            Filtrer les utilisateurs
-                        </label>
+                            {t(labels.pageUi.filtrerLesUtilisateurs)}</label>
                         <input
                             id="users-search"
                             type="text"
                             value={usersSearchInput}
                             onChange={(event) => setUsersSearchInput(event.target.value)}
-                            placeholder="Nom d'utilisateur ou courriel"
+                            placeholder={t(labels.pageUi.nomDUtilisateurOuCourriel)}
                             className="w-full rounded-lg border px-3 py-2 text-sm"
                         />
                     </div>
 
                     <div>
                         <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="users-role-filter">
-                            Role
-                        </label>
+                            {t(labels.pageUi.role)}</label>
                         <select
                             id="users-role-filter"
                             value={usersRoleFilter}
@@ -814,7 +807,7 @@ const UserRegisterPage: React.FC = () => {
                         >
                             {USER_ROLE_FILTER_OPTIONS.map((value) => (
                                 <option key={value} value={value}>
-                                    {value === "ALL" ? "Tous les roles" : value}
+                                    {value === "ALL" ? t(labels.pageUi.tousLesRoles) : value}
                                 </option>
                             ))}
                         </select>
@@ -824,16 +817,14 @@ const UserRegisterPage: React.FC = () => {
                         type="submit"
                         className="self-end rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                     >
-                        Filtrer
-                    </button>
+                        {t(labels.pageUi.filtrer)}</button>
 
                     <button
                         type="button"
                         onClick={resetUsersFilters}
                         className="self-end rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                     >
-                        Reinitialiser
-                    </button>
+                        {t(labels.pageUi.reinitialiser2)}</button>
                 </form>
 
                 {editSaveStatus !== "idle" && (
@@ -859,18 +850,17 @@ const UserRegisterPage: React.FC = () => {
                                     ? "✕"
                                     : "..."}
                         </span>
-                        <span>{editSaveMessage}</span>
+                        <span>{t(editSaveMessage)}</span>
                     </div>
                 )}
 
                 <p className="mb-3 text-xs text-gray-500">
-                    Cliquez sur <span className="font-semibold text-blue-700">Modifier</span> pour ouvrir le panneau d'edition d'un utilisateur.
-                </p>
+                    {t(labels.pageUi.cliquezSur)}{" "}<span className="font-semibold text-blue-700">{t(labels.pageUi.modifier)}</span> {" "}{t(labels.pageUi.pourOuvrirLePanneauDEditionDUnUtilisateur)}</p>
 
                 {loadingUsers ? (
-                    <p className="text-sm text-gray-500">Chargement des utilisateurs...</p>
+                    <p className="text-sm text-gray-500">{t(labels.pageUi.chargementDesUtilisateurs)}</p>
                 ) : users.length === 0 ? (
-                    <p className="text-sm text-gray-500">Aucun utilisateur.</p>
+                    <p className="text-sm text-gray-500">{t(labels.pageUi.aucunUtilisateur)}</p>
                 ) : (
                     <div className="space-y-3">
                         {users.map((managedUser) => (
@@ -889,17 +879,17 @@ const UserRegisterPage: React.FC = () => {
                                             {managedUser.username} ({managedUser.role})
                                         </div>
                                         <div className="text-xs text-gray-600">
-                                            {managedUser.email || "Aucun courriel"}
+                                            {managedUser.email || t(labels.pageUi.aucunCourriel)}
                                         </div>
                                         <div className="text-xs text-gray-500">
-                                            Statut: {managedUser.isActive ? "Actif" : "Inactif"}
+                                            {t(labels.pageUi.statut)}{managedUser.isActive ? t(labels.pageUi.active) : t(labels.pageUi.inactive)}
                                         </div>
                                         <div className="text-xs text-gray-500">
-                                            MFA: {managedUser.mfaEnabled
-                                                ? labels.auth.userManagement.mfaStatusEnabled
+                                            {t(labels.pageUi.mFA)}{managedUser.mfaEnabled
+                                                ? translateUiLabelTree(labels.auth.userManagement.mfaStatusEnabled, t)
                                                 : managedUser.mfaRequired
-                                                    ? labels.auth.userManagement.mfaStatusRequired
-                                                    : labels.auth.userManagement.mfaStatusDisabled}
+                                                    ? translateUiLabelTree(labels.auth.userManagement.mfaStatusRequired, t)
+                                                    : translateUiLabelTree(labels.auth.userManagement.mfaStatusDisabled, t)}
                                         </div>
                                     </div>
 
@@ -909,7 +899,7 @@ const UserRegisterPage: React.FC = () => {
                                             onClick={() => startEdit(managedUser)}
                                             className="rounded bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-700"
                                         >
-                                            {selectedUserId === managedUser.id ? "Modification ouverte" : "Modifier"}
+                                            {selectedUserId === managedUser.id ? t(labels.pageUi.modificationOuverte) : t(labels.pageUi.modifier)}
                                         </button>
                                         <button
                                             type="button"
@@ -918,7 +908,7 @@ const UserRegisterPage: React.FC = () => {
                                             }}
                                             className="rounded bg-amber-100 px-2 py-1 text-xs text-amber-800 hover:bg-amber-200"
                                         >
-                                            {managedUser.isActive ? "Rendre inactif" : "Rendre actif"}
+                                            {managedUser.isActive ? t(labels.pageUi.rendreInactif) : t(labels.pageUi.rendreActif)}
                                         </button>
                                         <button
                                             type="button"
@@ -927,8 +917,7 @@ const UserRegisterPage: React.FC = () => {
                                             }}
                                             className="rounded bg-red-100 px-2 py-1 text-xs text-red-700 hover:bg-red-200"
                                         >
-                                            Effacer
-                                        </button>
+                                            {t(labels.pageUi.effacer)}</button>
                                     </div>
                                 </div>
                             </div>
@@ -941,8 +930,7 @@ const UserRegisterPage: React.FC = () => {
                                 disabled={loadingUsers || usersPage <= 1}
                                 className="rounded border border-gray-300 px-3 py-1 text-xs text-gray-700 disabled:opacity-50"
                             >
-                                Precedent
-                            </button>
+                                {t(labels.pageUi.precedent3)}</button>
                             <button
                                 type="button"
                                 onClick={() =>
@@ -951,8 +939,7 @@ const UserRegisterPage: React.FC = () => {
                                 disabled={loadingUsers || usersPage >= usersTotalPages}
                                 className="rounded border border-gray-300 px-3 py-1 text-xs text-gray-700 disabled:opacity-50"
                             >
-                                Suivant
-                            </button>
+                                {t(labels.pageUi.suivant2)}</button>
                         </div>
                     </div>
                 )}
@@ -960,12 +947,11 @@ const UserRegisterPage: React.FC = () => {
 
             {selectedUserId && (
                 <div className="mt-8 rounded-xl border bg-white p-5 space-y-4">
-                    <h2 className="text-lg font-semibold text-gray-900">Edition utilisateur</h2>
+                    <h2 className="text-lg font-semibold text-gray-900">{t(labels.pageUi.editionUtilisateur)}</h2>
 
                     <div>
                         <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="edit-username">
-                            Nom d'utilisateur
-                        </label>
+                            {t(labels.pageUi.nomDUtilisateur)}</label>
                         <input
                             id="edit-username"
                             type="text"
@@ -977,8 +963,7 @@ const UserRegisterPage: React.FC = () => {
 
                     <div>
                         <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="edit-email">
-                            Courriel
-                        </label>
+                            {t(labels.pageUi.courriel)}</label>
                         <input
                             id="edit-email"
                             type="email"
@@ -990,8 +975,7 @@ const UserRegisterPage: React.FC = () => {
 
                     <div>
                         <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="edit-role">
-                            Role
-                        </label>
+                            {t(labels.pageUi.role)}</label>
                         <select
                         id="edit-role"
                         value={editRole}
@@ -1012,8 +996,8 @@ const UserRegisterPage: React.FC = () => {
 
                 {editRole === "RECEPTION" && (
                     <fieldset className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                        <legend className="px-1 text-sm font-medium text-gray-800">{labels.auth.userManagement.receptionClinicsLabel}</legend>
-                        <p className="mb-2 text-xs text-gray-600">{labels.auth.userManagement.receptionClinicsHelp}</p>
+                        <legend className="px-1 text-sm font-medium text-gray-800">{translateUiLabelTree(labels.auth.userManagement.receptionClinicsLabel, t)}</legend>
+                        <p className="mb-2 text-xs text-gray-600">{translateUiLabelTree(labels.auth.userManagement.receptionClinicsHelp, t)}</p>
                         <div className="space-y-1">
                             {clinics.map((clinic) => (
                                 <label key={clinic._id} className="flex items-center gap-2 text-sm text-gray-800">
@@ -1035,12 +1019,12 @@ const UserRegisterPage: React.FC = () => {
                                 onChange={(event) => setEditMfaRequired(event.target.checked)}
                                 className="mt-0.5 h-4 w-4"
                             />
-                            <span>{labels.auth.userManagement.mfaRequiredLabel}</span>
+                            <span>{translateUiLabelTree(labels.auth.userManagement.mfaRequiredLabel, t)}</span>
                         </label>
                         <p className="mt-1 text-xs text-gray-600">
                             {isMfaLockedForRole(editRole)
-                                ? labels.auth.userManagement.mfaPrivilegedRequired
-                                : labels.auth.userManagement.mfaRequiredHelp}
+                                ? translateUiLabelTree(labels.auth.userManagement.mfaPrivilegedRequired, t)
+                                : translateUiLabelTree(labels.auth.userManagement.mfaRequiredHelp, t)}
                         </p>
                     </div>
 
@@ -1052,20 +1036,19 @@ const UserRegisterPage: React.FC = () => {
                         disabled={saving}
                         className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                     >
-                        Sauvegarder les modifications
-                    </button>
+                        {t(labels.pageUi.sauvegarderLesModifications)}</button>
 
                     <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
                         <div>
                             <h3 className="text-sm font-semibold text-amber-950">
-                                {labels.auth.userManagement.passwordSectionTitle}
+                                {translateUiLabelTree(labels.auth.userManagement.passwordSectionTitle, t)}
                             </h3>
                             <p className="mt-1 text-xs text-amber-900">
-                                {labels.auth.userManagement.passwordSectionHelp}
+                                {translateUiLabelTree(labels.auth.userManagement.passwordSectionHelp, t)}
                             </p>
                         </div>
                         <label className="block text-xs font-semibold text-gray-700" htmlFor="reset-password">
-                            {labels.auth.userManagement.passwordLabel}
+                            {translateUiLabelTree(labels.auth.userManagement.passwordLabel, t)}
                         </label>
                         <input
                             id="reset-password"
@@ -1075,15 +1058,15 @@ const UserRegisterPage: React.FC = () => {
                             className="w-full rounded-lg border px-3 py-2 text-sm"
                             minLength={PASSWORD_MIN_LENGTH}
                             aria-describedby="reset-password-help"
-                            placeholder={labels.auth.userManagement.passwordPlaceholder}
+                            placeholder={translateUiLabelTree(labels.auth.userManagement.passwordPlaceholder, t)}
                         />
                         {resetPasswordTooShort ? (
                             <p className="text-xs font-medium text-red-700" id="reset-password-help">
-                                {labels.auth.userManagement.passwordMinLength}
+                                {translateUiLabelTree(labels.auth.userManagement.passwordMinLength, t)}
                             </p>
                         ) : (
                             <p className="text-xs text-amber-900" id="reset-password-help">
-                                {labels.auth.userManagement.passwordTemporaryHelp}
+                                {translateUiLabelTree(labels.auth.userManagement.passwordTemporaryHelp, t)}
                             </p>
                         )}
                         <button
@@ -1095,20 +1078,19 @@ const UserRegisterPage: React.FC = () => {
                             className="w-full rounded-lg bg-amber-600 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {resetPassword
-                                ? labels.auth.userManagement.passwordSetAction
-                                : labels.auth.userManagement.passwordGenerateAction}
+                                ? translateUiLabelTree(labels.auth.userManagement.passwordSetAction, t)
+                                : translateUiLabelTree(labels.auth.userManagement.passwordGenerateAction, t)}
                         </button>
                     </div>
 
                     {temporaryPasswordResult && (
                         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-                            <div className="font-semibold">Mot de passe temporaire genere</div>
+                            <div className="font-semibold">{t(labels.pageUi.motDePasseTemporaireGenere)}</div>
                             <div className="mt-2 break-all rounded bg-white px-3 py-2 font-mono text-emerald-950">
                                 {temporaryPasswordResult}
                             </div>
                             <div className="mt-2 text-xs text-emerald-900">
-                                Communiquez ce mot de passe temporaire a l'utilisateur par un canal controle. Il devra le remplacer a sa premiere connexion.
-                            </div>
+                                {t(labels.pageUi.communiquezCeMotDePasseTemporaireALUtilisateurParUnCanalControleIlDevr)}</div>
                         </div>
                     )}
 

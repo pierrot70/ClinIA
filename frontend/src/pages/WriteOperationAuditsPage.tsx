@@ -1,3 +1,5 @@
+import { useUiLabels, useUiLabelTree } from "../hooks/useUiLabels";
+import { UiMessage } from "../components/i18n/UiMessage";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Copy, DatabaseZap, Eye, RefreshCw } from "lucide-react";
 import { labels } from "../i18n/uiLabels";
@@ -66,15 +68,15 @@ type ReceiptSearchResult = {
     resourceIds: string[];
 };
 
-function formatTimestamp(value?: string | null) {
+function formatTimestamp(value: string | null | undefined, locale: string) {
     if (!value) return "-";
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleString("fr-CA");
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString(locale);
 }
 
-function formatCount(value?: number | null) {
+function formatCount(value: number | null | undefined, locale: string) {
     if (value == null || !Number.isFinite(value)) return "0";
-    return new Intl.NumberFormat("fr-CA").format(value);
+    return new Intl.NumberFormat(locale).format(value);
 }
 
 function formatWriteConcern(log: WriteOperationAuditLog) {
@@ -155,7 +157,8 @@ function buildReceiptSearchResults(logs: WriteOperationAuditLog[]): ReceiptSearc
 }
 
 function SummaryStrip({ summary }: { summary: WriteOperationAuditSummary | null }) {
-    const pageLabels = labels.writeOperationAudits;
+    const pageLabels = useUiLabelTree(labels.writeOperationAudits);
+    const { locale, t } = useUiLabels();
     const operationSummary = summary?.byOperation || {};
     const replicaSummary = summary?.byReplicaStatus || {};
 
@@ -164,14 +167,14 @@ function SummaryStrip({ summary }: { summary: WriteOperationAuditSummary | null 
             <div className="grid grid-cols-1 divide-y divide-gray-100 md:grid-cols-4 md:divide-x md:divide-y-0">
                 <div className="p-4">
                     <div className="text-xs font-medium uppercase text-gray-500">{pageLabels.summary.total}</div>
-                    <div className="mt-1 text-2xl font-semibold text-gray-950">{formatCount(summary?.total)}</div>
+                    <div className="mt-1 text-2xl font-semibold text-gray-950">{formatCount(summary?.total, locale)}</div>
                 </div>
                 <div className="p-4">
                     <div className="text-xs font-medium uppercase text-gray-500">{pageLabels.summary.operations}</div>
                     <div className="mt-2 flex flex-wrap gap-2">
                         {["CREATE", "UPDATE", "DELETE", "REPLY"].map((operation) => (
                             <span key={operation} className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700">
-                                {operation}: {formatCount(operationSummary[operation])}
+                                {operation}: {formatCount(operationSummary[operation], locale)}
                             </span>
                         ))}
                     </div>
@@ -181,7 +184,7 @@ function SummaryStrip({ summary }: { summary: WriteOperationAuditSummary | null 
                     <div className="mt-2 flex flex-wrap gap-2">
                         {["OK", "DEGRADED", "LAGGING", "INCIDENT"].map((status) => (
                             <span key={status} className={`rounded px-2 py-1 text-xs ${statusTone(status)}`}>
-                                {status}: {formatCount(replicaSummary[status])}
+                                {status}: {formatCount(replicaSummary[status], locale)}
                             </span>
                         ))}
                     </div>
@@ -189,7 +192,7 @@ function SummaryStrip({ summary }: { summary: WriteOperationAuditSummary | null 
                 <div className="p-4">
                     <div className="text-xs font-medium uppercase text-gray-500">{pageLabels.summary.majorityUnavailable}</div>
                     <div className="mt-1 text-2xl font-semibold text-gray-950">
-                        {formatCount(summary?.majorityUnavailableCount)}
+                        {formatCount(summary?.majorityUnavailableCount, locale)}
                     </div>
                 </div>
             </div>
@@ -198,7 +201,8 @@ function SummaryStrip({ summary }: { summary: WriteOperationAuditSummary | null 
 }
 
 export function WriteOperationAuditsPage() {
-    const pageLabels = labels.writeOperationAudits;
+    const pageLabels = useUiLabelTree(labels.writeOperationAudits);
+    const { locale, t } = useUiLabels();
     const [logs, setLogs] = useState<WriteOperationAuditLog[]>([]);
     const [receiptLogs, setReceiptLogs] = useState<WriteOperationAuditLog[]>([]);
     const [nearReceiptLogs, setNearReceiptLogs] = useState<WriteOperationAuditLog[]>([]);
@@ -598,13 +602,13 @@ export function WriteOperationAuditsPage() {
                     <span className="text-gray-500">
                         {loading
                             ? pageLabels.status.loading
-                            : `${formatCount(total)} ${pageLabels.status.results}`}
+                            : `${formatCount(total, locale)} ${pageLabels.status.results}`}
                     </span>
                 </div>
 
                 {error && (
                     <div className="mt-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                        {error.message}
+                        <UiMessage message={error.message} />
                     </div>
                 )}
             </section>
@@ -626,7 +630,7 @@ export function WriteOperationAuditsPage() {
                         <p className="mt-1 text-sm text-gray-600">{pageLabels.receiptSearch.description}</p>
                     </div>
                     <span className="text-sm text-gray-500">
-                        {formatCount(receiptResults.length)} {pageLabels.receiptSearch.found}
+                        {formatCount(receiptResults.length, locale)} {pageLabels.receiptSearch.found}
                     </span>
                 </div>
 
@@ -666,7 +670,7 @@ export function WriteOperationAuditsPage() {
                             <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                                 <div>
                                     <dt className="text-xs font-medium uppercase text-gray-500">{pageLabels.receiptSearch.date}</dt>
-                                    <dd className="mt-0.5 text-gray-900">{formatTimestamp(receipt.timestamp)}</dd>
+                                    <dd className="mt-0.5 text-gray-900">{formatTimestamp(receipt.timestamp, locale)}</dd>
                                 </div>
                                 <div>
                                     <dt className="text-xs font-medium uppercase text-gray-500">{pageLabels.receiptSearch.actor}</dt>
@@ -716,7 +720,7 @@ export function WriteOperationAuditsPage() {
                                 </p>
                             </div>
                             <span className="text-sm text-gray-500">
-                                {formatCount(nearReceiptResults.length)} {pageLabels.receiptSearch.found}
+                                {formatCount(nearReceiptResults.length, locale)} {pageLabels.receiptSearch.found}
                             </span>
                         </div>
 
@@ -750,7 +754,7 @@ export function WriteOperationAuditsPage() {
                                     <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                                         <div>
                                             <dt className="text-xs font-medium uppercase text-amber-700">{pageLabels.receiptSearch.date}</dt>
-                                            <dd className="mt-0.5 text-gray-900">{formatTimestamp(receipt.timestamp)}</dd>
+                                            <dd className="mt-0.5 text-gray-900">{formatTimestamp(receipt.timestamp, locale)}</dd>
                                         </div>
                                         <div>
                                             <dt className="text-xs font-medium uppercase text-amber-700">{pageLabels.receiptSearch.actor}</dt>
@@ -792,7 +796,7 @@ export function WriteOperationAuditsPage() {
                         {pageLabels.table.title}
                     </button>
                     <span className="text-sm text-gray-500">
-                        {formatCount(total)} {pageLabels.status.results}
+                        {formatCount(total, locale)} {pageLabels.status.results}
                     </span>
                 </div>
 
@@ -836,7 +840,7 @@ export function WriteOperationAuditsPage() {
                                     }
                                 >
                                     <td className="whitespace-nowrap px-4 py-3 text-gray-700">
-                                        {formatTimestamp(log.timestamp)}
+                                        {formatTimestamp(log.timestamp, locale)}
                                     </td>
                                     <td className="px-4 py-3 font-medium text-gray-900">
                                         {log.collectionName}
@@ -848,7 +852,7 @@ export function WriteOperationAuditsPage() {
                                         </div>
                                     </td>
                                     <td className="px-4 py-3 text-gray-700">
-                                        <div className="font-medium">{log.actorUsernameMasked || "unknown"}</div>
+                                        <div className="font-medium">{log.actorUsernameMasked || t(labels.openAiLogs.status.unknownActor)}</div>
                                         <div className="text-xs text-gray-500">{log.actorRole || "-"}</div>
                                     </td>
                                     <td className="px-4 py-3 text-gray-700">

@@ -1,3 +1,5 @@
+import { labels } from "../../i18n/uiLabels";
+import { useUiLabels } from "../../hooks/useUiLabels";
 import type { SecurityIncidentBlockingData } from "../../types/api";
 
 interface Props {
@@ -13,6 +15,7 @@ export function SecurityBlockingAlert({
     acknowledging,
     onAcknowledge,
 }: Props) {
+    const { locale: uiLocale, t } = useUiLabels();
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
@@ -23,31 +26,30 @@ export function SecurityBlockingAlert({
         >
             <div className="w-full max-w-2xl rounded-lg border border-red-300 bg-white p-6 shadow-xl">
                 <h2 id="security-blocking-title" className="text-lg font-semibold text-red-700">
-                    Alerte securite bloquante
-                </h2>
+                    {t(labels.componentUi.alerteSecuriteBloquante)}</h2>
 
                 <p id="security-blocking-description" className="mt-3 text-sm text-slate-800">
-                    {blocking.userMessage}
+                    {t(blocking.userMessage)}
                 </p>
 
                 <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
                     <p>
-                        Incident: <span className="font-medium">{blocking.incident.id}</span>
+                        {t(labels.componentUi.incident)} <span className="font-medium">{blocking.incident.id}</span>
                     </p>
                     <p>
-                        Raison: <span className="font-medium">{blocking.incident.reason}</span>
+                        {t(labels.componentUi.raison)} <span className="font-medium">{blocking.incident.reason}</span>
                     </p>
                     <p>
-                        Phase: <span className="font-medium">{blocking.incident.phase}</span>
+                        {t(labels.componentUi.phase)} <span className="font-medium">{blocking.incident.phase}</span>
                     </p>
                     <p>
-                        Horodatage: <span className="font-medium">{blocking.incident.timestamp}</span>
+                        {t(labels.componentUi.horodatage)} <span className="font-medium">{Number.isNaN(new Date(blocking.incident.timestamp).getTime()) ? blocking.incident.timestamp : new Date(blocking.incident.timestamp).toLocaleString(uiLocale)}</span>
                     </p>
                 </div>
 
                 {actionableMessage && (
                     <p className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                        {actionableMessage}
+                        {t(actionableMessage)}
                     </p>
                 )}
 
@@ -58,12 +60,11 @@ export function SecurityBlockingAlert({
                         disabled={acknowledging}
                         className="rounded bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        J'ai lu et compris
-                    </button>
+                        {t(labels.componentUi.jAiLuEtCompris)}</button>
                     <p className="text-xs text-slate-600">
                         {acknowledging
-                            ? "Confirmation en cours..."
-                            : "Cette action est obligatoire pour reprendre le workflow."}
+                            ? t(labels.componentUi.confirmationEnCours)
+                            : t(labels.componentUi.cetteActionEstObligatoirePourReprendreLeWorkflow)}
                     </p>
                 </div>
             </div>

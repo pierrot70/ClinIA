@@ -1,3 +1,6 @@
+import { UiMessage } from "../components/i18n/UiMessage";
+import { labels } from "../i18n/uiLabels";
+import { UiText } from "../components/i18n/UiText";
 import type { ClinicalAnalysis } from "../types/clinical";
 import { ClinicalSafetySections } from "../components/clinical/ClinicalSafetySections";
 
@@ -63,10 +66,10 @@ export function ClinicalResultPage({ data, serviceMode, targetLang }: PropsWithL
             {showTranslationError && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
                     <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-                        <h2 className="text-lg font-semibold text-red-700 mb-2">Translation error</h2>
-                        <p className="text-sm text-gray-800 mb-4">{showTranslationError}</p>
+                        <h2 className="text-lg font-semibold text-red-700 mb-2"><UiText text={labels.componentUi.erreurDeTraduction} /></h2>
+                        <p className="text-sm text-gray-800 mb-4"><UiMessage message={showTranslationError} /></p>
                         <button className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700" onClick={() => setShowTranslationError(null)}>
-                            Close
+                            <UiText text={labels.pageUi.close} />
                         </button>
                     </div>
                 </div>

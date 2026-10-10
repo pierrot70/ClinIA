@@ -1,3 +1,4 @@
+import { UiMessage } from "../components/i18n/UiMessage";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
@@ -717,7 +718,7 @@ export function AppointmentsPage() {
 
                     {patientsError && (
                         <div className="text-xs text-red-600">
-                            {patientsError.message}
+                            <UiMessage message={patientsError.message} />
                         </div>
                     )}
 
@@ -792,7 +793,7 @@ export function AppointmentsPage() {
                         ))}
                     </select>
                     {referenceClinicsError && (
-                        <span className="text-xs text-red-600">{referenceClinicsError.message}</span>
+                        <span className="text-xs text-red-600"><UiMessage message={referenceClinicsError.message} /></span>
                     )}
                 </label>
 
@@ -820,7 +821,7 @@ export function AppointmentsPage() {
                 )}
                 {recommendationError && (
                     <div className="text-xs text-red-600">
-                        {recommendationError.message}
+                        <UiMessage message={recommendationError.message} />
                     </div>
                 )}
                 {patientId && specialty && !recommendationLoading && !recommendation && !recommendationError && (
@@ -856,7 +857,7 @@ export function AppointmentsPage() {
                         </div>
                         {coordinationRequestError && (
                             <div className="text-xs text-red-700">
-                                {coordinationRequestError.message}
+                                <UiMessage message={coordinationRequestError.message} />
                             </div>
                         )}
                         {coordinationRequestAlreadyOpen !== null ? (
@@ -927,7 +928,7 @@ export function AppointmentsPage() {
                         )}
                         {manualOptionsError && (
                             <div className="text-xs text-red-600">
-                                {manualOptionsError.message}
+                                <UiMessage message={manualOptionsError.message} />
                             </div>
                         )}
                         {manualOptions && manualOptions.cliniques.length === 0 && (

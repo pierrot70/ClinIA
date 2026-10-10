@@ -1,0 +1,3468 @@
+{
+  "byKey": {
+    "app.landing.title": {
+      "source": "ClinIA",
+      "translations": {
+        "he": "קליניה",
+        "en": "ClinIA",
+        "es": "ClinIA",
+        "ko": "ClinIA",
+        "vi": "ClinIA",
+        "no": "ClinIA",
+        "ja": "ClinIA",
+        "zh": "ClinIA"
+      }
+    },
+    "app.landing.subtitle": {
+      "source": "Accelerer la recherche. Comparer les alternatives. Verifier les references.",
+      "translations": {
+        "he": "להאיץ את המחקר. להשוות את החלופות. לבדוק את ההפניות.",
+        "en": "Accelerate research. Compare alternatives. Verify references.",
+        "es": "Acelerar la investigación. Comparar las alternativas. Verificar las referencias.",
+        "ko": "연구를 가속화하세요. 대안을 비교하세요. 참고 문헌을 확인하세요.",
+        "vi": "Tăng tốc nghiên cứu. So sánh các lựa chọn thay thế. Kiểm tra các tài liệu tham khảo.",
+        "no": "Akselerer søket. Sammenligne alternativer. Sjekke referanser.",
+        "ja": "検索を加速する。代替案を比較する。参考文献を確認する。",
+        "zh": "加速研究。比较替代方案。核实参考资料。"
+      }
+    },
+    "app.landing.supportingText": {
+      "source": "ClinIA utilise l'IA pour accelerer la recherche clinique, comparer des alternatives therapeutiques plausibles et presenter des references consultables.",
+      "translations": {
+        "he": "ClinIA משתמשת בבינה מלאכותית כדי להאיץ את המחקר הקליני, להשוות בין חלופות טיפוליות סבירות ולהציג הפניות שניתן לעיין בהן.",
+        "en": "ClinIA uses AI to accelerate clinical research, compare plausible therapeutic alternatives, and present consultable references.",
+        "es": "ClinIA utiliza IA para acelerar la investigación clínica, comparar alternativas terapéuticas plausibles y presentar referencias consultables.",
+        "ko": "ClinIA는 임상 연구를 가속화하고, 가능한 치료 대안을 비교하며, 참조 자료를 제공하기 위해 AI를 활용합니다.",
+        "vi": "ClinIA sử dụng AI để tăng tốc nghiên cứu lâm sàng, so sánh các lựa chọn điều trị khả thi và trình bày các tài liệu tham khảo có thể tra cứu.",
+        "no": "ClinIA bruker KI for å akselerere klinisk forskning, sammenligne plausible terapeutiske alternativer og presentere konsulterbare referanser.",
+        "ja": "ClinIAはAIを活用して臨床研究を加速し、妥当な治療代替案を比較し、参照可能な文献を提示します。",
+        "zh": "ClinIA 利用人工智能加速临床研究，比较可行的治疗替代方案并展示可查询的参考资料。"
+      }
+    },
+    "app.landing.clinicalDemoTitle": {
+      "source": "Démo clinique",
+      "translations": {
+        "he": "הדגמה קלינית",
+        "en": "Clinical demo",
+        "es": "Demostración clínica",
+        "ko": "임상 데모",
+        "vi": "Bản trình diễn lâm sàng",
+        "no": "Klinisk demo",
+        "ja": "臨床デモ",
+        "zh": "临床演示"
+      }
+    },
+    "app.landing.clinicalDemoBody": {
+      "source": "Accéder directement à la démonstration ClinIA.",
+      "translations": {
+        "he": "גש ישירות להדגמת ClinIA.",
+        "en": "Access the ClinIA demonstration directly.",
+        "es": "Acceder directamente a la demostración ClinIA.",
+        "ko": "ClinIA 데모에 바로 접속하기.",
+        "vi": "Truy cập trực tiếp vào bản trình diễn ClinIA.",
+        "no": "Gå direkte til ClinIA-demonstrasjonen.",
+        "ja": "ClinIAのデモに直接アクセスする。",
+        "zh": "直接访问ClinIA演示。"
+      }
+    },
+    "app.landing.doctorLoginTitle": {
+      "source": "Connexion médecin",
+      "translations": {
+        "he": "התחברות לרופא",
+        "en": "Doctor login",
+        "es": "Conexión médico",
+        "ko": "의사 로그인",
+        "vi": "Đăng nhập bác sĩ",
+        "no": "Legeinnlogging",
+        "ja": "医師ログイン",
+        "zh": "医生登录"
+      }
+    },
+    "app.landing.doctorLoginBody": {
+      "source": "Ouvrir la page de connexion utilisateur.",
+      "translations": {
+        "he": "פתח את דף הכניסה למשתמש.",
+        "en": "Open the user login page.",
+        "es": "Abrir la página de inicio de sesión del usuario.",
+        "ko": "사용자 로그인 페이지 열기.",
+        "vi": "Mở trang đăng nhập người dùng.",
+        "no": "Åpne brukerpåloggingsside.",
+        "ja": "ユーザーログインページを開く。",
+        "zh": "打开用户登录页面。"
+      }
+    },
+    "app.landing.adminLoginTitle": {
+      "source": "Connexion admin",
+      "translations": {
+        "he": "כניסת מנהל",
+        "en": "Admin login",
+        "es": "Conexión admin",
+        "ko": "관리자 연결",
+        "vi": "Đăng nhập quản trị viên",
+        "no": "Admin-innlogging",
+        "ja": "管理者ログイン",
+        "zh": "管理员登录"
+      }
+    },
+    "app.landing.adminLoginBody": {
+      "source": "Ouvrir la page de connexion administrateur.",
+      "translations": {
+        "he": "פתח את דף הכניסה למנהל.",
+        "en": "Open the administrator login page.",
+        "es": "Abrir la página de inicio de sesión del administrador.",
+        "ko": "관리자 로그인 페이지 열기.",
+        "vi": "Mở trang đăng nhập quản trị viên.",
+        "no": "Åpne administratørinnloggingssiden.",
+        "ja": "管理者ログインページを開く。",
+        "zh": "打开管理员登录页面。"
+      }
+    },
+    "app.landing.demoTooltip": {
+      "source": "Ce bouton vous permet de vous familiariser avec l'application sans connexion.",
+      "translations": {
+        "he": "כפתור זה מאפשר לך להכיר את האפליקציה ללא התחברות.",
+        "en": "This button allows you to explore the app without signing in.",
+        "es": "Este botón le permite familiarizarse con la aplicación sin conexión.",
+        "ko": "이 버튼을 사용하면 연결 없이 애플리케이션을 익힐 수 있습니다.",
+        "vi": "Nút này cho phép bạn làm quen với ứng dụng mà không cần kết nối.",
+        "no": "Denne knappen lar deg bli kjent med appen uten tilkobling.",
+        "ja": "このボタンを使うと、接続なしでアプリを体験できます。",
+        "zh": "此按钮允许您在无连接状态下熟悉应用程序。"
+      }
+    },
+    "app.landing.tooltipOk": {
+      "source": "OK",
+      "translations": {
+        "he": "אישור",
+        "en": "OK",
+        "es": "Aceptar",
+        "ko": "확인",
+        "vi": "Đồng ý",
+        "no": "OK",
+        "ja": "OK",
+        "zh": "确定"
+      }
+    },
+    "app.status.maintenance": {
+      "source": "Maintenance en cours. L'application est temporairement arrêtée pour les usagers non SUPERADMIN.",
+      "translations": {
+        "en": "Maintenance in progress. The application is temporarily stopped for non-SUPERADMIN users.",
+        "es": "Mantenimiento en curso. La aplicación está temporalmente detenida para los usuarios que no son SUPERADMIN.",
+        "he": "תחזוקה מתבצעת. היישום נעצר זמנית למשתמשים שאינם SUPERADMIN.",
+        "ko": "유지 관리 중입니다. SUPERADMIN이 아닌 사용자는 애플리케이션이 일시 중지됩니다.",
+        "vi": "Đang bảo trì. Ứng dụng tạm thời ngừng hoạt động đối với người dùng không phải SUPERADMIN.",
+        "no": "Vedlikehold pågår. Applikasjonen er midlertidig stoppet for brukere som ikke er SUPERADMIN.",
+        "ja": "メンテナンス中です。SUPERADMIN以外のユーザーは一時的にアプリケーションが停止しています。",
+        "zh": "维护中。应用程序暂时停止，非超级管理员用户无法使用。"
+      }
+    },
+    "clinicalDemo.intro.tagline": {
+      "source": "Accelerer. Comparer. Verifier.",
+      "translations": {
+        "en": "Accelerate. Compare. Verify.",
+        "he": "להאיץ. להשוות. לאמת.",
+        "es": "Acelerar. Comparar. Verificar.",
+        "ko": "가속화. 비교. 확인.",
+        "vi": "Tăng tốc. So sánh. Xác minh.",
+        "no": "Akselerer. Sammenlign. Verifiser.",
+        "ja": "加速。比較。検証。",
+        "zh": "加速。比较。验证。"
+      }
+    },
+    "clinicalDemo.intro.subtitle": {
+      "source": "Recherche clinique plus rapide. Alternatives comparables. References consultables.",
+      "translations": {
+        "en": "Faster clinical research. Comparable alternatives. Consultable references.",
+        "he": "מחקר קליני מהיר יותר. חלופות דומות. הפניות ניתנות לעיון.",
+        "es": "Investigación clínica más rápida. Alternativas comparables. Referencias consultables.",
+        "ko": "더 빠른 임상 연구. 비교 가능한 대안. 참조 가능.",
+        "vi": "Nghiên cứu lâm sàng nhanh hơn. Các lựa chọn thay thế tương đương. Tham khảo có thể tra cứu.",
+        "no": "Raskere klinisk forskning. Sammenlignbare alternativer. Konsulterbare referanser.",
+        "ja": "より迅速な臨床試験。比較可能な代替案。参照可能な文献。",
+        "zh": "更快速的临床研究。可比替代方案。可查阅的参考资料。"
+      }
+    },
+    "clinicalDemo.comments.leaveComment": {
+      "source": "Laisser un commentaire",
+      "translations": {
+        "en": "Leave a comment",
+        "he": "השאר תגובה",
+        "es": "Dejar un comentario",
+        "ko": "댓글 남기기",
+        "vi": "Để lại bình luận",
+        "no": "Legg igjen en kommentar",
+        "ja": "コメントを残す",
+        "zh": "留下评论"
+      }
+    },
+    "clinicalDemo.comments.replyLookupTitle": {
+      "source": "Voir les réponses à mes commentaires",
+      "translations": {
+        "en": "View responses to my comments",
+        "he": "הצג תגובות להערות שלי",
+        "es": "Ver las respuestas a mis comentarios",
+        "ko": "내 댓글에 대한 답변 보기",
+        "vi": "Xem câu trả lời cho nhận xét của tôi",
+        "no": "Se svar på mine kommentarer",
+        "ja": "自分のコメントへの返信を見る",
+        "zh": "查看我评论的回复"
+      }
+    },
+    "clinicalDemo.form.openAiModelLabel": {
+      "source": "Modèle OpenAI",
+      "translations": {
+        "en": "OpenAI Model",
+        "he": "מודל OpenAI",
+        "es": "Modelo OpenAI",
+        "ko": "OpenAI 모델",
+        "vi": "Mô hình OpenAI",
+        "no": "OpenAI-modell",
+        "ja": "OpenAIモデル",
+        "zh": "OpenAI 模型"
+      }
+    },
+    "clinicalDemo.form.simulationMode": {
+      "source": "Mode simulation",
+      "translations": {
+        "en": "Simulation mode",
+        "he": "מצב סימולציה",
+        "es": "Modo simulación",
+        "ko": "모드 시뮬레이션",
+        "vi": "Chế độ mô phỏng",
+        "no": "Simuleringsmodus",
+        "ja": "モードシミュレーション",
+        "zh": "模式模拟"
+      }
+    },
+    "clinicalPatientSelection.manual": {
+      "source": "Saisie manuelle",
+      "translations": {
+        "he": "הזנה ידנית",
+        "en": "Manual entry",
+        "es": "Entrada manual",
+        "ko": "수동 입력",
+        "vi": "Nhập thủ công",
+        "no": "Manuell inntasting",
+        "ja": "手動入力",
+        "zh": "手动输入"
+      }
+    },
+    "clinicalPatientSelection.existingPatient": {
+      "source": "Patient existant",
+      "translations": {
+        "he": "מטופל קיים",
+        "en": "Existing patient",
+        "es": "Paciente existente",
+        "ko": "기존 환자",
+        "vi": "Bệnh nhân hiện có",
+        "no": "Eksisterende pasient",
+        "ja": "既存の患者",
+        "zh": "现有患者"
+      }
+    },
+    "header.brand.subtitle": {
+      "source": "Assistant clinique IA - Prototype",
+      "translations": {
+        "en": "AI Clinical Assistant - Prototype",
+        "es": "Asistente clínico IA - Prototipo",
+        "ko": "임상 AI 어시스턴트 - 프로토타입",
+        "vi": "Trợ lý lâm sàng AI - Nguyên mẫu",
+        "no": "Klinisk IA-assistent - Prototype",
+        "ja": "臨床アシスタントIA - プロトタイプ",
+        "zh": "临床助手 IA - 原型",
+        "he": "עוזר קליני בינה מלאכותית - אב טיפוס"
+      }
+    },
+    "header.controls.language": {
+      "source": "Langue",
+      "translations": {
+        "en": "Language",
+        "es": "Idioma",
+        "ko": "언어",
+        "vi": "Ngôn ngữ",
+        "no": "Språk",
+        "ja": "言語",
+        "zh": "语言",
+        "he": "שפה"
+      }
+    },
+    "header.controls.openMenu": {
+      "source": "Ouvrir le menu",
+      "translations": {
+        "en": "Open menu",
+        "es": "Abrir el menú",
+        "ko": "메뉴 열기",
+        "vi": "Mở menu",
+        "no": "Åpne menyen",
+        "ja": "メニューを開く",
+        "zh": "打开菜单",
+        "he": "פתח את התפריט"
+      }
+    },
+    "header.controls.menu": {
+      "source": "Menu",
+      "translations": {
+        "en": "Menu",
+        "es": "Menú",
+        "ko": "메뉴",
+        "vi": "Thực đơn",
+        "no": "Meny",
+        "ja": "メニュー",
+        "zh": "菜单",
+        "he": "תפריט"
+      }
+    },
+    "header.controls.close": {
+      "source": "Fermer",
+      "translations": {
+        "en": "Close",
+        "es": "Cerrar",
+        "ko": "닫기",
+        "vi": "Đóng",
+        "no": "Lukk",
+        "ja": "閉じる",
+        "zh": "关闭",
+        "he": "סגור"
+      }
+    },
+    "header.controls.refresh": {
+      "source": "Rafraichir",
+      "translations": {
+        "en": "Refresh",
+        "es": "Actualizar",
+        "ko": "새로 고침",
+        "vi": "Làm mới",
+        "no": "Oppdater",
+        "ja": "更新する",
+        "zh": "刷新",
+        "he": "רענן"
+      }
+    },
+    "header.controls.search": {
+      "source": "Rechercher",
+      "translations": {
+        "en": "Search",
+        "es": "Buscar",
+        "ko": "검색",
+        "vi": "Tìm kiếm",
+        "no": "Søk",
+        "ja": "検索",
+        "zh": "搜索",
+        "he": "חפש"
+      }
+    },
+    "header.controls.reset": {
+      "source": "Reinitialiser",
+      "translations": {
+        "en": "Reset",
+        "es": "Reiniciar",
+        "ko": "재설정",
+        "vi": "Khởi động lại",
+        "no": "Tilbakestill",
+        "ja": "リセット",
+        "zh": "重新初始化",
+        "he": "אתחול מחדש"
+      }
+    },
+    "header.publicHome.languageTooltip": {
+      "source": "Vous pouvez sélectionner la langue de votre choix.",
+      "translations": {
+        "en": "You can select the language of your choice.",
+        "es": "Puede seleccionar el idioma de su elección.",
+        "ko": "원하는 언어를 선택할 수 있습니다.",
+        "vi": "Bạn có thể chọn ngôn ngữ bạn muốn.",
+        "no": "Du kan velge språket du ønsker.",
+        "ja": "お好みの言語を選択できます。",
+        "zh": "您可以选择您喜欢的语言。",
+        "he": "אתה יכול לבחור את השפה הרצויה לך."
+      }
+    },
+    "header.aiMode.real": {
+      "source": "IA réelle",
+      "translations": {
+        "en": "Real AI",
+        "es": "IA real",
+        "ko": "실제 IA",
+        "vi": "IA thực tế",
+        "no": "Faktisk IA",
+        "ja": "実際のIA",
+        "zh": "实际IA",
+        "he": "IA אמיתית"
+      }
+    },
+    "header.aiMode.mock": {
+      "source": "IA mock",
+      "translations": {
+        "en": "AI mock",
+        "es": "Simulación de IA",
+        "ko": "IA 모의",
+        "vi": "Mô phỏng IA",
+        "no": "IA mock",
+        "ja": "IAモック",
+        "zh": "IA 模拟",
+        "he": "דגם IA"
+      }
+    },
+    "header.aiMode.forceRealTitle": {
+      "source": "Forcer IA réelle",
+      "translations": {
+        "en": "Force real AI",
+        "es": "Forzar IA real",
+        "ko": "실제 AI 강제 적용",
+        "vi": "Buộc AI thực tế",
+        "no": "Tving ekte IA",
+        "ja": "実際のAIを強制する",
+        "zh": "强制真实IA",
+        "he": "כפה בינה מלאכותית אמיתית"
+      }
+    },
+    "header.aiMode.mockTitle": {
+      "source": "Utiliser le mode mock",
+      "translations": {
+        "en": "Use mock mode",
+        "es": "Usar el modo simulado",
+        "ko": "모의 모드 사용",
+        "vi": "Sử dụng chế độ mô phỏng",
+        "no": "Bruk mock-modus",
+        "ja": "モックモードを使用する",
+        "zh": "使用模拟模式",
+        "he": "השתמש במצב דמה"
+      }
+    },
+    "header.nav.home": {
+      "source": "Accueil",
+      "translations": {
+        "en": "Home",
+        "es": "Inicio",
+        "ko": "홈",
+        "vi": "Trang chủ",
+        "no": "Hjem",
+        "ja": "ホーム",
+        "zh": "首页",
+        "he": "בית"
+      }
+    },
+    "header.nav.clinicalAnalysis": {
+      "source": "Analyse clinique",
+      "translations": {
+        "en": "Clinical analysis",
+        "es": "Análisis clínico",
+        "ko": "임상 분석",
+        "vi": "Phân tích lâm sàng",
+        "no": "Klinisk analyse",
+        "ja": "臨床分析",
+        "zh": "临床分析",
+        "he": "ניתוח קליני"
+      }
+    },
+    "header.nav.comments": {
+      "source": "Commentaires",
+      "translations": {
+        "en": "Comments",
+        "es": "Comentarios",
+        "ko": "댓글",
+        "vi": "Bình luận",
+        "no": "Kommentarer",
+        "ja": "コメント",
+        "zh": "评论",
+        "he": "הערות"
+      }
+    },
+    "header.nav.clinicManagement": {
+      "source": "Gestion clinique",
+      "translations": {
+        "en": "Clinical Management",
+        "es": "Gestión clínica",
+        "ko": "임상 관리",
+        "vi": "Quản lý lâm sàng",
+        "no": "Klinisk administrasjon",
+        "ja": "臨床管理",
+        "zh": "临床管理",
+        "he": "ניהול קליני"
+      }
+    },
+    "header.nav.appointments": {
+      "source": "Rendez-vous",
+      "translations": {
+        "en": "Appointment",
+        "es": "Cita",
+        "ko": "약속",
+        "vi": "Cuộc hẹn",
+        "no": "Avtale",
+        "ja": "予約",
+        "zh": "预约",
+        "he": "פגישה"
+      }
+    },
+    "header.nav.patients": {
+      "source": "Patients",
+      "translations": {
+        "en": "Patients",
+        "es": "Pacientes",
+        "ko": "환자",
+        "vi": "Bệnh nhân",
+        "no": "Pasienter",
+        "ja": "患者",
+        "zh": "患者",
+        "he": "מטופלים"
+      }
+    },
+    "header.nav.cliniques": {
+      "source": "Cliniques",
+      "translations": {
+        "en": "Clinics",
+        "es": "Clínicas",
+        "ko": "클리닉",
+        "vi": "Phòng khám",
+        "no": "Klinikker",
+        "ja": "クリニック",
+        "zh": "诊所",
+        "he": "קליניקות"
+      }
+    },
+    "header.nav.specialists": {
+      "source": "Spécialistes",
+      "translations": {
+        "en": "Specialists",
+        "es": "Especialistas",
+        "ko": "전문가",
+        "vi": "Chuyên gia",
+        "no": "Spesialister",
+        "ja": "専門家",
+        "zh": "专家",
+        "he": "מומחים"
+      }
+    },
+    "header.nav.openaiLogs": {
+      "source": "OpenAI logs",
+      "translations": {
+        "en": "OpenAI logs",
+        "es": "Registros de OpenAI",
+        "ko": "OpenAI 로그",
+        "vi": "Nhật ký OpenAI",
+        "no": "OpenAI-logger",
+        "ja": "OpenAIログ",
+        "zh": "OpenAI 日志",
+        "he": "יומני OpenAI"
+      }
+    },
+    "header.nav.appManagement": {
+      "source": "Gestion Application",
+      "translations": {
+        "en": "Application Management",
+        "es": "Gestión de Aplicaciones",
+        "ko": "애플리케이션 관리",
+        "vi": "Quản lý Ứng dụng",
+        "no": "Administrasjonsprogram",
+        "ja": "アプリケーション管理",
+        "zh": "应用管理",
+        "he": "ניהול יישומים"
+      }
+    },
+    "header.nav.quickMode": {
+      "source": "Mode rapide",
+      "translations": {
+        "en": "Quick mode",
+        "es": "Modo rápido",
+        "ko": "빠른 모드",
+        "vi": "Chế độ nhanh",
+        "no": "Rask modus",
+        "ja": "高速モード",
+        "zh": "快速模式",
+        "he": "מצב מהיר"
+      }
+    },
+    "header.nav.patientSummary": {
+      "source": "Résumé patient",
+      "translations": {
+        "en": "Patient summary",
+        "es": "Resumen del paciente",
+        "ko": "환자 요약",
+        "vi": "Tóm tắt bệnh nhân",
+        "no": "Pasientoversikt",
+        "ja": "患者概要",
+        "zh": "患者简历",
+        "he": "סיכום מטופל"
+      }
+    },
+    "header.nav.login": {
+      "source": "Connexion",
+      "translations": {
+        "en": "Connection",
+        "es": "Conexión",
+        "ko": "연결",
+        "vi": "Đăng nhập",
+        "no": "Pålogging",
+        "ja": "接続",
+        "zh": "登录",
+        "he": "התחברות"
+      }
+    },
+    "header.nav.admin": {
+      "source": "Admin",
+      "translations": {
+        "en": "Admin",
+        "es": "Administrador",
+        "ko": "관리자",
+        "vi": "Quản trị viên",
+        "no": "Administrator",
+        "ja": "管理者",
+        "zh": "管理员",
+        "he": "מנהל מערכת"
+      }
+    },
+    "header.nav.mockStudio": {
+      "source": "Mock Studio",
+      "translations": {
+        "en": "Mock Studio",
+        "es": "Estudio Simulado",
+        "ko": "모의 스튜디오",
+        "vi": "Phòng Thí Nghiệm Giả",
+        "no": "Mock Studio",
+        "ja": "モックスタジオ",
+        "zh": "模拟工作室",
+        "he": "סטודיו מדומה"
+      }
+    },
+    "header.nav.patientAudits": {
+      "source": "Audits patient",
+      "translations": {
+        "en": "Patient audits",
+        "es": "Auditorías de pacientes",
+        "ko": "환자 감사",
+        "vi": "Kiểm tra bệnh nhân",
+        "no": "Reviderer pasient",
+        "ja": "患者を監査する",
+        "zh": "审核患者",
+        "he": "בוחן מטופל"
+      }
+    },
+    "header.nav.openaiAudits": {
+      "source": "Audits OpenAI",
+      "translations": {
+        "en": "OpenAI Audits",
+        "es": "Auditorías OpenAI",
+        "ko": "OpenAI 감사",
+        "vi": "Kiểm toán OpenAI",
+        "no": "Revisjoner OpenAI",
+        "ja": "OpenAIの監査",
+        "zh": "审计 OpenAI",
+        "he": "בדיקות OpenAI"
+      }
+    },
+    "header.nav.dbAudits": {
+      "source": "Audits BD",
+      "translations": {
+        "en": "BD Audits",
+        "es": "Auditorías BD",
+        "ko": "감사 BD",
+        "vi": "Kiểm toán BD",
+        "no": "Revisjoner BD",
+        "ja": "監査BD",
+        "zh": "审核 BD",
+        "he": "בדיקות BD"
+      }
+    },
+    "header.nav.myWriteReceipts": {
+      "source": "Mes reçus",
+      "translations": {
+        "en": "My receipts",
+        "es": "Mis recibos",
+        "ko": "내 영수증",
+        "vi": "Biên lai của tôi",
+        "no": "Mine kvitteringer",
+        "ja": "私の領収書",
+        "zh": "我的收据",
+        "he": "הקבלות שלי"
+      }
+    },
+    "header.nav.dbStatus": {
+      "source": "Etat BD",
+      "translations": {
+        "en": "Status BD",
+        "es": "Estado BD",
+        "ko": "BD 상태",
+        "vi": "Trạng thái BD",
+        "no": "Database status",
+        "ja": "BD状態",
+        "zh": "数据库状态",
+        "he": "מצב מסד נתונים"
+      }
+    },
+    "header.nav.users": {
+      "source": "Utilisateurs",
+      "translations": {
+        "en": "Users",
+        "es": "Usuarios",
+        "ko": "사용자",
+        "vi": "Người dùng",
+        "no": "Brukere",
+        "ja": "ユーザー",
+        "zh": "用户",
+        "he": "משתמשים"
+      }
+    },
+    "header.nav.logout": {
+      "source": "Déconnexion",
+      "translations": {
+        "en": "Logout",
+        "es": "Desconexión",
+        "ko": "로그아웃",
+        "vi": "Đăng xuất",
+        "no": "Logg ut",
+        "ja": "ログアウト",
+        "zh": "登出",
+        "he": "התנתקות"
+      }
+    },
+    "header.appManagement.activeUsers": {
+      "source": "Montrer Usager Actif",
+      "translations": {
+        "en": "Show Active User",
+        "es": "Mostrar Usuario Activo",
+        "ko": "활성 사용자 표시",
+        "vi": "Hiển thị Người dùng Hoạt động",
+        "no": "Vis aktiv bruker",
+        "ja": "アクティブユーザーを表示",
+        "zh": "显示活跃用户",
+        "he": "הצג משתמש פעיל"
+      }
+    },
+    "header.appManagement.authLogs": {
+      "source": "Montrer Auth Log",
+      "translations": {
+        "en": "Show Auth Log",
+        "es": "Mostrar registro de autenticación",
+        "ko": "인증 로그 표시",
+        "vi": "Hiển thị Nhật ký Xác thực",
+        "no": "Vis Auth Logg",
+        "ja": "認証ログを表示",
+        "zh": "显示身份验证日志",
+        "he": "הצג יומן אימות"
+      }
+    },
+    "header.appManagement.authGraphs": {
+      "source": "Graphiques Auth",
+      "translations": {
+        "en": "Auth Charts",
+        "es": "Gráficos Auth",
+        "ko": "인증 그래프",
+        "vi": "Đồ thị Xác thực",
+        "no": "Godkjente grafer",
+        "ja": "認証グラフ",
+        "zh": "认证图表",
+        "he": "גרפים Auth"
+      }
+    },
+    "header.appManagement.newComments": {
+      "source": "Nouveaux commentaires médecins",
+      "translations": {
+        "en": "New doctor comments",
+        "es": "Nuevos comentarios de médicos",
+        "ko": "새로운 의사 댓글",
+        "vi": "Bình luận mới của bác sĩ",
+        "no": "Nye legekommentarer",
+        "ja": "新しい医師のコメント",
+        "zh": "新的医生评论",
+        "he": "תגובות רופאים חדשות"
+      }
+    },
+    "header.appManagement.securityIncidents": {
+      "source": "Incidents sécurité",
+      "translations": {
+        "en": "Security incidents",
+        "es": "Incidentes de seguridad",
+        "ko": "보안 사고",
+        "vi": "Sự cố an ninh",
+        "no": "Sikkerhetshendelser",
+        "ja": "セキュリティインシデント",
+        "zh": "安全事件",
+        "he": "תקריות אבטחה"
+      }
+    },
+    "header.appManagement.xyGraph": {
+      "source": "x-y graph",
+      "translations": {
+        "en": "x-y graph",
+        "es": "Gráfico x-y",
+        "ko": "x-y 그래프",
+        "vi": "đồ thị x-y",
+        "no": "x-y-graf",
+        "ja": "x-y グラフ",
+        "zh": "x-y 图表",
+        "he": "גרף x-y"
+      }
+    },
+    "header.appManagement.pieGraph": {
+      "source": "Pie graph",
+      "translations": {
+        "en": "Pie chart",
+        "es": "Gráfico de sectores",
+        "ko": "원형 그래프",
+        "vi": "Biểu đồ hình tròn",
+        "no": "Sektordiagram",
+        "ja": "円グラフ",
+        "zh": "饼图",
+        "he": "גרף עוגה"
+      }
+    },
+    "header.appManagement.histogramGraph": {
+      "source": "Histogramme graph",
+      "translations": {
+        "en": "Histogram graph",
+        "es": "Gráfico de histograma",
+        "ko": "히스토그램 그래프",
+        "vi": "Biểu đồ Histogramme",
+        "no": "Histogramdiagram",
+        "ja": "ヒストグラムグラフ",
+        "zh": "直方图图表",
+        "he": "גרף היסטוגרמה"
+      }
+    },
+    "header.appManagement.shutdown": {
+      "source": "Arret de l'application",
+      "translations": {
+        "en": "Application stop",
+        "es": "Detención de la aplicación",
+        "ko": "애플리케이션 중지",
+        "vi": "Dừng ứng dụng",
+        "no": "Stopp av applikasjonen",
+        "ja": "アプリケーションの停止",
+        "zh": "停止应用程序",
+        "he": "עצירת היישום"
+      }
+    },
+    "header.appManagement.clearMaintenance": {
+      "source": "Fin de maintenance",
+      "translations": {
+        "en": "End of maintenance",
+        "es": "Fin de mantenimiento",
+        "ko": "유지보수 종료",
+        "vi": "Kết thúc bảo trì",
+        "no": "Vedlikehold ferdig",
+        "ja": "メンテナンス終了",
+        "zh": "维护结束",
+        "he": "סיום תחזוקה"
+      }
+    },
+    "header.appManagement.forceReopen": {
+      "source": "Forcer reouverture normale",
+      "translations": {
+        "en": "Force normal reopening",
+        "es": "Forzar reapertura normal",
+        "ko": "정상 재개 강제 실행",
+        "vi": "Ép buộc mở lại bình thường",
+        "no": "Tving normal gjenåpning",
+        "ja": "通常の再開を強制する",
+        "zh": "强制正常重新开启",
+        "he": "כפה פתיחה מחדש רגילה"
+      }
+    },
+    "header.voice.activateVoiceMode": {
+      "source": "Activer mode vocal",
+      "translations": {
+        "en": "Enable voice mode",
+        "es": "Activar modo de voz",
+        "ko": "음성 모드 활성화",
+        "vi": "Kích hoạt chế độ giọng nói",
+        "no": "Aktiver stemmemodus",
+        "ja": "音声モードを有効にする",
+        "zh": "启用语音模式",
+        "he": "הפעל מצב קול"
+      }
+    },
+    "header.voice.deactivateVoiceMode": {
+      "source": "Désactiver mode vocal",
+      "translations": {
+        "en": "Disable voice mode",
+        "es": "Desactivar modo vocal",
+        "ko": "음성 모드 비활성화",
+        "vi": "Tắt chế độ giọng nói",
+        "no": "Deaktiver stemmemodus",
+        "ja": "音声モードを無効にする",
+        "zh": "禁用语音模式",
+        "he": "השבת מצב קול"
+      }
+    },
+    "header.voice.micTestTitle": {
+      "source": "Test rapide du micro (niveau sonore)",
+      "translations": {
+        "en": "Quick mic test (volume level)",
+        "es": "Prueba rápida del micrófono (nivel de sonido)",
+        "ko": "마이크 빠른 테스트 (음량)",
+        "vi": "Kiểm tra nhanh micro (mức âm lượng)",
+        "no": "Rask mikrofontest (lydnivå)",
+        "ja": "マイクのクイックテスト（音量レベル）",
+        "zh": "麦克风快速测试（音量级别）",
+        "he": "בדיקת מיקרופון מהירה (רמת קול)"
+      }
+    },
+    "header.voice.micTest": {
+      "source": "Tester micro",
+      "translations": {
+        "en": "Micro tester",
+        "es": "Micro probador",
+        "ko": "테스터 마이크로",
+        "vi": "Kiểm tra vi mô",
+        "no": "Test mikro",
+        "ja": "マイクロテスター",
+        "zh": "测试微型",
+        "he": "מיקרו בודק"
+      }
+    },
+    "header.voice.micTestActive": {
+      "source": "Test micro actif",
+      "translations": {
+        "en": "Active micro test",
+        "es": "Prueba micro activa",
+        "ko": "활성 마이크로 테스트",
+        "vi": "Kiểm tra vi hoạt động",
+        "no": "Test mikroaktiv",
+        "ja": "テストマイクロアクティフ",
+        "zh": "测试活性微粒",
+        "he": "בדיקת מיקרו פעיל"
+      }
+    },
+    "header.voice.micLevelPrefix": {
+      "source": "Niveau micro:",
+      "translations": {
+        "en": "Micro level:",
+        "es": "Nivel micro:",
+        "ko": "마이크로 수준:",
+        "vi": "Mức vi mô:",
+        "no": "Mikronivå:",
+        "ja": "マイクロレベル:",
+        "zh": "微观层面：",
+        "he": "רמת מיקרו:"
+      }
+    },
+    "header.voice.enablePersistentWake": {
+      "source": "Activer écoute persistante",
+      "translations": {
+        "en": "Enable persistent listening",
+        "es": "Activar escucha persistente",
+        "ko": "지속적인 활성 청취",
+        "vi": "Kích hoạt nghe liên tục",
+        "no": "Aktiver vedvarende lytting",
+        "ja": "常時リスニングを有効にする",
+        "zh": "启用持续监听",
+        "he": "הפעל האזנה מתמשכת"
+      }
+    },
+    "header.voice.disablePersistentWake": {
+      "source": "Désactiver écoute persistante",
+      "translations": {
+        "en": "Disable persistent listening",
+        "es": "Desactivar escucha persistente",
+        "ko": "지속 청취 비활성화",
+        "vi": "Tắt nghe liên tục",
+        "no": "Deaktiver vedvarende lytting",
+        "ja": "常時リスニングを無効にする",
+        "zh": "禁用持续监听",
+        "he": "השבת האזנה מתמשכת"
+      }
+    },
+    "header.voice.persistentWakeOn": {
+      "source": "Écoute persistante: ON",
+      "translations": {
+        "en": "Persistent listening: ON",
+        "es": "Escucha persistente: ACTIVADO",
+        "ko": "지속 청취: 켬",
+        "vi": "Lắng nghe liên tục: BẬT",
+        "no": "Vedvarende lytting: PÅ",
+        "ja": "持続的なリスニング: ON",
+        "zh": "持续监听：开启",
+        "he": "האזנה מתמשכת: מופעל"
+      }
+    },
+    "login.title.admin": {
+      "source": "Connexion administrateur",
+      "translations": {
+        "en": "Administrator login",
+        "es": "Conexión de administrador",
+        "ko": "관리자 연결",
+        "vi": "Đăng nhập quản trị viên",
+        "no": "Administrator pålogging",
+        "ja": "管理者ログイン",
+        "zh": "管理员登录",
+        "he": "כניסת מנהל מערכת"
+      }
+    },
+    "login.title.register": {
+      "source": "Creation de compte ClinIA",
+      "translations": {
+        "en": "ClinIA Account Creation",
+        "es": "Creación de cuenta ClinIA",
+        "ko": "ClinIA 계정 생성",
+        "vi": "Tạo tài khoản ClinIA",
+        "no": "Opprettelse av ClinIA-konto",
+        "ja": "ClinIAアカウントの作成",
+        "zh": "ClinIA账户创建",
+        "he": "יצירת חשבון ClinIA"
+      }
+    },
+    "login.title.login": {
+      "source": "Connexion ClinIA",
+      "translations": {
+        "en": "ClinIA Login",
+        "es": "Conexión ClinIA",
+        "ko": "ClinIA 연결",
+        "vi": "Kết nối ClinIA",
+        "no": "ClinIA pålogging",
+        "ja": "ClinIAへの接続",
+        "zh": "ClinIA 登录",
+        "he": "התחברות ClinIA"
+      }
+    },
+    "login.description.admin": {
+      "source": "Acces reserve a la console d'administration ClinIA.",
+      "translations": {
+        "en": "Reserved access to the ClinIA administration console.",
+        "es": "Acceso reservado a la consola de administración ClinIA.",
+        "ko": "ClinIA 관리 콘솔 액세스 예약.",
+        "vi": "Truy cập hạn chế vào bảng điều khiển quản trị ClinIA.",
+        "no": "Begrenset tilgang til ClinIA administrasjonskonsoll.",
+        "ja": "管理コンソールClinIAへの限定アクセス。",
+        "zh": "访问ClinIA管理控制台的权限。",
+        "he": "גישה שמורה לקונסולת הניהול של ClinIA."
+      }
+    },
+    "login.description.register": {
+      "source": "Creer un compte avec votre courriel, mot de passe et role.",
+      "translations": {
+        "en": "Create an account with your email, password, and role.",
+        "es": "Crear una cuenta con su correo electrónico, contraseña y rol.",
+        "ko": "이메일, 비밀번호 및 역할로 계정 만들기.",
+        "vi": "Tạo tài khoản bằng email, mật khẩu và vai trò của bạn.",
+        "no": "Opprett en konto med e-post, passord og rolle.",
+        "ja": "メールアドレス、パスワード、役割でアカウントを作成してください。",
+        "zh": "使用您的电子邮件、密码和角色创建账户。",
+        "he": "צור חשבון עם האימייל, הסיסמה והתפקיד שלך."
+      }
+    },
+    "login.description.login": {
+      "source": "Connectez-vous pour acceder aux modules cliniques securises.",
+      "translations": {
+        "en": "Sign in to access secure clinical modules.",
+        "es": "Inicie sesión para acceder a los módulos clínicos seguros.",
+        "ko": "보안 임상 모듈에 접속하려면 로그인하세요.",
+        "vi": "Đăng nhập để truy cập các mô-đun lâm sàng an toàn.",
+        "no": "Logg inn for å få tilgang til sikre kliniske moduler.",
+        "ja": "安全な臨床モジュールにアクセスするにはログインしてください。",
+        "zh": "登录以访问安全的临床模块。",
+        "he": "התחבר כדי לגשת למודולים קליניים מאובטחים."
+      }
+    },
+    "login.modeToggle.alreadyHaveAccount": {
+      "source": "J'ai deja un compte",
+      "translations": {
+        "en": "I already have an account",
+        "es": "Ya tengo una cuenta",
+        "ko": "이미 계정이 있습니다",
+        "vi": "Tôi đã có tài khoản",
+        "no": "Jeg har allerede en konto",
+        "ja": "すでにアカウントをお持ちですか",
+        "zh": "我已有账户",
+        "he": "כבר יש לי חשבון"
+      }
+    },
+    "login.modeToggle.createAccount": {
+      "source": "Je n'ai pas de compte, en creer un",
+      "translations": {
+        "en": "I don't have an account, create one",
+        "es": "No tengo una cuenta, crear una",
+        "ko": "계정이 없으신가요? 새로 만들기",
+        "vi": "Tôi không có tài khoản, tạo một tài khoản mới",
+        "no": "Jeg har ikke en konto, opprett en",
+        "ja": "アカウントをお持ちでない場合は、作成してください",
+        "zh": "我没有账户，创建一个",
+        "he": "אין לי חשבון, ליצור אחד"
+      }
+    },
+    "login.fields.email": {
+      "source": "Courriel",
+      "translations": {
+        "en": "Email",
+        "es": "Correo electrónico",
+        "ko": "이메일",
+        "vi": "Email",
+        "no": "E-post",
+        "ja": "メール",
+        "zh": "电子邮件",
+        "he": "דוא\"ל"
+      }
+    },
+    "login.fields.identifier": {
+      "source": "Identifiant (courriel ou nom d'utilisateur)",
+      "translations": {
+        "en": "Identifier (email or username)",
+        "es": "Identificador (correo electrónico o nombre de usuario)",
+        "ko": "식별자(이메일 또는 사용자 이름)",
+        "vi": "Tên đăng nhập (email hoặc tên người dùng)",
+        "no": "Brukernavn (e-post eller brukernavn)",
+        "ja": "識別子（メールアドレスまたはユーザー名）",
+        "zh": "标识符（电子邮件或用户名）",
+        "he": "מזהה (דוא\"ל או שם משתמש)"
+      }
+    },
+    "login.fields.password": {
+      "source": "Mot de passe",
+      "translations": {
+        "en": "Password",
+        "es": "Contraseña",
+        "ko": "비밀번호",
+        "vi": "Mật khẩu",
+        "no": "Passord",
+        "ja": "パスワード",
+        "zh": "密码",
+        "he": "סיסמה"
+      }
+    },
+    "login.fields.accountRole": {
+      "source": "Role du compte",
+      "translations": {
+        "en": "Account role",
+        "es": "Rol de la cuenta",
+        "ko": "계정 역할",
+        "vi": "Vai trò của tài khoản",
+        "no": "Kontorolle",
+        "ja": "アカウントの役割",
+        "zh": "账户角色",
+        "he": "תפקיד החשבון"
+      }
+    },
+    "login.action.creating": {
+      "source": "Creation...",
+      "translations": {
+        "en": "Creation...",
+        "es": "Creando...",
+        "ko": "생성 중...",
+        "vi": "Đang tạo...",
+        "no": "Opprettelse...",
+        "ja": "作成中...",
+        "zh": "创建中...",
+        "he": "יוצר..."
+      }
+    },
+    "login.action.loggingIn": {
+      "source": "Connexion...",
+      "translations": {
+        "en": "Connecting...",
+        "es": "Conectando...",
+        "ko": "연결 중...",
+        "vi": "Đang kết nối...",
+        "no": "Kobler til...",
+        "ja": "接続中...",
+        "zh": "连接中...",
+        "he": "מתחבר..."
+      }
+    },
+    "login.action.createAccount": {
+      "source": "Creer mon compte",
+      "translations": {
+        "en": "Create my account",
+        "es": "Crear mi cuenta",
+        "ko": "내 계정 만들기",
+        "vi": "Tạo tài khoản của tôi",
+        "no": "Opprett min konto",
+        "ja": "アカウントを作成する",
+        "zh": "创建我的账户",
+        "he": "צור את החשבון שלי"
+      }
+    },
+    "login.action.login": {
+      "source": "Se connecter",
+      "translations": {
+        "en": "Sign in",
+        "es": "Iniciar sesión",
+        "ko": "로그인",
+        "vi": "Đăng nhập",
+        "no": "Logg inn",
+        "ja": "ログイン",
+        "zh": "登录",
+        "he": "התחבר"
+      }
+    },
+    "login.action.forgotPassword": {
+      "source": "Mot de passe oublie?",
+      "translations": {
+        "en": "Forgot password?",
+        "es": "¿Olvidó su contraseña?",
+        "ko": "비밀번호를 잊으셨나요?",
+        "vi": "Quên mật khẩu?",
+        "no": "Glemt passord?",
+        "ja": "パスワードをお忘れですか？",
+        "zh": "忘记密码？",
+        "he": "שכחת סיסמה?"
+      }
+    },
+    "login.errors.adminOnly": {
+      "source": "Acces reserve aux comptes administrateurs.",
+      "translations": {
+        "en": "Restricted access to administrator accounts.",
+        "es": "Acceso reservado a cuentas de administrador.",
+        "ko": "관리자 계정 전용 액세스.",
+        "vi": "Truy cập giới hạn cho tài khoản quản trị viên.",
+        "no": "Tilgang kun for administrator kontoer.",
+        "ja": "管理者アカウント専用アクセス。",
+        "zh": "仅限管理员账户访问。",
+        "he": "גישה שמורה לחשבונות מנהלים."
+      }
+    },
+    "login.errors.createFailed": {
+      "source": "Impossible de creer le compte.",
+      "translations": {
+        "en": "Unable to create the account.",
+        "es": "No se puede crear la cuenta.",
+        "ko": "계정을 생성할 수 없습니다.",
+        "vi": "Không thể tạo tài khoản.",
+        "no": "Kan ikke opprette kontoen.",
+        "ja": "アカウントを作成できません。",
+        "zh": "无法创建账户。",
+        "he": "לא ניתן ליצור את החשבון."
+      }
+    },
+    "login.errors.loginFailed": {
+      "source": "Impossible de se connecter. Verifiez vos identifiants.",
+      "translations": {
+        "en": "Unable to connect. Please check your credentials.",
+        "es": "No se puede conectar. Verifique sus credenciales.",
+        "ko": "연결할 수 없습니다. 자격 증명을 확인하세요.",
+        "vi": "Không thể kết nối. Vui lòng kiểm tra thông tin đăng nhập của bạn.",
+        "no": "Kan ikke logge inn. Sjekk brukernavn og passord.",
+        "ja": "接続できません。認証情報を確認してください。",
+        "zh": "无法连接。请检查您的凭据。",
+        "he": "לא ניתן להתחבר. בדוק את פרטי ההתחברות שלך."
+      }
+    },
+    "login.recovery.emailLabel": {
+      "source": "Courriel du compte",
+      "translations": {
+        "en": "Account email",
+        "es": "Correo electrónico de la cuenta",
+        "ko": "계정 이메일",
+        "vi": "Email của tài khoản",
+        "no": "Kontoe-post",
+        "ja": "アカウントのメール",
+        "zh": "账户电子邮件",
+        "he": "דוא\"ל החשבון"
+      }
+    },
+    "login.recovery.verificationCodeLabel": {
+      "source": "Code de verification",
+      "translations": {
+        "en": "Verification code",
+        "es": "Código de verificación",
+        "ko": "인증 코드",
+        "vi": "Mã xác minh",
+        "no": "Verifiseringskode",
+        "ja": "確認コード",
+        "zh": "验证码",
+        "he": "קוד אימות"
+      }
+    },
+    "login.recovery.newPasswordLabel": {
+      "source": "Nouveau mot de passe",
+      "translations": {
+        "en": "New password",
+        "es": "Nueva contraseña",
+        "ko": "새 비밀번호",
+        "vi": "Mật khẩu mới",
+        "no": "Nytt passord",
+        "ja": "新しいパスワード",
+        "zh": "新密码",
+        "he": "סיסמה חדשה"
+      }
+    },
+    "login.recovery.confirmPasswordLabel": {
+      "source": "Confirmer le nouveau mot de passe",
+      "translations": {
+        "en": "Confirm new password",
+        "es": "Confirmar la nueva contraseña",
+        "ko": "새 비밀번호 확인하기",
+        "vi": "Xác nhận mật khẩu mới",
+        "no": "Bekreft det nye passordet",
+        "ja": "新しいパスワードを確認する",
+        "zh": "确认新密码",
+        "he": "אשר את הסיסמה החדשה"
+      }
+    },
+    "login.recovery.processing": {
+      "source": "Traitement...",
+      "translations": {
+        "en": "Processing...",
+        "es": "Tratamiento...",
+        "ko": "처리 중...",
+        "vi": "Đang xử lý...",
+        "no": "Behandler...",
+        "ja": "処理中...",
+        "zh": "处理中...",
+        "he": "מעבד..."
+      }
+    },
+    "login.recovery.sendCode": {
+      "source": "Envoyer le code",
+      "translations": {
+        "en": "Send code",
+        "es": "Enviar el código",
+        "ko": "코드 보내기",
+        "vi": "Gửi mã",
+        "no": "Send koden",
+        "ja": "コードを送信する",
+        "zh": "发送代码",
+        "he": "שלח את הקוד"
+      }
+    },
+    "login.recovery.verifyCode": {
+      "source": "Verifier le code",
+      "translations": {
+        "en": "Verify the code",
+        "es": "Verificar el código",
+        "ko": "코드 확인",
+        "vi": "Xác minh mã",
+        "no": "Bekreft koden",
+        "ja": "コードを確認する",
+        "zh": "验证代码",
+        "he": "אמת את הקוד"
+      }
+    },
+    "login.recovery.changePassword": {
+      "source": "Modifier le mot de passe",
+      "translations": {
+        "en": "Change Password",
+        "es": "Modificar la contraseña",
+        "ko": "비밀번호 변경",
+        "vi": "Thay đổi mật khẩu",
+        "no": "Endre passordet",
+        "ja": "パスワードを変更する",
+        "zh": "修改密码",
+        "he": "שנה את הסיסמה"
+      }
+    },
+    "login.recovery.backToLogin": {
+      "source": "Retour a la connexion",
+      "translations": {
+        "en": "Back to sign-in",
+        "es": "Volver a la conexión",
+        "ko": "로그인으로 돌아가기",
+        "vi": "Quay lại đăng nhập",
+        "no": "Tilbake til pålogging",
+        "ja": "ログインに戻る",
+        "zh": "返回登录",
+        "he": "חזרה להתחברות"
+      }
+    },
+    "login.recovery.requestSent": {
+      "source": "Si ce compte existe, un code a ete envoye par courriel.",
+      "translations": {
+        "en": "If this account exists, a code has been sent by email.",
+        "es": "Si esta cuenta existe, se ha enviado un código por correo electrónico.",
+        "ko": "이 계정이 존재하면 이메일로 코드가 전송되었습니다.",
+        "vi": "Nếu tài khoản này tồn tại, một mã đã được gửi qua email.",
+        "no": "Hvis denne kontoen finnes, er en kode sendt på e-post.",
+        "ja": "このアカウントが存在する場合、コードがメールで送信されました。",
+        "zh": "如果该账户存在，验证码已通过电子邮件发送。",
+        "he": "אם חשבון זה קיים, קוד נשלח בדוא\"ל."
+      }
+    },
+    "login.recovery.codeVerified": {
+      "source": "Code confirme. Choisissez maintenant un nouveau mot de passe.",
+      "translations": {
+        "en": "Code confirmed. Please choose a new password now.",
+        "es": "Código confirmado. Ahora elija una nueva contraseña.",
+        "ko": "코드 확인됨. 이제 새 비밀번호를 선택하세요.",
+        "vi": "Mã đã xác nhận. Vui lòng chọn mật khẩu mới ngay bây giờ.",
+        "no": "Kode bekreftet. Velg nå et nytt passord.",
+        "ja": "コードが確認されました。新しいパスワードを今すぐ選択してください。",
+        "zh": "代码已确认。现在请选择一个新密码。",
+        "he": "קוד אושר. בחר סיסמה חדשה כעת."
+      }
+    },
+    "login.recovery.passwordsMismatch": {
+      "source": "Les mots de passe ne correspondent pas.",
+      "translations": {
+        "en": "Passwords do not match.",
+        "es": "Las contraseñas no coinciden.",
+        "ko": "비밀번호가 일치하지 않습니다.",
+        "vi": "Mật khẩu không khớp.",
+        "no": "Passordene samsvarer ikke.",
+        "ja": "パスワードが一致しません。",
+        "zh": "密码不匹配。",
+        "he": "הסיסמאות אינן תואמות."
+      }
+    },
+    "login.recovery.passwordChanged": {
+      "source": "Mot de passe modifie. Vous pouvez maintenant vous connecter.",
+      "translations": {
+        "en": "Password changed. You can now sign in.",
+        "es": "Contraseña modificada. Ahora puede iniciar sesión.",
+        "ko": "비밀번호가 변경되었습니다. 이제 로그인할 수 있습니다.",
+        "vi": "Mật khẩu đã được thay đổi. Bạn có thể đăng nhập ngay bây giờ.",
+        "no": "Passord endret. Du kan nå logge inn.",
+        "ja": "パスワードが変更されました。今すぐログインできます。",
+        "zh": "密码已修改。您现在可以登录。",
+        "he": "סיסמה שונתה. כעת ניתן להתחבר."
+      }
+    },
+    "login.recovery.continueFailed": {
+      "source": "Impossible de poursuivre la reinitialisation.",
+      "translations": {
+        "en": "Unable to continue the reset.",
+        "es": "No se puede continuar con el restablecimiento.",
+        "ko": "재설정을 계속할 수 없습니다.",
+        "vi": "Không thể tiếp tục đặt lại.",
+        "no": "Kan ikke fortsette tilbakestillingen.",
+        "ja": "リセットを続行できません。",
+        "zh": "无法继续重置。",
+        "he": "לא ניתן להמשיך באיפוס."
+      }
+    },
+    "auth.session.revokedTitle": {
+      "source": "Session interrompue par securite",
+      "translations": {
+        "en": "Session interrupted for security reasons",
+        "es": "Sesión interrumpida por seguridad",
+        "ko": "보안에 의해 세션이 중단되었습니다",
+        "vi": "Phiên làm việc bị gián đoạn do bảo mật",
+        "no": "Økt avbrutt av sikkerhet",
+        "ja": "セッションはセキュリティにより中断されました",
+        "zh": "会话因安全原因中断",
+        "he": "הפסקת מושב עקב אבטחה"
+      }
+    },
+    "auth.session.revokedBody": {
+      "source": "Une activite inhabituelle a ete detectee sur ce compte. Votre session a ete invalidee par securite et une reconnexion est necessaire pour poursuivre. Si cette activite ne venait pas de vous, changez votre mot de passe des maintenant.",
+      "translations": {
+        "en": "Unusual activity has been detected on this account. Your session has been invalidated for security reasons and you need to log in again to continue. If this activity was not initiated by you, change your password immediately.",
+        "es": "Se ha detectado una actividad inusual en esta cuenta. Su sesión ha sido invalidada por seguridad y es necesario volver a iniciar sesión para continuar. Si esta actividad no fue realizada por usted, cambie su contraseña ahora mismo.",
+        "ko": "이 계정에서 비정상적인 활동이 감지되었습니다. 보안을 위해 세션이 무효화되었으며 계속하려면 다시 로그인해야 합니다. 이 활동이 본인이 아닌 경우 즉시 비밀번호를 변경하세요.",
+        "vi": "Một hoạt động bất thường đã được phát hiện trên tài khoản này. Phiên làm việc của bạn đã bị vô hiệu hóa vì lý do bảo mật và bạn cần đăng nhập lại để tiếp tục. Nếu hoạt động này không phải do bạn thực hiện, hãy thay đổi mật khẩu ngay bây giờ.",
+        "no": "En uvanlig aktivitet ble oppdaget på denne kontoen. Økten din ble ugyldiggjort av sikkerhetsgrunner, og du må logge inn på nytt for å fortsette. Hvis denne aktiviteten ikke kom fra deg, endre passordet ditt nå.",
+        "ja": "このアカウントで異常な活動が検出されました。セキュリティのためセッションが無効になり、続行するには再ログインが必要です。この活動がご自身によるものでない場合は、ただちにパスワードを変更してください。",
+        "zh": "检测到该账户有异常活动。出于安全考虑，您的会话已被注销，需重新登录以继续操作。如果此活动非您本人所为，请立即更改密码。",
+        "he": "זוהתה פעילות חריגה בחשבון זה. הסשן שלך בוטל מטעמי אבטחה ויש להתחבר מחדש כדי להמשיך. אם הפעילות לא בוצעה על ידך, שנה את הסיסמה שלך כעת."
+      }
+    },
+    "auth.session.restrictedTitle": {
+      "source": "Acces temporairement restreint",
+      "translations": {
+        "en": "Access temporarily restricted",
+        "es": "Acceso temporalmente restringido",
+        "ko": "일시적으로 접근 제한됨",
+        "vi": "Truy cập tạm thời bị hạn chế",
+        "no": "Tilgang midlertidig begrenset",
+        "ja": "アクセス一時的に制限されています",
+        "zh": "访问暂时受限",
+        "he": "גישה מוגבלת זמנית"
+      }
+    },
+    "auth.session.restrictedBody": {
+      "source": "Une activite inhabituelle a ete detectee sur ce compte. Votre session a ete invalidee par securite et une reconnexion est necessaire. ClinIA bloque temporairement l'acces aux routes sensibles pendant la periode de restriction. Si cette activite ne venait pas de vous, changez votre mot de passe des maintenant.",
+      "translations": {
+        "en": "Unusual activity has been detected on this account. Your session has been invalidated for security reasons and a reconnection is required. ClinIA temporarily blocks access to sensitive routes during the restriction period. If this activity was not initiated by you, change your password immediately.",
+        "es": "Se ha detectado una actividad inusual en esta cuenta. Su sesión ha sido invalidada por seguridad y es necesario volver a iniciar sesión. ClinIA bloquea temporalmente el acceso a las rutas sensibles durante el período de restricción. Si esta actividad no fue realizada por usted, cambie su contraseña ahora mismo.",
+        "ko": "이 계정에서 비정상적인 활동이 감지되었습니다. 보안을 위해 세션이 무효화되었으며 다시 로그인해야 합니다. ClinIA는 제한 기간 동안 민감한 경로에 대한 접근을 일시적으로 차단합니다. 이 활동이 본인이 아닌 경우 즉시 비밀번호를 변경하십시오.",
+        "vi": "Một hoạt động bất thường đã được phát hiện trên tài khoản này. Phiên làm việc của bạn đã bị vô hiệu hóa vì lý do bảo mật và cần đăng nhập lại. ClinIA tạm thời chặn truy cập vào các tuyến nhạy cảm trong thời gian hạn chế. Nếu hoạt động này không phải do bạn thực hiện, hãy thay đổi mật khẩu ngay bây giờ.",
+        "no": "En uvanlig aktivitet ble oppdaget på denne kontoen. Økten din ble ugyldiggjort av sikkerhetsgrunner, og du må logge inn på nytt. ClinIA blokkerer midlertidig tilgangen til sensitive ruter i restriksjonsperioden. Hvis denne aktiviteten ikke kom fra deg, endre passordet ditt nå.",
+        "ja": "このアカウントで異常な活動が検出されました。セキュリティのためセッションが無効化され、再ログインが必要です。ClinIAは制限期間中、機密ルートへのアクセスを一時的にブロックします。この活動がご自身によるものでない場合は、ただちにパスワードを変更してください。",
+        "zh": "检测到该账户有异常活动。出于安全考虑，您的会话已被注销，需重新登录。ClinIA在限制期间暂时阻止访问敏感路径。如果此活动非您本人操作，请立即更改密码。",
+        "he": "זוהתה פעילות חריגה בחשבון זה. הסשן שלך בוטל מטעמי אבטחה ויש להתחבר מחדש. ClinIA חוסמת זמנית את הגישה לנתיבים רגישים במהלך תקופת ההגבלה. אם פעילות זו לא בוצעה על ידך, שנה את סיסמתך כעת."
+      }
+    },
+    "auth.session.restrictedUntilPrefix": {
+      "source": "Fin de restriction :",
+      "translations": {
+        "en": "Restriction end:",
+        "es": "Fin de restricción:",
+        "ko": "제한 종료 :",
+        "vi": "Kết thúc hạn chế :",
+        "no": "Slutt på restriksjon:",
+        "ja": "制限終了：",
+        "zh": "限制结束：",
+        "he": "סיום ההגבלה:"
+      }
+    }
+  },
+  "bySource": {
+    "Analyser": {
+      "en": "Analyze"
+    },
+    "Sexe": {
+      "en": "Sex"
+    },
+    "Autre": {
+      "en": "Other"
+    },
+    "Oui": {
+      "en": "Yes",
+      "es": "Sí"
+    },
+    "Non": {
+      "en": "No",
+      "es": "No"
+    },
+    "Traitement...": {
+      "en": "Processing...",
+      "es": "Tratamiento...",
+      "ko": "처리 중...",
+      "vi": "Đang xử lý...",
+      "no": "Behandler...",
+      "ja": "処理中...",
+      "zh": "处理中...",
+      "he": "מעבד..."
+    },
+    "Mot de passe": {
+      "en": "Password",
+      "es": "Contraseña",
+      "ko": "비밀번호",
+      "vi": "Mật khẩu",
+      "no": "Passord",
+      "ja": "パスワード",
+      "zh": "密码",
+      "he": "סיסמה"
+    },
+    "Nouveau mot de passe": {
+      "en": "New password",
+      "es": "Nueva contraseña",
+      "ko": "새 비밀번호",
+      "vi": "Mật khẩu mới",
+      "no": "Nytt passord",
+      "ja": "新しいパスワード",
+      "zh": "新密码",
+      "he": "סיסמה חדשה"
+    },
+    "Session interrompue par securite": {
+      "en": "Session interrupted for security reasons",
+      "es": "Sesión interrumpida por seguridad",
+      "ko": "보안에 의해 세션이 중단되었습니다",
+      "vi": "Phiên làm việc bị gián đoạn do bảo mật",
+      "no": "Økt avbrutt av sikkerhet",
+      "ja": "セッションはセキュリティにより中断されました",
+      "zh": "会话因安全原因中断",
+      "he": "הפסקת מושב עקב אבטחה"
+    },
+    "Une activite inhabituelle a ete detectee sur ce compte. Votre session a ete invalidee par securite et une reconnexion est necessaire pour poursuivre. Si cette activite ne venait pas de vous, changez votre mot de passe des maintenant.": {
+      "en": "Unusual activity has been detected on this account. Your session has been invalidated for security reasons and you need to log in again to continue. If this activity was not initiated by you, change your password immediately.",
+      "es": "Se ha detectado una actividad inusual en esta cuenta. Su sesión ha sido invalidada por seguridad y es necesario volver a iniciar sesión para continuar. Si esta actividad no fue realizada por usted, cambie su contraseña ahora mismo.",
+      "ko": "이 계정에서 비정상적인 활동이 감지되었습니다. 보안을 위해 세션이 무효화되었으며 계속하려면 다시 로그인해야 합니다. 이 활동이 본인이 아닌 경우 즉시 비밀번호를 변경하세요.",
+      "vi": "Một hoạt động bất thường đã được phát hiện trên tài khoản này. Phiên làm việc của bạn đã bị vô hiệu hóa vì lý do bảo mật và bạn cần đăng nhập lại để tiếp tục. Nếu hoạt động này không phải do bạn thực hiện, hãy thay đổi mật khẩu ngay bây giờ.",
+      "no": "En uvanlig aktivitet ble oppdaget på denne kontoen. Økten din ble ugyldiggjort av sikkerhetsgrunner, og du må logge inn på nytt for å fortsette. Hvis denne aktiviteten ikke kom fra deg, endre passordet ditt nå.",
+      "ja": "このアカウントで異常な活動が検出されました。セキュリティのためセッションが無効になり、続行するには再ログインが必要です。この活動がご自身によるものでない場合は、ただちにパスワードを変更してください。",
+      "zh": "检测到该账户有异常活动。出于安全考虑，您的会话已被注销，需重新登录以继续操作。如果此活动非您本人所为，请立即更改密码。",
+      "he": "זוהתה פעילות חריגה בחשבון זה. הסשן שלך בוטל מטעמי אבטחה ויש להתחבר מחדש כדי להמשיך. אם הפעילות לא בוצעה על ידך, שנה את הסיסמה שלך כעת."
+    },
+    "Acces temporairement restreint": {
+      "en": "Access temporarily restricted",
+      "es": "Acceso temporalmente restringido",
+      "ko": "일시적으로 접근 제한됨",
+      "vi": "Truy cập tạm thời bị hạn chế",
+      "no": "Tilgang midlertidig begrenset",
+      "ja": "アクセス一時的に制限されています",
+      "zh": "访问暂时受限",
+      "he": "גישה מוגבלת זמנית"
+    },
+    "Une activite inhabituelle a ete detectee sur ce compte. Votre session a ete invalidee par securite et une reconnexion est necessaire. ClinIA bloque temporairement l'acces aux routes sensibles pendant la periode de restriction. Si cette activite ne venait pas de vous, changez votre mot de passe des maintenant.": {
+      "en": "Unusual activity has been detected on this account. Your session has been invalidated for security reasons and a reconnection is required. ClinIA temporarily blocks access to sensitive routes during the restriction period. If this activity was not initiated by you, change your password immediately.",
+      "es": "Se ha detectado una actividad inusual en esta cuenta. Su sesión ha sido invalidada por seguridad y es necesario volver a iniciar sesión. ClinIA bloquea temporalmente el acceso a las rutas sensibles durante el período de restricción. Si esta actividad no fue realizada por usted, cambie su contraseña ahora mismo.",
+      "ko": "이 계정에서 비정상적인 활동이 감지되었습니다. 보안을 위해 세션이 무효화되었으며 다시 로그인해야 합니다. ClinIA는 제한 기간 동안 민감한 경로에 대한 접근을 일시적으로 차단합니다. 이 활동이 본인이 아닌 경우 즉시 비밀번호를 변경하십시오.",
+      "vi": "Một hoạt động bất thường đã được phát hiện trên tài khoản này. Phiên làm việc của bạn đã bị vô hiệu hóa vì lý do bảo mật và cần đăng nhập lại. ClinIA tạm thời chặn truy cập vào các tuyến nhạy cảm trong thời gian hạn chế. Nếu hoạt động này không phải do bạn thực hiện, hãy thay đổi mật khẩu ngay bây giờ.",
+      "no": "En uvanlig aktivitet ble oppdaget på denne kontoen. Økten din ble ugyldiggjort av sikkerhetsgrunner, og du må logge inn på nytt. ClinIA blokkerer midlertidig tilgangen til sensitive ruter i restriksjonsperioden. Hvis denne aktiviteten ikke kom fra deg, endre passordet ditt nå.",
+      "ja": "このアカウントで異常な活動が検出されました。セキュリティのためセッションが無効化され、再ログインが必要です。ClinIAは制限期間中、機密ルートへのアクセスを一時的にブロックします。この活動がご自身によるものでない場合は、ただちにパスワードを変更してください。",
+      "zh": "检测到该账户有异常活动。出于安全考虑，您的会话已被注销，需重新登录。ClinIA在限制期间暂时阻止访问敏感路径。如果此活动非您本人操作，请立即更改密码。",
+      "he": "זוהתה פעילות חריגה בחשבון זה. הסשן שלך בוטל מטעמי אבטחה ויש להתחבר מחדש. ClinIA חוסמת זמנית את הגישה לנתיבים רגישים במהלך תקופת ההגבלה. אם פעילות זו לא בוצעה על ידך, שנה את סיסמתך כעת."
+    },
+    "Fin de restriction :": {
+      "en": "Restriction end:",
+      "es": "Fin de restricción:",
+      "ko": "제한 종료 :",
+      "vi": "Kết thúc hạn chế :",
+      "no": "Slutt på restriksjon:",
+      "ja": "制限終了：",
+      "zh": "限制结束：",
+      "he": "סיום ההגבלה:"
+    },
+    "Annuler": {
+      "en": "Cancel",
+      "es": "Cancelar"
+    },
+    "Reinitialisation du mot de passe requise": {
+      "en": "Password reset required"
+    },
+    "Une activite inhabituelle a ete detectee sur ce compte.": {
+      "en": "Unusual activity has been detected on this account."
+    },
+    "L'acces aux zones protegees reste bloque tant qu'un vrai reset de mot de passe n'a pas ete effectue.": {
+      "en": "Access to protected areas remains blocked until a proper password reset has been completed."
+    },
+    "Contactez un SUPERADMIN pour faire reinitialiser votre mot de passe, ou utilisez le parcours de reinitialisation prevu lorsqu'il sera disponible.": {
+      "en": "Contact a SUPERADMIN to have your password reset, or use the password reset process when it becomes available."
+    },
+    "Compte concerne :": {
+      "en": "Account concerned:"
+    },
+    "Se deconnecter": {
+      "en": "Sign Out"
+    },
+    "Confirmer le nouveau mot de passe": {
+      "en": "Confirm new password",
+      "es": "Confirmar la nueva contraseña",
+      "ko": "새 비밀번호 확인하기",
+      "vi": "Xác nhận mật khẩu mới",
+      "no": "Bekreft det nye passordet",
+      "ja": "新しいパスワードを確認する",
+      "zh": "确认新密码",
+      "he": "אשר את הסיסמה החדשה"
+    },
+    "Enregistrement...": {
+      "en": "Recording...",
+      "es": "Grabando..."
+    },
+    "ClinIA": {
+      "en": "ClinIA",
+      "es": "ClinIA",
+      "ko": "ClinIA",
+      "vi": "ClinIA",
+      "no": "ClinIA",
+      "ja": "ClinIA",
+      "zh": "ClinIA",
+      "he": "קליניה"
+    },
+    "Accelerer la recherche. Comparer les alternatives. Verifier les references.": {
+      "en": "Accelerate research. Compare alternatives. Verify references.",
+      "es": "Acelerar la investigación. Comparar las alternativas. Verificar las referencias.",
+      "ko": "연구를 가속화하세요. 대안을 비교하세요. 참고 문헌을 확인하세요.",
+      "vi": "Tăng tốc nghiên cứu. So sánh các lựa chọn thay thế. Kiểm tra các tài liệu tham khảo.",
+      "no": "Akselerer søket. Sammenligne alternativer. Sjekke referanser.",
+      "ja": "検索を加速する。代替案を比較する。参考文献を確認する。",
+      "zh": "加速研究。比较替代方案。核实参考资料。",
+      "he": "להאיץ את המחקר. להשוות את החלופות. לבדוק את ההפניות."
+    },
+    "ClinIA utilise l'IA pour accelerer la recherche clinique, comparer des alternatives therapeutiques plausibles et presenter des references consultables.": {
+      "es": "ClinIA utiliza IA para acelerar la investigación clínica, comparar alternativas terapéuticas plausibles y presentar referencias consultables.",
+      "ko": "ClinIA는 임상 연구를 가속화하고, 가능한 치료 대안을 비교하며, 참조 자료를 제공하기 위해 AI를 활용합니다.",
+      "vi": "ClinIA sử dụng AI để tăng tốc nghiên cứu lâm sàng, so sánh các lựa chọn điều trị khả thi và trình bày các tài liệu tham khảo có thể tra cứu.",
+      "no": "ClinIA bruker KI for å akselerere klinisk forskning, sammenligne plausible terapeutiske alternativer og presentere konsulterbare referanser.",
+      "ja": "ClinIAはAIを活用して臨床研究を加速し、妥当な治療代替案を比較し、参照可能な文献を提示します。",
+      "zh": "ClinIA 利用人工智能加速临床研究，比较可行的治疗替代方案并展示可查询的参考资料。",
+      "he": "ClinIA משתמשת בבינה מלאכותית כדי להאיץ את המחקר הקליני, להשוות בין חלופות טיפוליות סבירות ולהציג הפניות שניתן לעיין בהן."
+    },
+    "Démo clinique": {
+      "en": "Clinical demo",
+      "es": "Demostración clínica",
+      "ko": "임상 데모",
+      "vi": "Bản trình diễn lâm sàng",
+      "no": "Klinisk demo",
+      "ja": "臨床デモ",
+      "zh": "临床演示",
+      "he": "הדגמה קלינית"
+    },
+    "Accéder directement à la démonstration ClinIA.": {
+      "en": "Access the ClinIA demonstration directly.",
+      "es": "Acceder directamente a la demostración ClinIA.",
+      "ko": "ClinIA 데모에 바로 접속하기.",
+      "vi": "Truy cập trực tiếp vào bản trình diễn ClinIA.",
+      "no": "Gå direkte til ClinIA-demonstrasjonen.",
+      "ja": "ClinIAのデモに直接アクセスする。",
+      "zh": "直接访问ClinIA演示。",
+      "he": "גש ישירות להדגמת ClinIA."
+    },
+    "Connexion médecin": {
+      "en": "Doctor login",
+      "es": "Conexión médico",
+      "ko": "의사 로그인",
+      "vi": "Đăng nhập bác sĩ",
+      "no": "Legeinnlogging",
+      "ja": "医師ログイン",
+      "zh": "医生登录",
+      "he": "התחברות לרופא"
+    },
+    "Ouvrir la page de connexion utilisateur.": {
+      "en": "Open the user login page.",
+      "es": "Abrir la página de inicio de sesión del usuario.",
+      "ko": "사용자 로그인 페이지 열기.",
+      "vi": "Mở trang đăng nhập người dùng.",
+      "no": "Åpne brukerpåloggingsside.",
+      "ja": "ユーザーログインページを開く。",
+      "zh": "打开用户登录页面。",
+      "he": "פתח את דף הכניסה למשתמש."
+    },
+    "Connexion admin": {
+      "en": "Admin login",
+      "es": "Conexión admin",
+      "ko": "관리자 연결",
+      "vi": "Đăng nhập quản trị viên",
+      "no": "Admin-innlogging",
+      "ja": "管理者ログイン",
+      "zh": "管理员登录",
+      "he": "כניסת מנהל"
+    },
+    "Ouvrir la page de connexion administrateur.": {
+      "en": "Open the administrator login page.",
+      "es": "Abrir la página de inicio de sesión del administrador.",
+      "ko": "관리자 로그인 페이지 열기.",
+      "vi": "Mở trang đăng nhập quản trị viên.",
+      "no": "Åpne administratørinnloggingssiden.",
+      "ja": "管理者ログインページを開く。",
+      "zh": "打开管理员登录页面。",
+      "he": "פתח את דף הכניסה למנהל."
+    },
+    "Ce bouton vous permet de vous familiariser avec l'application sans connexion.": {
+      "es": "Este botón le permite familiarizarse con la aplicación sin conexión.",
+      "ko": "이 버튼을 사용하면 연결 없이 애플리케이션을 익힐 수 있습니다.",
+      "vi": "Nút này cho phép bạn làm quen với ứng dụng mà không cần kết nối.",
+      "no": "Denne knappen lar deg bli kjent med appen uten tilkobling.",
+      "ja": "このボタンを使うと、接続なしでアプリを体験できます。",
+      "zh": "此按钮允许您在无连接状态下熟悉应用程序。",
+      "he": "כפתור זה מאפשר לך להכיר את האפליקציה ללא התחברות."
+    },
+    "OK": {
+      "en": "OK",
+      "es": "Aceptar",
+      "ko": "확인",
+      "vi": "Đồng ý",
+      "no": "OK",
+      "ja": "OK",
+      "zh": "确定",
+      "he": "אישור"
+    },
+    "Maintenance en cours. L'application est temporairement arrêtée pour les usagers non SUPERADMIN.": {
+      "es": "Mantenimiento en curso. La aplicación está temporalmente detenida para los usuarios que no son SUPERADMIN.",
+      "ko": "유지 관리 중입니다. SUPERADMIN이 아닌 사용자는 애플리케이션이 일시 중지됩니다.",
+      "vi": "Đang bảo trì. Ứng dụng tạm thời ngừng hoạt động đối với người dùng không phải SUPERADMIN.",
+      "no": "Vedlikehold pågår. Applikasjonen er midlertidig stoppet for brukere som ikke er SUPERADMIN.",
+      "ja": "メンテナンス中です。SUPERADMIN以外のユーザーは一時的にアプリケーションが停止しています。",
+      "zh": "维护中。应用程序暂时停止，非超级管理员用户无法使用。",
+      "he": "תחזוקה מתבצעת. היישום נעצר זמנית למשתמשים שאינם SUPERADMIN."
+    },
+    "Rafraichir": {
+      "en": "Refresh",
+      "es": "Actualizar",
+      "ko": "새로 고침",
+      "vi": "Làm mới",
+      "no": "Oppdater",
+      "ja": "更新する",
+      "zh": "刷新",
+      "he": "רענן"
+    },
+    "Inconnu": {
+      "en": "Unknown",
+      "es": "Desconocido"
+    },
+    "Erreur": {
+      "en": "Error",
+      "es": "Error"
+    },
+    "Assistant clinique IA - Prototype": {
+      "en": "AI Clinical Assistant - Prototype",
+      "es": "Asistente clínico IA - Prototipo",
+      "ko": "임상 AI 어시스턴트 - 프로토타입",
+      "vi": "Trợ lý lâm sàng AI - Nguyên mẫu",
+      "no": "Klinisk IA-assistent - Prototype",
+      "ja": "臨床アシスタントIA - プロトタイプ",
+      "zh": "临床助手 IA - 原型",
+      "he": "עוזר קליני בינה מלאכותית - אב טיפוס"
+    },
+    "Langue": {
+      "en": "Language",
+      "es": "Idioma",
+      "ko": "언어",
+      "vi": "Ngôn ngữ",
+      "no": "Språk",
+      "ja": "言語",
+      "zh": "语言",
+      "he": "שפה"
+    },
+    "Ouvrir le menu": {
+      "en": "Open menu",
+      "es": "Abrir el menú",
+      "ko": "메뉴 열기",
+      "vi": "Mở menu",
+      "no": "Åpne menyen",
+      "ja": "メニューを開く",
+      "zh": "打开菜单",
+      "he": "פתח את התפריט"
+    },
+    "Menu": {
+      "en": "Menu",
+      "es": "Menú",
+      "ko": "메뉴",
+      "vi": "Thực đơn",
+      "no": "Meny",
+      "ja": "メニュー",
+      "zh": "菜单",
+      "he": "תפריט"
+    },
+    "Fermer": {
+      "en": "Close",
+      "es": "Cerrar",
+      "ko": "닫기",
+      "vi": "Đóng",
+      "no": "Lukk",
+      "ja": "閉じる",
+      "zh": "关闭",
+      "he": "סגור"
+    },
+    "Rechercher": {
+      "en": "Search",
+      "es": "Buscar",
+      "ko": "검색",
+      "vi": "Tìm kiếm",
+      "no": "Søk",
+      "ja": "検索",
+      "zh": "搜索",
+      "he": "חפש"
+    },
+    "Reinitialiser": {
+      "en": "Reset",
+      "es": "Reiniciar",
+      "ko": "재설정",
+      "vi": "Khởi động lại",
+      "no": "Tilbakestill",
+      "ja": "リセット",
+      "zh": "重新初始化",
+      "he": "אתחול מחדש"
+    },
+    "Vous pouvez sélectionner la langue de votre choix.": {
+      "en": "You can select the language of your choice.",
+      "es": "Puede seleccionar el idioma de su elección.",
+      "ko": "원하는 언어를 선택할 수 있습니다.",
+      "vi": "Bạn có thể chọn ngôn ngữ bạn muốn.",
+      "no": "Du kan velge språket du ønsker.",
+      "ja": "お好みの言語を選択できます。",
+      "zh": "您可以选择您喜欢的语言。",
+      "he": "אתה יכול לבחור את השפה הרצויה לך."
+    },
+    "Forcer IA réelle": {
+      "en": "Force real AI",
+      "es": "Forzar IA real",
+      "ko": "실제 AI 강제 적용",
+      "vi": "Buộc AI thực tế",
+      "no": "Tving ekte IA",
+      "ja": "実際のAIを強制する",
+      "zh": "强制真实IA",
+      "he": "כפה בינה מלאכותית אמיתית"
+    },
+    "Utiliser le mode mock": {
+      "en": "Use mock mode",
+      "es": "Usar el modo simulado",
+      "ko": "모의 모드 사용",
+      "vi": "Sử dụng chế độ mô phỏng",
+      "no": "Bruk mock-modus",
+      "ja": "モックモードを使用する",
+      "zh": "使用模拟模式",
+      "he": "השתמש במצב דמה"
+    },
+    "Activer mode vocal": {
+      "en": "Enable voice mode",
+      "es": "Activar modo de voz",
+      "ko": "음성 모드 활성화",
+      "vi": "Kích hoạt chế độ giọng nói",
+      "no": "Aktiver stemmemodus",
+      "ja": "音声モードを有効にする",
+      "zh": "启用语音模式",
+      "he": "הפעל מצב קול"
+    },
+    "Désactiver mode vocal": {
+      "en": "Disable voice mode",
+      "es": "Desactivar modo vocal",
+      "ko": "음성 모드 비활성화",
+      "vi": "Tắt chế độ giọng nói",
+      "no": "Deaktiver stemmemodus",
+      "ja": "音声モードを無効にする",
+      "zh": "禁用语音模式",
+      "he": "השבת מצב קול"
+    },
+    "Test rapide du micro (niveau sonore)": {
+      "en": "Quick mic test (volume level)",
+      "es": "Prueba rápida del micrófono (nivel de sonido)",
+      "ko": "마이크 빠른 테스트 (음량)",
+      "vi": "Kiểm tra nhanh micro (mức âm lượng)",
+      "no": "Rask mikrofontest (lydnivå)",
+      "ja": "マイクのクイックテスト（音量レベル）",
+      "zh": "麦克风快速测试（音量级别）",
+      "he": "בדיקת מיקרופון מהירה (רמת קול)"
+    },
+    "Tester micro": {
+      "en": "Micro tester",
+      "es": "Micro probador",
+      "ko": "테스터 마이크로",
+      "vi": "Kiểm tra vi mô",
+      "no": "Test mikro",
+      "ja": "マイクロテスター",
+      "zh": "测试微型",
+      "he": "מיקרו בודק"
+    },
+    "Test micro actif": {
+      "en": "Active micro test",
+      "es": "Prueba micro activa",
+      "ko": "활성 마이크로 테스트",
+      "vi": "Kiểm tra vi hoạt động",
+      "no": "Test mikroaktiv",
+      "ja": "テストマイクロアクティフ",
+      "zh": "测试活性微粒",
+      "he": "בדיקת מיקרו פעיל"
+    },
+    "Niveau micro:": {
+      "en": "Micro level:",
+      "es": "Nivel micro:",
+      "ko": "마이크로 수준:",
+      "vi": "Mức vi mô:",
+      "no": "Mikronivå:",
+      "ja": "マイクロレベル:",
+      "zh": "微观层面：",
+      "he": "רמת מיקרו:"
+    },
+    "Activer écoute persistante": {
+      "en": "Enable persistent listening",
+      "es": "Activar escucha persistente",
+      "ko": "지속적인 활성 청취",
+      "vi": "Kích hoạt nghe liên tục",
+      "no": "Aktiver vedvarende lytting",
+      "ja": "常時リスニングを有効にする",
+      "zh": "启用持续监听",
+      "he": "הפעל האזנה מתמשכת"
+    },
+    "Désactiver écoute persistante": {
+      "en": "Disable persistent listening",
+      "es": "Desactivar escucha persistente",
+      "ko": "지속 청취 비활성화",
+      "vi": "Tắt nghe liên tục",
+      "no": "Deaktiver vedvarende lytting",
+      "ja": "常時リスニングを無効にする",
+      "zh": "禁用持续监听",
+      "he": "השבת האזנה מתמשכת"
+    },
+    "Écoute persistante: ON": {
+      "en": "Persistent listening: ON",
+      "es": "Escucha persistente: ACTIVADO",
+      "ko": "지속 청취: 켬",
+      "vi": "Lắng nghe liên tục: BẬT",
+      "no": "Vedvarende lytting: PÅ",
+      "ja": "持続的なリスニング: ON",
+      "zh": "持续监听：开启",
+      "he": "האזנה מתמשכת: מופעל"
+    },
+    "Accueil": {
+      "en": "Home",
+      "es": "Inicio",
+      "ko": "홈",
+      "vi": "Trang chủ",
+      "no": "Hjem",
+      "ja": "ホーム",
+      "zh": "首页",
+      "he": "בית"
+    },
+    "Analyse clinique": {
+      "en": "Clinical analysis",
+      "es": "Análisis clínico",
+      "ko": "임상 분석",
+      "vi": "Phân tích lâm sàng",
+      "no": "Klinisk analyse",
+      "ja": "臨床分析",
+      "zh": "临床分析",
+      "he": "ניתוח קליני"
+    },
+    "Commentaires": {
+      "en": "Comments",
+      "es": "Comentarios",
+      "ko": "댓글",
+      "vi": "Bình luận",
+      "no": "Kommentarer",
+      "ja": "コメント",
+      "zh": "评论",
+      "he": "הערות"
+    },
+    "Gestion clinique": {
+      "en": "Clinical Management",
+      "es": "Gestión clínica",
+      "ko": "임상 관리",
+      "vi": "Quản lý lâm sàng",
+      "no": "Klinisk administrasjon",
+      "ja": "臨床管理",
+      "zh": "临床管理",
+      "he": "ניהול קליני"
+    },
+    "Rendez-vous": {
+      "en": "Appointment",
+      "es": "Cita",
+      "ko": "약속",
+      "vi": "Cuộc hẹn",
+      "no": "Avtale",
+      "ja": "予約",
+      "zh": "预约",
+      "he": "פגישה"
+    },
+    "Patients": {
+      "en": "Patients",
+      "es": "Pacientes",
+      "ko": "환자",
+      "vi": "Bệnh nhân",
+      "no": "Pasienter",
+      "ja": "患者",
+      "zh": "患者",
+      "he": "מטופלים"
+    },
+    "Cliniques": {
+      "en": "Clinics",
+      "es": "Clínicas",
+      "ko": "클리닉",
+      "vi": "Phòng khám",
+      "no": "Klinikker",
+      "ja": "クリニック",
+      "zh": "诊所",
+      "he": "קליניקות"
+    },
+    "Spécialistes": {
+      "en": "Specialists",
+      "es": "Especialistas",
+      "ko": "전문가",
+      "vi": "Chuyên gia",
+      "no": "Spesialister",
+      "ja": "専門家",
+      "zh": "专家",
+      "he": "מומחים"
+    },
+    "OpenAI logs": {
+      "en": "OpenAI logs",
+      "es": "Registros de OpenAI",
+      "ko": "OpenAI 로그",
+      "vi": "Nhật ký OpenAI",
+      "no": "OpenAI-logger",
+      "ja": "OpenAIログ",
+      "zh": "OpenAI 日志",
+      "he": "יומני OpenAI"
+    },
+    "Gestion Application": {
+      "en": "Application Management",
+      "es": "Gestión de Aplicaciones",
+      "ko": "애플리케이션 관리",
+      "vi": "Quản lý Ứng dụng",
+      "no": "Administrasjonsprogram",
+      "ja": "アプリケーション管理",
+      "zh": "应用管理",
+      "he": "ניהול יישומים"
+    },
+    "Mode rapide": {
+      "en": "Quick mode",
+      "es": "Modo rápido",
+      "ko": "빠른 모드",
+      "vi": "Chế độ nhanh",
+      "no": "Rask modus",
+      "ja": "高速モード",
+      "zh": "快速模式",
+      "he": "מצב מהיר"
+    },
+    "Résumé patient": {
+      "en": "Patient summary",
+      "es": "Resumen del paciente",
+      "ko": "환자 요약",
+      "vi": "Tóm tắt bệnh nhân",
+      "no": "Pasientoversikt",
+      "ja": "患者概要",
+      "zh": "患者简历",
+      "he": "סיכום מטופל"
+    },
+    "Connexion": {
+      "en": "Connection",
+      "es": "Conexión",
+      "ko": "연결",
+      "vi": "Đăng nhập",
+      "no": "Pålogging",
+      "ja": "接続",
+      "zh": "登录",
+      "he": "התחברות"
+    },
+    "Admin": {
+      "en": "Admin",
+      "es": "Administrador",
+      "ko": "관리자",
+      "vi": "Quản trị viên",
+      "no": "Administrator",
+      "ja": "管理者",
+      "zh": "管理员",
+      "he": "מנהל מערכת"
+    },
+    "Mock Studio": {
+      "en": "Mock Studio",
+      "es": "Estudio Simulado",
+      "ko": "모의 스튜디오",
+      "vi": "Phòng Thí Nghiệm Giả",
+      "no": "Mock Studio",
+      "ja": "モックスタジオ",
+      "zh": "模拟工作室",
+      "he": "סטודיו מדומה"
+    },
+    "Audits patient": {
+      "en": "Patient audits",
+      "es": "Auditorías de pacientes",
+      "ko": "환자 감사",
+      "vi": "Kiểm tra bệnh nhân",
+      "no": "Reviderer pasient",
+      "ja": "患者を監査する",
+      "zh": "审核患者",
+      "he": "בוחן מטופל"
+    },
+    "Audits OpenAI": {
+      "en": "OpenAI Audits",
+      "es": "Auditorías OpenAI",
+      "ko": "OpenAI 감사",
+      "vi": "Kiểm toán OpenAI",
+      "no": "Revisjoner OpenAI",
+      "ja": "OpenAIの監査",
+      "zh": "审计 OpenAI",
+      "he": "בדיקות OpenAI"
+    },
+    "Audits BD": {
+      "en": "BD Audits",
+      "es": "Auditorías BD",
+      "ko": "감사 BD",
+      "vi": "Kiểm toán BD",
+      "no": "Revisjoner BD",
+      "ja": "監査BD",
+      "zh": "审核 BD",
+      "he": "בדיקות BD"
+    },
+    "Mes reçus": {
+      "en": "My receipts",
+      "es": "Mis recibos",
+      "ko": "내 영수증",
+      "vi": "Biên lai của tôi",
+      "no": "Mine kvitteringer",
+      "ja": "私の領収書",
+      "zh": "我的收据",
+      "he": "הקבלות שלי"
+    },
+    "Etat BD": {
+      "en": "Status BD",
+      "es": "Estado BD",
+      "ko": "BD 상태",
+      "vi": "Trạng thái BD",
+      "no": "Database status",
+      "ja": "BD状態",
+      "zh": "数据库状态",
+      "he": "מצב מסד נתונים"
+    },
+    "Utilisateurs": {
+      "en": "Users",
+      "es": "Usuarios",
+      "ko": "사용자",
+      "vi": "Người dùng",
+      "no": "Brukere",
+      "ja": "ユーザー",
+      "zh": "用户",
+      "he": "משתמשים"
+    },
+    "Déconnexion": {
+      "en": "Logout",
+      "es": "Desconexión",
+      "ko": "로그아웃",
+      "vi": "Đăng xuất",
+      "no": "Logg ut",
+      "ja": "ログアウト",
+      "zh": "登出",
+      "he": "התנתקות"
+    },
+    "Montrer Usager Actif": {
+      "en": "Show Active User",
+      "es": "Mostrar Usuario Activo",
+      "ko": "활성 사용자 표시",
+      "vi": "Hiển thị Người dùng Hoạt động",
+      "no": "Vis aktiv bruker",
+      "ja": "アクティブユーザーを表示",
+      "zh": "显示活跃用户",
+      "he": "הצג משתמש פעיל"
+    },
+    "Montrer Auth Log": {
+      "en": "Show Auth Log",
+      "es": "Mostrar registro de autenticación",
+      "ko": "인증 로그 표시",
+      "vi": "Hiển thị Nhật ký Xác thực",
+      "no": "Vis Auth Logg",
+      "ja": "認証ログを表示",
+      "zh": "显示身份验证日志",
+      "he": "הצג יומן אימות"
+    },
+    "Graphiques Auth": {
+      "en": "Auth Charts",
+      "es": "Gráficos Auth",
+      "ko": "인증 그래프",
+      "vi": "Đồ thị Xác thực",
+      "no": "Godkjente grafer",
+      "ja": "認証グラフ",
+      "zh": "认证图表",
+      "he": "גרפים Auth"
+    },
+    "Nouveaux commentaires médecins": {
+      "en": "New doctor comments",
+      "es": "Nuevos comentarios de médicos",
+      "ko": "새로운 의사 댓글",
+      "vi": "Bình luận mới của bác sĩ",
+      "no": "Nye legekommentarer",
+      "ja": "新しい医師のコメント",
+      "zh": "新的医生评论",
+      "he": "תגובות רופאים חדשות"
+    },
+    "Incidents sécurité": {
+      "en": "Security incidents",
+      "es": "Incidentes de seguridad",
+      "ko": "보안 사고",
+      "vi": "Sự cố an ninh",
+      "no": "Sikkerhetshendelser",
+      "ja": "セキュリティインシデント",
+      "zh": "安全事件",
+      "he": "תקריות אבטחה"
+    },
+    "x-y graph": {
+      "en": "x-y graph",
+      "es": "Gráfico x-y",
+      "ko": "x-y 그래프",
+      "vi": "đồ thị x-y",
+      "no": "x-y-graf",
+      "ja": "x-y グラフ",
+      "zh": "x-y 图表",
+      "he": "גרף x-y"
+    },
+    "Pie graph": {
+      "en": "Pie chart",
+      "es": "Gráfico de sectores",
+      "ko": "원형 그래프",
+      "vi": "Biểu đồ hình tròn",
+      "no": "Sektordiagram",
+      "ja": "円グラフ",
+      "zh": "饼图",
+      "he": "גרף עוגה"
+    },
+    "Histogramme graph": {
+      "en": "Histogram graph",
+      "es": "Gráfico de histograma",
+      "ko": "히스토그램 그래프",
+      "vi": "Biểu đồ Histogramme",
+      "no": "Histogramdiagram",
+      "ja": "ヒストグラムグラフ",
+      "zh": "直方图图表",
+      "he": "גרף היסטוגרמה"
+    },
+    "Arret de l'application": {
+      "en": "Application stop",
+      "es": "Detención de la aplicación",
+      "ko": "애플리케이션 중지",
+      "vi": "Dừng ứng dụng",
+      "no": "Stopp av applikasjonen",
+      "ja": "アプリケーションの停止",
+      "zh": "停止应用程序",
+      "he": "עצירת היישום"
+    },
+    "Fin de maintenance": {
+      "en": "End of maintenance",
+      "es": "Fin de mantenimiento",
+      "ko": "유지보수 종료",
+      "vi": "Kết thúc bảo trì",
+      "no": "Vedlikehold ferdig",
+      "ja": "メンテナンス終了",
+      "zh": "维护结束",
+      "he": "סיום תחזוקה"
+    },
+    "Forcer reouverture normale": {
+      "en": "Force normal reopening",
+      "es": "Forzar reapertura normal",
+      "ko": "정상 재개 강제 실행",
+      "vi": "Ép buộc mở lại bình thường",
+      "no": "Tving normal gjenåpning",
+      "ja": "通常の再開を強制する",
+      "zh": "强制正常重新开启",
+      "he": "כפה פתיחה מחדש רגילה"
+    },
+    "Date": {
+      "en": "Date",
+      "es": "Fecha"
+    },
+    "Date début": {
+      "en": "Start date",
+      "es": "Fecha de inicio"
+    },
+    "Date fin": {
+      "en": "End date",
+      "es": "Fecha de finalización"
+    },
+    "Tous": {
+      "en": "All",
+      "es": "Tout"
+    },
+    "Toutes": {
+      "en": "All",
+      "es": "Toutes -> Todas"
+    },
+    "Page": {
+      "en": "Page",
+      "es": "Página"
+    },
+    "résultats": {
+      "en": "results",
+      "es": "resultados"
+    },
+    "Action": {
+      "en": "Action",
+      "es": "Acción"
+    },
+    "Contexte": {
+      "en": "Context",
+      "es": "Contexto"
+    },
+    "Usager": {
+      "en": "User",
+      "es": "Usuario"
+    },
+    "IP": {
+      "en": "IP",
+      "es": "IP"
+    },
+    "Connexion administrateur": {
+      "en": "Administrator login",
+      "es": "Conexión de administrador",
+      "ko": "관리자 연결",
+      "vi": "Đăng nhập quản trị viên",
+      "no": "Administrator pålogging",
+      "ja": "管理者ログイン",
+      "zh": "管理员登录",
+      "he": "כניסת מנהל מערכת"
+    },
+    "Creation de compte ClinIA": {
+      "en": "ClinIA Account Creation",
+      "es": "Creación de cuenta ClinIA",
+      "ko": "ClinIA 계정 생성",
+      "vi": "Tạo tài khoản ClinIA",
+      "no": "Opprettelse av ClinIA-konto",
+      "ja": "ClinIAアカウントの作成",
+      "zh": "ClinIA账户创建",
+      "he": "יצירת חשבון ClinIA"
+    },
+    "Connexion ClinIA": {
+      "en": "ClinIA Login",
+      "es": "Conexión ClinIA",
+      "ko": "ClinIA 연결",
+      "vi": "Kết nối ClinIA",
+      "no": "ClinIA pålogging",
+      "ja": "ClinIAへの接続",
+      "zh": "ClinIA 登录",
+      "he": "התחברות ClinIA"
+    },
+    "Acces reserve a la console d'administration ClinIA.": {
+      "en": "Reserved access to the ClinIA administration console.",
+      "es": "Acceso reservado a la consola de administración ClinIA.",
+      "ko": "ClinIA 관리 콘솔 액세스 예약.",
+      "vi": "Truy cập hạn chế vào bảng điều khiển quản trị ClinIA.",
+      "no": "Begrenset tilgang til ClinIA administrasjonskonsoll.",
+      "ja": "管理コンソールClinIAへの限定アクセス。",
+      "zh": "访问ClinIA管理控制台的权限。",
+      "he": "גישה שמורה לקונסולת הניהול של ClinIA."
+    },
+    "Creer un compte avec votre courriel, mot de passe et role.": {
+      "en": "Create an account with your email, password, and role.",
+      "es": "Crear una cuenta con su correo electrónico, contraseña y rol.",
+      "ko": "이메일, 비밀번호 및 역할로 계정 만들기.",
+      "vi": "Tạo tài khoản bằng email, mật khẩu và vai trò của bạn.",
+      "no": "Opprett en konto med e-post, passord og rolle.",
+      "ja": "メールアドレス、パスワード、役割でアカウントを作成してください。",
+      "zh": "使用您的电子邮件、密码和角色创建账户。",
+      "he": "צור חשבון עם האימייל, הסיסמה והתפקיד שלך."
+    },
+    "Connectez-vous pour acceder aux modules cliniques securises.": {
+      "en": "Sign in to access secure clinical modules.",
+      "es": "Inicie sesión para acceder a los módulos clínicos seguros.",
+      "ko": "보안 임상 모듈에 접속하려면 로그인하세요.",
+      "vi": "Đăng nhập để truy cập các mô-đun lâm sàng an toàn.",
+      "no": "Logg inn for å få tilgang til sikre kliniske moduler.",
+      "ja": "安全な臨床モジュールにアクセスするにはログインしてください。",
+      "zh": "登录以访问安全的临床模块。",
+      "he": "התחבר כדי לגשת למודולים קליניים מאובטחים."
+    },
+    "J'ai deja un compte": {
+      "en": "I already have an account",
+      "es": "Ya tengo una cuenta",
+      "ko": "이미 계정이 있습니다",
+      "vi": "Tôi đã có tài khoản",
+      "no": "Jeg har allerede en konto",
+      "ja": "すでにアカウントをお持ちですか",
+      "zh": "我已有账户",
+      "he": "כבר יש לי חשבון"
+    },
+    "Je n'ai pas de compte, en creer un": {
+      "en": "I don't have an account, create one",
+      "es": "No tengo una cuenta, crear una",
+      "ko": "계정이 없으신가요? 새로 만들기",
+      "vi": "Tôi không có tài khoản, tạo một tài khoản mới",
+      "no": "Jeg har ikke en konto, opprett en",
+      "ja": "アカウントをお持ちでない場合は、作成してください",
+      "zh": "我没有账户，创建一个",
+      "he": "אין לי חשבון, ליצור אחד"
+    },
+    "Courriel": {
+      "en": "Email",
+      "es": "Correo electrónico",
+      "ko": "이메일",
+      "vi": "Email",
+      "no": "E-post",
+      "ja": "メール",
+      "zh": "电子邮件",
+      "he": "דוא\"ל"
+    },
+    "Identifiant (courriel ou nom d'utilisateur)": {
+      "en": "Identifier (email or username)",
+      "es": "Identificador (correo electrónico o nombre de usuario)",
+      "ko": "식별자(이메일 또는 사용자 이름)",
+      "vi": "Tên đăng nhập (email hoặc tên người dùng)",
+      "no": "Brukernavn (e-post eller brukernavn)",
+      "ja": "識別子（メールアドレスまたはユーザー名）",
+      "zh": "标识符（电子邮件或用户名）",
+      "he": "מזהה (דוא\"ל או שם משתמש)"
+    },
+    "Role du compte": {
+      "en": "Account role",
+      "es": "Rol de la cuenta",
+      "ko": "계정 역할",
+      "vi": "Vai trò của tài khoản",
+      "no": "Kontorolle",
+      "ja": "アカウントの役割",
+      "zh": "账户角色",
+      "he": "תפקיד החשבון"
+    },
+    "Creation...": {
+      "en": "Creation...",
+      "es": "Creando...",
+      "ko": "생성 중...",
+      "vi": "Đang tạo...",
+      "no": "Opprettelse...",
+      "ja": "作成中...",
+      "zh": "创建中...",
+      "he": "יוצר..."
+    },
+    "Connexion...": {
+      "en": "Connecting...",
+      "es": "Conectando...",
+      "ko": "연결 중...",
+      "vi": "Đang kết nối...",
+      "no": "Kobler til...",
+      "ja": "接続中...",
+      "zh": "连接中...",
+      "he": "מתחבר..."
+    },
+    "Creer mon compte": {
+      "en": "Create my account",
+      "es": "Crear mi cuenta",
+      "ko": "내 계정 만들기",
+      "vi": "Tạo tài khoản của tôi",
+      "no": "Opprett min konto",
+      "ja": "アカウントを作成する",
+      "zh": "创建我的账户",
+      "he": "צור את החשבון שלי"
+    },
+    "Se connecter": {
+      "en": "Sign in",
+      "es": "Iniciar sesión",
+      "ko": "로그인",
+      "vi": "Đăng nhập",
+      "no": "Logg inn",
+      "ja": "ログイン",
+      "zh": "登录",
+      "he": "התחבר"
+    },
+    "Mot de passe oublie?": {
+      "en": "Forgot password?",
+      "es": "¿Olvidó su contraseña?",
+      "ko": "비밀번호를 잊으셨나요?",
+      "vi": "Quên mật khẩu?",
+      "no": "Glemt passord?",
+      "ja": "パスワードをお忘れですか？",
+      "zh": "忘记密码？",
+      "he": "שכחת סיסמה?"
+    },
+    "Acces reserve aux comptes administrateurs.": {
+      "en": "Restricted access to administrator accounts.",
+      "es": "Acceso reservado a cuentas de administrador.",
+      "ko": "관리자 계정 전용 액세스.",
+      "vi": "Truy cập giới hạn cho tài khoản quản trị viên.",
+      "no": "Tilgang kun for administrator kontoer.",
+      "ja": "管理者アカウント専用アクセス。",
+      "zh": "仅限管理员账户访问。",
+      "he": "גישה שמורה לחשבונות מנהלים."
+    },
+    "Impossible de creer le compte.": {
+      "en": "Unable to create the account.",
+      "es": "No se puede crear la cuenta.",
+      "ko": "계정을 생성할 수 없습니다.",
+      "vi": "Không thể tạo tài khoản.",
+      "no": "Kan ikke opprette kontoen.",
+      "ja": "アカウントを作成できません。",
+      "zh": "无法创建账户。",
+      "he": "לא ניתן ליצור את החשבון."
+    },
+    "Impossible de se connecter. Verifiez vos identifiants.": {
+      "en": "Unable to connect. Please check your credentials.",
+      "es": "No se puede conectar. Verifique sus credenciales.",
+      "ko": "연결할 수 없습니다. 자격 증명을 확인하세요.",
+      "vi": "Không thể kết nối. Vui lòng kiểm tra thông tin đăng nhập của bạn.",
+      "no": "Kan ikke logge inn. Sjekk brukernavn og passord.",
+      "ja": "接続できません。認証情報を確認してください。",
+      "zh": "无法连接。请检查您的凭据。",
+      "he": "לא ניתן להתחבר. בדוק את פרטי ההתחברות שלך."
+    },
+    "Courriel du compte": {
+      "en": "Account email",
+      "es": "Correo electrónico de la cuenta",
+      "ko": "계정 이메일",
+      "vi": "Email của tài khoản",
+      "no": "Kontoe-post",
+      "ja": "アカウントのメール",
+      "zh": "账户电子邮件",
+      "he": "דוא\"ל החשבון"
+    },
+    "Code de verification": {
+      "en": "Verification code",
+      "es": "Código de verificación",
+      "ko": "인증 코드",
+      "vi": "Mã xác minh",
+      "no": "Verifiseringskode",
+      "ja": "確認コード",
+      "zh": "验证码",
+      "he": "קוד אימות"
+    },
+    "Envoyer le code": {
+      "en": "Send code",
+      "es": "Enviar el código",
+      "ko": "코드 보내기",
+      "vi": "Gửi mã",
+      "no": "Send koden",
+      "ja": "コードを送信する",
+      "zh": "发送代码",
+      "he": "שלח את הקוד"
+    },
+    "Verifier le code": {
+      "en": "Verify the code",
+      "es": "Verificar el código",
+      "ko": "코드 확인",
+      "vi": "Xác minh mã",
+      "no": "Bekreft koden",
+      "ja": "コードを確認する",
+      "zh": "验证代码",
+      "he": "אמת את הקוד"
+    },
+    "Modifier le mot de passe": {
+      "en": "Change Password",
+      "es": "Modificar la contraseña",
+      "ko": "비밀번호 변경",
+      "vi": "Thay đổi mật khẩu",
+      "no": "Endre passordet",
+      "ja": "パスワードを変更する",
+      "zh": "修改密码",
+      "he": "שנה את הסיסמה"
+    },
+    "Retour a la connexion": {
+      "en": "Back to sign-in",
+      "es": "Volver a la conexión",
+      "ko": "로그인으로 돌아가기",
+      "vi": "Quay lại đăng nhập",
+      "no": "Tilbake til pålogging",
+      "ja": "ログインに戻る",
+      "zh": "返回登录",
+      "he": "חזרה להתחברות"
+    },
+    "Si ce compte existe, un code a ete envoye par courriel.": {
+      "en": "If this account exists, a code has been sent by email.",
+      "es": "Si esta cuenta existe, se ha enviado un código por correo electrónico.",
+      "ko": "이 계정이 존재하면 이메일로 코드가 전송되었습니다.",
+      "vi": "Nếu tài khoản này tồn tại, một mã đã được gửi qua email.",
+      "no": "Hvis denne kontoen finnes, er en kode sendt på e-post.",
+      "ja": "このアカウントが存在する場合、コードがメールで送信されました。",
+      "zh": "如果该账户存在，验证码已通过电子邮件发送。",
+      "he": "אם חשבון זה קיים, קוד נשלח בדוא\"ל."
+    },
+    "Code confirme. Choisissez maintenant un nouveau mot de passe.": {
+      "en": "Code confirmed. Please choose a new password now.",
+      "es": "Código confirmado. Ahora elija una nueva contraseña.",
+      "ko": "코드 확인됨. 이제 새 비밀번호를 선택하세요.",
+      "vi": "Mã đã xác nhận. Vui lòng chọn mật khẩu mới ngay bây giờ.",
+      "no": "Kode bekreftet. Velg nå et nytt passord.",
+      "ja": "コードが確認されました。新しいパスワードを今すぐ選択してください。",
+      "zh": "代码已确认。现在请选择一个新密码。",
+      "he": "קוד אושר. בחר סיסמה חדשה כעת."
+    },
+    "Les mots de passe ne correspondent pas.": {
+      "en": "Passwords do not match.",
+      "es": "Las contraseñas no coinciden.",
+      "ko": "비밀번호가 일치하지 않습니다.",
+      "vi": "Mật khẩu không khớp.",
+      "no": "Passordene samsvarer ikke.",
+      "ja": "パスワードが一致しません。",
+      "zh": "密码不匹配。",
+      "he": "הסיסמאות אינן תואמות."
+    },
+    "Mot de passe modifie. Vous pouvez maintenant vous connecter.": {
+      "en": "Password changed. You can now sign in.",
+      "es": "Contraseña modificada. Ahora puede iniciar sesión.",
+      "ko": "비밀번호가 변경되었습니다. 이제 로그인할 수 있습니다.",
+      "vi": "Mật khẩu đã được thay đổi. Bạn có thể đăng nhập ngay bây giờ.",
+      "no": "Passord endret. Du kan nå logge inn.",
+      "ja": "パスワードが変更されました。今すぐログインできます。",
+      "zh": "密码已修改。您现在可以登录。",
+      "he": "סיסמה שונתה. כעת ניתן להתחבר."
+    },
+    "Impossible de poursuivre la reinitialisation.": {
+      "en": "Unable to continue the reset.",
+      "es": "No se puede continuar con el restablecimiento.",
+      "ko": "재설정을 계속할 수 없습니다.",
+      "vi": "Không thể tiếp tục đặt lại.",
+      "no": "Kan ikke fortsette tilbakestillingen.",
+      "ja": "リセットを続行できません。",
+      "zh": "无法继续重置。",
+      "he": "לא ניתן להמשיך באיפוס."
+    },
+    "Resume clinique du patient": {
+      "en": "Patient Clinical Summary"
+    },
+    "Profil, resume IA et contexte principal": {
+      "en": "Profile, AI summary, and main context"
+    },
+    "Alternatives et recommandations": {
+      "en": "Alternatives and Recommendations"
+    },
+    "Options plausibles, comparaison et points de suivi": {
+      "en": "Plausible options, comparison, and follow-up points"
+    },
+    "Questions cliniques a explorer": {
+      "en": "Clinical questions to explore"
+    },
+    "Points de verification et lecture complementaire": {
+      "en": "Checkpoints and Additional Reading"
+    },
+    "Lecture contextuelle, interpretation et references": {
+      "en": "Contextual reading, interpretation, and references"
+    },
+    "Sources cliniques consultables pour verification": {
+      "en": "Clinical sources available for verification"
+    },
+    "ClinIA ne presente pas ces resultats au hasard. Utilisez ces references cliniques pour verifier l'analyse et approfondir la lecture.": {
+      "en": "ClinIA does not present these results randomly. Use these clinical references to verify the analysis and further your reading."
+    },
+    "Accelerer. Comparer. Verifier.": {
+      "en": "Accelerate. Compare. Verify.",
+      "es": "Acelerar. Comparar. Verificar.",
+      "ko": "가속화. 비교. 확인.",
+      "vi": "Tăng tốc. So sánh. Xác minh.",
+      "no": "Akselerer. Sammenlign. Verifiser.",
+      "ja": "加速。比較。検証。",
+      "zh": "加速。比较。验证。",
+      "he": "להאיץ. להשוות. לאמת."
+    },
+    "Recherche clinique plus rapide. Alternatives comparables. References consultables.": {
+      "es": "Investigación clínica más rápida. Alternativas comparables. Referencias consultables.",
+      "ko": "더 빠른 임상 연구. 비교 가능한 대안. 참조 가능.",
+      "vi": "Nghiên cứu lâm sàng nhanh hơn. Các lựa chọn thay thế tương đương. Tham khảo có thể tra cứu.",
+      "no": "Raskere klinisk forskning. Sammenlignbare alternativer. Konsulterbare referanser.",
+      "ja": "より迅速な臨床試験。比較可能な代替案。参照可能な文献。",
+      "zh": "更快速的临床研究。可比替代方案。可查阅的参考资料。",
+      "he": "מחקר קליני מהיר יותר. חלופות דומות. הפניות ניתנות לעיון."
+    },
+    "Symptomes principaux": {
+      "en": "Main symptoms"
+    },
+    "Antecedents medicaux": {
+      "en": "Medical history"
+    },
+    "Modèle OpenAI": {
+      "en": "OpenAI Model",
+      "es": "Modelo OpenAI",
+      "ko": "OpenAI 모델",
+      "vi": "Mô hình OpenAI",
+      "no": "OpenAI-modell",
+      "ja": "OpenAIモデル",
+      "zh": "OpenAI 模型",
+      "he": "מודל OpenAI"
+    },
+    "Mode simulation": {
+      "en": "Simulation mode",
+      "es": "Modo simulación",
+      "ko": "모드 시뮬레이션",
+      "vi": "Chế độ mô phỏng",
+      "no": "Simuleringsmodus",
+      "ja": "モードシミュレーション",
+      "zh": "模式模拟",
+      "he": "מצב סימולציה"
+    },
+    "Pays du patient": {
+      "en": "Patient's country"
+    },
+    "Selectionner un pays": {
+      "en": "Select a country"
+    },
+    "Le pays est preselectionne a partir des parametres du navigateur lorsque l'information est disponible.": {
+      "en": "The country is preselected based on the browser settings when the information is available."
+    },
+    "Pays detecte par le navigateur :": {
+      "en": "Country detected by the browser:"
+    },
+    "Importer un objet JSON": {
+      "en": "Import a JSON object"
+    },
+    "Collez ici un objet JSON compatible avec les donnees cliniques pour pre-remplir le formulaire.": {
+      "en": "Paste here a JSON object compatible with clinical data to pre-fill the form."
+    },
+    "{ \"age\": 55, \"sex\": \"male\", \"diagnosis\": \"Diabete de type 2\" }": {
+      "en": "{ \"age\": 55, \"sex\": \"male\", \"diagnosis\": \"Type 2 diabetes\" }"
+    },
+    "Charger le JSON dans le formulaire": {
+      "en": "Load the JSON into the form"
+    },
+    "Le formulaire a ete rempli a partir du JSON.": {
+      "en": "The form was completed using the JSON."
+    },
+    "JSON invalide ou incompatible. Verifiez la syntaxe et la structure de l'objet.": {
+      "en": "Invalid or incompatible JSON. Please check the syntax and structure of the object."
+    },
+    "Mode comparaison visuelle": {
+      "en": "Visual comparison mode"
+    },
+    "Collez deux objets JSON pour comparer de visu deux resumes patient generes par ClinIA.": {
+      "en": "Paste two JSON objects to visually compare two patient summaries generated by ClinIA."
+    },
+    "JSON cas 1": {
+      "en": "Translate this text into Canadian English: JSON case 1"
+    },
+    "JSON cas 2": {
+      "en": "Translate this text into Canadian English: JSON case 2"
+    },
+    "Charger cas 1": {
+      "en": "Load case 1"
+    },
+    "Charger cas 2": {
+      "en": "Load case 2"
+    },
+    "Utilisez ces boutons pour charger rapidement deux JSON exemples dans les zones Case 1 et Case 2 avant la comparaison.": {
+      "en": "Use these buttons to quickly load two example JSON files into the Case 1 and Case 2 fields before comparison."
+    },
+    "Editer le JSON - Cas 1": {
+      "en": "Edit the JSON - Case 1"
+    },
+    "Editer le JSON - Cas 2": {
+      "en": "Edit the JSON - Case 2"
+    },
+    "Vous pouvez ajuster librement ce JSON avant de l'injecter dans la zone de comparaison correspondante.": {
+      "en": "You can freely adjust this JSON before injecting it into the corresponding comparison area."
+    },
+    "Charger ce JSON": {
+      "en": "Load this JSON file"
+    },
+    "Medication actuelle": {
+      "en": "Current medication"
+    },
+    "Vous pouvez choisir plusieurs traitements pour representer le meme patient.": {
+      "en": "You can choose multiple treatments to represent the same patient."
+    },
+    "Metformine": {
+      "en": "Metformin"
+    },
+    "Gliclazide": {
+      "en": "Gliclazide"
+    },
+    "Empagliflozine": {
+      "en": "Empagliflozin"
+    },
+    "Sitagliptine": {
+      "en": "Sitagliptin"
+    },
+    "Semaglutide": {
+      "en": "Semaglutide"
+    },
+    "Comparer les 2 cas": {
+      "en": "Compare the two cases"
+    },
+    "Les deux cas ont ete charges pour comparaison.": {
+      "en": "Both cases were loaded for comparison."
+    },
+    "Impossible de charger les deux cas. Verifiez les deux objets JSON.": {
+      "en": "Unable to load both cases. Please check both JSON objects."
+    },
+    "Ethnicite du patient": {
+      "en": "Patient ethnicity"
+    },
+    "Selectionnez l'ethnicite la plus pertinente pour le contexte clinique si elle est connue.": {
+      "en": "Select the most relevant ethnicity for the clinical context if known."
+    },
+    "Caucasien": {
+      "en": "Caucasian"
+    },
+    "Noir": {
+      "en": "Black"
+    },
+    "Asiatique": {
+      "en": "Asian"
+    },
+    "Hispanique ou Latino": {
+      "en": "Hispanic or Latino"
+    },
+    "Moyen-Oriental ou Nord-Africain": {
+      "en": "Middle Eastern or North African"
+    },
+    "Autochtone": {
+      "en": "Indigenous"
+    },
+    "Sud-Asiatique": {
+      "en": "South Asian"
+    },
+    "Asie du Sud-Est": {
+      "en": "Southeast Asia"
+    },
+    "Mixte": {
+      "en": "Mixed"
+    },
+    "Prefere ne pas repondre": {
+      "en": "Prefer not to answer"
+    },
+    "Parametres rapides - Diabete de type 2": {
+      "en": "Quick Settings - Type 2 Diabetes"
+    },
+    "Pre-remplissez rapidement les parametres cliniques utiles au diabete de type 2.": {
+      "en": "Quickly pre-fill the clinical parameters useful for type 2 diabetes."
+    },
+    "Vous pouvez ensuite les ajuster selon le profil du patient.": {
+      "en": "You can then adjust them according to the patient's profile."
+    },
+    "Quand tout vous convient, cliquez sur Analyser.": {
+      "en": "When everything is set, click Analyze."
+    },
+    "Fonction renale": {
+      "en": "Kidney function"
+    },
+    "Fragilite": {
+      "en": "Frailty"
+    },
+    "Laisser un commentaire": {
+      "en": "Leave a comment",
+      "es": "Dejar un comentario",
+      "ko": "댓글 남기기",
+      "vi": "Để lại bình luận",
+      "no": "Legg igjen en kommentar",
+      "ja": "コメントを残す",
+      "zh": "留下评论",
+      "he": "השאר תגובה"
+    },
+    "Cliquez ici pour ouvrir la page des commentaires, laisser un message de support ou de suivi, puis consulter les réponses plus tard avec votre code de suivi.": {
+      "en": "Click here to open the comments page, leave a support or follow-up message, then check the responses later with your tracking code."
+    },
+    "Utilisez ce selecteur pour choisir le modele d'analyse. Le mode mini est habituellement plus rapide et convient bien aux essais courants. L'autre modele peut servir de point de comparaison si vous voulez verifier comment la formulation ou la structure de la reponse change.": {
+      "en": "Use this selector to choose the analysis model. The mini mode is usually faster and well-suited for routine tests. The other model can be used as a point of comparison if you want to check how the wording or response structure changes."
+    },
+    "Utilisez ce selecteur pour charger un cas clinique deja rempli. C'est utile pour decouvrir rapidement le fonctionnement de ClinIA sans saisir toutes les donnees a la main.": {
+      "en": "Use this selector to load a pre-filled clinical case. It’s useful for quickly exploring how ClinIA works without entering all the data manually."
+    },
+    "Voir les réponses à mes commentaires": {
+      "es": "Ver las respuestas a mis comentarios",
+      "ko": "내 댓글에 대한 답변 보기",
+      "vi": "Xem câu trả lời cho nhận xét của tôi",
+      "no": "Se svar på mine kommentarer",
+      "ja": "自分のコメントへの返信を見る",
+      "zh": "查看我评论的回复",
+      "he": "הצג תגובות להערות שלי"
+    },
+    "Entrez exactement le nom ou pseudonyme utilisé lors du commentaire, ainsi que votre code de suivi. Si votre navigateur a conservé ces informations, elles sont pré-remplies automatiquement.": {
+      "en": "Enter the exact name or pseudonym used when commenting, along with your tracking code. If your browser has saved this information, it will be filled in automatically."
+    },
+    "Nom ou pseudonyme": {
+      "en": "Name or pseudonym"
+    },
+    "Code de suivi": {
+      "en": "Tracking code"
+    },
+    "Recherche...": {
+      "en": "Search..."
+    },
+    "Voir mes réponses": {
+      "en": "See my answers"
+    },
+    "Cliquez ici pour vérifier si l'équipe ClinIA a répondu à vos commentaires à l'aide de votre nom ou pseudonyme et de votre code de suivi.": {
+      "en": "Click here to check if the ClinIA team has responded to your comments using your name or username and your tracking code."
+    },
+    "Aucune réponse trouvée pour ces informations de suivi.": {
+      "en": "No tracking information found for this shipment."
+    },
+    "Commentaire du": {
+      "en": "Comment from"
+    },
+    "Réponse de": {
+      "en": "Response from"
+    },
+    "le": {
+      "en": "Veuillez fournir le texte que vous souhaitez faire traduire en anglais canadien."
+    },
+    "Chargement...": {
+      "en": "Loading...",
+      "es": "Cargando..."
+    },
+    "Suivant": {
+      "en": "Next",
+      "es": "Siguiente"
+    },
+    "Indapamide": {
+      "en": "Indapamide"
+    },
+    "Création": {
+      "en": "Creation"
+    },
+    "Réinitialiser": {
+      "en": "Reset",
+      "es": "Restablecer"
+    },
+    "Précédent": {
+      "en": "Previous",
+      "es": "Anterior"
+    },
+    "Saisie manuelle": {
+      "en": "Manual entry",
+      "es": "Entrada manual",
+      "ko": "수동 입력",
+      "vi": "Nhập thủ công",
+      "no": "Manuell inntasting",
+      "ja": "手動入力",
+      "zh": "手动输入",
+      "he": "הזנה ידנית"
+    },
+    "Patient existant": {
+      "en": "Existing patient",
+      "es": "Paciente existente",
+      "ko": "기존 환자",
+      "vi": "Bệnh nhân hiện có",
+      "no": "Eksisterende pasient",
+      "ja": "既存の患者",
+      "zh": "现有患者",
+      "he": "מטופל קיים"
+    },
+    "Spécialité": {
+      "en": "Specialty"
+    },
+    "Adresse": {
+      "en": "Address",
+      "es": "Dirección"
+    },
+    "Téléphone": {
+      "es": "Teléfono"
+    },
+    "Créer un rendez-vous": {
+      "en": "Create an appointment"
+    },
+    "Voir la liste": {
+      "en": "See the list"
+    },
+    "Numéro d'assurance maladie (auto)": {
+      "en": "Auto insurance number"
+    },
+    "Rechercher un patient existant": {
+      "en": "Search for an existing patient"
+    },
+    "Nom": {
+      "en": "Name",
+      "es": "Nombre"
+    },
+    "Prénom": {
+      "en": "First Name",
+      "es": "Nombre"
+    },
+    "Chargement des spécialistes...": {
+      "en": "Loading specialists..."
+    },
+    "Choisir un spécialiste *": {
+      "en": "Choose a specialist *"
+    },
+    "Aucun spécialiste disponible dans cette clinique.": {
+      "en": "No specialists available at this clinic."
+    },
+    "Clinique la plus proche introuvable": {
+      "en": "Nearest clinic not found"
+    },
+    "Aucun spécialiste disponible dans la clinique la plus proche.": {
+      "en": "No specialists available at the nearest clinic."
+    },
+    "Coordonnées manquantes pour déterminer la clinique la plus proche.": {
+      "en": "Missing contact information to determine the nearest clinic."
+    },
+    "Clinique": {
+      "en": "Clinic"
+    },
+    "Choisir une clinique *": {
+      "en": "Choose a clinic *"
+    },
+    "Chargement des cliniques...": {
+      "en": "Loading clinics..."
+    },
+    "Aucune clinique disponible.": {
+      "en": "No clinics available."
+    },
+    "Priorité": {
+      "en": "Priority"
+    },
+    "Normal": {
+      "en": "Normal"
+    },
+    "Urgent": {
+      "en": "Urgent"
+    },
+    "Créneaux disponibles": {
+      "en": "Available time slots"
+    },
+    "Motif (optionnel)": {
+      "en": "Reason (optional)"
+    },
+    "Création...": {
+      "en": "Creation...",
+      "es": "Bien sûr, veuillez fournir le texte complet que vous souhaitez traduire en espagnol."
+    },
+    "Créer le rendez-vous": {
+      "en": "Create the appointment"
+    },
+    "Rendez-vous créé avec succès.": {
+      "en": "Appointment successfully created."
+    },
+    "Le rendez-vous n'a pas été sauvegardé.": {
+      "en": "The appointment was not saved."
+    },
+    "Actions": {
+      "en": "Actions",
+      "es": "Acciones"
+    },
+    "Toutes les cliniques": {
+      "en": "All clinics"
+    },
+    "Créer un patient": {
+      "en": "Create a patient",
+      "es": "Crear un paciente"
+    },
+    "Rechercher les patients": {
+      "en": "Search for patients",
+      "es": "Buscar a los pacientes"
+    },
+    "Réponse serveur invalide (pagination manquante).": {
+      "en": "Invalid server response (missing pagination).",
+      "es": "Respuesta del servidor no válida (paginación faltante)."
+    },
+    "Latitude invalide.": {
+      "en": "Invalid latitude.",
+      "es": "Latitud inválida."
+    },
+    "Longitude invalide.": {
+      "en": "Invalid longitude.",
+      "es": "Longitud inválida."
+    },
+    "Nom et prénom sont requis.": {
+      "en": "First and last name are required.",
+      "es": "Nombre y apellido son obligatorios."
+    },
+    "Coordonnées invalides.": {
+      "en": "Invalid contact information.",
+      "es": "Datos de contacto no válidos."
+    },
+    "Acces temporairement restreint: ClinIA a bloque cette zone sensible apres une activite inhabituelle detectee sur ce compte. Reessayez plus tard ou contactez un SUPERADMIN.": {
+      "en": "Temporary Access Restricted: ClinIA has blocked this sensitive area due to unusual activity detected on this account. Please try again later or contact a SUPERADMIN.",
+      "es": "Acceso temporalmente restringido: ClinIA ha bloqueado esta zona sensible tras detectar una actividad inusual en esta cuenta. Inténtelo de nuevo más tarde o contacte con un SUPERADMIN."
+    },
+    "Modifier un patient": {
+      "en": "Edit a patient",
+      "es": "Modificar un paciente"
+    },
+    "Prénom *": {
+      "en": "First Name *",
+      "es": "Nombre *"
+    },
+    "Nom *": {
+      "en": "Name *",
+      "es": "Nombre *"
+    },
+    "Numéro d'assurance maladie (optionnel)": {
+      "en": "Health Insurance Number (optional)",
+      "es": "Número de seguro médico (opcional)"
+    },
+    "Téléphone (optionnel)": {
+      "en": "Phone (optional)",
+      "es": "Teléfono (opcional)"
+    },
+    "Courriel (optionnel)": {
+      "en": "Email (optional)",
+      "es": "Correo electrónico (opcional)"
+    },
+    "Adresse (optionnel)": {
+      "en": "Address (optional)",
+      "es": "Dirección (opcional)"
+    },
+    "Latitude (optionnel)": {
+      "en": "Latitude (optional)",
+      "es": "Latitud (opcional)"
+    },
+    "Longitude (optionnel)": {
+      "en": "Longitude (optional)",
+      "es": "Longitud (opcional)"
+    },
+    "SMS activé": {
+      "en": "SMS enabled",
+      "es": "SMS activado"
+    },
+    "Enregistrer": {
+      "en": "Save",
+      "es": "Guardar"
+    },
+    "Créer": {
+      "en": "Create",
+      "es": "Crear"
+    },
+    "Sauvegarde du patient en cours...": {
+      "en": "Patient backup in progress...",
+      "es": "Guardado del paciente en curso..."
+    },
+    "Sauvegarde des modifications en cours...": {
+      "en": "Saving changes in progress...",
+      "es": "Guardando los cambios en curso..."
+    },
+    "Patient sauvegardé avec succès.": {
+      "en": "Patient saved successfully.",
+      "es": "Paciente guardado con éxito."
+    },
+    "Modifications du patient sauvegardées avec succès.": {
+      "en": "Patient changes saved successfully.",
+      "es": "Cambios del paciente guardados con éxito."
+    },
+    "La sauvegarde n'a pas pu être confirmée. Vérifiez la connexion et réessayez.": {
+      "en": "The backup could not be confirmed. Please check the connection and try again.",
+      "es": "La copia de seguridad no pudo ser confirmada. Verifique la conexión y vuelva a intentarlo."
+    },
+    "Recherche": {
+      "en": "Search",
+      "es": "Investigación"
+    },
+    "Numéro assurance maladie": {
+      "en": "Health insurance number",
+      "es": "Número de seguro médico"
+    },
+    "Aucun patient trouvé.": {
+      "en": "No patient found.",
+      "es": "Ningún paciente encontrado."
+    },
+    "Créer rendez-vous": {
+      "en": "Create appointment",
+      "es": "Crear cita"
+    },
+    "Éditer": {
+      "en": "Edit",
+      "es": "Editar"
+    },
+    "Gestion des établissements": {
+      "en": "Facility Management"
+    },
+    "Créez, modifiez ou supprimez les établissements suivis par ClinIA.": {
+      "en": "Create, edit, or delete the facilities monitored by ClinIA."
+    },
+    "Créer une clinique": {
+      "en": "Create a clinic"
+    },
+    "Rechercher les cliniques": {
+      "en": "Search for clinics"
+    },
+    "Les champs 'nom', 'num_civique', 'rue' et 'code_postal' sont requis.": {
+      "en": "The fields 'name', 'civic_number', 'street', and 'postal_code' are required."
+    },
+    "Filtres": {
+      "en": "Filters"
+    },
+    "Ex: Clinique Mont-Royal": {
+      "en": "Example: Mont-Royal Clinic"
+    },
+    "Rue": {
+      "en": "Street"
+    },
+    "Ex: Rue Saint-Denis": {
+      "en": "Example: Saint Denis Street"
+    },
+    "Code postal": {
+      "en": "Postal code"
+    },
+    "Ex: H2X 1S1": {
+      "en": "Example: H2X 1S1"
+    },
+    "Latitude": {
+      "en": "Latitude"
+    },
+    "Longitude": {
+      "en": "Longitude"
+    },
+    "Aucune clinique trouvée.": {
+      "en": "No clinics found."
+    },
+    "Modifier": {
+      "en": "Edit"
+    },
+    "Supprimer": {
+      "en": "Delete",
+      "es": "Eliminar"
+    },
+    "Aucune clinique enregistrée": {
+      "en": "No registered clinic"
+    },
+    "clinique": {
+      "en": "clinic"
+    },
+    "cliniques": {
+      "en": "clinics"
+    },
+    "Modifier une clinique": {
+      "en": "Modify a clinic"
+    },
+    "Nouvelle clinique": {
+      "en": "New Clinic"
+    },
+    "Nom de la clinique": {
+      "en": "Clinic Name"
+    },
+    "Numéro civique": {
+      "en": "Civic number"
+    },
+    "Créer un spécialiste": {
+      "en": "Create a specialist"
+    },
+    "Rechercher les spécialistes": {
+      "en": "Search for specialists"
+    },
+    "Chaque disponibilité doit contenir une date et au moins un créneau.": {
+      "en": "Each availability must include a date and at least one time slot."
+    },
+    "Les dates de disponibilité doivent être valides.": {
+      "en": "The availability dates must be valid."
+    },
+    "Les heures de disponibilité doivent être valides.": {
+      "en": "Availability hours must be valid."
+    },
+    "Les heures doivent être alignées sur 15 minutes.": {
+      "en": "The hours must be rounded to the nearest 15 minutes."
+    },
+    "Les disponibilités ne peuvent pas être dans le passé.": {
+      "en": "Availability cannot be in the past."
+    },
+    "Les disponibilités ne doivent pas se chevaucher.": {
+      "en": "Availability times must not overlap."
+    },
+    "Chaque disponibilité doit contenir au moins un créneau.": {
+      "en": "Each availability must include at least one time slot."
+    },
+    "Nom, prénom et numéro de médecin sont requis.": {
+      "en": "Last name, first name, and physician number are required."
+    },
+    "Disponibilités invalides.": {
+      "en": "Invalid availabilities."
+    },
+    "Supprimer ce spécialiste définitivement ?": {
+      "en": "Permanently remove this specialist?"
+    },
+    "Modifier un spécialiste": {
+      "en": "Edit a specialist"
+    },
+    "Numéro de médecin *": {
+      "en": "Doctor Number *"
+    },
+    "Téléphone (automatique)": {
+      "en": "Telephone (automated)"
+    },
+    "Courriel (automatique)": {
+      "en": "Email (automatic)"
+    },
+    "Aucune clinique": {
+      "en": "No clinic"
+    },
+    "Aucune spécialité": {
+      "en": "No specialty"
+    },
+    "Disponibilités (jours du mois)": {
+      "en": "Availability (days of the month)"
+    },
+    "Mois ciblé": {
+      "en": "Target month"
+    },
+    "Sélectionnez les jours à activer.": {
+      "en": "Select the days to activate."
+    },
+    "Aucun jour sélectionné.": {
+      "en": "No day selected."
+    },
+    "Choisir une plage pour": {
+      "en": "Choose a beach for"
+    },
+    "Cliquez pour activer/désactiver les créneaux de 15 minutes (shift pour une plage).": {
+      "en": "Click to enable/disable 15-minute slots (Shift for a range)."
+    },
+    "Cliquez plusieurs créneaux pour créer une liste (ex: 14:45, 16:15).": {
+      "en": "Click multiple time slots to create a list (e.g., 2:45 PM, 4:15 PM)."
+    },
+    "Aucun créneau": {
+      "en": "No available slots"
+    },
+    "Retirer": {
+      "en": "Remove"
+    },
+    "Les créneaux sont générés par pas de 15 minutes et sauvegardés en ISO.": {
+      "en": "Time slots are generated in 15-minute intervals and saved in ISO format."
+    },
+    "Numéro de médecin": {
+      "en": "Physician number"
+    },
+    "Numéro médecin": {
+      "en": "Physician number"
+    },
+    "Disponibilités": {
+      "en": "Availability"
+    },
+    "Aucun spécialiste trouvé.": {
+      "en": "No specialists found."
+    },
+    "Janvier": {
+      "en": "January"
+    },
+    "Février": {
+      "en": "February"
+    },
+    "Mars": {
+      "en": "March"
+    },
+    "Avril": {
+      "en": "April"
+    },
+    "Mai": {
+      "en": "May"
+    },
+    "Juin": {
+      "en": "June"
+    },
+    "Juillet": {
+      "en": "July"
+    },
+    "Août": {
+      "en": "August"
+    },
+    "Septembre": {
+      "en": "September"
+    },
+    "Octobre": {
+      "en": "October"
+    },
+    "Novembre": {
+      "en": "November"
+    },
+    "Décembre": {
+      "en": "December"
+    },
+    "Consultation en lecture seule des envois anonymisés vers OpenAI.": {
+      "en": "Read-only consultation of anonymized submissions to OpenAI.",
+      "es": "Consulta en modo solo lectura de los envíos anonimizados a OpenAI."
+    },
+    "Ouvrir la page dédiée": {
+      "en": "Open the dedicated page",
+      "es": "Abrir la página dedicada"
+    },
+    "Temps requête:": {
+      "en": "Request time:",
+      "es": "Tiempo de consulta:"
+    },
+    "Résultat": {
+      "en": "Result",
+      "es": "Resultado"
+    },
+    "Nom d'utilisateur masqué": {
+      "en": "Masked username",
+      "es": "Nombre de usuario oculto"
+    },
+    "Rôle": {
+      "en": "Role",
+      "es": "Rol"
+    },
+    "ID utilisateur acteur": {
+      "en": "User ID actor",
+      "es": "ID de usuario actor"
+    },
+    "Chemin de requête": {
+      "en": "Request path",
+      "es": "Ruta de consulta"
+    },
+    "Transport": {
+      "en": "Transport",
+      "es": "Transport"
+    },
+    "Modèle": {
+      "en": "Model",
+      "es": "Modelo"
+    },
+    "Empreinte de charge utile": {
+      "en": "Payload imprint",
+      "es": "Carga útil de la huella"
+    },
+    "Taille de charge utile en octets": {
+      "en": "Payload size in bytes",
+      "es": "Tamaño de la carga útil en bytes"
+    },
+    "Classification": {
+      "en": "Classification",
+      "es": "Clasificación"
+    },
+    "ID d'accusé d'incident": {
+      "en": "Incident Acknowledgment ID",
+      "es": "ID de reporte de incidente"
+    },
+    "Neutralisé": {
+      "en": "Neutralized",
+      "es": "Neutralizado"
+    },
+    "ID de requête amont": {
+      "en": "Upstream request ID",
+      "es": "ID de solicitud ascendente"
+    },
+    "Code d'erreur": {
+      "en": "Error code",
+      "es": "Código de error"
+    },
+    "Afficher seulement les erreurs cliniques récentes": {
+      "en": "Show only recent clinical errors",
+      "es": "Mostrar solo los errores clínicos recientes"
+    },
+    "Chargement des journaux OpenAI...": {
+      "en": "Loading OpenAI logs...",
+      "es": "Cargando los registros de OpenAI..."
+    },
+    "Aucun résultat.": {
+      "en": "No results.",
+      "es": "Ningún resultado."
+    },
+    "Date début ne peut pas être plus grande que Date fin.": {
+      "en": "Start date cannot be later than end date.",
+      "es": "La fecha de inicio no puede ser posterior a la fecha de fin."
+    },
+    "Impossible de charger les journaux OpenAI.": {
+      "en": "Unable to load OpenAI logs.",
+      "es": "No se pueden cargar los registros de OpenAI."
+    },
+    "Erreur réseau lors du chargement des journaux OpenAI.": {
+      "en": "Network error while loading OpenAI logs.",
+      "es": "Error de red al cargar los registros de OpenAI."
+    },
+    "Invalide": {
+      "en": "Invalid",
+      "es": "Inválido"
+    },
+    "B": {
+      "en": "Il semble que votre message soit incomplet. Pourriez-vous fournir le texte complet que vous souhaitez faire traduire en anglais canadien?",
+      "es": "Il semble que votre message soit incomplet. Pourriez-vous fournir le texte complet que vous souhaitez traduire en espagnol ?"
+    },
+    "Charge utile": {
+      "en": "Payload",
+      "es": "Carga útil"
+    },
+    "Path": {
+      "en": "Path",
+      "es": "Camino"
+    },
+    "Upstream": {
+      "en": "Upstream",
+      "es": "En amont"
+    }
+  }
+}

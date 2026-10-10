@@ -2,93 +2,25 @@
 
 import React from "react";
 import { Link } from "react-router-dom";
-import { useHomeI18n } from "../contexts/HomeI18nContext";
-import { useTranslation } from "../hooks/useTranslation";
-
-// Source strings (EN)
-const DEMO_STRINGS = {
-  pageTitle: "ClinIA Demo in under 5 minutes",
-  pageSubtitle:
-    "This page is a guide for a short, clear, value-oriented demo. The goal is to show ClinIA's utility without compromising data security.",
-  startDemo: "Start the demo",
-  goToClinical: "Go to clinical analysis",
-  presenterChecklist: "Presenter checklist",
-  steps: [
-    {
-      minute: "00:00 - 00:45",
-      title: "ClinIA Context",
-      detail:
-        "Explain that ClinIA assists the physician with structured therapeutic options. ClinIA does not make a final diagnosis and does not prescribe.",
-    },
-    {
-      minute: "00:45 - 01:45",
-      title: "Login and roles",
-      detail:
-        "Show login, then role control (MEDECIN, ADMIN, SUPERADMIN) for sensitive sections.",
-    },
-    {
-      minute: "01:45 - 03:00",
-      title: "Clinical analysis",
-      detail:
-        "Submit a fictitious demo case, display clinical hypothesis, therapeutic options, justification, and contraindications.",
-    },
-    {
-      minute: "03:00 - 04:00",
-      title: "Patient journey",
-      detail:
-        "Navigate to appointments/patients pages to show the clinical workflow without exposing identifiable data.",
-    },
-    {
-      minute: "04:00 - 05:00",
-      title: "Security and compliance",
-      detail:
-        "Conclude with Loi 25 / PIPEDA safeguards: data minimization, audit logs, access control, and human clinical supervision.",
-    },
-  ],
-  checklist: [
-    "Use only fictitious data during the demo.",
-    "Avoid any patient-identifiable information in AI prompts.",
-    "Show a clear message: AI assists, the physician decides.",
-    "End with an invitation for questions and next steps.",
-  ],
-};
+import { useUiLabels } from "../hooks/useUiLabels";
+import { labels } from "../i18n/uiLabels";
 
 const DemoPage: React.FC = () => {
-  const { locale } = useHomeI18n();
-
-  // Hooks pour chaque champ statique
-  const { translated: pageTitle } = useTranslation({ text: DEMO_STRINGS.pageTitle, targetLang: locale });
-  const { translated: pageSubtitle } = useTranslation({ text: DEMO_STRINGS.pageSubtitle, targetLang: locale });
-  const { translated: startDemo } = useTranslation({ text: DEMO_STRINGS.startDemo, targetLang: locale });
-  const { translated: goToClinical } = useTranslation({ text: DEMO_STRINGS.goToClinical, targetLang: locale });
-  const { translated: presenterChecklist } = useTranslation({ text: DEMO_STRINGS.presenterChecklist, targetLang: locale });
-
-  // Hooks pour chaque étape (ordre fixe)
-  const { translated: stepTitle0 } = useTranslation({ text: DEMO_STRINGS.steps[0].title, targetLang: locale });
-  const { translated: stepDetail0 } = useTranslation({ text: DEMO_STRINGS.steps[0].detail, targetLang: locale });
-  const { translated: stepTitle1 } = useTranslation({ text: DEMO_STRINGS.steps[1].title, targetLang: locale });
-  const { translated: stepDetail1 } = useTranslation({ text: DEMO_STRINGS.steps[1].detail, targetLang: locale });
-  const { translated: stepTitle2 } = useTranslation({ text: DEMO_STRINGS.steps[2].title, targetLang: locale });
-  const { translated: stepDetail2 } = useTranslation({ text: DEMO_STRINGS.steps[2].detail, targetLang: locale });
-  const { translated: stepTitle3 } = useTranslation({ text: DEMO_STRINGS.steps[3].title, targetLang: locale });
-  const { translated: stepDetail3 } = useTranslation({ text: DEMO_STRINGS.steps[3].detail, targetLang: locale });
-  const { translated: stepTitle4 } = useTranslation({ text: DEMO_STRINGS.steps[4].title, targetLang: locale });
-  const { translated: stepDetail4 } = useTranslation({ text: DEMO_STRINGS.steps[4].detail, targetLang: locale });
-
+  const { t } = useUiLabels();
+  const pageTitle = t(labels.pageUi.demoPageTitle);
+  const pageSubtitle = t(labels.pageUi.demoPageSubtitle);
+  const startDemo = t(labels.pageUi.demoStart);
+  const goToClinical = t(labels.pageUi.demoClinicalLink);
+  const presenterChecklist = t(labels.pageUi.demoChecklistTitle);
   const steps = [
-    { minute: DEMO_STRINGS.steps[0].minute, title: stepTitle0, detail: stepDetail0 },
-    { minute: DEMO_STRINGS.steps[1].minute, title: stepTitle1, detail: stepDetail1 },
-    { minute: DEMO_STRINGS.steps[2].minute, title: stepTitle2, detail: stepDetail2 },
-    { minute: DEMO_STRINGS.steps[3].minute, title: stepTitle3, detail: stepDetail3 },
-    { minute: DEMO_STRINGS.steps[4].minute, title: stepTitle4, detail: stepDetail4 },
+    { minute: "00:00 - 00:45", title: t(labels.pageUi.demoContextTitle), detail: t(labels.pageUi.demoContextDetail) },
+    { minute: "00:45 - 01:45", title: t(labels.pageUi.demoRolesTitle), detail: t(labels.pageUi.demoRolesDetail) },
+    { minute: "01:45 - 03:00", title: t(labels.pageUi.demoAnalysisTitle), detail: t(labels.pageUi.demoAnalysisDetail) },
+    { minute: "03:00 - 04:00", title: t(labels.pageUi.demoJourneyTitle), detail: t(labels.pageUi.demoJourneyDetail) },
+    { minute: "04:00 - 05:00", title: t(labels.pageUi.demoSecurityTitle), detail: t(labels.pageUi.demoSecurityDetail) },
   ];
-
-  // Hooks pour chaque item de checklist (ordre fixe)
-  const { translated: checklist0 } = useTranslation({ text: DEMO_STRINGS.checklist[0], targetLang: locale });
-  const { translated: checklist1 } = useTranslation({ text: DEMO_STRINGS.checklist[1], targetLang: locale });
-  const { translated: checklist2 } = useTranslation({ text: DEMO_STRINGS.checklist[2], targetLang: locale });
-  const { translated: checklist3 } = useTranslation({ text: DEMO_STRINGS.checklist[3], targetLang: locale });
-  const checklist = [checklist0, checklist1, checklist2, checklist3];
+  const checklist = [labels.pageUi.demoFictitiousData, labels.pageUi.demoAvoidIdentifiers,
+    labels.pageUi.demoPhysicianDecides, labels.pageUi.demoQuestions].map(t);
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">

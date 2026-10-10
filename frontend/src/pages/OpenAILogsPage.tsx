@@ -1,3 +1,4 @@
+import { UiMessage } from "../components/i18n/UiMessage";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
@@ -581,13 +582,13 @@ export function OpenAILogsPage() {
 
                 {error && (
                     <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                        {error.message}
+                        <UiMessage message={error.message} />
                     </div>
                 )}
 
                 {exportError && (
                     <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                        {exportError}
+                        <UiMessage message={exportError} />
                     </div>
                 )}
 

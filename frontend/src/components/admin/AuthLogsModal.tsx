@@ -1,3 +1,4 @@
+import { UiMessage } from "../i18n/UiMessage";
 import React from "react";
 
 type AuthLogEntry = {
@@ -163,7 +164,7 @@ export function AuthLogsModal({
                             >
                                 {options.map((option) => (
                                     <option key={option.value || "ALL"} value={option.value}>
-                                        {option.label}
+                                        {renderLabel(option.label)}
                                     </option>
                                 ))}
                             </select>
@@ -209,7 +210,7 @@ export function AuthLogsModal({
                         </div>
                     ) : error ? (
                         <div className="rounded bg-red-50 p-3 text-sm text-red-700">
-                            {error}
+                            <UiMessage message={error} />
                         </div>
                     ) : logs.length === 0 ? (
                         <p className="text-sm text-gray-500">{renderLabel(headerLabels.authLogsModal.empty)}</p>

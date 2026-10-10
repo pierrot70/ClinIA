@@ -1,3 +1,7 @@
+import { UiMessage } from "../components/i18n/UiMessage";
+import { labels } from "../i18n/uiLabels";
+import { useUiLabels } from "../hooks/useUiLabels";
+import { translateUiLabelTree } from "../i18n/pageUiLabels";
 import { useEffect, useMemo, useState } from "react";
 import {
     fetchPatientsPaginated,
@@ -9,31 +13,31 @@ import type { ApiError } from "../types/api";
 import { useDebounce } from "../hooks/useDebounce";
 
 const ACTION_OPTIONS = [
-    { value: "", label: "Toutes les actions" },
-    { value: "PATIENT_CREATE", label: "Création" },
-    { value: "PATIENT_UPDATE", label: "Modification" },
-    { value: "PATIENT_ARCHIVE", label: "Archivage" },
-    { value: "PATIENT_DELETE", label: "Suppression" },
+    { value: "", label: labels.pageUi.toutesLesActions },
+    { value: "PATIENT_CREATE", label: labels.pageUi.creation },
+    { value: "PATIENT_UPDATE", label: labels.pageUi.modification },
+    { value: "PATIENT_ARCHIVE", label: labels.pageUi.archive },
+    { value: "PATIENT_DELETE", label: labels.pageUi.deletion },
 ] as const;
 
-function formatTimestamp(value: string) {
+function formatTimestamp(value: string, locale: string) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
         return value;
     }
 
-    return date.toLocaleString();
+    return date.toLocaleString(locale);
 }
 
 function formatAction(action: PatientAuditLog["action"]) {
-    if (action === "PATIENT_CREATE") return "Création";
-    if (action === "PATIENT_UPDATE") return "Modification";
-    if (action === "PATIENT_ARCHIVE") return "Archivage";
-    if (action === "PATIENT_DELETE") return "Suppression";
+    if (action === "PATIENT_CREATE") return labels.pageUi.creation;
+    if (action === "PATIENT_UPDATE") return labels.pageUi.modification;
+    if (action === "PATIENT_ARCHIVE") return labels.pageUi.archive;
+    if (action === "PATIENT_DELETE") return labels.pageUi.deletion;
     return action;
 }
 
-function formatAuditContext(log: PatientAuditLog) {
+function formatAuditContext(log: PatientAuditLog, t: (source: string) => string) {
     const secureRequest = log.context?.secureRequest;
 
     if (!secureRequest) {
@@ -43,21 +47,22 @@ function formatAuditContext(log: PatientAuditLog) {
     const parts = [];
 
     if (secureRequest.clinicalScopeProvided) {
-        parts.push("Portee clinique enregistree");
+        parts.push(t(labels.pageUi.porteeCliniqueEnregistree));
     }
 
     if (secureRequest.objectiveProvided) {
-        parts.push("Objectif enregistre");
+        parts.push(t(labels.pageUi.objectifEnregistre));
     }
 
     if ((secureRequest.selectedDocumentCount || 0) > 0) {
-        parts.push(`Documents: ${secureRequest.selectedDocumentCount}`);
+        parts.push(t(labels.pageUi.documentsSelected).replace("{count}", String(secureRequest.selectedDocumentCount)));
     }
 
     return parts.length > 0 ? parts.join(" | ") : "-";
 }
 
 export function PatientAuditLogsPage() {
+    const { locale: uiLocale, t } = useUiLabels();
     const [logs, setLogs] = useState<PatientAuditLog[]>([]);
     const [patientOptions, setPatientOptions] = useState<Patient[]>([]);
     const [loading, setLoading] = useState(false);
@@ -184,19 +189,15 @@ export function PatientAuditLogsPage() {
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
             <header className="space-y-2">
                 <h1 className="text-2xl font-semibold text-gray-900">
-                    Audits patient
-                </h1>
+                    {t(labels.pageUi.auditsPatient)}</h1>
                 <p className="text-sm text-gray-600 max-w-3xl">
-                    Consultez les créations, modifications et suppressions de patients avec l’acteur,
-                    l’IP, les champs touchés, le contexte de requête et l’horodatage.
-                </p>
+                    {t(labels.pageUi.consultezLesCreationsModificationsEtSuppressionsDePatientsAvecLActeurL)}</p>
             </header>
 
             <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs space-y-4">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
                     <label className="text-sm text-gray-700">
-                        Action
-                        <select
+                        {t(labels.pageUi.action)}<select
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={action}
                             onChange={(event) => {
@@ -213,28 +214,26 @@ export function PatientAuditLogsPage() {
                         >
                             {ACTION_OPTIONS.map((option) => (
                                 <option key={option.value || "all"} value={option.value}>
-                                    {option.label}
+                                    {t(option.label)}
                                 </option>
                             ))}
                         </select>
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Rechercher patient
-                        <input
+                        {t(labels.pageUi.rechercherPatient)}<input
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={patientSearch}
                             onChange={(event) => {
                                 setPage(1);
                                 setPatientSearch(event.target.value);
                             }}
-                            placeholder="Ex: Pierrot"
+                            placeholder={t(labels.pageUi.exPierrot)}
                         />
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Patient
-                        <select
+                        {t(labels.pageUi.patient)}<select
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={patientId}
                             onChange={(event) => {
@@ -244,8 +243,8 @@ export function PatientAuditLogsPage() {
                         >
                             <option value="">
                                 {patientsLoading
-                                    ? "Chargement des patients..."
-                                    : "Tous les patients"}
+                                    ? t(labels.pageUi.chargementDesPatients)
+                                    : t(labels.pageUi.tousLesPatients)}
                             </option>
                             {patientOptions.map((patient) => (
                                 <option key={patient._id} value={patient._id}>
@@ -256,8 +255,7 @@ export function PatientAuditLogsPage() {
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Actor User ID
-                        <input
+                        {t(labels.pageUi.actorUserID)}<input
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={actorUserId}
                             onChange={(event) => {
@@ -269,8 +267,7 @@ export function PatientAuditLogsPage() {
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Date début
-                        <input
+                        {t(labels.pageUi.dateDebut)}<input
                             type="date"
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={startDate}
@@ -283,8 +280,7 @@ export function PatientAuditLogsPage() {
                     </label>
 
                     <label className="text-sm text-gray-700">
-                        Date fin
-                        <input
+                        {t(labels.pageUi.dateFin)}<input
                             type="date"
                             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             value={endDate}
@@ -299,7 +295,7 @@ export function PatientAuditLogsPage() {
 
                 {patientId && (
                     <div className="rounded border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
-                        Patient ID sélectionné: {patientId}
+                        {t(labels.pageUi.patientIDSelectionne)} {patientId}
                     </div>
                 )}
 
@@ -311,23 +307,21 @@ export function PatientAuditLogsPage() {
                         }}
                         className="rounded bg-gray-900 px-4 py-2 font-medium text-white hover:bg-gray-800"
                     >
-                        Actualiser
-                    </button>
+                        {t(labels.pageUi.actualiser)}</button>
                     <button
                         type="button"
                         onClick={resetFilters}
                         className="rounded border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:border-gray-400"
                     >
-                        Réinitialiser
-                    </button>
+                        {t(labels.pageUi.reinitialiser)}</button>
                     <span className="text-gray-500">
-                        {loading ? "Chargement..." : `${total} audit${total > 1 ? "s" : ""}`}
+                        {loading ? t(labels.pageUi.loading) : t(labels.pageUi.auditCount).replace("{count}", total.toLocaleString(uiLocale))}
                     </span>
                 </div>
 
                 {error && (
                     <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                        {error.message}
+                        <UiMessage message={error.message} />
                     </div>
                 )}
             </section>
@@ -337,30 +331,28 @@ export function PatientAuditLogsPage() {
                     <table className="min-w-full text-left text-sm">
                         <thead className="bg-gray-50 text-gray-600">
                             <tr>
-                                <th className="px-4 py-3">Date</th>
-                                <th className="px-4 py-3">Action</th>
-                                <th className="px-4 py-3">Acteur</th>
-                                <th className="px-4 py-3">Patient</th>
-                                <th className="px-4 py-3">IP</th>
-                                <th className="px-4 py-3">Champs</th>
-                                <th className="px-4 py-3">Contexte</th>
-                                <th className="px-4 py-3">Route</th>
+                                <th className="px-4 py-3">{t(labels.pageUi.date)}</th>
+                                <th className="px-4 py-3">{t(labels.pageUi.action)}</th>
+                                <th className="px-4 py-3">{t(labels.pageUi.acteur)}</th>
+                                <th className="px-4 py-3">{t(labels.pageUi.patient)}</th>
+                                <th className="px-4 py-3">{t(labels.pageUi.iP)}</th>
+                                <th className="px-4 py-3">{t(labels.pageUi.champs)}</th>
+                                <th className="px-4 py-3">{t(labels.pageUi.contexte)}</th>
+                                <th className="px-4 py-3">{t(labels.pageUi.route)}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading && (
                                 <tr>
                                     <td className="px-4 py-6 text-gray-500" colSpan={8}>
-                                        Chargement des audits patient...
-                                    </td>
+                                        {t(labels.pageUi.chargementDesAuditsPatient)}</td>
                                 </tr>
                             )}
 
                             {!loading && logs.length === 0 && (
                                 <tr>
                                     <td className="px-4 py-6 text-gray-500" colSpan={8}>
-                                        Aucun audit patient trouvé.
-                                    </td>
+                                        {t(labels.pageUi.aucunAuditPatientTrouve)}</td>
                                 </tr>
                             )}
 
@@ -368,15 +360,15 @@ export function PatientAuditLogsPage() {
                                 logs.map((log) => (
                                     <tr key={log.id} className="border-t border-gray-100 align-top">
                                         <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-                                            {formatTimestamp(log.timestamp)}
+                                            {formatTimestamp(log.timestamp, uiLocale)}
                                         </td>
                                         <td className="px-4 py-3">
                                             <span className="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-800 border border-sky-200">
-                                                {formatAction(log.action)}
+                                                {t(formatAction(log.action))}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-gray-700">
-                                            <div>{log.actorUsernameMasked || "unknown"}</div>
+                                            <div>{log.actorUsernameMasked || t(labels.openAiLogs.status.unknownActor)}</div>
                                             <div className="text-xs text-gray-500">{log.actorRole || "-"}</div>
                                             <div className="text-xs text-gray-500 break-all">{log.actorUserId || "-"}</div>
                                         </td>
@@ -403,7 +395,7 @@ export function PatientAuditLogsPage() {
                                             )}
                                         </td>
                                         <td className="px-4 py-3 text-gray-700">
-                                            {formatAuditContext(log)}
+                                            {formatAuditContext(log, t)}
                                         </td>
                                         <td className="px-4 py-3 text-gray-700 break-all">
                                             {log.requestPath || "-"}
@@ -416,7 +408,7 @@ export function PatientAuditLogsPage() {
 
                 <div className="flex items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 text-sm text-gray-600">
                     <span>
-                        Page {page} / {Math.max(1, totalPages)}
+                        {t(labels.pageUi.page)} {page} / {Math.max(1, totalPages)}
                     </span>
                     <div className="flex items-center gap-2">
                         <button
@@ -425,8 +417,7 @@ export function PatientAuditLogsPage() {
                             disabled={page <= 1 || loading}
                             className="rounded border border-gray-300 px-3 py-1.5 disabled:opacity-50"
                         >
-                            Précédent
-                        </button>
+                            {t(labels.pageUi.precedent2)}</button>
                         <button
                             type="button"
                             onClick={() =>
@@ -435,8 +426,7 @@ export function PatientAuditLogsPage() {
                             disabled={page >= totalPages || loading}
                             className="rounded border border-gray-300 px-3 py-1.5 disabled:opacity-50"
                         >
-                            Suivant
-                        </button>
+                            {t(labels.pageUi.suivant2)}</button>
                     </div>
                 </div>
             </section>

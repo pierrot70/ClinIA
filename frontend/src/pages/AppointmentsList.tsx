@@ -1,3 +1,6 @@
+import { UiMessage } from "../components/i18n/UiMessage";
+import { useUiLabels } from "../hooks/useUiLabels";
+import { formatUiDate, formatUiTime, translateUiLabelTree } from "../i18n/pageUiLabels";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -56,6 +59,7 @@ function useDebounce<T>(value: T, delay = 300): T {
 /* ------------------------------------------------------------------ */
 
 export function AppointmentsListPage() {
+    const { locale: uiLocale, t } = useUiLabels();
     const { user } = useAuth();
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -134,7 +138,7 @@ export function AppointmentsListPage() {
         setAvailabilityRequests((current) =>
             current.filter((request) => request.id !== requestId)
         );
-        showToast("success", "Demande de disponibilités marquée traitée.");
+        showToast("success", labels.pageUi.demandeDeDisponibilitesMarqueeTraitee);
         setResolvingAvailabilityRequestId(null);
     }
 
@@ -323,7 +327,7 @@ export function AppointmentsListPage() {
             setError({
                 code: "INTERNAL_ERROR",
                 message:
-                    "Réponse serveur invalide (pagination manquante).",
+                    labels.pageUi.reponseServeurInvalidePaginationManquante,
                 retryable: false,
             });
             setLoading(false);
@@ -454,7 +458,7 @@ export function AppointmentsListPage() {
         }
     ): Promise<boolean> {
         if (options?.confirmMessage) {
-            const confirmed = window.confirm(options.confirmMessage);
+            const confirmed = window.confirm(t(options.confirmMessage));
             if (!confirmed) {
                 return false;
             }
@@ -546,7 +550,7 @@ export function AppointmentsListPage() {
         ) {
             showToast(
                 "info",
-                "Aucune modification à enregistrer."
+                labels.pageUi.aucuneModificationAEnregistrer
             );
             return;
         }
@@ -567,17 +571,19 @@ export function AppointmentsListPage() {
             {
                 confirmMessage: editingPurpose === "reschedule"
                     ? appointmentLabels.feedback.confirmRescheduled
-                        .replace("{date}", editDate)
-                        .replace("{time}", editTime)
-                    : `Confirmer le déplacement du rendez-vous au ${editDate} à ${editTime} ?`,
+                        .replace("{date}", formatUiDate(editDate, uiLocale))
+                        .replace("{time}", formatUiTime(editTime, uiLocale))
+                    : t(labels.pageUi.scheduleMoveConfirm)
+                        .replace("{date}", formatUiDate(editDate, uiLocale))
+                        .replace("{time}", formatUiTime(editTime, uiLocale)),
                 successMessage: editingPurpose === "reschedule"
                     ? appointmentLabels.feedback.rescheduled
-                    : "Horaire du rendez-vous mis à jour.",
+                    : t(labels.pageUi.scheduleUpdated),
                 errorMessage: (error) =>
                     ["SPECIALIST_ALREADY_BOOKED", "APPOINTMENT_CONFLICT"].includes(
                         error.code
                     )
-                        ? labels.appointmentsList.edit.slotJustBooked
+                        ? translateUiLabelTree(labels.appointmentsList.edit.slotJustBooked, t)
                         : error.message,
                 onError: (error) => {
                     if (
@@ -615,7 +621,7 @@ export function AppointmentsListPage() {
         editClinique === editOriginalClinique;
     const isEditTimeAllowed =
         isEditTimeSameAsOriginal || editSlots.includes(editTime);
-    const appointmentLabels = labels.appointmentsList;
+    const appointmentLabels = translateUiLabelTree(labels.appointmentsList, t);
     const overviewLabels = appointmentLabels.overview;
     const localize = (key: string, french: string) => appointmentListLabel(i18n.locale, key, french);
     const canManageSpecialistAvailability =
@@ -646,13 +652,13 @@ export function AppointmentsListPage() {
                     role="status"
                 >
                     <div className={toast.type === "success" ? "px-4 py-2" : ""}>
-                        {toast.message}
+                        {t(toast.message)}
                     </div>
                     {toast.type === "success" && (
                         <div className="px-4 pb-3">
                             <WriteVerificationReceipt
                                 verification={lastWriteVerification}
-                                labels={labels.writeVerification}
+                                labels={translateUiLabelTree(labels.writeVerification, t)}
                             />
                         </div>
                     )}
@@ -676,7 +682,7 @@ export function AppointmentsListPage() {
                 <section className="rounded border border-violet-300 bg-violet-50 p-4">
                     <h2 className="font-semibold text-violet-950">{localize("availabilityRequests", overviewLabels.availabilityRequests)}</h2>
                     <p className="mt-1 text-sm text-violet-900">{localize("availabilityDescription", overviewLabels.availabilityDescription)}</p>
-                    {availabilityRequestsError && <p className="mt-2 text-sm text-red-700">{availabilityRequestsError}</p>}
+                    {availabilityRequestsError && <p className="mt-2 text-sm text-red-700"><UiMessage message={availabilityRequestsError} /></p>}
                     {!availabilityRequestsError && availabilityRequests.length === 0 && <p className="mt-2 text-sm text-violet-900">{localize("noPendingRequests", overviewLabels.noPendingRequests)}</p>}
                     <div className="mt-3 space-y-2">
                         {availabilityRequests.map((request) => (
@@ -754,10 +760,10 @@ export function AppointmentsListPage() {
                         setStatus(e.target.value as AppointmentStatus | "");
                     }}
                 >
-                    <option value="">{localize("allStatuses", labels.coordinationRequestsPage.allStatuses)}</option>
+                    <option value="">{localize("allStatuses", translateUiLabelTree(labels.coordinationRequestsPage.allStatuses, t))}</option>
                     <option value="scheduled">{localize("scheduled", appointmentLabels.statuses.scheduled)}</option>
                     <option value="awaiting_confirmation">{localize("awaitingConfirmation", appointmentLabels.statuses.awaitingConfirmation)}</option>
-                    <option value="cancelled">{localize("cancelled", "Annulé")}</option>
+                    <option value="cancelled">{localize("cancelled", labels.pageUi.annule)}</option>
                     <option value="completed">{localize("completed", appointmentLabels.statuses.completed)}</option>
                     <option value="no_show">{localize("noShow", appointmentLabels.statuses.noShow)}</option>
                     <option value="rescheduled">{localize("rescheduled", appointmentLabels.statuses.rescheduled)}</option>
@@ -766,16 +772,15 @@ export function AppointmentsListPage() {
 
             {/* ---------------- Table ---------------- */}
 
-            {loading && <div>Chargement…</div>}
+            {loading && <div>{t(labels.pageUi.chargement)}</div>}
 
             {error && (
-                <div className="text-red-600">{error.message}</div>
+                <div className="text-red-600"><UiMessage message={error.message} /></div>
             )}
 
             {!loading && appointments.length === 0 && (
                 <div className="text-gray-500">
-                    Aucun rendez-vous trouvé.
-                </div>
+                    {t(labels.pageUi.aucunRendezVousTrouve)}</div>
             )}
 
             {!loading && appointments.length > 0 && (
@@ -850,7 +855,7 @@ export function AppointmentsListPage() {
                                         <select
                                             className="border rounded p-1"
                                             value={editClinique}
-                                            aria-label={labels.appointmentsList.edit.clinicLabel}
+                                            aria-label={translateUiLabelTree(labels.appointmentsList.edit.clinicLabel, t)}
                                             onChange={(event) => {
                                                 setEditClinique(event.target.value);
                                                 setEditTime("");
@@ -888,7 +893,7 @@ export function AppointmentsListPage() {
                                             }
                                         />
                                     ) : (
-                                        a.date
+                                        formatUiDate(a.date, uiLocale)
                                     )}
                                 </td>
                                 <td className="p-2">
@@ -905,12 +910,11 @@ export function AppointmentsListPage() {
                                                 }
                                             />
                                             <div className="text-xs text-gray-500">
-                                                {labels.appointmentsList.edit.availableSlots}
+                                                {translateUiLabelTree(labels.appointmentsList.edit.availableSlots, t)}
                                             </div>
                                             {editSlotsLoading && (
                                                 <div className="text-xs text-gray-400">
-                                                    Chargement…
-                                                </div>
+                                                    {t(labels.pageUi.chargement)}</div>
                                             )}
                                             <div className="flex flex-wrap gap-2">
                                                 {editSlots.map((slot) => (
@@ -973,21 +977,18 @@ export function AppointmentsListPage() {
                                                                 )}
                                                             </>
                                                         ) : (
-                                                            <span>Aucun créneau disponible pour cette date.</span>
+                                                            <span>{t(labels.pageUi.aucunCreneauDisponiblePourCetteDate)}</span>
                                                         )}
                                                     </div>
                                                 )}
                                             {!isEditFormComplete && (
                                                 <div className="text-xs text-amber-700">
-                                                    Date et heure requises.
-                                                </div>
+                                                    {t(labels.pageUi.dateEtHeureRequises)}</div>
                                             )}
                                             {isEditFormComplete &&
                                                 !isEditTimeAllowed && (
                                                     <div className="text-xs text-red-600">
-                                                        Ce créneau n&apos;est pas
-                                                        disponible.
-                                                    </div>
+                                                        {t(labels.pageUi.ceCreneauNEstPasDisponible)}</div>
                                                 )}
                                         </div>
                                     ) : (
@@ -998,7 +999,7 @@ export function AppointmentsListPage() {
                                                     : ""
                                             }
                                         >
-                                            {a.time}
+                                            {formatUiTime(a.time, uiLocale)}
                                         </span>
                                     )}
                                 </td>
@@ -1033,13 +1034,12 @@ export function AppointmentsListPage() {
                                             >
                                                 {editingPurpose === "reschedule"
                                                     ? appointmentLabels.actions.createRescheduled
-                                                    : "Enregistrer"}
+                                                    : t(labels.patientsPage.form.save)}
                                             </button>
                                             <button
                                                 onClick={stopEditing}
                                             >
-                                                Annuler
-                                            </button>
+                                                {t(labels.pageUi.annuler)}</button>
                                         </>
                                     ) : canResolve ? (
                                         <>
@@ -1109,7 +1109,7 @@ export function AppointmentsListPage() {
                                                     startEditing(a)
                                                 }
                                             >
-                                                {localize("modifySchedule", labels.appointmentsList.edit.modifySchedule)}
+                                                {localize("modifySchedule", translateUiLabelTree(labels.appointmentsList.edit.modifySchedule, t))}
                                             </button>
                                         </>
                                     ) : (
@@ -1129,19 +1129,17 @@ export function AppointmentsListPage() {
                             disabled={page <= 1}
                             onClick={() => setPage((p) => p - 1)}
                         >
-                            ← Précédent
-                        </button>
+                            {t(labels.pageUi.precedent)}</button>
 
                         <span>
-                            Page {page} / {totalPages}
+                            {t(labels.pageUi.page)} {page} / {totalPages}
                         </span>
 
                         <button
                             disabled={page >= totalPages}
                             onClick={() => setPage((p) => p + 1)}
                         >
-                            Suivant →
-                        </button>
+                            {t(labels.pageUi.suivant)}</button>
                     </div>
                 </>
             )}

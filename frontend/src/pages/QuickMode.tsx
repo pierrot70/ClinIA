@@ -2,10 +2,12 @@ import React from "react";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { getQuickModeHeader, QUICK_MODE_PANEL_EN as panel } from "../i18n/quickModeLabels";
 import { hypertensionTreatments } from "../data/hypertension";
+import { getExampleUiLabels } from "../i18n/exampleUiLabels";
 
 const QuickMode: React.FC = () => {
   const { locale } = useHomeI18n();
   const header = getQuickModeHeader(locale);
+  const ui = getExampleUiLabels(locale);
   const [first, second, third] = hypertensionTreatments;
 
   return (
@@ -19,10 +21,11 @@ const QuickMode: React.FC = () => {
         </p>
       </header>
 
-      <section lang="en" dir="ltr" translate="no" aria-labelledby="quick-recommendation-title" className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs space-y-2">
+      <section lang={locale} dir={locale.split("-")[0] === "he" ? "rtl" : "ltr"} aria-labelledby="quick-recommendation-title" className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs space-y-2">
         <p id="quick-recommendation-title" className="text-xs text-gray-500 uppercase tracking-wide">
-          {panel.title}
+          {ui.quickTitle}
         </p>
+        <div lang="en" dir="ltr" translate="no" data-testid="quick-clinical-example" className="space-y-2">
         <p className="text-sm text-gray-800">
           1️⃣ <span className="font-semibold">{first.name}</span> – {panel.first}
         </p>
@@ -32,8 +35,9 @@ const QuickMode: React.FC = () => {
         <p className="text-sm text-gray-800">
           3️⃣ <span className="font-semibold">{third.name}</span> – {panel.third}
         </p>
+        </div>
         <p className="text-xs text-gray-500 mt-2">
-          {panel.disclaimer}
+          {ui.quickDisclaimer}
         </p>
       </section>
     </div>

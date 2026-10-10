@@ -1,5 +1,6 @@
 import { UiTranslationCache } from "../models/UiTranslationCache.js";
 import crypto from "crypto";
+import { isValidUiTranslationPayload } from "./uiTranslationPayload.js";
 
 function hashSourceText(text) {
   return crypto.createHash("sha256").update(text).digest("hex");
@@ -18,7 +19,7 @@ export async function getCachedTranslation({
     targetLang,
     sourceHash,
   });
-  if (!cache) {
+  if (!cache || !isValidUiTranslationPayload(cache.payload, text)) {
     throw {
       code: "TRANSLATION_CACHE_MISS",
       message: "Traduction non disponible dans le cache local.",

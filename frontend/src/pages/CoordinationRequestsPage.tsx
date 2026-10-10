@@ -1,3 +1,4 @@
+import { UiMessage } from "../components/i18n/UiMessage";
 import { useCallback, useContext, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
@@ -114,7 +115,7 @@ export function CoordinationRequestsPage() {
         }
         const availability = response.data.availability;
         setSuccess(
-            text.availabilityVerified
+            labels.coordinationRequestsPage.availabilityVerified
                 .replace("{clinic}", availability.clinique.nom)
                 .replace("{specialist}", `${availability.specialist.prenom} ${availability.specialist.nom}`)
                 .replace("{date}", availability.date)
@@ -152,8 +153,8 @@ export function CoordinationRequestsPage() {
                     {text.refresh}
                 </button>
             </div>
-            {error && <div role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
-            {success && <div role="status" className="rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">{success}</div>}
+            {error && <div role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800"><UiMessage message={error} /></div>}
+            {success && <div role="status" className="rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800"><UiMessage message={success} /></div>}
             {loading ? <p className="text-sm text-gray-600">{text.loading}</p> : entries.length === 0 ? (
                 <div className="rounded border border-gray-200 bg-white p-6 text-sm text-gray-600">{text.empty}</div>
             ) : (

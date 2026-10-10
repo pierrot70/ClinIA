@@ -1,3 +1,5 @@
+import { labels } from "../i18n/uiLabels";
+import { useUiLabels } from "../hooks/useUiLabels";
 import React from "react";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -37,55 +39,56 @@ function getClinicalRelevanceLabel(treatment: ClinicalTreatmentCardData, languag
       : 0;
 
   if (evidenceLevel === "A" && monitoringCount <= 1 && contraindicationCount <= 1) {
-    return english ? "High clinical relevance" : "Pertinence clinique elevee";
+    return labels.pageUi.pertinenceCliniqueElevee;
   }
 
   if (evidenceLevel === "A" || evidenceLevel === "B") {
     if (monitoringCount >= 2 || contraindicationCount >= 2) {
-      return english ? "Relevant option requiring caution" : "Option pertinente avec vigilance";
+      return labels.pageUi.optionPertinenteAvecVigilance;
     }
-    return english ? "Clinically sound option" : "Option cliniquement solide";
+    return labels.pageUi.optionCliniquementSolide;
   }
 
   if (flags.includes("wellTolerated") && flags.includes("monitoring")) {
-    return english ? "Assess according to context" : "A evaluer selon le contexte";
+    return labels.pageUi.aEvaluerSelonLeContexte;
   }
 
   if (flags.includes("wellTolerated")) {
-    return english ? "Common option" : "Option courante";
+    return labels.pageUi.optionCourante;
   }
 
   if (flags.includes("monitoring")) {
-    return english ? "Option requiring monitoring" : "Option a surveiller";
+    return labels.pageUi.optionASurveiller;
   }
 
-  return english ? "To discuss" : "A discuter";
+  return labels.pageUi.aDiscuter;
 }
 
 function getSourceFootnote(sourceMode: string | undefined, realAI: boolean | undefined, language: "fr" | "en") {
   const english = language === "en";
   if (sourceMode === "real") {
     return realAI
-      ? (english ? "Based on a live OpenAI response" : "Base sur une reponse OpenAI reelle")
-      : (english ? "Based on a cached OpenAI response" : "Base sur une reponse OpenAI reelle mise en cache");
+      ? (labels.componentUi.baseSurUneReponseOpenAIReelle)
+      : (labels.componentUi.baseSurUneReponseOpenAIReelleMiseEnCache);
   }
 
   if (sourceMode === "degraded") {
-    return english ? "Based on a degraded fallback response" : "Base sur une reponse degradee de secours";
+    return labels.componentUi.baseSurUneReponseDegradeeDeSecours;
   }
 
   if (sourceMode === "mock") {
-    return english ? "Based on simulated data" : "Base sur des donnees simulees";
+    return labels.componentUi.baseSurDesDonneesSimulees;
   }
 
-  return english ? "Based on generated clinical context" : "Base sur un contexte clinique genere";
+  return labels.componentUi.baseSurUnContexteCliniqueGenere;
 }
 
 const TreatmentCard: React.FC<Props> = ({ treatment, sourceMode, realAI, language = "fr" }) => {
+    const { locale: uiLocale, t } = useUiLabels(language);
   const english = language === "en";
   const flags = Array.isArray(treatment.flags) ? treatment.flags : [];
-  const relevanceLabel = getClinicalRelevanceLabel(treatment, language);
-  const sourceFootnote = getSourceFootnote(sourceMode, realAI, language);
+  const relevanceLabel = getClinicalRelevanceLabel(treatment, "fr");
+  const sourceFootnote = getSourceFootnote(sourceMode, realAI, "fr");
   const nameTranslation = useTranslation({ text: treatment.name, targetLang: language });
   const classTranslation = useTranslation({ text: treatment.class, targetLang: language });
   const summaryTranslation = useTranslation({ text: treatment.summary, targetLang: language });
@@ -130,9 +133,9 @@ const TreatmentCard: React.FC<Props> = ({ treatment, sourceMode, realAI, languag
           <p className="text-xs text-gray-500">{displayedClass}</p>
         </div>
         <div className="text-right max-w-[11rem]">
-          <div className="text-xs uppercase text-gray-400">{english ? "Clinical relevance" : "Pertinence clinique"}</div>
+          <div className="text-xs uppercase text-gray-400">{t(labels.pageUi.pertinenceClinique)}</div>
           <div className="text-sm font-semibold text-primary">
-            {relevanceLabel}
+            {t(relevanceLabel)}
           </div>
         </div>
       </div>
@@ -141,22 +144,22 @@ const TreatmentCard: React.FC<Props> = ({ treatment, sourceMode, realAI, languag
 
       <div className="flex flex-wrap gap-2 text-xs">
         <span className="px-2 py-1 rounded-full bg-green-50 text-green-700 border border-green-100">
-          {english ? "First line" : "1ère ligne"}
+          {t(labels.componentUi.firstLine)}
         </span>
         {flags.includes("wellTolerated") && (
           <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-            {english ? "Well tolerated" : "Bien toléré"}
+            {t(labels.componentUi.bienTolere)}
           </span>
         )}
         {flags.includes("monitoring") && (
           <span className="px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
-            {english ? "Monitoring required" : "Surveillance requise"}
+            {t(labels.componentUi.surveillanceRequise)}
           </span>
         )}
       </div>
 
       <div className="flex items-center justify-between pt-1 text-xs text-gray-500">
-        <span>{sourceFootnote}</span>
+        <span>{t(sourceFootnote)}</span>
         <Link
           to={`/treatment/${encodeURIComponent(treatment.id)}`}
           state={{
@@ -166,7 +169,7 @@ const TreatmentCard: React.FC<Props> = ({ treatment, sourceMode, realAI, languag
           }}
           className="inline-flex items-center gap-1 text-primary hover:underline"
         >
-          {english ? "Details" : "Détails"}
+          {t(labels.componentUi.details)}
           <ArrowRight className="w-3 h-3" />
         </Link>
       </div>

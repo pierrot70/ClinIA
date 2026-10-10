@@ -1,3 +1,6 @@
+import { useUiLabelTree } from "../hooks/useUiLabels";
+import { UiMessage } from "../components/i18n/UiMessage";
+import { UiText } from "../components/i18n/UiText";
 import { analysisStatusLabels } from "../i18n/analysisStatusLabels";
 import { useEffect, useState, useContext, useRef } from "react";
 import { Link } from "react-router-dom";
@@ -60,7 +63,7 @@ export function ClinicalAnalyzePage() {
     const clinicalIntroLabels = labels.clinicalDemo.intro;
     const cachedResultNoticeLabels = getCachedResultNoticeLabels(targetLang);
     const navigationLabels = labels.clinicalDemo.navigation;
-    const cloudContentGuardLabels = labels.clinicalDemo.cloudContentGuard;
+    const cloudContentGuardLabels = useUiLabelTree(labels.clinicalDemo.cloudContentGuard);
     const requestBoundaryLabels = cloudContentGuardLabels.requestBoundary;
     const [openaiModel, setOpenaiModel] = useState<OpenAIModel>(DEFAULT_OPENAI_MODEL);
     const effectiveOpenaiModel = canConfigureAi ? openaiModel : DEFAULT_OPENAI_MODEL;
@@ -727,14 +730,14 @@ export function ClinicalAnalyzePage() {
 
     // Traductions dynamiques
     const { translated: modelLabel, loading: loadingModel, error: errorModel } = useTranslation({ text: labels.clinicalDemo.form.openAiModelLabel, targetLang, translationKey: "clinicalDemo.form.openAiModelLabel" });
-    const { translated: gptMiniLabel, loading: loadingMini, error: errorMini } = useTranslation({ text: "gpt-4.1-mini (JSON natif)", targetLang, openaiModel: effectiveOpenaiModel });
-    const { translated: gptLegacyLabel, loading: loadingLegacy, error: errorLegacy } = useTranslation({ text: "gpt-4-0613 (legacy)", targetLang, openaiModel: effectiveOpenaiModel });
-    const { translated: realIaLabel, loading: loadingReal, error: errorReal } = useTranslation({ text: "IA réelle activée", targetLang, openaiModel: effectiveOpenaiModel });
+    const { translated: gptMiniLabel, loading: loadingMini, error: errorMini } = useTranslation({ text: labels.pageUi.nativeJsonModel, targetLang, openaiModel: effectiveOpenaiModel });
+    const { translated: gptLegacyLabel, loading: loadingLegacy, error: errorLegacy } = useTranslation({ text: labels.pageUi.legacyModel, targetLang, openaiModel: effectiveOpenaiModel });
+    const { translated: realIaLabel, loading: loadingReal, error: errorReal } = useTranslation({ text: labels.pageUi.realAiEnabled, targetLang, openaiModel: effectiveOpenaiModel });
     const { translated: simModeLabel, loading: loadingSim, error: errorSim } = useTranslation({ text: labels.clinicalDemo.form.simulationMode, targetLang, translationKey: "clinicalDemo.form.simulationMode" });
-    const { translated: backendErrorLabel, loading: loadingBackend, error: errorBackend } = useTranslation({ text: "Erreur backend brute (sans flafla)", targetLang, openaiModel: effectiveOpenaiModel });
-    const { translated: loadingLabel } = useTranslation({ text: "Chargement...", targetLang, openaiModel: effectiveOpenaiModel });
+    const { translated: backendErrorLabel, loading: loadingBackend, error: errorBackend } = useTranslation({ text: labels.pageUi.rawBackendError, targetLang, openaiModel: effectiveOpenaiModel });
+    const { translated: loadingLabel } = useTranslation({ text: labels.pageUi.loading, targetLang, openaiModel: effectiveOpenaiModel });
     const commentLabels = labels.clinicalDemo.comments;
-    const comparisonLabels = labels.clinicalDemo.comparison;
+    const comparisonLabels = useUiLabelTree(labels.clinicalDemo.comparison);
     const { translated: reverifyActionLabel } = useTranslation({
         text: comparisonLabels.reverifyAction,
         targetLang,
@@ -895,10 +898,10 @@ export function ClinicalAnalyzePage() {
             {showTranslationError && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
                     <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-                        <h2 className="text-lg font-semibold text-red-700 mb-2">Translation error</h2>
-                        <p className="text-sm text-gray-800 mb-4">{showTranslationError}</p>
+                        <h2 className="text-lg font-semibold text-red-700 mb-2"><UiText text={labels.componentUi.erreurDeTraduction} /></h2>
+                        <p className="text-sm text-gray-800 mb-4"><UiMessage message={showTranslationError} /></p>
                         <button className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700" onClick={() => setShowTranslationError(null)}>
-                            Close
+                            <UiText text={labels.pageUi.close} />
                         </button>
                     </div>
                 </div>
@@ -1029,7 +1032,7 @@ export function ClinicalAnalyzePage() {
                         </form>
                         {replyLookupError && (
                             <div className="mt-3 rounded-lg bg-white/80 px-3 py-2 text-sm text-amber-900">
-                                {replyLookupError}
+                                <UiMessage message={replyLookupError} />
                             </div>
                         )}
                         {replyLookupItems.length > 0 && (

@@ -30,7 +30,15 @@ run_step() (
     case "$phase" in
         install) npm ci --no-audit ;;
         audit) node "$root/scripts/verify-npm-audit.mjs" ;;
-        tests) npm test -- --run ;;
+        tests)
+            if [[ "$component" == frontend ]]; then
+                node "$root/scripts/verify-ui-translation-coverage.mjs" --check
+                node "$root/scripts/verify-login-translation-catalog.mjs"
+                node --test "$root/scripts/verify-ui-translations.test.mjs"
+                node "$root/scripts/verify-ui-translations.mjs" --check --baseline "$root/scripts/ui-translations-exceptions.json" --output /tmp/clinia-ui-translations-ci.json
+            fi
+            npm test -- --run
+            ;;
         reauth) npm test -- --run services/__tests__/auth.service.test.js --sequence.shuffle --sequence.seed=3 ;;
         mongo) check_docker; docker pull mongo:7 ;;
         integration)

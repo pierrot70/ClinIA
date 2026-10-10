@@ -3,6 +3,7 @@ import { isAdminRole } from "../../auth/roles";
 import { useAuth } from "../../hooks/useAuth";
 import { labels } from "../../i18n/uiLabels";
 import { SessionExpiredError } from "../../services/authService";
+import { useUiLabels } from "../../hooks/useUiLabels";
 
 type EmailQuota = {
     day: string;
@@ -29,10 +30,10 @@ function isQuota(value: unknown): value is EmailQuota {
     return quota.status === status;
 }
 
-const quotaLabels = labels.emailQuota;
-
 export function EmailQuotaNotice() {
     const { isAuthenticated, user, authFetch } = useAuth();
+    const { t } = useUiLabels();
+    const quotaLabels = Object.fromEntries(Object.entries(labels.emailQuota).map(([key, source]) => [key, t(source)])) as Record<keyof typeof labels.emailQuota, string>;
     const allowed = isAuthenticated && isAdminRole(user?.role);
     const [quota, setQuota] = useState<EmailQuota | null>(null);
     const [loading, setLoading] = useState(true);

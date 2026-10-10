@@ -8,6 +8,7 @@ import { WalkInArrivalPage } from "./WalkInArrivalPage";
 import { urgentologistLabels, urgentologistTranslations, walkInEmergencyReminder } from "../i18n/urgentologistLabels";
 import { displaySpecialty } from "../i18n/specialtyLabels";
 import { receptionLabel } from "../i18n/receptionLabels";
+import { PAGE_UI_TRANSLATIONS } from "../i18n/pageUiLabels";
 import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 
 const api = vi.hoisted(() => ({ lookup: vi.fn(), slots: vi.fn(), book: vi.fn() }));
@@ -210,6 +211,23 @@ describe("reception rescheduling", () => {
         render(<Page />); await lookup();
         fireEvent.change(screen.getByRole("textbox"), { target: { value: "787878" } });
         await waitFor(() => expect(screen.queryByText(/An appointment is already scheduled/)).not.toBeInTheDocument());
+        expect(api.book).not.toHaveBeenCalled();
+    });
+});
+
+
+describe("emergency physician UI caption", () => {
+    it.each(["fr", "en", "es", "ko", "vi", "no", "ja", "zh", "he"])("follows the global selector in %s while preserving specialist data", async locale => {
+        api.slots.mockResolvedValue({ data: { presentation: "urgent_today", today: [{
+            specialist: { _id: "urgent", nom: "Synthetic clinician", specialty: "Urgentologue" },
+            date: "2030-01-01", slots: ["12:00"] }], future: [] } });
+        const { rerender } = render(<Page />); await lookup();
+        fireEvent.click(screen.getByRole("button", { name: "Reschedule this appointment" }));
+        await screen.findByRole("button", { name: /12:00/ });
+        rerender(<Page locale={locale} />);
+        const caption = locale === "fr" ? UI_LABELS_FR.pageUi.emergencyPhysician : PAGE_UI_TRANSLATIONS[locale].emergencyPhysician;
+        expect(screen.getByText(`— ${caption}`)).toBeInTheDocument();
+        expect(screen.getByText(/Synthetic clinician/)).toBeInTheDocument();
         expect(api.book).not.toHaveBeenCalled();
     });
 });

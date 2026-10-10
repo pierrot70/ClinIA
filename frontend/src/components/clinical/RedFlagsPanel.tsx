@@ -1,9 +1,11 @@
+import { labels } from "../../i18n/uiLabels";
+import { useUiLabels } from "../../hooks/useUiLabels";
 export function RedFlagsPanel({ flags }: { flags: string[] }) {
+    const { locale: uiLocale, t } = useUiLabels();
     return (
         <div className="bg-red-50 border border-red-200 rounded p-4">
             <div className="font-semibold text-red-800 mb-2">
-                ⚠️ Signaux d’alerte
-            </div>
+                {t(labels.componentUi.signauxDAlerte)}</div>
             <ul className="list-disc list-inside text-sm text-red-700">
                 {flags.map((flag, i) => (
                     <li key={i}>{flag}</li>

@@ -1,3 +1,4 @@
+import { UiMessage } from "../i18n/UiMessage";
 import { useContext, useEffect, useState } from "react";
 import { History, RotateCcw, X } from "lucide-react";
 import { HomeI18nContext } from "../../contexts/HomeI18nContext";
@@ -10,15 +11,16 @@ import {
     type PatientClinicalNoteVersion,
 } from "../../services/patientsApi";
 import { InfoTooltip } from "../system/InfoTooltip";
+import { useUiLabels, useUiLabelTree } from "../../hooks/useUiLabels";
 
 type ClinicalNoteHistoryProps = {
     patient: Patient;
     onRestored: (patient: Patient) => void;
 };
 
-function formatDate(value: string) {
+function formatDate(value: string, locale: string) {
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleString("fr-CA");
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString(locale);
 }
 
 function changeTypeLabel(version: PatientClinicalNoteVersion) {
@@ -29,7 +31,8 @@ function changeTypeLabel(version: PatientClinicalNoteVersion) {
 }
 
 export function ClinicalNoteHistory({ patient, onRestored }: ClinicalNoteHistoryProps) {
-    const copy = labels.clinicalNoteHistory;
+    const copy = useUiLabelTree(labels.clinicalNoteHistory);
+    const { t, locale } = useUiLabels();
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const notesCopy = labels.patientClinicalNotes;
     const { translated: helpButtonLabel } = useTranslation({
@@ -92,10 +95,10 @@ export function ClinicalNoteHistory({ patient, onRestored }: ClinicalNoteHistory
                     <button type="button" onClick={() => setOpen(false)} className="rounded p-2 text-gray-600 hover:bg-gray-100" title={copy.close}><X className="h-5 w-5" /><span className="sr-only">{copy.close}</span></button>
                 </header>
                 <div className="overflow-y-auto p-5">
-                    {error && <p className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+                    {error && <p className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700"><UiMessage message={error} /></p>}
                     {loading ? <p className="text-sm text-gray-600">{copy.loading}</p> : versions.length === 0 ? <p className="text-sm text-gray-600">{copy.empty}</p> : <div className="space-y-3">
                         {versions.map((version, index) => <article key={version.id} className="border border-gray-200 p-4">
-                            <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-sm font-semibold text-gray-950">{copy.version} {version.version} · {changeTypeLabel(version)}{index === 0 ? ` · ${copy.current}` : ""}</div><div className="mt-1 text-xs text-gray-500">{copy.savedAt} {formatDate(version.createdAt)} · {copy.author} {version.actorUsernameMasked}</div></div><button type="button" disabled={restoringId === version.id} onClick={() => void restore(version)} className="inline-flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"><RotateCcw className="h-4 w-4" />{restoringId === version.id ? copy.restoring : copy.restore}</button></div>
+                            <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-sm font-semibold text-gray-950">{copy.version} {version.version} · {t(changeTypeLabel(version))}{index === 0 ? ` · ${copy.current}` : ""}</div><div className="mt-1 text-xs text-gray-500">{copy.savedAt} {formatDate(version.createdAt, locale)} · {copy.author} {version.actorUsernameMasked}</div></div><button type="button" disabled={restoringId === version.id} onClick={() => void restore(version)} className="inline-flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"><RotateCcw className="h-4 w-4" />{restoringId === version.id ? copy.restoring : copy.restore}</button></div>
                             <pre className="mt-3 whitespace-pre-wrap break-words border-t border-gray-100 pt-3 font-sans text-sm leading-6 text-gray-800">{version.note || "-"}</pre>
                         </article>)}
                     </div>}

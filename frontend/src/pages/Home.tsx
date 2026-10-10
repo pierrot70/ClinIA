@@ -1,9 +1,12 @@
 import React from "react";
 import SearchBar from "../components/SearchBar";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
+import { useUiLabels } from "../hooks/useUiLabels";
+import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 
 const Home: React.FC = () => {
-  const { strings, isTranslating, locale } = useHomeI18n();
+  const { strings, isTranslating } = useHomeI18n();
+  const { t } = useUiLabels();
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 sm:py-10 flex flex-col items-center gap-8 sm:gap-10">
@@ -23,9 +26,7 @@ const Home: React.FC = () => {
           </p>
           {isTranslating && (
             <p className="text-xs text-blue-700 bg-blue-50 border border-blue-100 inline-block px-3 py-1 rounded-full">
-              {locale.toLowerCase().startsWith("en")
-                ? "Translating interface..."
-                : "Traduction de l'interface..."}
+              {t(UI_LABELS_FR.generalUi.translating)}
             </p>
           )}
 

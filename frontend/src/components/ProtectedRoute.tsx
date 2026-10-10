@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { getDefaultRouteForRole, type UserRole } from "../auth/roles";
 import { labels } from "../i18n/uiLabels";
+import { UiText } from "./i18n/UiText";
 
 type ProtectedRouteProps = {
     children?: React.ReactElement;
@@ -67,7 +68,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     if (status === "loading" || isVerifyingSession) {
         return (
             <div className="max-w-6xl mx-auto px-4 py-8">
-                <p className="text-sm text-gray-500">{labels.auth.session.validating}</p>
+                <p className="text-sm text-gray-500"><UiText text={labels.auth.session.validating} /></p>
             </div>
         );
     }

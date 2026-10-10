@@ -1,3 +1,4 @@
+import { UiMessage } from "../components/i18n/UiMessage";
 import { exceedsNewPasswordByteLimit } from "../auth/passwordPolicy";
 import { passwordPolicyLabels } from "../i18n/passwordPolicyLabels";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -130,6 +131,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     };
     // Server messages never go to the translation API; only local fallbacks apply.
     const translatedError = useTranslation({ text: error ?? "", targetLang: locale }).translated;
+    const translatedSuccess = useTranslation({ text: success ?? "", targetLang: locale }).translated;
 
     const redirectTarget = useMemo(() => {
         const from = (location.state as { from?: string } | null)?.from;
@@ -179,7 +181,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
         if (registerMode && !adminOnly && exceedsNewPasswordByteLimit(password)) {
-            setError(passwordTooLong);
+            setError(labels.auth.passwordPolicy.tooLong);
             return;
         }
         setLoading(true);
@@ -193,7 +195,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
 
             if (adminOnly && !isAdminRole(session.user.role)) {
                 await logout();
-                setError(adminOnlyErrorLabel);
+                setError(loginLabels.errors.adminOnly);
                 return;
             }
 
@@ -221,8 +223,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
             } else {
                 setError(
                     registerMode
-                        ? createFailedLabel
-                        : loginFailedLabel
+                        ? loginLabels.errors.createFailed
+                        : loginLabels.errors.loginFailed
                 );
             }
         } finally {
@@ -253,12 +255,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                 setMfaCode("");
                 setError(
                     err.code === "MFA_TEMPORARILY_LOCKED"
-                        ? mfaLabels.temporarilyLocked
-                        : mfaLabels.challengeExpiredRestart
+                        ? loginLabels.mfa.temporarilyLocked
+                        : loginLabels.mfa.challengeExpiredRestart
                 );
                 return;
             }
-            setError(err instanceof Error ? err.message : loginFailedLabel);
+            setError(err instanceof Error ? err.message : loginLabels.errors.loginFailed);
         } finally {
             setLoading(false);
         }
@@ -285,7 +287,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
             if (recoveryStep === "request") {
                 await requestPasswordRecovery(email);
                 setRecoveryStep("verify");
-                setSuccess(recoveryRequestSentLabel);
+                setSuccess(recoveryLabels.requestSent);
                 return;
             }
 
@@ -293,28 +295,28 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                 const grant = await verifyPasswordRecoveryCode(email, recoveryCode);
                 setRecoveryGrant(grant);
                 setRecoveryStep("complete");
-                setSuccess(recoveryCodeVerifiedLabel);
+                setSuccess(recoveryLabels.codeVerified);
                 return;
             }
 
             if (exceedsNewPasswordByteLimit(newPassword)) {
-                setError(passwordTooLong);
+                setError(labels.auth.passwordPolicy.tooLong);
                 return;
             }
             if (newPassword !== confirmPassword) {
-                setError(recoveryPasswordsMismatchLabel);
+                setError(recoveryLabels.passwordsMismatch);
                 return;
             }
 
             await completePasswordRecovery(email, recoveryGrant, newPassword);
             resetRecovery();
             setEmail(email);
-            setSuccess(recoveryPasswordChangedLabel);
+            setSuccess(recoveryLabels.passwordChanged);
         } catch (err: unknown) {
             setError(
                 err instanceof Error && err.message
                     ? err.message
-                    : recoveryContinueFailedLabel
+                    : recoveryLabels.continueFailed
             );
         } finally {
             setLoading(false);
@@ -398,13 +400,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
 
             {error && (
                 <div className="mb-4 p-3 rounded bg-red-50 text-red-700 text-sm">
-                    {translatedError}
+                    <UiMessage message={translatedError} />
                 </div>
             )}
 
             {success && (
                 <div className="mb-4 rounded bg-emerald-50 p-3 text-sm text-emerald-700">
-                    {success}
+                    {translatedSuccess}
                 </div>
             )}
 

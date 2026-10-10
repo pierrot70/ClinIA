@@ -8,6 +8,8 @@ import { updatePatient, type Patient } from "../../services/patientsApi";
 import type { WriteVerificationMeta } from "../../types/api";
 import { ClinicalNoteHistory } from "./ClinicalNoteHistory";
 import { InfoTooltip } from "../system/InfoTooltip";
+import { useUiLabelTree } from "../../hooks/useUiLabels";
+import { UiMessage } from "../i18n/UiMessage";
 
 type PatientClinicalNotesModalProps = {
     patient: Patient | null;
@@ -27,7 +29,7 @@ function withTimestampedEntry(note: string) {
 }
 
 export function PatientClinicalNotesModal({ patient, onClose, onSaved }: PatientClinicalNotesModalProps) {
-    const copy = labels.patientClinicalNotes;
+    const copy = useUiLabelTree(labels.patientClinicalNotes);
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const { translated: helpButtonLabel } = useTranslation({
         text: copy.help.button,
@@ -85,7 +87,7 @@ export function PatientClinicalNotesModal({ patient, onClose, onSaved }: Patient
             setMessage(response.error.message || copy.error);
         } else if (response.data) {
             onSaved(response.data);
-            setMessage(copy.saved);
+            setMessage(labels.patientClinicalNotes.saved);
             setWriteVerification(response.meta.writeVerification ?? null);
         }
         setSaving(false);
@@ -109,7 +111,7 @@ export function PatientClinicalNotesModal({ patient, onClose, onSaved }: Patient
                 <div>
                     <textarea id="patient-clinical-note" ref={noteInputRef} value={note} maxLength={10000} onChange={(event) => setNote(event.target.value)} placeholder={copy.placeholder} rows={12} className="mt-2 block w-full resize-y rounded border border-gray-300 px-3 py-2 text-sm leading-6 text-gray-900" />
                 </div>
-                {message && <p className={`rounded border p-3 text-sm ${message === copy.saved ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`}>{message}</p>}
+                {message && <p className={`rounded border p-3 text-sm ${message === labels.patientClinicalNotes.saved ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`}><UiMessage message={message} /></p>}
                 <WriteVerificationReceipt
                     verification={writeVerification}
                     labels={labels.writeVerification}

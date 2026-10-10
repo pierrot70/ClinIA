@@ -1,3 +1,4 @@
+import { UiMessage } from "./i18n/UiMessage";
 import React, { useContext, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
@@ -660,7 +661,7 @@ export function OpenAILogsModal({
                         </div>
                     ) : error ? (
                         <div className="rounded bg-red-50 p-3 text-sm text-red-700">
-                            {error}
+                            <UiMessage message={error} />
                         </div>
                     ) : logs.length === 0 ? (
                         <p className="text-sm text-gray-500">{modalLabels.noResult}</p>

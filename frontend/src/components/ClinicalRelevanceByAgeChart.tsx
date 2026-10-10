@@ -1,3 +1,5 @@
+import { labels } from "../i18n/uiLabels";
+import { useUiLabels } from "../hooks/useUiLabels";
 import React, { useState } from "react";
 import {
   CartesianGrid,
@@ -44,16 +46,16 @@ const SERIES_COLORS = [
 ];
 
 const ENGLISH_CHART_LABELS: Record<string, string> = {
-  "Faible pertinence": "Low relevance",
-  "A considerer": "Consider",
-  "Pertinence moderee": "Moderate relevance",
-  "Souvent pertinente": "Often relevant",
-  "Pertinence contextuelle elevee": "High contextual relevance",
+  [labels.componentUi.faiblePertinence]: "Low relevance",
+  [labels.componentUi.aConsiderer]: "Consider",
+  [labels.componentUi.pertinenceModeree]: "Moderate relevance",
+  [labels.componentUi.souventPertinente]: "Often relevant",
+  [labels.componentUi.pertinenceContextuelleElevee]: "High contextual relevance",
   "Metformine": "Metformin",
-  "Poursuite prudente de la strategie actuelle": "Careful continuation of the current strategy",
-  "Inhibiteur SGLT2": "SGLT2 inhibitor",
-  "Option GLP-1": "GLP-1 option",
-  "Mode de vie": "Lifestyle measures",
+  [labels.componentUi.poursuitePrudenteDeLaStrategieActuelle]: "Careful continuation of the current strategy",
+  [labels.componentUi.inhibiteurSGLT2]: "SGLT2 inhibitor",
+  [labels.componentUi.optionGLP1]: "GLP-1 option",
+  [labels.componentUi.modeDeVie]: "Lifestyle measures",
 };
 
 function displayChartLabel(value: string, language: "fr" | "en") {
@@ -70,6 +72,7 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
   sources,
   language = "fr",
 }) => {
+    const { locale: uiLocale, t } = useUiLabels(language);
   const english = language === "en";
   const titleTranslation = useTranslation({ text: title, targetLang: language });
   const subtitleTranslation = useTranslation({ text: subtitle, targetLang: language });
@@ -132,7 +135,7 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
               domain={[1, 5]}
               ticks={[1, 2, 3, 4, 5]}
               tickFormatter={(value) =>
-                displayChartLabel(levelLabels[value as ClinicalRelevanceLevel], language)
+                t(levelLabels[value as ClinicalRelevanceLevel])
               }
               width={148}
               tick={{ fontSize: 11, fill: "#4b5563" }}
@@ -141,9 +144,9 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
             />
             <Tooltip
               formatter={(value) =>
-                displayChartLabel(levelLabels[value as ClinicalRelevanceLevel], language)
+                t(levelLabels[value as ClinicalRelevanceLevel])
               }
-              labelFormatter={(label) => `${english ? "Age" : "Âge"}: ${label}`}
+              labelFormatter={(label) => `${t(labels.componentUi.age)}: ${label}`}
               contentStyle={{
                 borderRadius: "0.75rem",
                 borderColor: "#d1d5db",
@@ -200,13 +203,11 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
       </div>
 
       <p className="mt-3 text-[11px] text-gray-500">
-        {english
-          ? "Contextual clinical visual aid. It does not by itself indicate reduced pharmacological effectiveness with age. The final treatment decision always belongs to the physician."
-          : "Aide visuelle clinique contextuelle. Elle n'indique pas a elle seule une baisse d'efficacite pharmacologique avec l'age. La decision therapeutique finale appartient toujours au medecin."}
+        {t(labels.componentUi.aideVisuelleCliniqueContextuelleElleNIndiquePasAElleSeuleUneBaiss)}
       </p>
 
       <ClinicalReferenceList
-        title={english ? "Clinical sources" : "Provenance clinique"}
+        title={t(labels.componentUi.provenanceClinique)}
         sources={sources}
         language={language}
       />

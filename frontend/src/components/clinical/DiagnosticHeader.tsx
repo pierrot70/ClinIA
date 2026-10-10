@@ -1,3 +1,5 @@
+import { labels } from "../../i18n/uiLabels";
+import { useUiLabels } from "../../hooks/useUiLabels";
 type Certainty = "low" | "moderate" | "high";
 
 const certaintyStyle: Record<Certainty, string> = {
@@ -15,16 +17,16 @@ export function DiagnosticHeader({
     certainty: Certainty;
     justification: string;
 }) {
+    const { locale: uiLocale, t } = useUiLabels();
     return (
         <div className="bg-white border rounded p-5">
             <div className="flex items-center justify-between">
                 <h1 className="text-xl font-semibold text-gray-900">
-                    Diagnostic suspecté
-                </h1>
+                    {t(labels.componentUi.diagnosticSuspecte)}</h1>
                 <span
                     className={`px-3 py-1 text-sm font-medium rounded ${certaintyStyle[certainty]}`}
                 >
-          Certitude {certainty}
+          {t(labels.componentUi.certitude)} {t(certainty === "high" ? labels.componentUi.elevee : certainty === "moderate" ? labels.componentUi.moderee : labels.componentUi.faible)}
         </span>
             </div>
 

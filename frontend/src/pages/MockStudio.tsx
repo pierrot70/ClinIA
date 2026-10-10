@@ -1,3 +1,7 @@
+import { UiMessage } from "../components/i18n/UiMessage";
+import { labels } from "../i18n/uiLabels";
+import { useUiLabels } from "../hooks/useUiLabels";
+import { translateUiLabelTree } from "../i18n/pageUiLabels";
 // frontend/src/pages/MockStudio.tsx
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -20,6 +24,7 @@ type MockEntry = {
 type MockMap = Record<string, MockEntry>;
 
 const MockStudio: React.FC = () => {
+    const { locale: uiLocale, t } = useUiLabels();
     const [mocks, setMocks] = useState<MockMap>({});
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -53,7 +58,7 @@ const MockStudio: React.FC = () => {
                     navigate("/admin/login");
                     return;
                 }
-                setError("Impossible de charger les mocks.");
+                setError(labels.pageUi.impossibleDeChargerLesMocks);
             } finally {
                 setLoading(false);
             }
@@ -96,10 +101,10 @@ const MockStudio: React.FC = () => {
 
             if (!res.ok) {
                 const j = await res.json().catch(() => ({}));
-                throw new Error(j.error || "Erreur lors de la sauvegarde.");
+                throw new Error(j.error || labels.pageUi.erreurLorsDeLaSauvegarde);
             }
 
-            setInfo("Mocks sauvegardés avec succès !");
+            setInfo(labels.pageUi.mocksSauvegardesAvecSucces);
         } catch (err: unknown) {
             if (err instanceof SessionExpiredError) {
                 navigate("/admin/login");
@@ -109,7 +114,7 @@ const MockStudio: React.FC = () => {
             if (err instanceof Error) {
                 setError(err.message);
             } else {
-                setError("Erreur inconnue.");
+                setError(labels.pageUi.erreurInconnue);
             }
         } finally {
             setSaving(false);
@@ -138,7 +143,7 @@ const MockStudio: React.FC = () => {
     const handleDeleteCondition = () => {
         if (!selectedKey) return;
         // eslint-disable-next-line no-restricted-globals
-        if (!confirm(`Supprimer "${selectedKey}" ?`)) return;
+        if (!confirm(t(labels.pageUi.deleteMock).replace("{name}", selectedKey))) return;
 
         setMocks((prev) => {
             const copy = { ...prev };
@@ -181,7 +186,7 @@ const MockStudio: React.FC = () => {
     if (loading) {
         return (
             <div className="max-w-6xl mx-auto px-4 py-8">
-                <p className="text-gray-500 text-sm">Chargement des mocks…</p>
+                <p className="text-gray-500 text-sm">{t(labels.pageUi.chargementDesMocks)}</p>
             </div>
         );
     }
@@ -194,36 +199,33 @@ const MockStudio: React.FC = () => {
             <header className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-semibold text-gray-900">
-                        ClinIA Mock Studio (Admin)
-                    </h1>
+                        {t(labels.pageUi.clinIAMockStudioAdmin)}</h1>
                     <p className="text-sm text-gray-600">
-                        Éditeur des réponses simulées par diagnostic.
-                    </p>
+                        {t(labels.pageUi.editeurDesReponsesSimuleesParDiagnostic)}</p>
                     <Link
                         to="/admin/users/manage"
                         className="mt-2 inline-block text-sm text-blue-600 hover:text-blue-700"
                     >
-                        Gerer les utilisateurs
-                    </Link>
+                        {t(labels.pageUi.gererLesUtilisateurs)}</Link>
                 </div>
                 <button
                     onClick={handleSave}
                     disabled={saving}
                     className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
                 >
-                    {saving ? "Sauvegarde…" : "Sauvegarder"}
+                    {saving ? t(labels.pageUi.saving) : t(labels.pageUi.save)}
                 </button>
             </header>
 
             {error && (
                 <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm">
-                    {error}
+                    <UiMessage message={error} />
                 </div>
             )}
 
             {info && (
                 <div className="p-3 rounded-lg bg-green-50 text-green-700 text-sm">
-                    {info}
+                    {t(info)}
                 </div>
             )}
 
@@ -231,14 +233,12 @@ const MockStudio: React.FC = () => {
                 <aside className="md:col-span-1 border rounded-xl bg-white p-3 space-y-3">
                     <div className="flex items-center justify-between mb-2">
                         <h2 className="text-sm font-semibold text-gray-800">
-                            Diagnostics disponibles
-                        </h2>
+                            {t(labels.pageUi.diagnosticsDisponibles)}</h2>
                         <button
                             onClick={handleAddCondition}
                             className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
                         >
-                            + Ajouter
-                        </button>
+                            {t(labels.pageUi.ajouter)}</button>
                     </div>
 
                     <ul className="space-y-1 max-h-[400px] overflow-y-auto text-sm">
@@ -261,15 +261,13 @@ const MockStudio: React.FC = () => {
                     </ul>
 
                     <p className="text-xs text-gray-400 pt-3 border-t">
-                        `_fallback` = utilisé si aucune correspondance.
-                    </p>
+                        {t(labels.pageUi.fallbackUtiliseSiAucuneCorrespondance)}</p>
                 </aside>
 
                 <main className="md:col-span-2 border rounded-xl bg-white p-4 space-y-4">
                     {!selectedKey || !current ? (
                         <p className="text-sm text-gray-500">
-                            Sélectionne un diagnostic dans la colonne de gauche.
-                        </p>
+                            {t(labels.pageUi.selectionneUnDiagnosticDansLaColonneDeGauche)}</p>
                     ) : (
                         <>
                             <div className="flex items-center justify-between">
@@ -277,21 +275,19 @@ const MockStudio: React.FC = () => {
                                     <h2 className="text-lg font-semibold text-gray-900">
                                         {selectedKey}
                                     </h2>
-                                    <p className="text-xs text-gray-500">Clé interne du mock.</p>
+                                    <p className="text-xs text-gray-500">{t(labels.pageUi.cleInterneDuMock)}</p>
                                 </div>
 
                                 <button
                                     onClick={handleDeleteCondition}
                                     className="text-xs px-3 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100"
                                 >
-                                    Supprimer
-                                </button>
+                                    {t(labels.pageUi.supprimer)}</button>
                             </div>
 
                             <div>
                                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                                    Mots-clés (match)
-                                </label>
+                                    {t(labels.pageUi.motsClesMatch)}</label>
                                 <input
                                     type="text"
                                     className="w-full border rounded-lg px-2 py-1 text-sm"
@@ -311,8 +307,7 @@ const MockStudio: React.FC = () => {
 
                             <div>
                                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                                    Résumé patient
-                                </label>
+                                    {t(labels.pageUi.resumePatient)}</label>
                                 <textarea
                                     className="w-full border rounded-lg px-2 py-1 text-sm min-h-[80px]"
                                     value={current.patient_summary}
@@ -328,17 +323,15 @@ const MockStudio: React.FC = () => {
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-sm font-semibold text-gray-800">
-                                        Traitements
-                                    </h3>
+                                        {t(labels.pageUi.traitements)}</h3>
                                     <button
                                         onClick={handleAddTreatment}
                                         className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
                                     >
-                                        + Ajouter
-                                    </button>
+                                        {t(labels.pageUi.ajouter)}</button>
                                 </div>
 
-                                {current.treatments.map((t, index) => (
+                                {current.treatments.map((treatment, index) => (
                                     <div
                                         key={index}
                                         className="border rounded-lg p-3 space-y-2 text-sm"
@@ -347,7 +340,7 @@ const MockStudio: React.FC = () => {
                                             <input
                                                 type="text"
                                                 className="flex-1 border rounded px-2 py-1 mr-2"
-                                                value={t.name}
+                                                value={treatment.name}
                                                 onChange={(e) =>
                                                     updateCurrentEntry((prev) => {
                                                         const c = [...prev.treatments];
@@ -355,23 +348,21 @@ const MockStudio: React.FC = () => {
                                                         return { ...prev, treatments: c };
                                                     })
                                                 }
-                                                placeholder="Nom du traitement"
+                                                placeholder={t(labels.pageUi.nomDuTraitement)}
                                             />
                                             <button
                                                 onClick={() => handleDeleteTreatment(index)}
                                                 className="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100"
                                             >
-                                                Supprimer
-                                            </button>
+                                                {t(labels.pageUi.supprimer)}</button>
                                         </div>
 
                                         <div>
                                             <label className="block text-xs font-semibold text-gray-600 mb-1">
-                                                Justification
-                                            </label>
+                                                {t(labels.pageUi.justification)}</label>
                                             <textarea
                                                 className="w-full border rounded px-2 py-1 text-xs"
-                                                value={t.justification}
+                                                value={treatment.justification}
                                                 onChange={(e) =>
                                                     updateCurrentEntry((prev) => {
                                                         const c = [...prev.treatments];
@@ -388,12 +379,11 @@ const MockStudio: React.FC = () => {
                                         <div className="grid grid-cols-2 gap-2">
                                             <div>
                                                 <label className="block text-xs font-semibold text-gray-600 mb-1">
-                                                    Contre-indications
-                                                </label>
+                                                    {t(labels.pageUi.contreIndications)}</label>
                                                 <input
                                                     type="text"
                                                     className="w-full border rounded px-2 py-1 text-xs"
-                                                    value={t.contraindications.join(", ")}
+                                                    value={treatment.contraindications.join(", ")}
                                                     onChange={(e) =>
                                                         updateCurrentEntry((prev) => {
                                                             const c = [...prev.treatments];
@@ -412,12 +402,11 @@ const MockStudio: React.FC = () => {
 
                                             <div>
                                                 <label className="block text-xs font-semibold text-gray-600 mb-1">
-                                                    Efficacité (%)
-                                                </label>
+                                                    {t(labels.pageUi.efficacite)}</label>
                                                 <input
                                                     type="number"
                                                     className="w-full border rounded px-2 py-1 text-xs"
-                                                    value={t.efficacy}
+                                                    value={treatment.efficacy}
                                                     min={0}
                                                     max={100}
                                                     onChange={(e) =>

@@ -232,7 +232,7 @@ describe("useTranslation", () => {
         expect(translateTextMock).not.toHaveBeenCalled();
     });
 
-    it("keeps technical OpenAI log labels stable in Vietnamese", async () => {
+    it("localizes OpenAI log labels in Vietnamese while preserving the transport identifier", async () => {
         translateTextMock.mockResolvedValue("Tên người dùng bị ẩn");
 
         const username = renderHook(() =>
@@ -255,7 +255,7 @@ describe("useTranslation", () => {
             expect(transport.result.current.loading).toBe(false);
         });
 
-        expect(username.result.current.translated).toBe("Masked username");
+        expect(username.result.current.translated).toBe("Tên người dùng đã che");
         expect(transport.result.current.translated).toBe("Transport");
         expect(translateTextMock).not.toHaveBeenCalled();
     });
@@ -302,7 +302,7 @@ describe("useTranslation", () => {
         expect(translateTextMock).not.toHaveBeenCalled();
     });
 
-    it("keeps short OpenAI log count labels stable in Vietnamese", async () => {
+    it("localizes OpenAI log count labels in Vietnamese", async () => {
         translateTextMock.mockResolvedValue(
             "Le mot \"logs\" peut se traduire en vietnamien selon le contexte."
         );
@@ -319,7 +319,7 @@ describe("useTranslation", () => {
             expect(result.current.loading).toBe(false);
         });
 
-        expect(result.current.translated).toBe("logs");
+        expect(result.current.translated).toBe("nhật ký");
         expect(result.current.error).toBeNull();
         expect(translateTextMock).not.toHaveBeenCalled();
     });
@@ -382,15 +382,7 @@ describe("useTranslation", () => {
         expect(translateTextMock).not.toHaveBeenCalled();
     });
 
-    it("does not let an old English translation overwrite a newer French locale", async () => {
-        let resolveEnglishTranslation: ((value: string) => void) | null = null;
-        translateTextMock.mockImplementation(
-            () =>
-                new Promise<string>((resolve) => {
-                    resolveEnglishTranslation = resolve;
-                })
-        );
-
+    it("switches immediately from English to French without requesting a remote translation", async () => {
         const { result, rerender } = renderHook(
             ({ targetLang }) =>
                 useTranslation({
@@ -403,7 +395,9 @@ describe("useTranslation", () => {
             }
         );
 
+        expect(result.current.translated).toBe("Doctor sign-in");
         rerender({ targetLang: "fr-CA" });
+        expect(result.current.translated).toBe("Connexion médecin");
 
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
@@ -411,16 +405,10 @@ describe("useTranslation", () => {
 
         expect(result.current.translated).toBe("Connexion médecin");
 
-        if (resolveEnglishTranslation) {
-            (resolveEnglishTranslation as (value: string) => void)("Doctor sign-in");
-        }
-
-        await waitFor(() => {
-            expect(result.current.translated).toBe("Connexion médecin");
-        });
+        expect(translateTextMock).not.toHaveBeenCalled();
     });
 
-    it("reuses an approved UI translation from persistent browser storage without a network call", async () => {
+    it("ignores obsolete browser cache when a versioned local translation is available", async () => {
         window.localStorage.setItem(
             "clinia_ui_translation_v1:clinicalDemo.cachedResultNotice.title|es",
             "Analisis equivalente ya disponible"
@@ -438,7 +426,7 @@ describe("useTranslation", () => {
             expect(result.current.loading).toBe(false);
         });
 
-        expect(result.current.translated).toBe("Analisis equivalente ya disponible");
+        expect(result.current.translated).toBe("Ya existe un análisis equivalente");
         expect(translateTextMock).not.toHaveBeenCalled();
     });
 });

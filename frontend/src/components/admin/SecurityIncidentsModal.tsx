@@ -1,4 +1,6 @@
+import { UiMessage } from "../i18n/UiMessage";
 import React from "react";
+import { useUiLabels } from "../../hooks/useUiLabels";
 import { CircleHelp } from "lucide-react";
 
 import type { SecurityIncidentEntry, SecurityIncidentPagination } from "../../services/securityIncidentApi";
@@ -88,6 +90,12 @@ type HeaderLabels = {
         pageSeparator: string;
         resultSuffix: string;
         first: string;
+        mfaChallengeExhaustedWhatHappened: string;
+        mfaChallengeExhaustedWhatWasBlocked: string;
+        mfaChallengeExhaustedNextStep: string;
+        loginFailureThrottledWhatHappened: string;
+        loginFailureThrottledWhatWasBlocked: string;
+        loginFailureThrottledNextStep: string;
         previousSymbol: string;
         nextSymbol: string;
         last: string;
@@ -129,6 +137,7 @@ export function SecurityIncidentsModal({
     onAcknowledge,
     onLoadPage,
 }: SecurityIncidentsModalProps) {
+    const { t } = useUiLabels();
     const [explainedIncidentId, setExplainedIncidentId] = React.useState("");
     const [isSummaryVisible, setIsSummaryVisible] = React.useState(false);
 
@@ -136,7 +145,7 @@ export function SecurityIncidentsModal({
         return null;
     }
 
-    const labels = headerLabels.securityIncidentsModal;
+    const labels = Object.fromEntries(Object.entries(headerLabels.securityIncidentsModal).map(([key, source]) => [key, t(source)])) as HeaderLabels["securityIncidentsModal"];
 
     function getExplanation(item: SecurityIncidentEntry) {
         if (item.type === "NON_SECURE_CONTENT" && item.phase === "pre_cloud") {
@@ -323,7 +332,7 @@ export function SecurityIncidentsModal({
                         <p className="text-sm text-gray-500">{labels.loading}</p>
                     ) : error ? (
                         <div className="rounded bg-red-50 p-3 text-sm text-red-700">
-                            {error}
+                            <UiMessage message={error} />
                         </div>
                     ) : items.length === 0 ? (
                         <p className="text-sm text-gray-500">{labels.empty}</p>

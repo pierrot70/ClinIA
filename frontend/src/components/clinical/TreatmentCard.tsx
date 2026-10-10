@@ -1,12 +1,14 @@
+import { labels } from "../../i18n/uiLabels";
+import { useUiLabels } from "../../hooks/useUiLabels";
 export function TreatmentCard({ treatment }: { treatment: any }) {
+    const { locale: uiLocale, t } = useUiLabels();
     return (
         <div className="bg-white border rounded p-5 space-y-3">
             <div className="flex justify-between items-center">
                 <h2 className="text-lg font-semibold text-gray-900">
-                    Traitement recommandé
-                </h2>
+                    {t(labels.componentUi.traitementRecommande)}</h2>
                 <span className="text-sm px-2 py-1 rounded bg-blue-100 text-blue-800">
-          Niveau de preuve {treatment.evidence_level}
+          {t(labels.componentUi.niveauDePreuve)}{treatment.evidence_level}
         </span>
             </div>
 
@@ -17,18 +19,18 @@ export function TreatmentCard({ treatment }: { treatment: any }) {
 
             <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                    <span className="font-medium">Posologie :</span>{" "}
+                    <span className="font-medium">{t(labels.componentUi.posologie)}</span>{" "}
                     <span className="font-semibold">{treatment.dosage}</span>
                 </div>
                 <div>
-                    <span className="font-medium">Durée :</span>{" "}
+                    <span className="font-medium">{t(labels.componentUi.duree)}</span>{" "}
                     {treatment.duration}
                 </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                    <div className="font-medium mb-1">Contre-indications</div>
+                    <div className="font-medium mb-1">{t(labels.pageUi.contreIndications)}</div>
                     <ul className="list-disc list-inside text-gray-700">
                         {treatment.contraindications.map((ci: string, i: number) => (
                             <li key={i}>{ci}</li>
@@ -37,7 +39,7 @@ export function TreatmentCard({ treatment }: { treatment: any }) {
                 </div>
 
                 <div>
-                    <div className="font-medium mb-1">Surveillance</div>
+                    <div className="font-medium mb-1">{t(labels.pageUi.surveillance)}</div>
                     <ul className="list-disc list-inside text-gray-700">
                         {treatment.monitoring.map((m: string, i: number) => (
                             <li key={i}>{m}</li>

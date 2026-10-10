@@ -208,7 +208,7 @@ describe("ClinicalDemoResult", () => {
             screen.getByText("Quel est le profil clinique principal retenu ici ?")
         ).toBeInTheDocument();
         expect(
-            screen.getByText(/Pourquoi Inhibiteur SGLT2 ressort-il comme option a discuter/)
+            screen.getByText(/Pourquoi Inhibiteur SGLT2 ressort-il comme option à discuter/)
         ).toBeInTheDocument();
         expect(
             screen.queryByText("Questions fréquentes (simulation)")

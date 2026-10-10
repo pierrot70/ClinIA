@@ -268,6 +268,65 @@ export const HOME_STRINGS_FR: HomeStrings = {
   },
 };
 
+export const HOME_STRINGS_NO: HomeStrings = {
+  home: {
+    title: "Spar tid etter hver diagnose.",
+    subtitle: "Basert på en diagnose foreslår ClinIA behandlingsalternativer rangert etter effekt, toleranse og gjeldende kunnskap — presentert på få sekunder som et tydelig sammendrag, med anonymiserte kliniske opplysninger.",
+    disclaimer: "Prototype med simulerte data – ikke beregnet på faktisk klinisk praksis.",
+    cardReadTitle: "6 sekunders lesing",
+    cardReadBody: "Et svært kort sammendrag: 1 anbefalt behandling, 2 alternativer og 3 setninger med det viktigste.",
+    cardChartsTitle: "Tydelige diagrammer",
+    cardChartsBody: "Sammenlignende effekt, bivirkningsprofil og klinisk relevans vises med et raskt overblikk.",
+    cardQuestionsTitle: "Forventede spørsmål",
+    cardQuestionsBody: "Grensesnittet foreslår vanlige spørsmål og viser strukturerte svar for å redusere den kognitive belastningen.",
+  },
+  demo: {
+    pageTitle: "ClinIA-demo på under 5 minutter",
+    pageSubtitle: "Denne siden er en veiviser for en kort og tydelig demonstrasjon med vekt på klinisk verdi. Målet er å vise nytten av ClinIA uten å gå på akkord med datasikkerheten.",
+    startDemo: "Start demoen",
+    goToClinical: "Gå til klinisk analyse",
+    presenterChecklist: "Sjekkliste for presentatøren",
+    steps: [
+      { minute: "00:00 - 00:45", title: "ClinIA i sammenheng", detail: "Forklar at ClinIA støtter legen med strukturerte behandlingsalternativer. ClinIA stiller ikke en endelig diagnose og forskriver ikke behandling." },
+      { minute: "00:45 - 01:45", title: "Innlogging og roller", detail: "Vis innlogging og deretter rollekontroll (MEDECIN, ADMIN, SUPERADMIN) for sensitive seksjoner." },
+      { minute: "01:45 - 03:00", title: "Klinisk analyse", detail: "Send inn et fiktivt demonstrasjonstilfelle og vis klinisk hypotese, behandlingsalternativer, begrunnelse og kontraindikasjoner." },
+      { minute: "03:00 - 04:00", title: "Pasientforløp", detail: "Gå til sidene for avtaler og pasienter for å vise den kliniske arbeidsflyten uten å eksponere identifiserbare opplysninger." },
+      { minute: "04:00 - 05:00", title: "Sikkerhet og etterlevelse", detail: "Avslutt med sikkerhetstiltakene i Loi 25 / PIPEDA: dataminimering, revisjonslogger, tilgangskontroll og menneskelig klinisk tilsyn." },
+    ],
+    checklist: [
+      "Bruk bare fiktive data under demonstrasjonen.",
+      "Unngå identifiserbar pasientinformasjon i KI-forespørsler.",
+      "Vis et tydelig budskap: KI støtter, legen bestemmer.",
+      "Avslutt med en invitasjon til spørsmål og neste steg.",
+    ],
+  },
+  search: {
+    secureModeHint: "Hurtigmodus: bare anonymiserte kliniske opplysninger. Avanserte innstillinger er valgfrie.",
+    objectiveLabel: "Mål", showAdvanced: "Vis avanserte innstillinger", hideAdvanced: "Skjul avanserte innstillinger",
+    sexLabel: "Kjønn", ageLabel: "Alder", currentMedicationsLabel: "Nåværende legemidler", currentMedicationsPlaceholder: "F.eks. pantoprazol, ondansetron",
+    scopeLabel: "Spesialitet", ageGroupLabel: "Pasientgruppe", symptomLabel: "Hovedsymptom", durationLabel: "Symptomvarighet",
+    severityLabel: "Alvorlighetsgrad", redFlagsLabel: "Faresignaler", comorbidityLabel: "Komorbiditeter", notesLabel: "Kliniske notater",
+    notesPlaceholder: "Anonymiserte kliniske notater (ingen pasientidentifikatorer)",
+    launchSecure: "Send sikker forespørsel", checkAttestation: "Kryss av for bekreftelsen",
+    attestationRequiredHint: "Obligatorisk før innsending: kryss av for bekreftelsen nedenfor for å aktivere knappen.",
+    attestationText: "Jeg bekrefter at disse opplysningene er anonymiserte og ikke inneholder pasientidentifikatorer (navn, RAMQ, fødselsdato, telefon, e-post eller adresse).",
+    privacyFooter: "ClinIA krever ingen identifiserende opplysninger: skriv aldri inn navn, RAMQ, telefon, e-post, fødselsdato eller adresse.",
+    privacyConfirmRequired: "Bekreft personvernerklæringen før innsending.",
+    sensitiveDetected: "Advarsel: mulig sensitivt innhold oppdaget", voiceSensitiveDetected: "Advarsel: mulig sensitiv diktering oppdaget",
+    blockedSensitive: "Inndata blokkert: fjern alle personopplysninger (navn, RAMQ, telefon eller e-post) før du fortsetter.",
+  },
+  options: {
+    objectives: ["Innledende behandling", "Behandlingsjustering", "Alternativ ved intoleranse", "Overvåking og oppfølging"],
+    clinicalScopes: ["Allmennmedisin", "Kardiologi", "Nevrologi", "Psykiatri", "Geriatri", "Onkologi"],
+    ageGroups: ["Voksen", "Barn", "Eldre", "Graviditet"],
+    symptomProfiles: ["Hypertensjon", "Kronisk smerte", "Migrene", "Angst", "Søvnløshet", "Luftveisinfeksjon", "Kreft"],
+    durations: ["< 24 t", "1–7 dager", "1–4 uker", "> 1 måned"],
+    severityLevels: ["Mild", "Moderat", "Alvorlig"],
+    redFlagStatuses: ["Ingen faresignaler", "Faresignaler til stede"],
+    comorbidityContexts: ["Ingen større komorbiditeter", "Nyresvikt", "Leversvikt", "Høy kardiovaskulær risiko", "Polyfarmasi"],
+  },
+};
+
 export const HOME_STRINGS_EN: HomeStrings = {
   home: {
     title: "Save time after every diagnosis.",

@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { isValidUiTranslationPayload } from "./uiTranslationPayload.js";
 
 const WRITE_CONCERN = { w: "majority", j: true, wtimeout: 5000 };
 
@@ -37,6 +38,9 @@ export function createApprovedUiTranslationSeeder({
                 })
             );
             if (existing) {
+                if (!isValidUiTranslationPayload(existing.payload, entry.text)) {
+                    throw new Error(`invalid_cached_approved_translation namespace=${entry.namespace}`);
+                }
                 report.skipped += 1;
                 logger.log(`SKIP namespace=${entry.namespace} source_hash=${sourceHash.slice(0, 12)}`);
                 continue;
@@ -54,6 +58,9 @@ export function createApprovedUiTranslationSeeder({
             });
             if (typeof translated !== "string" || !translated.trim()) {
                 throw new Error(`empty_approved_translation namespace=${entry.namespace}`);
+            }
+            if (!isValidUiTranslationPayload({ text: translated }, entry.text)) {
+                throw new Error(`invalid_approved_translation_placeholders namespace=${entry.namespace}`);
             }
 
             try {

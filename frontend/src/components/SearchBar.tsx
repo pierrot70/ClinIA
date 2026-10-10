@@ -1,3 +1,6 @@
+import { UiMessage } from "./i18n/UiMessage";
+import { labels } from "../i18n/uiLabels";
+import { useUiLabels } from "../hooks/useUiLabels";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -51,23 +54,23 @@ const getSensitiveInputReason = (value: string): string | null => {
     {
       regex:
         /\b(nom du patient|nom patient|prenom|prénom|assurance maladie|ramq|nas|adresse|telephone|téléphone|courriel|email)\b/i,
-      reason: "termes d'identification personnelle",
+      reason: labels.componentUi.termesDIdentificationPersonnelle,
     },
     {
       regex: /\b[A-Z]{4}\s?\d{8}\b/i,
-      reason: "numéro d'assurance maladie potentiel",
+      reason: labels.componentUi.numeroDAssuranceMaladiePotentiel,
     },
     {
       regex: /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i,
-      reason: "adresse courriel",
+      reason: labels.componentUi.adresseCourriel,
     },
     {
       regex: /\b(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}\b/,
-      reason: "numéro de téléphone",
+      reason: labels.componentUi.numeroDeTelephone,
     },
     {
       regex: /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b/,
-      reason: "date personnelle potentielle",
+      reason: labels.componentUi.datePersonnellePotentielle,
     },
   ];
 
@@ -117,9 +120,9 @@ const splitListField = (value: string): string[] =>
 const getPatientDocumentId = (document: PatientSecureRequestDocument): string =>
   String(document.id).trim();
 
-const formatDocumentTimestamp = (value?: string): string => {
+const formatDocumentTimestamp = (value: string | undefined, locale: string, t: (source:string)=>string): string => {
   if (!value) {
-    return "date inconnue";
+    return t(labels.componentUi.dateInconnue);
   }
 
   const date = new Date(value);
@@ -127,7 +130,7 @@ const formatDocumentTimestamp = (value?: string): string => {
     return value;
   }
 
-  return date.toLocaleString("fr-CA", {
+  return date.toLocaleString(locale, {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -138,14 +141,13 @@ const formatDocumentTimestamp = (value?: string): string => {
 };
 
 const formatSecureRequestDocumentLabel = (
-  document: PatientSecureRequestDocument
+  document: PatientSecureRequestDocument, locale: string, t: (source:string)=>string
 ): string => {
-  return `${document.clinicalScope} - derniere requete du ${formatDocumentTimestamp(
-    document.uploadedAt
-  )}`;
+  return t(labels.componentUi.scopeDerniereRequeteDuDate).replace("{scope}", document.clinicalScope).replace("{date}", formatDocumentTimestamp(document.uploadedAt, locale, t));
 };
 
 const SearchBar: React.FC = () => {
+    const { locale: uiLocale, t } = useUiLabels();
   const { strings } = useHomeI18n();
   const {
     objectives,
@@ -234,21 +236,21 @@ const SearchBar: React.FC = () => {
 
     if (!trimmedName) {
       setCreatePatientError(
-        "Le nom du patient est requis."
+        labels.componentUi.leNomDuPatientEstRequis
       );
       return;
     }
 
     if (!creatorReference) {
       setCreatePatientError(
-        "Aucun usager authentifie n'est disponible pour creer ce patient."
+        labels.componentUi.aucunUsagerAuthentifieNEstDisponiblePourCreerCePatient
       );
       return;
     }
 
     const { prenom, nom } = splitPatientName(trimmedName);
     if (!prenom || !nom) {
-      setCreatePatientError("Impossible d'interpreter le nom du patient.");
+      setCreatePatientError(labels.componentUi.impossibleDInterpreterLeNomDuPatient);
       return;
     }
 
@@ -265,7 +267,7 @@ const SearchBar: React.FC = () => {
 
     if ("error" in response) {
       setCreatePatientError(
-        response.error.message || "Impossible de creer le patient."
+        response.error.message || labels.componentUi.impossibleDeCreerLePatient
       );
       return;
     }
@@ -367,7 +369,7 @@ const SearchBar: React.FC = () => {
       if ("error" in saveResponse) {
         setInputWarning(
           saveResponse.error.message ||
-            "Impossible de sauvegarder les parametres du patient."
+            labels.componentUi.impossibleDeSauvegarderLesParametresDuPatient
         );
         return;
       }
@@ -726,20 +728,18 @@ const SearchBar: React.FC = () => {
     <div className="w-full max-w-2xl space-y-3">
       <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-left shadow-xs">
         <label className="text-xs text-gray-600 block">
-          Patient
-          <select
+          {t(labels.pageUi.patient)}<select
             value={selectedPatientId}
             onChange={(e) => void handlePatientSelection(e.target.value)}
             className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-hidden focus:border-primary"
           >
             <option value="">
               {patientsLoading
-                ? "Chargement des patients..."
-                : "Selectionner un patient"}
+                ? t(labels.pageUi.chargementDesPatients)
+                : t(labels.componentUi.selectionnerUnPatient)}
             </option>
             <option value={CREATE_PATIENT_OPTION}>
-              Creer un patient...
-            </option>
+              {t(labels.componentUi.creerUnPatient)}</option>
             {patients.map((patient) => (
               <option key={patient._id} value={patient._id}>
                 {patient.prenom} {patient.nom} - {patient.num_assurance_maladie}
@@ -751,17 +751,16 @@ const SearchBar: React.FC = () => {
         {isCreatingPatient && (
           <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 space-y-3">
             <label className="block text-xs text-gray-700">
-              Nom du patient
-              <input
+              {t(labels.componentUi.nomDuPatient)}<input
                 value={patientNameDraft}
                 onChange={(e) => setPatientNameDraft(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-hidden focus:border-primary"
-                placeholder="Ex: Jean Tremblay"
+                placeholder={t(labels.componentUi.exJeanTremblay)}
               />
             </label>
 
             <p className="text-xs text-emerald-800">
-              Cree par: {user?.email || user?.id || "Usager inconnu"}
+              {t(labels.componentUi.creePar)} {user?.email || user?.id || t(labels.componentUi.usagerInconnu)}
             </p>
 
             <button
@@ -770,17 +769,17 @@ const SearchBar: React.FC = () => {
               disabled={creatingPatient}
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
             >
-              {creatingPatient ? "Creation..." : "Creer le patient"}
+              {creatingPatient ? t(labels.loginPage.action.creating) : t(labels.componentUi.creerLePatient)}
             </button>
 
             {createPatientError && (
-              <p className="text-xs text-red-700">{createPatientError}</p>
+              <p className="text-xs text-red-700"><UiMessage message={createPatientError} /></p>
             )}
           </div>
         )}
 
         {patientsError && (
-          <p className="mt-2 text-xs text-amber-700">{patientsError}</p>
+          <p className="mt-2 text-xs text-amber-700"><UiMessage message={patientsError} /></p>
         )}
 
         {selectedPatient && (
@@ -788,27 +787,27 @@ const SearchBar: React.FC = () => {
             <div className="font-semibold">
               {selectedPatient.prenom} {selectedPatient.nom}
             </div>
-            <div>RAMQ: {selectedPatient.num_assurance_maladie}</div>
+            <div>{t(labels.componentUi.rAMQ)} {selectedPatient.num_assurance_maladie}</div>
             {selectedPatient.telephone && (
-              <div>Telephone: {selectedPatient.telephone}</div>
+              <div>{t(labels.componentUi.telephone)} {selectedPatient.telephone}</div>
             )}
             {selectedPatient.addresse && (
-              <div>Addresse: {selectedPatient.addresse}</div>
+              <div>{t(labels.componentUi.addresse)} {selectedPatient.addresse}</div>
             )}
             {selectedPatient.created_by_reference && (
-              <div>Cree par: {selectedPatient.created_by_reference}</div>
+              <div>{t(labels.componentUi.creePar)} {selectedPatient.created_by_reference}</div>
             )}
             <div>
-              Documents selectionnes: {selectedDocumentIds.length}
+              {t(labels.componentUi.documentsSelectionnes)} {selectedDocumentIds.length}
               {availablePatientDocuments.length > 0
                 ? ` / ${availablePatientDocuments.length}`
                 : ""}
             </div>
             {selectedPatient.secure_request_profile?.lastRequestedAt && (
               <div>
-                Derniere requete: {new Date(
+                {t(labels.componentUi.derniereRequete)} {new Date(
                   selectedPatient.secure_request_profile.lastRequestedAt
-                ).toLocaleString()}
+                 ).toLocaleString(uiLocale)}
               </div>
             )}
           </div>
@@ -858,7 +857,7 @@ const SearchBar: React.FC = () => {
               value={sex}
               onChange={(e) => setSex(e.target.value)}
               className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-hidden focus:border-primary"
-              placeholder="Ex: Female"
+              placeholder={t(labels.componentUi.exFemale)}
             />
           </label>
 
@@ -868,7 +867,7 @@ const SearchBar: React.FC = () => {
               value={age}
               onChange={(e) => setAge(e.target.value)}
               className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 outline-hidden focus:border-primary"
-              placeholder="Ex: 54"
+              placeholder={t(labels.componentUi.ex54)}
             />
           </label>
 
@@ -905,11 +904,11 @@ const SearchBar: React.FC = () => {
             <div className="text-xs text-gray-600 sm:col-span-3">
               <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
                 <div>
-                  <div className="font-medium text-gray-700">Documents du patient</div>
+                  <div className="font-medium text-gray-700">{t(labels.componentUi.documentsDuPatient)}</div>
                   <div className="text-gray-500">
                     {documentsLoading
-                      ? "Chargement des dernieres requetes..."
-                      : `${selectedDocumentIds.length} document(s) selectionne(s)`}
+                      ? t(labels.componentUi.chargementDesDernieresRequetes)
+                      : `${t(labels.componentUi.documentsSelectionnes)} ${selectedDocumentIds.length.toLocaleString(uiLocale)}`}
                   </div>
                 </div>
                 <button
@@ -917,8 +916,7 @@ const SearchBar: React.FC = () => {
                   onClick={() => setIsDocumentsModalOpen(true)}
                   className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-gray-400"
                 >
-                  Choisir les documents
-                </button>
+                  {t(labels.componentUi.choisirLesDocuments)}</button>
               </div>
             </div>
           )}
@@ -960,11 +958,11 @@ const SearchBar: React.FC = () => {
                 value={cancerType}
                 onChange={e => setCancerType(e.target.value)}
               >
-                <option value="">Select cancer type…</option>
-                <option value="Stomach cancer">Stomach cancer</option>
-                <option value="Breast cancer">Breast cancer</option>
-                <option value="Lung cancer">Lung cancer</option>
-                <option value="Colorectal cancer">Colorectal cancer</option>
+                <option value="">{t(labels.componentUi.selectionnerLeTypeDeCancer)}</option>
+                <option value="Stomach cancer">{t(labels.componentUi.cancerDeLEstomac)}</option>
+                <option value="Breast cancer">{t(labels.componentUi.cancerDuSein)}</option>
+                <option value="Lung cancer">{t(labels.componentUi.cancerDuPoumon)}</option>
+                <option value="Colorectal cancer">{t(labels.componentUi.cancerColorectal)}</option>
               </select>
             )}
           </label>
@@ -1056,7 +1054,7 @@ const SearchBar: React.FC = () => {
           onClick={handleSearch}
           disabled={isSubmitDisabled}
           className="text-sm bg-primary text-white px-3 py-1.5 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-          title={attestationMissing ? "Cochez d'abord l'attestation" : undefined}
+          title={attestationMissing ? t(labels.componentUi.cochezDAbordLAttestation) : undefined}
         >
           {attestationMissing
             ? strings.search.checkAttestation
@@ -1085,7 +1083,7 @@ const SearchBar: React.FC = () => {
             clearVoiceWaitingState();
             const checked = e.target.checked;
             setPrivacyAttestation(checked);
-            if (checked && inputWarning === "Veuillez confirmer l'attestation de confidentialité avant l'envoi.") {
+            if (checked && inputWarning === t(labels.componentUi.veuillezConfirmerLAttestationDeConfidentialiteAvantLEnvoi)) {
               setInputWarning(null);
             }
           }}
@@ -1098,16 +1096,14 @@ const SearchBar: React.FC = () => {
 
       {inputWarning && (
         <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-          {inputWarning}
+          {t(inputWarning)}
         </div>
       )}
 
       {sensitiveReason && !sensitiveAcknowledged && (
         <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-3 text-xs text-red-800 space-y-2">
           <div>
-            Contenu potentiellement non securitaire detecte ({sensitiveReason}).
-            Confirmez explicitement avant de continuer.
-          </div>
+            {t(labels.componentUi.contenuPotentiellementNonSecuritaireDetecte)}{t(sensitiveReason)}{t(labels.componentUi.confirmezExplicitementAvantDeContinuer)}</div>
           <button
             type="button"
             onClick={() => {
@@ -1116,8 +1112,7 @@ const SearchBar: React.FC = () => {
             }}
             className="rounded bg-red-600 px-3 py-1.5 text-white hover:bg-red-700 transition-colors"
           >
-            J'ai lu et compris
-          </button>
+            {t(labels.componentUi.jAiLuEtCompris)}</button>
         </div>
       )}
       {isDocumentsModalOpen && selectedPatient && (
@@ -1125,18 +1120,16 @@ const SearchBar: React.FC = () => {
           <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
             <div className="border-b border-gray-200 px-5 py-4">
               <h2 className="text-base font-semibold text-gray-900">
-                Documents du patient
-              </h2>
+                {t(labels.componentUi.documentsDuPatient)}</h2>
               <p className="mt-1 text-sm text-gray-600">
-                Selectionnez un ou plusieurs documents pour la requete securisee de {selectedPatient.prenom} {selectedPatient.nom}.
+                {t(labels.componentUi.selectionnezUnOuPlusieursDocumentsPourLaRequeteSecuriseeDe)} {selectedPatient.prenom} {selectedPatient.nom}.
               </p>
             </div>
 
             <div className="max-h-[50vh] overflow-y-auto px-5 py-4">
               {documentsLoading ? (
                 <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-sm text-gray-500">
-                  Chargement des dernieres requetes securisees...
-                </div>
+                  {t(labels.componentUi.chargementDesDernieresRequetesSecurisees)}</div>
               ) : availablePatientDocuments.length > 0 ? (
                 <div className="space-y-3">
                   {availablePatientDocuments.map((document) => {
@@ -1164,13 +1157,13 @@ const SearchBar: React.FC = () => {
                         />
                         <span className="flex-1">
                           <span className="block font-medium text-gray-900">
-                            {formatSecureRequestDocumentLabel(document)}
+                            {formatSecureRequestDocumentLabel(document, uiLocale, t)}
                           </span>
                           <span className="block text-xs text-gray-500">
-                            {document.type || "Type inconnu"}
+                            {document.type || t(labels.componentUi.typeInconnu)}
                             {document.objective ? ` | ${document.objective}` : ""}
                             {document.uploadedAt
-                              ? ` | ${formatDocumentTimestamp(document.uploadedAt)}`
+                              ? ` | ${formatDocumentTimestamp(document.uploadedAt, uiLocale, t)}`
                               : ""}
                           </span>
                         </span>
@@ -1180,8 +1173,7 @@ const SearchBar: React.FC = () => {
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-sm text-gray-500">
-                  Aucune requete securisee precedente disponible pour ce patient.
-                </div>
+                  {t(labels.componentUi.aucuneRequeteSecuriseePrecedenteDisponiblePourCePatient)}</div>
               )}
             </div>
 
@@ -1194,23 +1186,20 @@ const SearchBar: React.FC = () => {
                 }}
                 className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:border-gray-400"
               >
-                Tout selectionner
-              </button>
+                {t(labels.componentUi.toutSelectionner)}</button>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setIsDocumentsModalOpen(false)}
                   className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:border-gray-400"
                 >
-                  Fermer
-                </button>
+                  {t(labels.pageUi.close)}</button>
                 <button
                   type="button"
                   onClick={() => setIsDocumentsModalOpen(false)}
                   className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary/90"
                 >
-                  Confirmer
-                </button>
+                  {t(labels.componentUi.confirmer)}</button>
               </div>
             </div>
           </div>

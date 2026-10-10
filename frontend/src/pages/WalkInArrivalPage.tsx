@@ -1,4 +1,6 @@
+import { UiMessage } from "../components/i18n/UiMessage";
 import { useEffect, useRef, useState } from "react";
+import { useUiLabels } from "../hooks/useUiLabels";
 import { labels } from "../i18n/uiLabels";
 import {
     createWalkInBooking,
@@ -37,6 +39,7 @@ function AvailabilityOptions({
     locale: string;
     introduction?: string;
 }) {
+    const { t } = useUiLabels(locale);
     const urgent = urgentologistLabels(locale, availability.urgentologists?.limit);
     const [choice, setChoice] = useState<"family" | "tomorrow" | null>(null);
     useEffect(() => { setChoice(null); }, [availability]);
@@ -71,7 +74,7 @@ function AvailabilityOptions({
                         {availability.today.map((option) => (
                             <li key={`${option.specialist._id}-${option.date}`} className="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
                                 <strong>{option.specialist.prenom} {option.specialist.nom}</strong>
-                                {option.specialist.specialty === "Urgentologue" && <span lang="en" translate="no"> — Emergency Physician</span>}
+                                {option.specialist.specialty === "Urgentologue" && <span> — {t(labels.pageUi.emergencyPhysician)}</span>}
                                 <span className="ml-2">{option.date}</span>
                                 <div className="mt-2 flex flex-wrap gap-2">
                                     {option.slots.map((time) => (
@@ -105,7 +108,7 @@ function AvailabilityOptions({
                         {availability.future.map((option) => (
                             <li key={`${option.specialist._id}-${option.date}`} className="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
                                 <strong>{option.specialist.prenom} {option.specialist.nom}</strong>
-                                {option.specialist.specialty === "Urgentologue" && <span lang="en" translate="no"> — Emergency Physician</span>}
+                                {option.specialist.specialty === "Urgentologue" && <span> — {t(labels.pageUi.emergencyPhysician)}</span>}
                                 <span className="ml-2">{option.date}</span>
                                 <div className="mt-2 flex flex-wrap gap-2">
                                     {option.slots.map((time) => (
@@ -136,6 +139,7 @@ function AvailabilityOptions({
 
 export function WalkInArrivalPage() {
     const { locale } = useHomeI18n();
+    const { t } = useUiLabels(locale);
     const replan = receptionReplanLabels(locale);
     const requestEpoch = useRef(0);
     const [replacementId, setReplacementId] = useState<string | undefined>();
@@ -335,7 +339,7 @@ export function WalkInArrivalPage() {
                     </p>
                 </header>
 
-                {error && <p role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
+                {error && <p role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"><UiMessage message={error} /></p>}
 
                 <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-xs">
                     <p className="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-slate-800">
@@ -409,7 +413,7 @@ export function WalkInArrivalPage() {
             <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-xs">
                 <label className="mb-1 block text-sm font-medium text-slate-800" htmlFor="walk-in-ramq">{receptionLabel(locale, "ramqLabel", source.ramqLabel)}</label>
                 <div className="flex gap-2">
-                    <input id="walk-in-ramq" value={ramq} onChange={(event) => { clearSelection(); setRamq(event.target.value); }} placeholder={source.ramqPlaceholder} className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2" />
+                    <input id="walk-in-ramq" value={ramq} onChange={(event) => { clearSelection(); setRamq(event.target.value); }} placeholder={t(source.ramqPlaceholder)} className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2" />
                     <button type="button" onClick={() => void searchPatient()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{receptionLabel(locale, "searchPatient", source.searchPatient)}</button>
                 </div>
 
@@ -441,7 +445,7 @@ export function WalkInArrivalPage() {
                     </p>
                 ) : (
                     <p role="alert" className="mt-5 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                        {clinicsError || source.availabilityRequiredClinic}
+                        {clinicsError || t(source.availabilityRequiredClinic)}
                     </p>
                 )}
 
@@ -452,14 +456,14 @@ export function WalkInArrivalPage() {
                             <p className="mt-1 text-sm text-amber-900">{receptionLabel(locale, "newPatientDescription", source.newPatientDescription)}</p>
                         </div>
                         <button type="button" onClick={() => void loadWalkInAvailability()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{walkInAvailability ? receptionLabel(locale, "refreshAvailability", source.refreshAvailability) : receptionLabel(locale, "searchAvailability", source.searchAvailability)}</button>
-                        {loading && <p className="text-sm text-slate-600">{source.availabilityLoading}</p>}
+                        {loading && <p className="text-sm text-slate-600">{t(source.availabilityLoading)}</p>}
                         {walkInAvailability && <AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} />}
                     </div>
                 ) : (
                     <>
                         {pending.length === 0 && <button type="button" onClick={confirmSelection} disabled={!selectedPatient || loading} className="mt-4 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{walkInAvailability ? receptionLabel(locale, "refreshAvailability", source.refreshAvailability) : receptionLabel(locale, "searchAvailability", source.searchAvailability)}</button>}
                         {selectedPatient && <p className="mt-3 text-sm text-slate-700">{receptionLabel(locale, "existingPatientDescription", source.existingPatientDescription)}</p>}
-                        {loading && selectedPatient && <p className="mt-3 text-sm text-slate-600">{source.availabilityLoading}</p>}
+                        {loading && selectedPatient && <p className="mt-3 text-sm text-slate-600">{t(source.availabilityLoading)}</p>}
                         {selectedPatient && walkInAvailability && (
                             <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4">
                                 <AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} introduction={replacementId ? replan.kept : undefined} />

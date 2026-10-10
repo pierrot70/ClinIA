@@ -1,9 +1,13 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render as renderWithLocale, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { MfaRequiredError, MfaVerificationError } from "../services/authService";
+import { UI_LOCALES } from "../i18n/uiLocales";
+import { getLocalUiTranslation } from "../i18n/localUiTranslations";
+import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
+import { HomeI18nContext } from "../contexts/HomeI18nContext";
 
 const language = vi.hoisted(() => ({ locale: "fr" }));
 
@@ -37,6 +41,11 @@ vi.mock("../contexts/HomeI18nContext", async () => {
 
 import LoginPage from "./LoginPage";
 
+function render(ui: React.ReactElement) {
+    return renderWithLocale(ui, { wrapper: ({ children }) =>
+        <HomeI18nContext.Provider value={{ locale: language.locale } as any}>{children}</HomeI18nContext.Provider> });
+}
+
 describe("LoginPage MFA recovery codes", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -66,6 +75,25 @@ describe("LoginPage MFA recovery codes", () => {
                 recoveryCodes: ["RECOVERY-ONE", "RECOVERY-TWO"],
             };
         });
+    });
+
+    it.each(UI_LOCALES)("renders credential and MFA error states in %s with mocked authentication", async locale => {
+        language.locale = locale;
+        const copy = UI_LABELS_FR.loginPage;
+        const translated = (source: string) => getLocalUiTranslation(source, locale)!;
+        auth.login.mockRejectedValue(new Error(copy.errors.invalidCredentials));
+        render(<MemoryRouter><LoginPage /></MemoryRouter>);
+        fireEvent.submit(document.querySelector("form")!);
+        expect(await screen.findByText(translated(copy.errors.invalidCredentials))).toBeInTheDocument();
+        auth.login.mockRejectedValue(new MfaRequiredError({ mfaChallenge: "synthetic", enrollmentRequired: false }));
+        fireEvent.submit(document.querySelector("form")!);
+        expect(await screen.findByText(translated(copy.mfa.title))).toBeInTheDocument();
+        expect(screen.getByText(translated(copy.mfa.description))).toBeInTheDocument();
+        expect(screen.getByLabelText(translated(copy.mfa.codeLabel))).toBeInTheDocument();
+        auth.completeMfaLogin.mockRejectedValue(new MfaVerificationError("INVALID_MFA_CODE", copy.errors.invalidMfaCode));
+        fireEvent.submit(document.querySelector("form")!);
+        expect(await screen.findByText(translated(copy.errors.invalidMfaCode))).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: translated(copy.mfa.verify) })).toBeInTheDocument();
     });
 
     it("passes an existing password over 72 bytes to login unchanged", async () => {

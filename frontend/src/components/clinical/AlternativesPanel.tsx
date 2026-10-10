@@ -1,6 +1,9 @@
+import { labels } from "../../i18n/uiLabels";
+import { useUiLabels } from "../../hooks/useUiLabels";
 import { useState } from "react";
 
 export function AlternativesPanel({ alternatives }: { alternatives: any[] }) {
+    const { locale: uiLocale, t } = useUiLabels();
     const [open, setOpen] = useState(false);
 
     return (
@@ -9,7 +12,7 @@ export function AlternativesPanel({ alternatives }: { alternatives: any[] }) {
                 onClick={() => setOpen(!open)}
                 className="w-full text-left p-4 font-medium text-sm"
             >
-                {open ? "Masquer les alternatives" : "Voir les alternatives"}
+                {open ? t(labels.componentUi.masquerLesAlternatives) : t(labels.componentUi.voirLesAlternatives)}
             </button>
 
             {open && (

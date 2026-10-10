@@ -4,6 +4,8 @@ import { Loader2, Mic, MicOff } from "lucide-react";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { useTranslation } from "../hooks/useTranslation";
 import { labels } from "../i18n/uiLabels";
+import { useUiLabels } from "../hooks/useUiLabels";
+import { formatVoiceUiStatus } from "../i18n/voiceUiLabels";
 import { logSafeClientError } from "../utils/safeClientLog";
 
 type NavCommand = {
@@ -296,12 +298,12 @@ const detectLocaleFromTranscript = (transcript: string): string | null => {
 
 const NAV_COMMANDS: NavCommand[] = [
     {
-        label: "Rendez-vous",
+        label: labels.header.nav.appointments,
         path: "/appointments",
         keywords: ["rendez vous", "rendez-vous", "rdv"],
     },
     {
-        label: "Accueil",
+        label: labels.header.nav.home,
         path: "/",
         keywords: [
             "retourne a la maison",
@@ -316,17 +318,17 @@ const NAV_COMMANDS: NavCommand[] = [
         ],
     },
     {
-        label: "Patients",
+        label: labels.header.nav.patients,
         path: "/patients",
         keywords: ["patients", "patient"],
     },
     {
-        label: "Cliniques",
+        label: labels.header.nav.cliniques,
         path: "/cliniques",
         keywords: ["cliniques", "clinique"],
     },
     {
-        label: "Specialistes",
+        label: labels.header.nav.specialists,
         path: "/specialists",
         keywords: [
             "specialistes",
@@ -343,7 +345,7 @@ const NAV_COMMANDS: NavCommand[] = [
 
 const ACTION_COMMANDS: ActionCommand[] = [
     {
-        label: "Dictee",
+        label: labels.header.voice.feedback.dictation,
         action: "dictation",
         keywords: [
             "dictee",
@@ -374,7 +376,7 @@ const ACTION_COMMANDS: ActionCommand[] = [
         response: "Recherche lancee.",
     },
     {
-        label: "Effacer",
+        label: labels.header.voice.feedback.clear,
         action: "clear",
         keywords: [
             "efface",
@@ -397,7 +399,7 @@ const ACTION_COMMANDS: ActionCommand[] = [
         response: "Diagnostic efface.",
     },
     {
-        label: "Arret",
+        label: labels.header.voice.feedback.stop,
         action: "stop",
         keywords: ["arrete", "stop", "pause", "stop listening"],
         response: "Écoute arrêtée.",
@@ -435,14 +437,14 @@ const LOCAL_VOICE_TEXT_BY_LANG: Record<
         returnHome: "Retour a l'accueil.",
         returnHomeInstruction:
             "Dites ou ecrivez votre diagnostic, puis dites Lancer Requete ou cliquez sur Lancer Requete pour lancer.",
-        captured: "Diagnostic capture.",
+        captured: labels.header.voice.feedback.captured,
         followup:
             "Si satisfait, cliquez ou dites «Lancer Requete», ou dites «Nouveau diagnostic» pour recommencer.",
         action: {
             dictation: "Dites votre diagnostic.",
             execute: "Recherche lancee.",
             clear: "Diagnostic efface.",
-            stop: "Ecoute arretee.",
+            stop: labels.header.voice.feedback.stopped,
         },
         navOpen: {
             appointments: "Ouverture rendez-vous.",
@@ -623,6 +625,8 @@ const VoiceNavButton: React.FC = () => {
     const location = useLocation();
     const { setLocaleFromVoice, isTranslating, locale } = useHomeI18n();
     const voiceLabels = labels.header.voice;
+    const feedback = voiceLabels.feedback;
+    const { t } = useUiLabels();
     const { translated: activateVoiceMode } = useTranslation({
         text: voiceLabels.activateVoiceMode,
         targetLang: locale,
@@ -676,7 +680,12 @@ const VoiceNavButton: React.FC = () => {
         Boolean((import.meta as any).env.DEV);
     const [isListening, setIsListening] = useState(false);
     const [isHandsFree, setIsHandsFree] = useState(false);
-    const [status, setStatus] = useState<string | null>(null);
+    const [status, setStatusText] = useState<string | null>(null);
+    const [statusParams, setStatusParams] = useState<Record<string, string>>({});
+    const setStatus = useCallback((source: string, params: Record<string, string> = {}) => {
+        setStatusText(source);
+        setStatusParams(params);
+    }, []);
     const [micLevel, setMicLevel] = useState<number | null>(null);
     const [isMicTestActive, setIsMicTestActive] = useState(false);
     const [voiceMode, setVoiceMode] = useState<"navigation" | "dictation">(
@@ -1058,7 +1067,7 @@ const VoiceNavButton: React.FC = () => {
                 });
             }
 
-            setStatus(`Entendu: "${transcript}"`);
+            setStatus(feedback.heard, { text: transcript });
             if (isDev && typeof window !== "undefined") {
                 console.info("[VoiceNav] transcript", {
                     raw: transcript,
@@ -1070,7 +1079,7 @@ const VoiceNavButton: React.FC = () => {
             }
 
             if (isWakeWord) {
-                setStatus("Navigation: Accueil");
+                setStatus(feedback.navigation, { label: labels.header.nav.home });
                 // Clear previous diagnostic and mark we're waiting for dictation
                 try {
                     window.localStorage.setItem("clinia_waiting_dictation", "1");
@@ -1089,7 +1098,7 @@ const VoiceNavButton: React.FC = () => {
 
             if (requestedLocale) {
                 const localeLabel = requestedLocale.toUpperCase();
-                setStatus(`Traduction de l'accueil (${localeLabel})...`);
+                setStatus(feedback.translating, { language: localeLabel });
                 setLocaleFromVoice(requestedLocale)
                     .then(
                         ({
@@ -1114,9 +1123,9 @@ const VoiceNavButton: React.FC = () => {
                         } catch (e) {}
 
                         if (requestedLocale === "fr") {
-                            setStatus("Accueil en francais.");
+                            setStatus(feedback.homeFrench);
                         } else {
-                            setStatus(`Accueil traduit (${localeLabel}).`);
+                            setStatus(feedback.translated, { language: localeLabel });
                         }
                         speak(voiceAck, {
                             interrupt: true,
@@ -1131,7 +1140,7 @@ const VoiceNavButton: React.FC = () => {
                     }
                     )
                     .catch(() => {
-                        setStatus("Langue non reconnue, retour au francais.");
+                        setStatus(feedback.unrecognizedLanguage);
                         setLocaleFromVoice("fr")
                             .then(
                                 ({
@@ -1185,7 +1194,7 @@ const VoiceNavButton: React.FC = () => {
 
             // If user says "diagnostic", navigate home and activate dictation mode.
             if (isDiagnosticWord) {
-                setStatus("Activation du mode dictée...");
+                setStatus(feedback.dictationStarting);
                 navigate("/");
                 setVoiceMode("dictation");
                 // Enable hands-free so speak() will restart listening after the prompt.
@@ -1214,7 +1223,7 @@ const VoiceNavButton: React.FC = () => {
             );
 
             if (matchedNav) {
-                setStatus(`Navigation: ${matchedNav.label}`);
+                setStatus(feedback.navigation, { label: matchedNav.label });
                 navigate(matchedNav.path);
                 if (matchedNav.path === "/") {
                     setVoiceMode("dictation");
@@ -1253,7 +1262,7 @@ const VoiceNavButton: React.FC = () => {
             );
 
             if (matchedAction) {
-                setStatus(`Commande: ${matchedAction.label}`);
+                setStatus(feedback.command, { label: matchedAction.label });
                 if (matchedAction.action === "dictation") {
                     setVoiceMode("dictation");
                     speak(localVoiceText.action.dictation);
@@ -1279,7 +1288,7 @@ const VoiceNavButton: React.FC = () => {
                     isHandsFreeRef.current = false;
                     setIsListening(false);
                     isListeningRef.current = false;
-                    setStatus(localVoiceText.action.stop);
+                    setStatus(feedback.stopped);
                     speak(localVoiceText.action.stop);
                     return;
                 }
@@ -1289,7 +1298,7 @@ const VoiceNavButton: React.FC = () => {
                 const now = Date.now();
                 const last = lastDictationRef.current;
                 if (last && last.text === normalized && now - last.at < 2000) {
-                    setStatus("Diagnostic capture.");
+                    setStatus(feedback.captured);
                     return;
                 }
                 lastDictationRef.current = { text: normalized, at: now };
@@ -1300,7 +1309,7 @@ const VoiceNavButton: React.FC = () => {
                     })
                 );
                 setVoiceMode("dictation");
-                setStatus("Diagnostic capture.");
+                setStatus(feedback.captured);
                 speak(localVoiceText.captured, {
                     restartListening: false,
                     onDone: () => {
@@ -1313,7 +1322,7 @@ const VoiceNavButton: React.FC = () => {
                 return;
             }
 
-            setStatus(`Commande non reconnue: "${transcript}"`);
+            setStatus(feedback.unrecognizedCommand, { text: transcript });
         },
         [location.pathname, locale, navigate, speak, voiceMode]
     );
@@ -1331,7 +1340,7 @@ const VoiceNavButton: React.FC = () => {
         (recognition as SpeechRecognition & { continuous?: boolean }).continuous =
             false;
         recognition.onstart = () => {
-            setStatus("Micro actif, parlez maintenant...");
+            setStatus(feedback.microphoneActive);
             if (isDev) {
                 console.info("[VoiceNav] recognition start");
             }
@@ -1412,7 +1421,7 @@ const VoiceNavButton: React.FC = () => {
             handleTranscript(localeCandidate || candidates[0]);
         };
         recognition.onnomatch = () => {
-            setStatus("Aucune reconnaissance vocale.");
+            setStatus(feedback.noRecognition);
             if (isDev) {
                 console.info("[VoiceNav] no match");
             }
@@ -1420,12 +1429,12 @@ const VoiceNavButton: React.FC = () => {
         recognition.onerror = (event) => {
             if (event.error === "audio-capture") {
                 setStatus(
-                    "Micro non accessible. Verifiez les permissions du navigateur et de l'OS."
+                    feedback.inaccessible
                 );
             } else {
                 // Treat common transient errors (no-speech) specially when hands-free is enabled
                 if (event.error === "no-speech") {
-                    setStatus("Aucune parole détectée.");
+                    setStatus(feedback.noSpeech);
                     if (isDev) {
                         console.info("[VoiceNav] recognition no-speech");
                     }
@@ -1440,14 +1449,14 @@ const VoiceNavButton: React.FC = () => {
                         }, 500);
                         return;
                     } else {
-                        setStatus("Aucune parole détectée.");
+                        setStatus(feedback.noSpeech);
                         setIsListening(false);
                         isListeningRef.current = false;
                         return;
                     }
                 }
 
-                setStatus(`Erreur vocale: ${event.error}`);
+                setStatus(feedback.voiceError, { error: event.error });
             }
             if (isDev) {
                 logSafeClientError("VOICE_RECOGNITION_FAILED");
@@ -1473,7 +1482,7 @@ const VoiceNavButton: React.FC = () => {
                 silenceStopRef.current = false;
                 setIsHandsFree(false);
                 isHandsFreeRef.current = false;
-                setStatus("Ecoute arretee (silence).");
+                setStatus(feedback.stoppedSilence);
                 return;
             }
             if (isSpeakingRef.current) {
@@ -1518,7 +1527,7 @@ const VoiceNavButton: React.FC = () => {
 
     const enablePersistentWake = useCallback(() => {
         if (typeof navigator === "undefined" || !navigator.mediaDevices) {
-            setStatus("API micro indisponible sur ce navigateur.");
+            setStatus(feedback.apiUnavailable);
             return;
         }
         navigator.mediaDevices
@@ -1534,12 +1543,12 @@ const VoiceNavButton: React.FC = () => {
                 try {
                     window.localStorage.setItem("clinia_wake_enabled", "1");
                 } catch (e) {}
-                setStatus("Écoute persistante activée.");
+                setStatus(feedback.persistentEnabled);
                 // start listening right away
                 startListeningRef.current();
             })
             .catch((err) => {
-                setStatus(`Autorisation micro refusée: ${err?.name || "inconnu"}`);
+                setStatus(feedback.permissionDenied, { error: err?.name || feedback.unknownError });
             });
     }, []);
 
@@ -1555,7 +1564,7 @@ const VoiceNavButton: React.FC = () => {
         try {
             window.localStorage.removeItem("clinia_wake_enabled");
         } catch (e) {}
-        setStatus("Écoute persistante désactivée.");
+        setStatus(feedback.persistentDisabled);
     }, []);
 
     const startListening = useCallback(() => {
@@ -1575,11 +1584,11 @@ const VoiceNavButton: React.FC = () => {
         }
         const recognition = createRecognition();
         if (!recognition) {
-            setStatus("Navigation vocale indisponible.");
+            setStatus(feedback.navigationUnavailable);
             return;
         }
         recognitionRef.current = recognition;
-        setStatus("Ecoute en cours...");
+        setStatus(feedback.listening);
         setIsListening(true);
         isListeningRef.current = true;
         const startRecognition = () => {
@@ -1587,13 +1596,13 @@ const VoiceNavButton: React.FC = () => {
                 recognition.start();
             } catch (error) {
                 logSafeClientError("VOICE_START_FAILED");
-                setStatus("Erreur de demarrage micro.");
+                setStatus(feedback.startFailed);
                 setIsListening(false);
                 isListeningRef.current = false;
             }
         };
         if (typeof window === "undefined" || !navigator.mediaDevices) {
-            setStatus("API micro indisponible. Essayez Chrome/HTTPS/localhost.");
+            setStatus(feedback.apiHint);
             startRecognition();
             return;
         }
@@ -1629,7 +1638,7 @@ const VoiceNavButton: React.FC = () => {
                     logSafeClientError("VOICE_MEDIA_ACCESS_FAILED");
                 }
                 setStatus(
-                    `Micro non accessible: ${error?.name || "inconnu"}.`
+                    feedback.microphoneError, { error: error?.name || feedback.unknownError }
                 );
                 setIsListening(false);
                 isListeningRef.current = false;
@@ -1643,7 +1652,7 @@ const VoiceNavButton: React.FC = () => {
     const toggleListening = () => {
         console.info("[VoiceNav] toggleListening, isHandsFree=", isHandsFree, "isListening=", isListening);
         if (!isSupported) {
-            setStatus("Navigation vocale non supportee sur ce navigateur.");
+            setStatus(feedback.unsupported);
             return;
         }
 
@@ -1664,7 +1673,7 @@ const VoiceNavButton: React.FC = () => {
             setIsListening(false);
             setIsHandsFree(false);
             isHandsFreeRef.current = false;
-            setStatus("Ecoute arretee.");
+            setStatus(feedback.stopped);
             return;
         }
 
@@ -1707,7 +1716,7 @@ const VoiceNavButton: React.FC = () => {
             return;
         }
         if (typeof window === "undefined" || !navigator.mediaDevices) {
-            setStatus("API micro indisponible. Essayez Chrome/HTTPS/localhost.");
+            setStatus(feedback.apiHint);
             return;
         }
         navigator.mediaDevices
@@ -1716,7 +1725,7 @@ const VoiceNavButton: React.FC = () => {
                 const AudioCtx =
                     window.AudioContext || (window as any).webkitAudioContext;
                 if (!AudioCtx) {
-                    setStatus("AudioContext indisponible.");
+                    setStatus(feedback.audioUnavailable);
                     stream.getTracks().forEach((track) => track.stop());
                     return;
                 }
@@ -1739,14 +1748,14 @@ const VoiceNavButton: React.FC = () => {
                     setMicLevel(Math.min(100, Math.round(rms * 200)));
                 }, 100);
                 setIsMicTestActive(true);
-                setStatus("Test micro actif.");
+                setStatus(feedback.testActive);
             })
             .catch((error) => {
                 if (isDev) {
                     logSafeClientError("VOICE_MIC_TEST_FAILED");
                 }
                 setStatus(
-                    `Test micro impossible: ${error?.name || "inconnu"}.`
+                    feedback.testError, { error: error?.name || feedback.unknownError }
                 );
                 stopMicTest();
             });
@@ -1765,7 +1774,7 @@ const VoiceNavButton: React.FC = () => {
                             ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                             : "border-gray-200 text-gray-700 hover:bg-gray-50")
                 }
-                title="Dire: ouvre la page des rendez-vous, patients, cliniques, specialistes; retourne a la maison; execute; efface; arrete"
+                title={t(feedback.tooltip)}
                 aria-label={isHandsFree ? deactivateVoiceMode : activateVoiceMode}
             >
                 {isTranslating ? (
@@ -1816,7 +1825,7 @@ const VoiceNavButton: React.FC = () => {
             )}
             {status && (
                 <span className="text-xs text-gray-500" aria-live="polite">
-                    {status}
+                    {formatVoiceUiStatus(status, t, statusParams)}
                 </span>
             )}
         </div>

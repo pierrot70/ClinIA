@@ -1,4 +1,6 @@
+import { UiMessage } from "../i18n/UiMessage";
 import React from "react";
+import { useUiLabels } from "../../hooks/useUiLabels";
 
 import type { ClinicianComment } from "../../services/clinicianCommentsApi";
 
@@ -89,7 +91,7 @@ type ClinicianInboxModalProps = {
 
 export function ClinicianInboxModal({
     isOpen,
-    labels,
+    labels: sourceLabels,
     headerLabels,
     items,
     actors,
@@ -119,6 +121,8 @@ export function ClinicianInboxModal({
     onCancelReply,
     onLoadPage,
 }: ClinicianInboxModalProps) {
+    const { t } = useUiLabels();
+    const labels = Object.fromEntries(Object.entries(sourceLabels).map(([key, source]) => [key, t(source)])) as ClinicianInboxLabels;
     if (!isOpen) {
         return null;
     }
@@ -227,7 +231,7 @@ export function ClinicianInboxModal({
                             onClick={onSearch}
                             className="rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
                         >
-                            {headerLabels.controls.search}
+                            {t(headerLabels.controls.search)}
                         </button>
                     </div>
 
@@ -235,7 +239,7 @@ export function ClinicianInboxModal({
                         <p className="text-sm text-gray-500">{labels.loading}</p>
                     ) : error ? (
                         <div className="rounded bg-red-50 p-3 text-sm text-red-700">
-                            {error}
+                            <UiMessage message={error} />
                         </div>
                     ) : items.length === 0 ? (
                         <p className="text-sm text-gray-500">{labels.empty}</p>

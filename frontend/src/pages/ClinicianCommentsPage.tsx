@@ -1,3 +1,5 @@
+import { useUiLabels } from "../hooks/useUiLabels";
+import { UiMessage } from "../components/i18n/UiMessage";
 import React, { useContext, useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
@@ -140,7 +142,8 @@ export function ClinicianCommentsPage() {
     const [submitting, setSubmitting] = useState(false);
     const [replying, setReplying] = useState(false);
     const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
+    const { t } = useUiLabels();
+    const [success, setSuccess] = useState<{ label: string; trackingCode?: string } | null>(null);
     const [lastWriteVerification, setLastWriteVerification] =
         useState<WriteVerificationMeta | null>(null);
 
@@ -227,7 +230,7 @@ export function ClinicianCommentsPage() {
         event.preventDefault();
         setSubmitting(true);
         setError("");
-        setSuccess("");
+        setSuccess(null);
         setLastWriteVerification(null);
 
         const response = await createClinicianComment(
@@ -258,13 +261,9 @@ export function ClinicianCommentsPage() {
                 // Ignore local storage errors.
             }
         }
-        setSuccess(
-            formatWriteVerificationMessage(`${response.data.redactionCount > 0
-                ? ui.savedWithRedactionLabel
-                : ui.savedLabel} ${ui.trackingCodePrefix} ${response.data.trackingCode || trackingCode}`,
-                response.meta?.writeVerification ?? null
-            )
-        );
+        setSuccess({ label: response.data.redactionCount > 0
+            ? labels.commentsPage.status.savedWithRedaction : labels.commentsPage.status.saved,
+            trackingCode: response.data.trackingCode || trackingCode });
         setLastWriteVerification(response.meta?.writeVerification ?? null);
 
         if (isAuthenticated) {
@@ -289,7 +288,7 @@ export function ClinicianCommentsPage() {
 
         setReplying(true);
         setError("");
-        setSuccess("");
+        setSuccess(null);
         setLastWriteVerification(null);
 
         const response = await replyToClinicianComment(selectedCommentId, replyMessage);
@@ -301,12 +300,7 @@ export function ClinicianCommentsPage() {
         }
 
         setReplyMessage("");
-        setSuccess(
-            formatWriteVerificationMessage(
-                ui.replySaved,
-                response.meta?.writeVerification ?? null
-            )
-        );
+        setSuccess({ label: labels.commentsPage.status.replySaved });
         setLastWriteVerification(response.meta?.writeVerification ?? null);
         setItems((currentItems) =>
             currentItems.map((item) =>
@@ -428,14 +422,16 @@ export function ClinicianCommentsPage() {
 
                     {error && (
                         <div className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-                            {error}
+                            <UiMessage message={error} />
                         </div>
                     )}
 
                     {success && (
                         <div className="mt-4">
                             <div className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                                {success}
+                                {formatWriteVerificationMessage(
+                                    t(success.label) + (success.trackingCode ? ` ${t(labels.commentsPage.status.trackingCodePrefix)} ${success.trackingCode}` : ""),
+                                    lastWriteVerification, t(labels.pageUi.verificationNumber))}
                             </div>
                             <WriteVerificationReceipt
                                 verification={lastWriteVerification}

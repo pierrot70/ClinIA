@@ -1,3 +1,6 @@
+import { UiMessage } from "../components/i18n/UiMessage";
+import { useUiLabels } from "../hooks/useUiLabels";
+import { translateUiLabelTree } from "../i18n/pageUiLabels";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, Archive, Clock, Database, HardDrive, RefreshCw, Server } from "lucide-react";
 import { fetchDbStatus, updateBackupProtection, type DbStatusPayload } from "../services/dbStatusApi";
@@ -25,7 +28,7 @@ type ReplicaReading = {
     drillTotalCycles: number | null;
 };
 
-function formatBytes(value?: number | null) {
+function formatBytes(value: number | null | undefined, locale: string) {
     if (value == null || !Number.isFinite(value)) {
         return "-";
     }
@@ -39,18 +42,18 @@ function formatBytes(value?: number | null) {
         unitIndex += 1;
     }
 
-    return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+    return `${size.toLocaleString(locale, { maximumFractionDigits: size >= 10 || unitIndex === 0 ? 0 : 1 })} ${units[unitIndex]}`;
 }
 
-function formatNumber(value?: number | null) {
+function formatNumber(value: number | null | undefined, locale: string) {
     if (value == null || !Number.isFinite(value)) {
         return "-";
     }
 
-    return new Intl.NumberFormat("fr-CA").format(value);
+    return new Intl.NumberFormat(locale).format(value);
 }
 
-function formatTimestamp(value?: string | null) {
+function formatTimestamp(value: string | null | undefined, locale: string) {
     if (!value) {
         return "-";
     }
@@ -60,18 +63,19 @@ function formatTimestamp(value?: string | null) {
         return value;
     }
 
-    return date.toLocaleString("fr-CA");
+    return date.toLocaleString(locale);
 }
 
-function formatAgeHours(value?: number | null) {
+function formatAgeHours(value: number | null | undefined, locale: string, t: (source: string) => string) {
     if (value == null || !Number.isFinite(value)) {
         return "-";
     }
 
-    return `${value.toLocaleString("fr-CA")} ${labels.dbStatus.backups.hoursSuffix}`;
+    return `${value.toLocaleString(locale)} ${t(labels.dbStatus.backups.hoursSuffix)}`;
 }
 
 function StatusPill({ ok, label }: { ok: boolean; label: string }) {
+    const { t } = useUiLabels();
     return (
         <span
             className={
@@ -81,7 +85,7 @@ function StatusPill({ ok, label }: { ok: boolean; label: string }) {
                     : "bg-red-50 text-red-700 ring-1 ring-red-200")
             }
         >
-            {label}
+            {t(label)}
         </span>
     );
 }
@@ -93,6 +97,7 @@ function TonePill({
     tone: "emerald" | "amber" | "red" | "slate";
     label: string;
 }) {
+    const { t } = useUiLabels();
     const toneClass = {
         emerald: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
         amber: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
@@ -102,7 +107,7 @@ function TonePill({
 
     return (
         <span className={"inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium " + toneClass}>
-            {label}
+            {t(label)}
         </span>
     );
 }
@@ -118,6 +123,7 @@ function MetricCard({
     value: string;
     detail?: string;
 }) {
+    const { t } = useUiLabels();
     return (
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-xs">
             <div className="flex items-center gap-3">
@@ -126,7 +132,7 @@ function MetricCard({
                 </div>
                 <div className="min-w-0">
                     <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                        {label}
+                        {t(label)}
                     </div>
                     <div className="truncate text-lg font-semibold text-gray-950">
                         {value}
@@ -159,11 +165,20 @@ function isStandaloneMember(member: DbStatusPayload["replicaSet"]["members"][num
 }
 
 function ReplicaMemberCard({ member }: { member: DbStatusPayload["replicaSet"]["members"][number] }) {
-    const replicaLabels = labels.dbStatus.replica;
+    const { locale: uiLocale, t } = useUiLabels();
+    const replicaLabels = translateUiLabelTree(labels.dbStatus.replica, t);
     const standalone = isStandaloneMember(member);
-    const roleLabel = standalone ? "standalone" : member.role;
-    const onlineLabel = standalone ? "online" : member.onlineStatus;
-    const syncLabel = standalone ? "sync n/a" : member.syncStatus;
+    const roleLabel = standalone ? labels.pageUi.standaloneMember : ({
+        primary: labels.pageUi.primaryMember, secondary: labels.pageUi.secondaryMember,
+        arbiter: labels.pageUi.arbiterMember, unknown: labels.pageUi.unknownMember,
+    }[member.role]);
+    const onlineLabel = standalone ? labels.pageUi.onlineMember : ({
+        online: labels.pageUi.onlineMember, down: labels.pageUi.downMember, unknown: labels.pageUi.unknownMember,
+    }[member.onlineStatus]);
+    const syncLabel = standalone ? labels.pageUi.syncNA : ({
+        synced: labels.pageUi.syncedMember, syncing: labels.pageUi.syncingMember,
+        unsynced: labels.pageUi.unsyncedMember, unknown: labels.pageUi.unknownMember,
+    }[member.syncStatus]);
     const syncTone = standalone ? "not-applicable" : member.syncStatus;
 
     return (
@@ -171,22 +186,22 @@ function ReplicaMemberCard({ member }: { member: DbStatusPayload["replicaSet"]["
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <div className="truncate text-sm font-semibold text-gray-950">{member.name}</div>
-                    <div className="mt-1 text-xs uppercase text-gray-500">{roleLabel}</div>
+                    <div className="mt-1 text-xs uppercase text-gray-500">{t(roleLabel)}</div>
                 </div>
                 <span className={"inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-medium " + memberToneClass(standalone ? "online" : member.onlineStatus)}>
-                    {onlineLabel}
+                    {t(onlineLabel)}
                 </span>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
                 <span className={"inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium " + memberToneClass(syncTone)}>
-                    {syncLabel}
+                    {t(syncLabel)}
                 </span>
                 <span className="inline-flex items-center rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
                     {member.state}
                 </span>
                 {member.lagSeconds != null && (
                     <span className="inline-flex items-center rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
-                        lag {member.lagSeconds}{replicaLabels.secondsSuffix}
+                        {t(labels.pageUi.lag)}{member.lagSeconds}{replicaLabels.secondsSuffix}
                     </span>
                 )}
             </div>
@@ -200,7 +215,7 @@ function ReplicaMemberCard({ member }: { member: DbStatusPayload["replicaSet"]["
                 {member.optimeDate && (
                     <div>
                         <span className="font-medium text-gray-700">{replicaLabels.optime}: </span>
-                        <span>{formatTimestamp(member.optimeDate)}</span>
+                        <span>{formatTimestamp(member.optimeDate, uiLocale)}</span>
                     </div>
                 )}
                 {member.lastHeartbeatMessage && (
@@ -254,18 +269,18 @@ function getWriteSafetyDrillTone(status?: string | null) {
 
 function getWriteSafetyDrillLabel(status?: string | null) {
     if (status === "success") {
-        return "Success";
+        return labels.pageUi.success;
     }
 
     if (status === "failure") {
-        return "Echec";
+        return labels.pageUi.failure;
     }
 
     if (status === "running") {
-        return "En cours";
+        return labels.pageUi.enCours;
     }
 
-    return "Inactif";
+    return labels.pageUi.inactive;
 }
 
 function formatReplicaHealth({
@@ -276,11 +291,11 @@ function formatReplicaHealth({
     healthyCount: number;
     memberCount: number;
     status?: DbStatusPayload["replicaSet"]["summary"]["status"];
-}) {
-    const value = `${healthyCount} / ${memberCount}`;
+}, t: (source: string) => string, locale: string) {
+    const value = `${healthyCount.toLocaleString(locale)} / ${memberCount.toLocaleString(locale)}`;
 
     if (status === "INCIDENT" && healthyCount === 0 && memberCount > 0) {
-        return `${value} ${labels.dbStatus.replica.confirmed}`;
+        return `${value} ${t(labels.dbStatus.replica.confirmed)}`;
     }
 
     return value;
@@ -304,18 +319,18 @@ function formatWritablePrimary(value?: boolean | null, majorityAvailable?: boole
 
 function getOverallStatus(data: DbStatusPayload | null) {
     if (!data) {
-        return { ok: false, label: "Aucune donnee" };
+        return { ok: false, label: labels.pageUi.aucuneDonnee };
     }
 
     if (data.connection.status !== "connected" || !data.ping.ok) {
-        return { ok: false, label: "BD degradee" };
+        return { ok: false, label: labels.pageUi.bDDegradee };
     }
 
     if (data.database?.status === "error") {
-        return { ok: false, label: "Stats BD indisponibles" };
+        return { ok: false, label: labels.pageUi.statsBDIndisponibles };
     }
 
-    return { ok: true, label: "BD operationnelle" };
+    return { ok: true, label: labels.pageUi.bDOperationnelle };
 }
 
 function getBackupStatusLabel(status?: DbStatusPayload["backups"]["latestStatus"]) {
@@ -394,6 +409,7 @@ function getProtectionLabel(backup: DbStatusPayload["backups"]["backups"][number
 }
 
 export function DbStatusPage() {
+    const { locale: uiLocale, t } = useUiLabels();
     const [data, setData] = useState<DbStatusPayload | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
     const [loading, setLoading] = useState(true);
@@ -526,8 +542,8 @@ export function DbStatusPage() {
     const database = data?.database?.status === "ok" ? data.database : null;
     const collectionErrors = data?.collections.filter((collection) => collection.status !== "ok") || [];
     const replicaMembers = data?.replicaSet.members || [];
-    const backupLabels = labels.dbStatus.backups;
-    const replicaLabels = labels.dbStatus.replica;
+    const backupLabels = translateUiLabelTree(labels.dbStatus.backups, t);
+    const replicaLabels = translateUiLabelTree(labels.dbStatus.replica, t);
     const backupStatusOk = data?.backups.latestStatus === "ok";
     const replicaSet = data?.replicaSet || null;
     const hasReplicaSummary = Boolean(replicaSet?.summary);
@@ -542,8 +558,10 @@ export function DbStatusPage() {
     const standaloneMode = replicaMembers.length === 1 && isStandaloneMember(replicaMembers[0]);
     const syncedMembers = replicaMembers.filter((member) => member.syncStatus === "synced").length;
     const replicaSummary = standaloneMode
-        ? "Mode standalone local"
-        : `${syncedMembers} / ${replicaMembers.length} membre(s) synchronise(s)`;
+        ? t(labels.pageUi.modeStandaloneLocal)
+        : t(labels.pageUi.synchronizedMembers)
+            .replace("{count}", syncedMembers.toLocaleString(uiLocale))
+            .replace("{total}", replicaMembers.length.toLocaleString(uiLocale));
 
     return (
         <section className="mx-auto max-w-6xl px-4 py-8">
@@ -554,13 +572,13 @@ export function DbStatusPage() {
                         {hasReplicaSummary && replicaSet && (
                             <TonePill
                                 tone={getReplicaTone(replicaSet.summary.status)}
-                                label={`${replicaLabels.setName} ${getReplicaStatusLabel(replicaSet.summary.status)}`}
+                                label={`${replicaLabels.setName} ${t(getReplicaStatusLabel(replicaSet.summary.status))}`}
                             />
                         )}
                     </div>
-                    <h1 className="text-2xl font-semibold text-gray-950">Etat des bases de donnees</h1>
+                    <h1 className="text-2xl font-semibold text-gray-950">{t(labels.pageUi.etatDesBasesDeDonnees)}</h1>
                     <p className="mt-2 max-w-3xl text-sm text-gray-600">
-                        {labels.dbStatus.replica.autoRefreshDescription}
+                        {translateUiLabelTree(labels.dbStatus.replica.autoRefreshDescription, t)}
                     </p>
                 </div>
 
@@ -571,33 +589,33 @@ export function DbStatusPage() {
                     disabled={loading}
                 >
                     <RefreshCw className={"h-4 w-4 " + (refreshing ? "animate-spin" : "")} />
-                    {labels.dbStatus.replica.refreshAction}
+                    {translateUiLabelTree(labels.dbStatus.replica.refreshAction, t)}
                 </button>
             </div>
 
             {error && (
                 <div className="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                    {error.message}
+                    <UiMessage message={error.message} />
                 </div>
             )}
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <MetricCard
                     icon={<Database className="h-5 w-5" />}
-                    label="Connexion"
-                    value={data?.connection.status || (loading ? "Chargement" : "Indisponible")}
-                    detail={data?.connection.databaseName ? `${data.connection.databaseName} sur ${data.connection.host || "host inconnu"}` : undefined}
+                    label={t(labels.pageUi.databaseConnection)}
+                    value={data?.connection.status || t(loading ? labels.pageUi.loading : labels.componentUi.serviceTemporairementIndisponible)}
+                    detail={data?.connection.databaseName ? t(labels.pageUi.databaseHost).replace("{database}", data.connection.databaseName).replace("{host}", data.connection.host || t(labels.pageUi.hostInconnu)) : undefined}
                 />
                 <MetricCard
                     icon={<Activity className="h-5 w-5" />}
-                    label="Ping Mongo"
-                    value={data?.ping.ok ? "OK" : "Non disponible"}
+                    label={t(labels.pageUi.pingMongo)}
+                    value={data?.ping.ok ? "OK" : t(labels.pageUi.nonDisponible)}
                     detail={data?.ping.latencyMs != null ? `${data.ping.latencyMs} ms` : data?.ping.error || undefined}
                 />
                 <MetricCard
                     icon={<Server className="h-5 w-5" />}
                     label={replicaLabels.setName}
-                    value={replicaSet?.summary ? getReplicaStatusLabel(replicaSet.summary.status) : replicaLabels.notDetected}
+                    value={replicaSet?.summary ? t(getReplicaStatusLabel(replicaSet.summary.status)) : replicaLabels.notDetected}
                     detail={replicaSet?.available
                         ? `${replicaSet.setName || replicaLabels.detected}, ${replicaLabels.lastKnownPrimary}: ${replicaSet.primary || displayedLastKnownPrimary || replicaLabels.unknownPrimary}`
                         : replicaSet?.error || replicaSet?.summary?.message || undefined}
@@ -605,18 +623,18 @@ export function DbStatusPage() {
                 <MetricCard
                     icon={<Clock className="h-5 w-5" />}
                     label={replicaLabels.lastReading}
-                    value={data ? formatTimestamp(data.checkedAt) : "-"}
+                    value={data ? formatTimestamp(data.checkedAt, uiLocale) : "-"}
                     detail={lastRefreshStartedAt
-                        ? `${refreshing ? replicaLabels.refreshing : replicaLabels.lastRequest}: ${lastRefreshStartedAt.toLocaleTimeString("fr-CA")}`
+                        ? `${refreshing ? replicaLabels.refreshing : replicaLabels.lastRequest}: ${lastRefreshStartedAt.toLocaleTimeString(uiLocale)}`
                         : undefined}
                 />
             </div>
 
             <div className="mt-6 grid gap-4 md:grid-cols-4">
-                <MetricCard icon={<HardDrive className="h-5 w-5" />} label="Donnees" value={formatBytes(database?.dataSizeBytes)} detail={`${formatNumber(database?.objects)} document(s)`} />
-                <MetricCard icon={<HardDrive className="h-5 w-5" />} label="Stockage" value={formatBytes(database?.storageSizeBytes)} detail={`${formatNumber(database?.collections)} collection(s)`} />
-                <MetricCard icon={<HardDrive className="h-5 w-5" />} label="Index" value={formatBytes(database?.indexSizeBytes)} detail={`${formatNumber(database?.indexes)} index`} />
-                <MetricCard icon={<Activity className="h-5 w-5" />} label="Temps backend" value={data ? `${data.responseTimeMs} ms` : "-"} detail={collectionErrors.length > 0 ? `${collectionErrors.length} collection(s) en erreur` : "Collections lisibles"} />
+                <MetricCard icon={<HardDrive className="h-5 w-5" />} label={t(labels.pageUi.donnees)} value={formatBytes(database?.dataSizeBytes, uiLocale)} detail={t(labels.pageUi.documentCount).replace("{count}", formatNumber(database?.objects, uiLocale))} />
+                <MetricCard icon={<HardDrive className="h-5 w-5" />} label={t(labels.pageUi.stockage)} value={formatBytes(database?.storageSizeBytes, uiLocale)} detail={t(labels.pageUi.collectionCount).replace("{count}", formatNumber(database?.collections, uiLocale))} />
+                <MetricCard icon={<HardDrive className="h-5 w-5" />} label={t(labels.pageUi.index)} value={formatBytes(database?.indexSizeBytes, uiLocale)} detail={`${formatNumber(database?.indexes, uiLocale)} ${t(labels.pageUi.index)}`} />
+                <MetricCard icon={<Activity className="h-5 w-5" />} label={t(labels.pageUi.tempsBackend)} value={data ? `${data.responseTimeMs} ms` : "-"} detail={collectionErrors.length > 0 ? t(labels.pageUi.collectionErrors).replace("{count}", collectionErrors.length.toLocaleString(uiLocale)) : t(labels.pageUi.collectionsLisibles)} />
             </div>
 
             {replicaSet?.summary && (
@@ -642,7 +660,7 @@ export function DbStatusPage() {
                                     healthyCount: replicaSet.summary.healthyCount,
                                     memberCount: replicaSet.summary.memberCount,
                                     status: replicaSet.summary.status,
-                                })}
+                                }, t, uiLocale)}
                             </div>
                         </div>
                         <div>
@@ -660,7 +678,7 @@ export function DbStatusPage() {
                         <div>
                             <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{replicaLabels.writablePrimary}</div>
                             <div className="mt-1 font-semibold text-gray-950">
-                                {formatWritablePrimary(replicaSet.isWritablePrimary, replicaSet.summary.majorityAvailable)}
+                                {t(formatWritablePrimary(replicaSet.isWritablePrimary, replicaSet.summary.majorityAvailable))}
                             </div>
                         </div>
                         <div>
@@ -721,7 +739,7 @@ export function DbStatusPage() {
                                             </span>
                                         )}
                                     </div>
-                                    <div className="font-medium text-gray-950">{formatTimestamp(reading.checkedAt)}</div>
+                                    <div className="font-medium text-gray-950">{formatTimestamp(reading.checkedAt, uiLocale)}</div>
                                     {reading.drillCycle != null && reading.drillTotalCycles != null && (
                                         <div className="mt-1 text-xs font-semibold text-gray-700">
                                             {replicaLabels.writeSafetyDrillCycle}: {reading.drillCycle} / {reading.drillTotalCycles}
@@ -733,11 +751,11 @@ export function DbStatusPage() {
                                                 healthyCount: reading.healthyCount,
                                                 memberCount: reading.memberCount,
                                                 status: reading.status,
-                                            })}
+                                            }, t, uiLocale)}
                                         </span>
                                         <span>{replicaLabels.primary}: {reading.primaryCount}</span>
                                         <span>
-                                            {replicaLabels.writablePrimary}: {formatWritablePrimary(reading.isWritablePrimary, reading.majorityAvailable)}
+                                            {replicaLabels.writablePrimary}: {t(formatWritablePrimary(reading.isWritablePrimary, reading.majorityAvailable))}
                                         </span>
                                         <span>{replicaLabels.secondaries}: {reading.secondaryCount}</span>
                                         <span>
@@ -800,7 +818,7 @@ export function DbStatusPage() {
                                 {replicaLabels.writeSafetyDrillUpdated}
                             </div>
                             <div className="mt-1 font-semibold text-gray-950">
-                                {formatTimestamp(writeSafetyDrill.updatedAt)}
+                                {formatTimestamp(writeSafetyDrill.updatedAt, uiLocale)}
                             </div>
                         </div>
                         <div>
@@ -840,7 +858,7 @@ export function DbStatusPage() {
                     </div>
                     <div>
                         <span className="font-medium text-gray-900">{backupLabels.age}: </span>
-                        {formatAgeHours(data?.backups.latestAgeHours)}
+                        {formatAgeHours(data?.backups.latestAgeHours, uiLocale, t)}
                     </div>
                     <div>
                         <span className="font-medium text-gray-900">{backupLabels.checksum}: </span>
@@ -876,14 +894,14 @@ export function DbStatusPage() {
                             {(data?.backups.backups || []).map((backup) => (
                                 <tr key={backup.fileName}>
                                     <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900">{backup.fileName}</td>
-                                    <td className="px-4 py-3 text-right text-gray-700">{formatBytes(backup.sizeBytes)}</td>
+                                    <td className="px-4 py-3 text-right text-gray-700">{formatBytes(backup.sizeBytes, uiLocale)}</td>
                                     <td className="px-4 py-3 text-right text-gray-700">
-                                        {backup.manifest.available ? formatNumber(backup.manifest.collectionCount) : backupLabels.unavailableShort}
+                                        {backup.manifest.available ? formatNumber(backup.manifest.collectionCount, uiLocale) : backupLabels.unavailableShort}
                                     </td>
                                     <td className="px-4 py-3 text-right text-gray-700">
-                                        {backup.manifest.available ? formatNumber(backup.manifest.documentCount) : backupLabels.unavailableShort}
+                                        {backup.manifest.available ? formatNumber(backup.manifest.documentCount, uiLocale) : backupLabels.unavailableShort}
                                     </td>
-                                    <td className="px-4 py-3 text-right text-gray-700">{formatAgeHours(backup.ageHours)}</td>
+                                    <td className="px-4 py-3 text-right text-gray-700">{formatAgeHours(backup.ageHours, uiLocale, t)}</td>
                                     <td className="px-4 py-3">
                                         <StatusPill ok={!backup.sha256Error && backup.sha256FilePresent} label={getChecksumLabel(backup)} />
                                     </td>
@@ -913,7 +931,7 @@ export function DbStatusPage() {
                                             </button>
                                         </div>
                                     </td>
-                                    <td className="whitespace-nowrap px-4 py-3 text-gray-700">{formatTimestamp(backup.createdAt)}</td>
+                                    <td className="whitespace-nowrap px-4 py-3 text-gray-700">{formatTimestamp(backup.createdAt, uiLocale)}</td>
                                 </tr>
                             ))}
                             {!loading && !data?.backups.backups.length && (
@@ -932,7 +950,7 @@ export function DbStatusPage() {
                 <div className="mt-6">
                     <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                         <div>
-                            <h2 className="text-base font-semibold text-gray-950">Membres Mongo</h2>
+                            <h2 className="text-base font-semibold text-gray-950">{t(labels.pageUi.membresMongo)}</h2>
                             <p className="text-sm text-gray-500">
                                 {replicaSummary}
                             </p>
@@ -948,18 +966,18 @@ export function DbStatusPage() {
 
             <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xs">
                 <div className="border-b border-gray-200 px-4 py-3">
-                    <h2 className="text-base font-semibold text-gray-950">Collections Mongo</h2>
+                    <h2 className="text-base font-semibold text-gray-950">{t(labels.pageUi.collectionsMongo)}</h2>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
                         <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                             <tr>
-                                <th className="px-4 py-3">Collection</th>
-                                <th className="px-4 py-3">Etat</th>
-                                <th className="px-4 py-3 text-right">Documents</th>
-                                <th className="px-4 py-3 text-right">Donnees</th>
-                                <th className="px-4 py-3 text-right">Stockage</th>
-                                <th className="px-4 py-3 text-right">Index</th>
+                                <th className="px-4 py-3">{t(labels.pageUi.collection)}</th>
+                                <th className="px-4 py-3">{t(labels.pageUi.etat)}</th>
+                                <th className="px-4 py-3 text-right">{t(labels.pageUi.documents)}</th>
+                                <th className="px-4 py-3 text-right">{t(labels.pageUi.donnees)}</th>
+                                <th className="px-4 py-3 text-right">{t(labels.pageUi.stockage)}</th>
+                                <th className="px-4 py-3 text-right">{t(labels.pageUi.index)}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 bg-white">
@@ -967,19 +985,18 @@ export function DbStatusPage() {
                                 <tr key={collection.name}>
                                     <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900">{collection.name}</td>
                                     <td className="px-4 py-3">
-                                        <StatusPill ok={collection.status === "ok"} label={collection.status === "ok" ? "OK" : "Erreur"} />
+                                        <StatusPill ok={collection.status === "ok"} label={collection.status === "ok" ? "OK" : t(labels.pageUi.error)} />
                                     </td>
-                                    <td className="px-4 py-3 text-right text-gray-700">{formatNumber(collection.documentCount)}</td>
-                                    <td className="px-4 py-3 text-right text-gray-700">{formatBytes(collection.sizeBytes)}</td>
-                                    <td className="px-4 py-3 text-right text-gray-700">{formatBytes(collection.storageSizeBytes)}</td>
-                                    <td className="px-4 py-3 text-right text-gray-700">{formatNumber(collection.indexCount)} / {formatBytes(collection.indexSizeBytes)}</td>
+                                    <td className="px-4 py-3 text-right text-gray-700">{formatNumber(collection.documentCount, uiLocale)}</td>
+                                    <td className="px-4 py-3 text-right text-gray-700">{formatBytes(collection.sizeBytes, uiLocale)}</td>
+                                    <td className="px-4 py-3 text-right text-gray-700">{formatBytes(collection.storageSizeBytes, uiLocale)}</td>
+                                    <td className="px-4 py-3 text-right text-gray-700">{formatNumber(collection.indexCount, uiLocale)} / {formatBytes(collection.indexSizeBytes, uiLocale)}</td>
                                 </tr>
                             ))}
                             {!loading && !data?.collections.length && (
                                 <tr>
                                     <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                                        Aucune collection a afficher.
-                                    </td>
+                                        {t(labels.pageUi.aucuneCollectionAAfficher)}</td>
                                 </tr>
                             )}
                         </tbody>

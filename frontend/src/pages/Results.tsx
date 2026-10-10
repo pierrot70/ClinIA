@@ -1,3 +1,6 @@
+import { labels } from "../i18n/uiLabels";
+import { useUiLabels } from "../hooks/useUiLabels";
+import { translateUiLabelTree } from "../i18n/pageUiLabels";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useClinicalAnalysis } from "../hooks/useClinicalAnalysis";
 import { Link } from "react-router-dom";
@@ -27,7 +30,8 @@ function buildFallbackPayload(): ClinicalPayload {
 }
 
 const Results: React.FC = () => {
-    const { locale } = useHomeI18n();
+    const { locale: uiLocale, t } = useUiLabels();
+
     const isProd = !!import.meta.env.PROD;
     const { pendingClinicalAnalysis, clearPendingClinicalAnalysis } =
         useClinicalAnalysisNavigation();
@@ -153,7 +157,7 @@ const Results: React.FC = () => {
         if ("error" in ackResponse) {
             setBlockingActionableMessage(
                 ackResponse.error.message ||
-                    "Impossible d'enregistrer l'acknowledgment de securite."
+                    labels.pageUi.impossibleDEnregistrerLAcknowledgmentDeSecurite
             );
             setAcknowledgingIncident(false);
             return;
@@ -183,7 +187,7 @@ const Results: React.FC = () => {
             <header className="space-y-2">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <h1 className="text-2xl font-semibold text-gray-900">
-                        {locale === "en" ? "Clinical analysis" : "Analyse clinique"}
+                        {t(labels.pageUi.analyseClinique)}
                     </h1>
                     {!isProd && (
                         <div className="flex items-center gap-2">
@@ -212,13 +216,13 @@ const Results: React.FC = () => {
                                         : "bg-white text-gray-700 border-gray-200"
                                 }`}
                             >
-                                {realAI ? "IA réelle: ON" : "IA réelle: OFF"}
+                                {realAI ? t(labels.pageUi.iAReelleON) : t(labels.pageUi.iAReelleOFF)}
                             </button>
                         </div>
                     )}
                 </div>
                 <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-2 max-w-2xl">
-                    Source: {sourceMode}
+                    {t(labels.pageUi.source)}{sourceMode}
                 </p>
                 {neutralizedMessage && (
                     <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 max-w-2xl">
@@ -227,8 +231,7 @@ const Results: React.FC = () => {
                 )}
                 {!isProd && realAI && (
                     <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 max-w-2xl">
-                        ⚠️ IA réelle activée — consommation de crédits OpenAI.
-                    </p>
+                        {t(labels.pageUi.iAReelleActiveeConsommationDeCreditsOpenAI)}</p>
                 )}
             </header>
 

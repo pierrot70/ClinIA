@@ -13,6 +13,9 @@ import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { getClinicalResultStrings } from "../i18n/clinicalResultStrings";
 import { labels } from "../i18n/uiLabels";
 import { useTranslation } from "../hooks/useTranslation";
+import { UiMessage } from "./i18n/UiMessage";
+import { useUiLabels } from "../hooks/useUiLabels";
+import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 import {
   getImmediateEnglishClinicalContent,
   shouldHideFrenchSourceInEnglish,
@@ -128,6 +131,7 @@ function TranslatedContentText({
   language: "fr" | "en";
   className?: string;
 }) {
+  const { t } = useUiLabels(language);
   const sourceText = typeof text === "string" ? text : "";
   const translation = useTranslation({ text: sourceText, targetLang: language });
   const translated =
@@ -135,7 +139,7 @@ function TranslatedContentText({
     (translation.loading ||
       translation.translated === sourceText ||
       shouldHideFrenchSourceInEnglish(translation.translated))
-      ? getImmediateEnglishClinicalContent(sourceText) || "Clinical details are available in the source analysis."
+      ? getImmediateEnglishClinicalContent(sourceText) || t(UI_LABELS_FR.residualClinicalUi.detailsInSource)
       : translation.translated;
 
   if (sourceText) {
@@ -160,6 +164,7 @@ function TranslatedContentSpan({
   text: unknown;
   language: "fr" | "en";
 }) {
+  const { t } = useUiLabels(language);
   const sourceText = typeof text === "string" ? text : "";
   const translation = useTranslation({ text: sourceText, targetLang: language });
   const translated =
@@ -167,7 +172,7 @@ function TranslatedContentSpan({
     (translation.loading ||
       translation.translated === sourceText ||
       shouldHideFrenchSourceInEnglish(translation.translated))
-      ? getImmediateEnglishClinicalContent(sourceText) || "Clinical details are available in the source analysis."
+      ? getImmediateEnglishClinicalContent(sourceText) || t(UI_LABELS_FR.residualClinicalUi.detailsInSource)
       : translation.translated;
 
   if (sourceText) {
@@ -184,6 +189,7 @@ function SuggestedTreatmentDescription({
   treatmentName: string;
   language: "fr" | "en";
 }) {
+  const { t } = useUiLabels(language);
   const nameTranslation = useTranslation({
     text: treatmentName,
     targetLang: language,
@@ -193,15 +199,13 @@ function SuggestedTreatmentDescription({
     (nameTranslation.loading ||
       nameTranslation.translated === treatmentName ||
       shouldHideFrenchSourceInEnglish(nameTranslation.translated))
-      ? getImmediateEnglishClinicalContent(treatmentName) || "Clinical option"
+      ? getImmediateEnglishClinicalContent(treatmentName) || t(UI_LABELS_FR.residualClinicalUi.clinicalOption)
       : nameTranslation.translated;
 
   return (
     <>
       <span className="font-semibold">{displayedName}</span>
-      {language === "en"
-        ? " is presented as a priority option to discuss according to the clinical context."
-        : " est présenté comme option prioritaire à discuter selon le contexte clinique."}
+      {t(UI_LABELS_FR.residualClinicalUi.prioritySuffix)}
     </>
   );
 }
@@ -245,11 +249,11 @@ function truncateText(value: string, maxLength = 220) {
 function buildDynamicQuestions({
   summary,
   treatments,
-  language,
+  t,
 }: {
   summary?: string;
   treatments?: Array<Record<string, any>>;
-  language: "fr" | "en";
+  t: (source: string) => string;
 }) {
   if (!summary && (!Array.isArray(treatments) || treatments.length === 0)) {
     return [];
@@ -260,10 +264,7 @@ function buildDynamicQuestions({
 
   if (summary) {
     questions.push({
-      question:
-        language === "fr"
-          ? "Quel est le profil clinique principal retenu ici ?"
-          : "What is the main clinical profile identified here?",
+      question: t(UI_LABELS_FR.residualClinicalUi.mainProfileQuestion),
       answer: truncateText(summary),
     });
   }
@@ -273,25 +274,17 @@ function buildDynamicQuestions({
       topTreatment.justification ||
       topTreatment.indication ||
       topTreatment.summary ||
-      (language === "fr"
-        ? "Cette option ressort dans le contexte clinique actuel."
-        : "This option stands out in the current clinical context.");
+      t(UI_LABELS_FR.residualClinicalUi.optionContext);
 
     questions.push({
-      question:
-        language === "fr"
-          ? `Pourquoi ${topTreatment.name} ressort-il comme option a discuter ?`
-          : `Why does ${topTreatment.name} stand out as an option to discuss?`,
+      question: t(UI_LABELS_FR.residualClinicalUi.optionQuestion).replace("{name}", () => String(topTreatment.name)),
       answer: truncateText(String(justification)),
     });
   }
 
   if (topTreatment?.monitoring && Array.isArray(topTreatment.monitoring) && topTreatment.monitoring.length > 0) {
     questions.push({
-      question:
-        language === "fr"
-          ? "Quels points de surveillance devraient retenir l'attention ?"
-          : "Which monitoring points require attention?",
+      question: t(UI_LABELS_FR.residualClinicalUi.monitoringQuestion),
       answer: truncateText(topTreatment.monitoring.join(", ")),
     });
   }
@@ -302,10 +295,7 @@ function buildDynamicQuestions({
     topTreatment.contraindications.length > 0
   ) {
     questions.push({
-      question:
-        language === "fr"
-          ? "Quelles contre-indications ou limites doivent etre revues ?"
-          : "Which contraindications or limitations should be reviewed?",
+      question: t(UI_LABELS_FR.residualClinicalUi.contraindicationsQuestion),
       answer: truncateText(topTreatment.contraindications.join(", ")),
     });
   }
@@ -326,6 +316,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   onCopyRequest,
   copyRequestFeedback,
 }) => {
+  const { t } = useUiLabels();
   const i18n = useContext(HomeI18nContext) || { locale: "fr" };
   const targetLang = i18n.locale;
   const reviewLabels = clinicalReviewLabels(targetLang);
@@ -389,7 +380,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   const dynamicQuestions = buildDynamicQuestions({
     summary,
     treatments: normalizedTreatments as Array<Record<string, any>>,
-    language: contentLanguage,
+    t,
   });
   const renderedQuestions = dynamicQuestions.length > 0 ? dynamicQuestions : normalizedQuestions;
 
@@ -397,14 +388,14 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   if (error) {
     const helpMessage =
       errorCode === "OPENAI_ANALYZE_SATURATED"
-        ? "Le service est temporairement sature. Reessayez plus tard ou contactez un administrateur."
-        : "Merci de verifier les donnees cliniques et reessayer.";
+        ? t(UI_LABELS_FR.residualClinicalUi.saturatedHelp)
+        : t(UI_LABELS_FR.residualClinicalUi.retryHelp);
 
     return (
       <div className="space-y-6">
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-6 rounded-xl text-center">
-          <h2 className="text-lg font-semibold mb-2">Erreur d'analyse IA</h2>
-          <p className="mb-2">{error}</p>
+          <h2 className="text-lg font-semibold mb-2">{t(UI_LABELS_FR.residualClinicalUi.analysisErrorTitle)}</h2>
+          <p className="mb-2"><UiMessage message={error} /></p>
           <p>{helpMessage}</p>
         </div>
 
@@ -414,7 +405,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
             <div>
               <h2 className="text-lg font-semibold">{patientSummaryLabel}</h2>
               <p className="mt-1 text-sm text-gray-600">
-                La requete clinique demeure disponible pour faciliter le signalement de l'erreur.
+                {t(UI_LABELS_FR.residualClinicalUi.requestRetained)}
               </p>
             </div>
             {canCopyRequest ? (

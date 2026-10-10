@@ -9,6 +9,9 @@ import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 import { getCommentsPageFallback } from "../i18n/commentsPageLabels";
 import { getReceiptLabelFallback } from "../i18n/myWriteReceiptsLabels";
 import { getAppointmentCreationFallback } from "../i18n/appointmentCreationLabels";
+import { getLocalUiTranslation } from "../i18n/localUiTranslations";
+import { validUiTranslation } from "../i18n/uiLocales";
+import approvedUiKeys from "../i18n/approvedUiKeys.json";
 
 // Fallbacks locaux pour les labels critiques (clé = texte source)
 const criticalLabelFallbacks: Record<string, Record<string, string>> = {
@@ -92,7 +95,7 @@ const criticalLabelFallbacks: Record<string, Record<string, string>> = {
 };
 
 const translationCache = new Map();
-const APPROVED_UI_TRANSLATION_STORAGE_PREFIX = "clinia_ui_translation_v1";
+const APPROVED_UI_TRANSLATION_STORAGE_PREFIX = "clinia_ui_translation_v2";
 
 function getStoredTranslation(cacheKey: string) {
   try {
@@ -125,6 +128,8 @@ function shouldTranslateText(text: unknown) {
 }
 
 function getVersionedLocalFallback(text: string, targetLang: string): string | null {
+  const local = getLocalUiTranslation(text, targetLang);
+  if (local !== null) return local;
   // Product mode identifiers intentionally remain identical in every language.
   if (text === UI_LABELS_FR.header.aiMode.mock || text === UI_LABELS_FR.header.aiMode.real) return text;
   const targetBase = baseLocale(targetLang);
@@ -145,7 +150,7 @@ function getVersionedLocalFallback(text: string, targetLang: string): string | n
 }
 
 function getMissingTranslationFallback(text: string, targetLang: string): string {
-  return getVersionedLocalFallback(text, targetLang) || enFallback[text] || text;
+  return getVersionedLocalFallback(text, targetLang) || text;
 }
 
 export function useTranslation({ text, targetLang, namespace = "clinical-demo", sourceLocale = "fr", openaiModel, translationKey }: {
@@ -157,9 +162,10 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
   translationKey?: string;
 }) {
   const [error, setError] = useState<string | null>(null);
-  const cacheKey = `${translationKey || "local"}|${targetLang}`;
+  // Source is part of the identity: an edited label cannot reuse stale text.
+  const cacheKey = `${translationKey || "local"}|${targetLang}|${encodeURIComponent(text)}`;
   const isSourceLocale = baseLocale(targetLang) === baseLocale(sourceLocale);
-  const [translated, setTranslated] = useState(text);
+  const [translated, setTranslated] = useState(() => getVersionedLocalFallback(text, targetLang) ?? text);
   const [loading, setLoading] = useState(!isSourceLocale);
   const requestVersionRef = useRef(0);
 
@@ -193,12 +199,12 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
       setLoading(false);
       return;
     }
-    if (!translationKey) {
+    if (!translationKey || (approvedUiKeys as Record<string, string>)[translationKey] !== text) {
       setTranslated(getMissingTranslationFallback(text, targetLang));
       setLoading(false);
       return;
     }
-    if (translationCache.has(cacheKey)) {
+    if (translationCache.has(cacheKey) && validUiTranslation(text, translationCache.get(cacheKey))) {
       setTranslated(translationCache.get(cacheKey));
       setLoading(false);
       return;
@@ -206,7 +212,7 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
     // Only opaque, backend-approved UI keys reach this branch. Never persist
     // clinical text, patient data, or generated analysis content in browser storage.
     const storedTranslation = getStoredTranslation(cacheKey);
-    if (storedTranslation) {
+    if (storedTranslation && validUiTranslation(text, storedTranslation)) {
       translationCache.set(cacheKey, storedTranslation);
       setTranslated(storedTranslation);
       setLoading(false);
@@ -217,8 +223,9 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
       .then((result) => {
         if (!disposed && requestVersionRef.current === requestVersion) {
           let clean = result;
+          if (!validUiTranslation(text, clean)) throw new Error("Invalid UI translation");
           if (typeof clean === "string" && clean.match(/^Le texte reste le m[êe]me/)) {
-            clean = text;
+            throw new Error("Invalid UI translation explanation");
           }
           translationCache.set(cacheKey, clean);
           storeTranslation(cacheKey, clean);
@@ -251,5 +258,7 @@ export function useTranslation({ text, targetLang, namespace = "clinical-demo", 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, targetLang, namespace, sourceLocale, translationKey]);
 
-  return { translated, loading, error };
+  // Local labels follow the selector in the same render, including while a
+  // remote lookup from an older locale is still finishing.
+  return { translated: getVersionedLocalFallback(text, targetLang) ?? translated, loading, error };
 }

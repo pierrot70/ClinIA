@@ -13,12 +13,12 @@ import {
   HOME_STRINGS_HE,
   HOME_STRINGS_JA,
   HOME_STRINGS_KO,
+  HOME_STRINGS_NO,
   HOME_STRINGS_VI,
   HOME_STRINGS_ZH,
-  hasValidHomeStringsShape,
   type HomeStrings,
 } from "../i18n/homeStrings";
-import { translateHomeStrings } from "../services/i18nApi";
+import { UI_LOCALES, normalizeUiLocale } from "../i18n/uiLocales";
 
 type Locale = string;
 
@@ -38,17 +38,7 @@ type HomeI18nContextValue = {
 export const HomeI18nContext = createContext<HomeI18nContextValue | null>(null);
 const UI_LOCALE_STORAGE_KEY = "clinia_ui_locale_v3";
 
-const SUPPORTED_UI_LOCALES = [
-  "fr-CA",
-  "en-CA",
-  "ja",
-  "zh",
-  "he",
-  "es",
-  "ko-KR",
-  "vi",
-  "no-NO",
-] as const;
+const SUPPORTED_UI_LOCALES = UI_LOCALES;
 type SupportedUiLocale = (typeof SUPPORTED_UI_LOCALES)[number];
 
 const toSupportedUiLocale = (value: string): SupportedUiLocale => {
@@ -144,6 +134,7 @@ const LOCAL_HOME_STRINGS_BY_BASE: Record<string, HomeStrings> = {
   es: HOME_STRINGS_ES,
   ko: HOME_STRINGS_KO,
   vi: HOME_STRINGS_VI,
+  no: HOME_STRINGS_NO,
 };
 
 const getLocalHomeStrings = (baseLang: string): HomeStrings => {
@@ -157,147 +148,48 @@ const getLocalHomeStrings = (baseLang: string): HomeStrings => {
   if (normalized.startsWith("es")) return HOME_STRINGS_ES;
   if (normalized.startsWith("ko")) return HOME_STRINGS_KO;
   if (normalized.startsWith("vi")) return HOME_STRINGS_VI;
+  if (normalized.startsWith("no")) return HOME_STRINGS_NO;
   return HOME_STRINGS_EN;
 };
 
-const LOCAL_SCRIPT_LOCK_LANGS = new Set(["he", "ja", "ko"]);
 
 export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [locale, setLocaleState] = useState<Locale>("en-CA");
-  const [strings, setStrings] = useState<HomeStrings>(HOME_STRINGS_EN);
-  const [isTranslating, setIsTranslating] = useState(false);
+  const [locale, setLocaleState] = useState<Locale>(() => {
+    try {
+      const stored = window.localStorage.getItem(UI_LOCALE_STORAGE_KEY);
+      if (stored) return normalizeUiLocale(stored);
+    } catch {}
+    return detectBrowserUiLocale();
+  });
+  const [strings, setStrings] = useState<HomeStrings>(() => getLocalHomeStrings(toBaseLang(locale)));
+  const isTranslating = false;
+
+  useEffect(() => {
+    const previousLang = document.documentElement.lang;
+    const previousDir = document.documentElement.dir;
+    document.documentElement.lang = locale;
+    document.documentElement.dir = toBaseLang(locale) === "he" ? "rtl" : "ltr";
+    return () => {
+      document.documentElement.lang = previousLang;
+      document.documentElement.dir = previousDir;
+    };
+  }, [locale]);
 
   const setLocaleFromVoice = useCallback(async (target: Locale) => {
-    const normalizedTarget = toSupportedUiLocale(target);
+    const normalizedTarget = normalizeUiLocale(target);
     const targetBase = toBaseLang(normalizedTarget);
-
-    if (!normalizedTarget || targetBase === "fr") {
-      setLocaleState("fr-CA");
-      setStrings(HOME_STRINGS_FR);
-      try {
-        window.localStorage.setItem(UI_LOCALE_STORAGE_KEY, "fr-CA");
-      } catch (e) {}
-      return {
-        voiceAck: buildVoiceAck("fr"),
-        dictationInstruction: buildDictationPrompt("fr"),
-      };
-    }
-
-    // KISS: apply a local bundle immediately so UI updates without reload,
-    // then refine with cache/API if available.
     setLocaleState(normalizedTarget);
     setStrings(getLocalHomeStrings(targetBase));
     try {
       window.localStorage.setItem(UI_LOCALE_STORAGE_KEY, normalizedTarget);
-    } catch (e) {}
-
-    if (LOCAL_SCRIPT_LOCK_LANGS.has(targetBase)) {
-      // Keep native-script bundles deterministic for these locales.
-      try {
-        window.localStorage.removeItem(cacheKeyForLocale(targetBase));
-      } catch (e) {}
-      return {
-        voiceAck: buildVoiceAck(targetBase),
-        dictationInstruction: buildDictationPrompt(targetBase),
-      };
-    }
-
-    setIsTranslating(true);
-    try {
-      const cached = window.localStorage.getItem(
-        cacheKeyForLocale(targetBase)
-      );
-      if (cached) {
-        const parsed = JSON.parse(cached) as
-          | HomeStrings
-          | {
-              strings: HomeStrings;
-              resolvedLang?: string;
-              voicePrompts?: {
-                dictationInstruction?: string;
-              };
-            };
-
-        const cachedStrings =
-          (parsed as { strings?: HomeStrings }).strings ||
-          (parsed as HomeStrings);
-
-        const cachedPrompt =
-          (parsed as { voicePrompts?: { dictationInstruction?: string } })
-            ?.voicePrompts?.dictationInstruction;
-
-        const cachedResolvedLang =
-          (parsed as { resolvedLang?: string })?.resolvedLang;
-
-        const cachedBase = (cachedResolvedLang || "").toLowerCase().slice(0, 2);
-        const isFallbackEnglishUnderNonEnglishTarget =
-          targetBase !== "en" &&
-          JSON.stringify(cachedStrings) === JSON.stringify(HOME_STRINGS_EN);
-        const hasInvalidCachedShape =
-          !hasValidHomeStringsShape(cachedStrings);
-
-        if (
-          hasInvalidCachedShape ||
-          (cachedBase && cachedBase !== targetBase) ||
-          isFallbackEnglishUnderNonEnglishTarget
-        ) {
-          window.localStorage.removeItem(cacheKeyForLocale(targetBase));
-        } else {
-          setStrings(cachedStrings);
-          setLocaleState(normalizedTarget);
-          try {
-            window.localStorage.setItem(UI_LOCALE_STORAGE_KEY, normalizedTarget);
-          } catch (e) {}
-          return {
-            voiceAck: buildVoiceAck(targetBase),
-            dictationInstruction:
-              cachedPrompt || buildDictationPrompt(targetBase),
-          };
-        }
-      }
-
-      const translated = await translateHomeStrings(targetBase);
-
-      const translatedBase = (translated.resolvedLang || "")
-        .toLowerCase()
-        .slice(0, 2);
-      const isMismatchedTranslation =
-        translatedBase.length > 0 && translatedBase !== targetBase;
-
-      if (isMismatchedTranslation) {
-        throw new Error("MISMATCHED_TRANSLATION_LOCALE");
-      }
-
-      setStrings(translated.strings);
-      setLocaleState(normalizedTarget);
-      window.localStorage.setItem(
-        cacheKeyForLocale(targetBase),
-        JSON.stringify({
-          strings: translated.strings,
-          resolvedLang: translated.resolvedLang || targetBase,
-          voicePrompts: translated.voicePrompts,
-        })
-      );
-      try {
-        window.localStorage.setItem(UI_LOCALE_STORAGE_KEY, normalizedTarget);
-      } catch (e) {}
-      return {
-        voiceAck: translated.voiceAck || buildVoiceAck(targetBase),
-        dictationInstruction:
-          translated.voicePrompts?.dictationInstruction ||
-          buildDictationPrompt(targetBase),
-      };
-    } catch (err) {
-      // Keep the already-applied local bundle for the requested language.
-      return {
-        voiceAck: buildVoiceAck(targetBase),
-        dictationInstruction: buildDictationPrompt(targetBase),
-      };
-    } finally {
-      setIsTranslating(false);
-    }
+      window.localStorage.removeItem(cacheKeyForLocale(targetBase));
+    } catch {}
+    return {
+      voiceAck: buildVoiceAck(targetBase),
+      dictationInstruction: buildDictationPrompt(targetBase),
+    };
   }, []);
 
   const setLocaleFromDropdown = useCallback(
@@ -312,23 +204,18 @@ export const HomeI18nProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const applyInitialLocale = async () => {
       let initialLocale: SupportedUiLocale | null = null;
-      // 1. Try browser language
+      // Restore the user's explicit selection before browser preferences.
       try {
-        const browserLocale = detectBrowserUiLocale();
-        if (browserLocale) {
-          initialLocale = browserLocale;
-        }
+        const stored = window.localStorage.getItem(UI_LOCALE_STORAGE_KEY);
+        if (stored) initialLocale = normalizeUiLocale(stored);
       } catch (e) {
         initialLocale = null;
       }
 
-      // 2. Try localStorage if browser language not found
+      // Use browser language only when the user has not chosen a locale.
       if (!initialLocale) {
         try {
-          const stored = window.localStorage.getItem(UI_LOCALE_STORAGE_KEY);
-          if (stored) {
-            initialLocale = toSupportedUiLocale(stored);
-          }
+          initialLocale = detectBrowserUiLocale();
         } catch (e) {
           initialLocale = null;
         }

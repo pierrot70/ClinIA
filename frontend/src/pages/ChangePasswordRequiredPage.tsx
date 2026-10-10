@@ -1,3 +1,4 @@
+import { UiMessage } from "../components/i18n/UiMessage";
 import { exceedsNewPasswordByteLimit } from "../auth/passwordPolicy";
 import { passwordPolicyLabels } from "../i18n/passwordPolicyLabels";
 import React, { useContext, useState } from "react";
@@ -6,6 +7,7 @@ import { useAuth } from "../hooks/useAuth";
 import { labels } from "../i18n/uiLabels";
 import { useTranslation } from "../hooks/useTranslation";
 import { API_URL } from "../services/config";
+import { UiText } from "../components/i18n/UiText";
 
 const ChangePasswordRequiredPage: React.FC = () => {
     const { authFetch, logout, user } = useAuth();
@@ -36,11 +38,11 @@ const ChangePasswordRequiredPage: React.FC = () => {
         setDone(null);
 
         if (exceedsNewPasswordByteLimit(newPassword)) {
-            setError(passwordPolicyLabels(targetLang).tooLong);
+            setError(labels.auth.passwordPolicy.tooLong);
             return;
         }
         if (newPassword !== confirmPassword) {
-            setError(mismatch);
+            setError(pageLabels.mismatch);
             return;
         }
 
@@ -58,19 +60,19 @@ const ChangePasswordRequiredPage: React.FC = () => {
             if (!response.ok) {
                 setError(
                     payload?.error?.message ||
-                        "Impossible de finaliser le changement de mot de passe."
+                        labels.generalUi.passwordChangeFailed
                 );
                 return;
             }
 
-            setDone(success);
+            setDone(pageLabels.success);
             setNewPassword("");
             setConfirmPassword("");
             window.setTimeout(() => {
                 window.location.replace("/login");
             }, 1200);
         } catch {
-            setError("Impossible de finaliser le changement de mot de passe.");
+            setError(labels.generalUi.passwordChangeFailed);
         } finally {
             setSaving(false);
         }
@@ -87,8 +89,8 @@ const ChangePasswordRequiredPage: React.FC = () => {
                         {user.email}
                     </p>
                 )}
-                {error && <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
-                {done && <div className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{done}</div>}
+                {error && <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700"><UiMessage message={error} /></div>}
+                {done && <div className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700"><UiText text={done} /></div>}
                 <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                     <div>
                         <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor="forced-new-password">

@@ -1,0 +1,30 @@
+import { UI_LABELS_FR } from "./uiLabels.fr";
+import { baseUiLocale } from "./uiLocales";
+
+// French source, then EN, ES, KO, VI, NO, JA, ZH, HE.
+// Only fixed interface labels; codes, secrets and user input never enter this table.
+export const authUiRows: readonly (readonly string[])[] = [
+    [UI_LABELS_FR.loginPage.action.creating, "Creating...", "Creando...", "생성 중…", "Đang tạo…", "Oppretter...", "作成中…", "正在创建…", "יוצר…"],
+    [UI_LABELS_FR.loginPage.errors.invalidCredentials, "Invalid credentials.", "Credenciales incorrectas.", "로그인 정보가 올바르지 않습니다.", "Thông tin đăng nhập không hợp lệ.", "Ugyldig påloggingsinformasjon.", "認証情報が正しくありません。", "登录信息无效。", "פרטי ההתחברות שגויים."],
+    [UI_LABELS_FR.loginPage.errors.invalidMfaCode, "Invalid MFA code.", "Código MFA incorrecto.", "MFA 코드가 올바르지 않습니다.", "Mã MFA không hợp lệ.", "Ugyldig MFA-kode.", "MFAコードが正しくありません。", "MFA 验证码无效。", "קוד האימות הדו־שלבי שגוי."],
+    [UI_LABELS_FR.loginPage.errors.mfaVerificationFailed, "Unable to verify the MFA code.", "No se pudo verificar el código MFA.", "MFA 코드를 확인할 수 없습니다.", "Không thể xác minh mã MFA.", "Kunne ikke bekrefte MFA-koden.", "MFAコードを確認できません。", "无法验证 MFA 验证码。", "לא ניתן לאמת את קוד האימות הדו־שלבי."],
+    [UI_LABELS_FR.loginPage.recovery.unavailable, "Password recovery is temporarily unavailable. Contact a ClinIA administrator.", "La recuperación de contraseña no está disponible temporalmente. Contacte con un administrador de ClinIA.", "비밀번호 재설정을 일시적으로 사용할 수 없습니다. ClinIA 관리자에게 문의하세요.", "Chức năng đặt lại mật khẩu tạm thời không khả dụng. Hãy liên hệ quản trị viên ClinIA.", "Tilbakestilling av passord er midlertidig utilgjengelig. Kontakt en ClinIA-administrator.", "パスワードの再設定は一時的に利用できません。ClinIA管理者にお問い合わせください。", "密码重置功能暂时不可用。请联系 ClinIA 管理员。", "איפוס הסיסמה אינו זמין זמנית. יש לפנות למנהל ClinIA."],
+    [UI_LABELS_FR.loginPage.mfa.title, "Two-factor verification", "Verificación en dos pasos", "2단계 인증", "Xác minh hai bước", "Tofaktorbekreftelse", "二要素認証", "双重验证", "אימות דו־שלבי"],
+    [UI_LABELS_FR.loginPage.mfa.description, "Enter the six-digit code from your authenticator app.", "Introduzca el código de seis dígitos de su aplicación de autenticación.", "인증 앱의 6자리 코드를 입력하세요.", "Nhập mã gồm sáu chữ số từ ứng dụng xác thực của bạn.", "Skriv inn den sekssifrede koden fra autentiseringsappen din.", "認証アプリの6桁のコードを入力してください。", "请输入身份验证应用中的六位验证码。", "יש להזין את הקוד בן שש הספרות מאפליקציית האימות."],
+    [UI_LABELS_FR.loginPage.mfa.enrollmentDescription, "Add this key to your authenticator app, then enter the displayed code.", "Añada esta clave a su aplicación de autenticación e introduzca el código mostrado.", "이 키를 인증 앱에 추가한 다음 표시된 코드를 입력하세요.", "Thêm khóa này vào ứng dụng xác thực, sau đó nhập mã được hiển thị.", "Legg til denne nøkkelen i autentiseringsappen, og skriv deretter inn koden som vises.", "このキーを認証アプリに追加し、表示されたコードを入力してください。", "将此密钥添加到身份验证应用，然后输入显示的验证码。", "יש להוסיף את המפתח לאפליקציית האימות ואז להזין את הקוד המוצג."],
+    [UI_LABELS_FR.loginPage.mfa.manualEntryKey, "Setup key", "Clave de configuración", "설정 키", "Khóa thiết lập", "Oppsettsnøkkel", "設定キー", "设置密钥", "מפתח הגדרה"],
+    [UI_LABELS_FR.loginPage.mfa.codeLabel, "Verification code or recovery code", "Código de verificación o de recuperación", "인증 코드 또는 복구 코드", "Mã xác minh hoặc mã khôi phục", "Bekreftelseskode eller gjenopprettingskode", "認証コードまたはリカバリーコード", "验证码或恢复码", "קוד אימות או קוד שחזור"],
+    [UI_LABELS_FR.loginPage.mfa.verify, "Verify and sign in", "Verificar e iniciar sesión", "확인하고 로그인", "Xác minh và đăng nhập", "Bekreft og logg inn", "確認してログイン", "验证并登录", "אימות והתחברות"],
+    [UI_LABELS_FR.loginPage.mfa.challengeExpiredRestart, "This MFA challenge is no longer valid. Sign in again with your credentials to get a new challenge.", "Esta solicitud MFA ya no es válida. Inicie sesión de nuevo con sus credenciales para obtener una nueva solicitud.", "이 MFA 인증 요청은 더 이상 유효하지 않습니다. 로그인 정보를 다시 입력하여 새 인증 요청을 받으세요.", "Yêu cầu xác minh MFA này không còn hợp lệ. Hãy đăng nhập lại để nhận yêu cầu mới.", "Denne MFA-forespørselen er ikke lenger gyldig. Logg inn på nytt for å få en ny forespørsel.", "このMFA認証要求は無効です。認証情報で再度ログインし、新しい認証要求を取得してください。", "此 MFA 验证请求已失效。请使用登录信息重新登录以获取新的验证请求。", "בקשת האימות הזו אינה תקפה עוד. יש להתחבר שוב עם פרטי ההתחברות כדי לקבל בקשה חדשה."],
+    [UI_LABELS_FR.loginPage.mfa.temporarilyLocked, "Too many invalid MFA codes. Try again in 15 minutes with your credentials.", "Demasiados códigos MFA incorrectos. Vuelva a intentarlo en 15 minutos con sus credenciales.", "잘못된 MFA 코드 입력 횟수가 너무 많습니다. 15분 후 로그인 정보로 다시 시도하세요.", "Đã nhập quá nhiều mã MFA không hợp lệ. Hãy thử đăng nhập lại sau 15 phút.", "For mange ugyldige MFA-koder. Prøv å logge inn igjen om 15 minutter.", "無効なMFAコードの入力回数が多すぎます。15分後に認証情報で再試行してください。", "无效 MFA 验证码次数过多。请在 15 分钟后使用登录信息重试。", "הוזנו יותר מדי קודי אימות שגויים. יש לנסות להתחבר שוב בעוד 15 דקות."],
+    [UI_LABELS_FR.loginPage.mfa.recoveryCodesTitle, "Recovery codes", "Códigos de recuperación", "복구 코드", "Mã khôi phục", "Gjenopprettingskoder", "リカバリーコード", "恢复码", "קודי שחזור"],
+    [UI_LABELS_FR.loginPage.mfa.recoveryCodesDescription, "Keep these codes in a safe place. Each code can only be used once.", "Guarde estos códigos en un lugar seguro. Cada código solo puede utilizarse una vez.", "이 코드를 안전한 곳에 보관하세요. 각 코드는 한 번만 사용할 수 있습니다.", "Giữ các mã này ở nơi an toàn. Mỗi mã chỉ có thể sử dụng một lần.", "Oppbevar kodene på et trygt sted. Hver kode kan bare brukes én gang.", "これらのコードを安全な場所に保管してください。各コードは一度だけ使用できます。", "请将这些恢复码保存在安全的地方。每个恢复码只能使用一次。", "יש לשמור את הקודים במקום בטוח. ניתן להשתמש בכל קוד פעם אחת בלבד."],
+    [UI_LABELS_FR.loginPage.mfa.continue, "Continue to ClinIA", "Continuar a ClinIA", "ClinIA로 계속", "Tiếp tục đến ClinIA", "Fortsett til ClinIA", "ClinIAへ進む", "继续进入 ClinIA", "המשך אל ClinIA"],
+];
+
+const languages = ["fr", "en", "es", "ko", "vi", "no", "ja", "zh", "he"];
+export function localizeAuthUiLabel(source: string, locale: string): string | null {
+    const row = authUiRows.find(entry => entry[0] === source);
+    const column = languages.indexOf(baseUiLocale(locale));
+    return row && column >= 0 ? row[column] ?? null : null;
+}

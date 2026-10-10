@@ -1,3 +1,6 @@
+import { UiMessage } from "../i18n/UiMessage";
+import { UiText } from "../i18n/UiText";
+
 type SaveFeedbackType = "info" | "success" | "error";
 
 type SaveFeedbackProps = {
@@ -18,7 +21,7 @@ export function SaveFeedback({ type, message }: SaveFeedbackProps) {
             role="status"
             aria-live="polite"
         >
-            {message}
+            {type === "error" ? <UiMessage message={message} /> : <UiText text={message} />}
         </div>
     );
 }

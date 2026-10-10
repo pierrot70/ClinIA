@@ -2,6 +2,8 @@ import { UI_LABELS_FR } from "./uiLabels.fr";
 
 // Fallback anglais pour les textes statiques cliniques
 export const enFallback: Record<string, string> = {
+  [UI_LABELS_FR.app.landing.supportingText]: "ClinIA uses AI to accelerate clinical research, compare plausible therapeutic alternatives, and present references you can consult.",
+  [UI_LABELS_FR.app.landing.demoTooltip]: "This button lets you explore the application without signing in.",
   [UI_LABELS_FR.loginPage.mfa.title]: "Two-factor verification",
   [UI_LABELS_FR.loginPage.mfa.description]: "Enter the six-digit code from your authenticator app.",
   [UI_LABELS_FR.loginPage.mfa.enrollmentDescription]: "Add this key to your authenticator app, then enter the displayed code.",

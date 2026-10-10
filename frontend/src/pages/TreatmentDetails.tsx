@@ -1,3 +1,6 @@
+import { labels } from "../i18n/uiLabels";
+import { useUiLabels } from "../hooks/useUiLabels";
+import { translateUiLabelTree } from "../i18n/pageUiLabels";
 import React from "react";
 import { useLocation, useParams, Link } from "react-router-dom";
 import { hypertensionTreatments } from "../data/hypertension";
@@ -40,47 +43,47 @@ function getClinicalRelevanceLabel(treatment?: DetailTreatment) {
       : 0;
 
   if (evidenceLevel === "A" && monitoringCount <= 1 && contraindicationCount <= 1) {
-    return "Pertinence clinique elevee";
+    return labels.pageUi.pertinenceCliniqueElevee;
   }
 
   if (evidenceLevel === "A" || evidenceLevel === "B") {
     if (monitoringCount >= 2 || contraindicationCount >= 2) {
-      return "Option pertinente avec vigilance";
+      return labels.pageUi.optionPertinenteAvecVigilance;
     }
-    return "Option cliniquement solide";
+    return labels.pageUi.optionCliniquementSolide;
   }
 
   if (flags.includes("wellTolerated") && flags.includes("monitoring")) {
-    return "A evaluer selon le contexte";
+    return labels.pageUi.aEvaluerSelonLeContexte;
   }
 
   if (flags.includes("wellTolerated")) {
-    return "Option courante";
+    return labels.pageUi.optionCourante;
   }
 
   if (flags.includes("monitoring")) {
-    return "Option a surveiller";
+    return labels.pageUi.optionASurveiller;
   }
 
-  return "A discuter";
+  return labels.pageUi.aDiscuter;
 }
 
 function getSourceLabel(sourceMode?: string, realAI?: boolean) {
   if (sourceMode === "real") {
     return realAI
-      ? "Reponse OpenAI reelle"
-      : "Reponse OpenAI reelle mise en cache";
+      ? labels.pageUi.reponseOpenAIReelle
+      : labels.pageUi.reponseOpenAIReelleMiseEnCache;
   }
 
   if (sourceMode === "degraded") {
-    return "Reponse degradee de secours";
+    return labels.pageUi.reponseDegradeeDeSecours;
   }
 
   if (sourceMode === "mock") {
-    return "Donnees simulees";
+    return labels.pageUi.donneesSimulees;
   }
 
-  return "Contexte clinique genere";
+  return labels.pageUi.contexteCliniqueGenere;
 }
 
 function normalizeList(value?: string[] | string) {
@@ -112,6 +115,7 @@ function normalizeFallbackTreatment(treatment?: Treatment): DetailTreatment | nu
 }
 
 const TreatmentDetails: React.FC = () => {
+    const { locale: uiLocale, t } = useUiLabels();
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const locationState = (location.state as TreatmentLocationState | null) ?? null;
@@ -127,11 +131,9 @@ const TreatmentDetails: React.FC = () => {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10">
         <p className="text-sm text-gray-600 mb-4">
-          Traitement introuvable.
-        </p>
+          {t(labels.pageUi.traitementIntrouvable)}</p>
         <Link to="/results" className="text-primary text-sm hover:underline">
-          &larr; Retour aux résultats
-        </Link>
+          {t(labels.pageUi.retourAuxResultats)}</Link>
       </div>
     );
   }
@@ -146,78 +148,73 @@ const TreatmentDetails: React.FC = () => {
   );
   const surveillanceLabel =
     monitoringItems.length >= 2
-      ? "Surveillance renforcee"
+      ? labels.pageUi.surveillanceRenforcee
       : monitoringItems.length === 1 || flags.includes("monitoring")
-      ? "Surveillance ciblee"
-      : "Surveillance standard";
+      ? labels.pageUi.surveillanceCiblee
+      : labels.pageUi.surveillanceStandard;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10 space-y-6">
       <div className="space-y-1">
         <p className="text-xs text-gray-500 uppercase tracking-wide">
-          {sourceLabel}
+          {t(sourceLabel)}
         </p>
         <h1 className="text-2xl font-semibold text-gray-900">
           {treatment.name}
         </h1>
-        <p className="text-sm text-gray-600">{treatment.class ?? "Traitement"}</p>
+        <p className="text-sm text-gray-600">{treatment.class ?? t(labels.pageUi.treatment)}</p>
       </div>
 
       <section className="grid sm:grid-cols-3 gap-4 text-sm">
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-xs">
-          <div className="text-xs text-gray-500">Pertinence clinique</div>
+          <div className="text-xs text-gray-500">{t(labels.pageUi.pertinenceClinique)}</div>
           <div className="text-lg font-semibold text-primary">
-            {relevanceLabel}
+            {t(relevanceLabel)}
           </div>
           <p className="text-[11px] text-gray-500 mt-1">
-            Repere qualitatif derive du niveau de preuve, de la surveillance et des contre-indications.
-          </p>
+            {t(labels.pageUi.repereQualitatifDeriveDuNiveauDePreuveDeLaSurveillanceEtDesContreIndic)}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-xs">
-          <div className="text-xs text-gray-500">Surveillance</div>
+          <div className="text-xs text-gray-500">{t(labels.pageUi.surveillance)}</div>
           <div className="text-sm font-semibold text-amber-600">
-            {surveillanceLabel}
+            {t(surveillanceLabel)}
           </div>
           <p className="text-[11px] text-gray-500 mt-1">
             {monitoringItems.length > 0
-              ? `${monitoringItems.length} point(s) de surveillance identifie(s).`
-              : "Aucun point de surveillance detaille fourni."}
+              ? t(labels.pageUi.monitoringCount).replace("{count}", monitoringItems.length.toLocaleString(uiLocale))
+              : t(labels.pageUi.aucunPointDeSurveillanceDetailleFourni)}
           </p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-xs">
-          <div className="text-xs text-gray-500">Source du contenu</div>
+          <div className="text-xs text-gray-500">{t(labels.pageUi.sourceDuContenu)}</div>
           <div className="text-sm font-semibold text-gray-900">
-            {sourceLabel}
+            {t(sourceLabel)}
           </div>
           <p className="text-[11px] text-gray-500 mt-1">
-            Cette fiche reprend le contexte du traitement affiche dans la page clinique.
-          </p>
+            {t(labels.pageUi.cetteFicheReprendLeContexteDuTraitementAfficheDansLaPageClinique)}</p>
         </div>
       </section>
 
       <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs text-sm text-gray-700 space-y-3">
         <h2 className="text-sm font-semibold text-gray-800">
-          Comment interpréter ces informations ?
-        </h2>
+          {t(labels.pageUi.commentInterpreterCesInformations)}</h2>
         <p>
           {treatment.details ??
             treatment.summary ??
             treatment.indication ??
-            "Aucun detail supplementaire fourni pour cette option."}
+            t(labels.pageUi.aucunDetailSupplementaireFourniPourCetteOption)}
         </p>
         {treatment.dosage || treatment.duration ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <div className="text-xs font-semibold uppercase text-gray-500">
-                Posologie
-              </div>
-              <div>{treatment.dosage || "Non precisee"}</div>
+                {t(labels.pageUi.posologie)}</div>
+              <div>{treatment.dosage || t(labels.pageUi.nonPrecisee)}</div>
             </div>
             <div>
               <div className="text-xs font-semibold uppercase text-gray-500">
-                Duree
-              </div>
-              <div>{treatment.duration || "Non precisee"}</div>
+                {t(labels.pageUi.duree)}</div>
+              <div>{treatment.duration || t(labels.pageUi.nonPrecisee)}</div>
             </div>
           </div>
         ) : null}
@@ -226,8 +223,7 @@ const TreatmentDetails: React.FC = () => {
       <section className="grid gap-4 sm:grid-cols-2">
         <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
           <h2 className="text-sm font-semibold text-gray-800 mb-2">
-            Contre-indications
-          </h2>
+            {t(labels.pageUi.contreIndications)}</h2>
           {contraindicationItems.length > 0 ? (
             <ul className="list-disc ml-4 space-y-1 text-sm text-gray-700">
               {contraindicationItems.map((item) => (
@@ -236,15 +232,13 @@ const TreatmentDetails: React.FC = () => {
             </ul>
           ) : (
             <p className="text-sm text-gray-500">
-              Aucune contre-indication detaillee fournie.
-            </p>
+              {t(labels.pageUi.aucuneContreIndicationDetailleeFournie)}</p>
           )}
         </div>
 
         <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
           <h2 className="text-sm font-semibold text-gray-800 mb-2">
-            Points de surveillance
-          </h2>
+            {t(labels.pageUi.pointsDeSurveillance)}</h2>
           {monitoringItems.length > 0 ? (
             <ul className="list-disc ml-4 space-y-1 text-sm text-gray-700">
               {monitoringItems.map((item) => (
@@ -253,15 +247,13 @@ const TreatmentDetails: React.FC = () => {
             </ul>
           ) : (
             <p className="text-sm text-gray-500">
-              Aucun point de surveillance detaille fourni.
-            </p>
+              {t(labels.pageUi.aucunPointDeSurveillanceDetailleFourni)}</p>
           )}
         </div>
       </section>
 
       <Link to="/results" className="text-primary text-sm hover:underline">
-        &larr; Retour aux résultats
-      </Link>
+        {t(labels.pageUi.retourAuxResultats)}</Link>
     </div>
   );
 };

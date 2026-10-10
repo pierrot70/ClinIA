@@ -1,5 +1,7 @@
 import React from "react";
 import { useTranslation } from "../hooks/useTranslation";
+import { useUiLabels } from "../hooks/useUiLabels";
+import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 import {
     getImmediateEnglishClinicalContent,
     shouldHideFrenchSourceInEnglish,
@@ -23,6 +25,8 @@ function TreatmentRow({
     treatment: Treatment;
     language: "fr" | "en";
 }) {
+    const { t } = useUiLabels(language);
+    const fixed = UI_LABELS_FR.residualClinicalUi;
     const contraindications = Array.isArray(treatment.contraindications)
         ? treatment.contraindications.join(", ")
         : treatment.contraindications;
@@ -34,9 +38,9 @@ function TreatmentRow({
         english && (loading || translated === source || shouldHideFrenchSourceInEnglish(translated))
             ? getImmediateEnglishClinicalContent(source) || fallback
             : translated;
-    const name = safeEnglish(treatment.name, nameTranslation.translated, nameTranslation.loading, "Clinical option");
-    const justification = safeEnglish(treatment.justification, justificationTranslation.translated, justificationTranslation.loading, "Clinical rationale available in the source analysis.");
-    const displayedContraindications = safeEnglish(contraindications, contraindicationsTranslation.translated, contraindicationsTranslation.loading, "None listed");
+    const name = safeEnglish(treatment.name, nameTranslation.translated, nameTranslation.loading, t(fixed.clinicalOption));
+    const justification = safeEnglish(treatment.justification, justificationTranslation.translated, justificationTranslation.loading, t(fixed.rationaleInSource));
+    const displayedContraindications = safeEnglish(contraindications, contraindicationsTranslation.translated, contraindicationsTranslation.loading, t(fixed.noneListed));
 
     return (
         <tr className="border">
@@ -48,19 +52,20 @@ function TreatmentRow({
 }
 
 const AITreatmentTable: React.FC<AITreatmentTableProps> = ({ treatments, language = "fr" }) => {
-    const english = language === "en";
+    const { t } = useUiLabels(language);
+    const fixed = UI_LABELS_FR.residualClinicalUi;
     return (
         <div className="p-6 bg-white shadow-lg rounded-xl border border-gray-200">
             <h2 className="text-xl font-semibold mb-4 text-blue-700">
-                {english ? "Proposed treatment options" : "Options thérapeutiques proposées"}
+                {t(fixed.proposedOptions)}
             </h2>
 
             <table className="w-full border-collapse text-sm">
                 <thead>
                 <tr className="bg-gray-100">
-                    <th className="p-3 border">{english ? "Treatment" : "Traitement"}</th>
-                    <th className="p-3 border">{english ? "Rationale" : "Justification"}</th>
-                    <th className="p-3 border">{english ? "Contraindications" : "Contre-indications"}</th>
+                    <th className="p-3 border">{t(fixed.treatment)}</th>
+                    <th className="p-3 border">{t(fixed.rationale)}</th>
+                    <th className="p-3 border">{t(fixed.contraindications)}</th>
                 </tr>
                 </thead>
 

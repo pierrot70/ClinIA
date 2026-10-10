@@ -1,3 +1,4 @@
+import { UiMessage } from "../components/i18n/UiMessage";
 import { useCallback, useContext, useEffect, useState } from "react";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { labels } from "../i18n/uiLabels";
@@ -80,7 +81,7 @@ export function DelegatedPatientAccessPage() {
                 <p className="mt-1 max-w-3xl text-sm text-gray-600">{text.description}</p>
             </div>
             <div className="flex justify-end"><button type="button" onClick={() => void load()} disabled={loading} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">{text.refresh}</button></div>
-            {error && <div role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
+            {error && <div role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800"><UiMessage message={error} /></div>}
             {loading ? <p className="text-sm text-gray-600">{text.loading}</p> : accesses.length === 0 ? (
                 <div className="rounded border border-gray-200 bg-white p-6 text-sm text-gray-600">{text.empty}</div>
             ) : (

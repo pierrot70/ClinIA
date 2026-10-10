@@ -1,3 +1,4 @@
+import { UiMessage } from "../components/i18n/UiMessage";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { useTranslation } from "../hooks/useTranslation";
@@ -837,7 +838,7 @@ export function SpecialistsPage() {
 
             {error && (
                 <div className="text-sm text-red-600">
-                    {error.message}
+                    <UiMessage message={error.message} />
                 </div>
             )}
 

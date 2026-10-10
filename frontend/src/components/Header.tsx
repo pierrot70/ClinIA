@@ -16,6 +16,7 @@ import { isAdminRole } from "../auth/roles";
 import { SessionExpiredError } from "../services/authService";
 import { useTranslation } from "../hooks/useTranslation";
 import { labels } from "../i18n/uiLabels";
+import { useUiLabels } from "../hooks/useUiLabels";
 import {
     listClinicianCommentsInbox,
     replyToClinicianComment,
@@ -297,6 +298,7 @@ const Header: React.FC = () => {
     const todayDateValue = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const location = useLocation();
     const { locale, setLocaleFromDropdown, isTranslating } = useHomeI18n();
+    const { t } = useUiLabels();
     // ...existing code...
     const {
         isAuthenticated,
@@ -506,9 +508,7 @@ const Header: React.FC = () => {
     }, [isPublicHomeHeader]);
 
     const triggerAppShutdown = async () => {
-        const confirmed = window.confirm(
-            "Activer l'arret de l'application dans 30 secondes ? Tous les utilisateurs (sauf SUPERADMIN) seront deconnectes."
-        );
+        const confirmed = window.confirm(t(headerLabels.feedback.shutdownConfirm));
 
         if (!confirmed) {
             return;
@@ -530,29 +530,22 @@ const Header: React.FC = () => {
 
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) {
-                window.alert(
-                    payload?.error?.message ||
-                        "Impossible de planifier l'arret de l'application."
-                );
+                window.alert(t(headerLabels.feedback.shutdownFailed));
                 return;
             }
 
-            window.alert(
-                "Arret de l'application planifie dans 30 secondes pour les utilisateurs non SUPERADMIN."
-            );
+            window.alert(t(headerLabels.feedback.shutdownSuccess));
         } catch (err) {
             if (err instanceof SessionExpiredError) {
                 logout();
                 return;
             }
-            window.alert("Erreur reseau lors de la planification de l'arret.");
+            window.alert(t(headerLabels.feedback.shutdownFailed));
         }
     };
 
     const clearMaintenance = async () => {
-        const confirmed = window.confirm(
-            "Terminer la maintenance ? L'application sera accessible a tous les utilisateurs."
-        );
+        const confirmed = window.confirm(t(headerLabels.feedback.maintenanceConfirm));
 
         if (!confirmed) {
             return;
@@ -570,27 +563,22 @@ const Header: React.FC = () => {
 
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) {
-                window.alert(
-                    payload?.error?.message ||
-                        "Impossible de terminer la maintenance."
-                );
+                window.alert(t(headerLabels.feedback.maintenanceFailed));
                 return;
             }
 
-            window.alert("Maintenance terminee. L'application est de nouveau accessible.");
+            window.alert(t(headerLabels.feedback.maintenanceSuccess));
         } catch (err) {
             if (err instanceof SessionExpiredError) {
                 logout();
                 return;
             }
-            window.alert("Erreur reseau lors de la fin de maintenance.");
+            window.alert(t(headerLabels.feedback.maintenanceFailed));
         }
     };
 
     const forceReopenMaintenance = async () => {
-        const confirmed = window.confirm(
-            "Forcer la reouverture normale maintenant ? Cette action est de secours si Mongo ne sauvegarde pas correctement."
-        );
+        const confirmed = window.confirm(t(headerLabels.feedback.reopenConfirm));
 
         if (!confirmed) {
             return;
@@ -608,27 +596,22 @@ const Header: React.FC = () => {
 
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) {
-                window.alert(
-                    payload?.error?.message ||
-                        "Impossible de forcer la reouverture."
-                );
+                window.alert(t(headerLabels.feedback.reopenFailed));
                 return;
             }
 
             if (payload?.data?.persisted === false) {
-                window.alert(
-                    "Reouverture forcee activee. Attention: la sauvegarde Mongo a echoue, verifier l'etat de la base."
-                );
+                window.alert(t(headerLabels.feedback.reopenUnpersisted));
                 return;
             }
 
-            window.alert("Reouverture forcee appliquee. L'application est accessible.");
+            window.alert(t(headerLabels.feedback.reopenSuccess));
         } catch (err) {
             if (err instanceof SessionExpiredError) {
                 logout();
                 return;
             }
-            window.alert("Erreur reseau lors de la reouverture forcee.");
+            window.alert(t(headerLabels.feedback.reopenFailed));
         }
     };
 
@@ -654,17 +637,14 @@ const Header: React.FC = () => {
                         await loadActiveUsers(showLoadingState);
                     } catch (err) {
                         setActiveUsersError(
-                            err instanceof Error
-                                ? err.message
-                                : labels.auth.sensitiveAction.networkError
+                            labels.auth.sensitiveAction.networkError
                         );
                         setActiveUsers([]);
                     }
                     return;
                 }
                 setActiveUsersError(
-                    payload?.error?.message ||
-                        "Impossible de charger les usagers actifs."
+                    headerLabels.feedback.activeUsersFailed
                 );
                 setActiveUsers([]);
                 return;
@@ -677,7 +657,7 @@ const Header: React.FC = () => {
                 return;
             }
 
-            setActiveUsersError("Erreur reseau lors du chargement des usagers actifs.");
+            setActiveUsersError(headerLabels.feedback.activeUsersFailed);
             setActiveUsers([]);
         } finally {
             if (showLoadingState) {
@@ -699,7 +679,7 @@ const Header: React.FC = () => {
         setAuthLogsError(null);
 
         if (authLogStartDate && authLogEndDate && authLogStartDate > authLogEndDate) {
-            setAuthLogsError("Date debut ne peut pas etre plus grande que Date fin.");
+            setAuthLogsError(headerLabels.feedback.dateRangeInvalid);
             setAuthLogs([]);
             setAuthLogsQueryDurationMs(null);
             if (showLoadingState) {
@@ -743,9 +723,7 @@ const Header: React.FC = () => {
                         await loadAuthLogs(targetPage, showLoadingState);
                     } catch (err) {
                         setAuthLogsError(
-                            err instanceof Error
-                                ? err.message
-                                : labels.auth.sensitiveAction.networkError
+                            labels.auth.sensitiveAction.networkError
                         );
                         setAuthLogs([]);
                         setAuthLogsQueryDurationMs(Math.round(performance.now() - requestStartedAt));
@@ -753,8 +731,7 @@ const Header: React.FC = () => {
                     return;
                 }
                 setAuthLogsError(
-                    payload?.error?.message ||
-                        "Impossible de charger les logs d'authentification."
+                    headerLabels.feedback.authLogsFailed
                 );
                 setAuthLogs([]);
                 setAuthLogsQueryDurationMs(Math.round(performance.now() - requestStartedAt));
@@ -779,7 +756,7 @@ const Header: React.FC = () => {
                 return;
             }
 
-            setAuthLogsError("Erreur reseau lors du chargement des logs auth.");
+            setAuthLogsError(headerLabels.feedback.authLogsFailed);
             setAuthLogs([]);
             setAuthLogsQueryDurationMs(Math.round(performance.now() - requestStartedAt));
         } finally {
@@ -829,7 +806,7 @@ const Header: React.FC = () => {
 
     const loadAuthGraphs = async () => {
         if (authLogStartDate && authLogEndDate && authLogStartDate > authLogEndDate) {
-            setAuthGraphsError("Date debut ne peut pas etre plus grande que Date fin.");
+            setAuthGraphsError(headerLabels.feedback.dateRangeInvalid);
             setAuthGraphPoints([]);
             return;
         }
@@ -867,9 +844,7 @@ const Header: React.FC = () => {
                         await loadAuthGraphs();
                     } catch (err) {
                         setAuthGraphsError(
-                            err instanceof Error
-                                ? err.message
-                                : labels.auth.sensitiveAction.networkError
+                            labels.auth.sensitiveAction.networkError
                         );
                         setAuthGraphPoints([]);
                         setAuthGraphActions([]);
@@ -877,8 +852,7 @@ const Header: React.FC = () => {
                     return;
                 }
                 setAuthGraphsError(
-                    payload?.error?.message ||
-                        "Impossible de charger le graphique des logs auth."
+                    headerLabels.feedback.authGraphFailed
                 );
                 setAuthGraphPoints([]);
                 setAuthGraphActions([]);
@@ -901,7 +875,7 @@ const Header: React.FC = () => {
                 return;
             }
 
-            setAuthGraphsError("Erreur reseau lors du chargement du graphique auth.");
+            setAuthGraphsError(headerLabels.feedback.authGraphFailed);
             setAuthGraphPoints([]);
             setAuthGraphActions([]);
         } finally {
@@ -981,7 +955,7 @@ const Header: React.FC = () => {
             );
 
             if (!response.ok) {
-                setClinicianInboxError(response.error.message);
+                setClinicianInboxError(headerLabels.feedback.commentsFailed);
                 setClinicianInboxItems([]);
                 return;
             }
@@ -1006,7 +980,7 @@ const Header: React.FC = () => {
                 logout();
                 return;
             }
-            setClinicianInboxError("Erreur reseau lors du chargement des nouveaux commentaires.");
+            setClinicianInboxError(headerLabels.feedback.commentsFailed);
             setClinicianInboxItems([]);
         } finally {
             if (showLoadingState) {
@@ -1036,7 +1010,7 @@ const Header: React.FC = () => {
             });
 
             if ("error" in response) {
-                setSecurityIncidentError(response.error.message);
+                setSecurityIncidentError(headerLabels.feedback.incidentsFailed);
                 setSecurityIncidentItems([]);
                 return;
             }
@@ -1055,7 +1029,7 @@ const Header: React.FC = () => {
                 logout();
                 return;
             }
-            setSecurityIncidentError("Erreur reseau lors du chargement des incidents de securite.");
+            setSecurityIncidentError(headerLabels.feedback.incidentsFailed);
             setSecurityIncidentItems([]);
         } finally {
             if (showLoadingState) {
@@ -1121,7 +1095,7 @@ const Header: React.FC = () => {
             });
 
             if ("error" in response) {
-                setSecurityIncidentError(response.error.message);
+                setSecurityIncidentError(headerLabels.feedback.acknowledgeFailed);
                 return;
             }
 
@@ -1134,7 +1108,7 @@ const Header: React.FC = () => {
                 logout();
                 return;
             }
-            setSecurityIncidentError("Erreur reseau lors de l'acquittement de l'incident.");
+            setSecurityIncidentError(headerLabels.feedback.acknowledgeFailed);
         } finally {
             setSecurityIncidentAckingId("");
         }
@@ -1164,7 +1138,7 @@ const Header: React.FC = () => {
             );
 
             if (!response.ok) {
-                setClinicianInboxError(response.error.message);
+                setClinicianInboxError(headerLabels.feedback.replyFailed);
                 return;
             }
 
@@ -1181,7 +1155,7 @@ const Header: React.FC = () => {
                 logout();
                 return;
             }
-            setClinicianInboxError("Erreur reseau lors de l'enregistrement de la reponse.");
+            setClinicianInboxError(headerLabels.feedback.replyFailed);
         } finally {
             setClinicianInboxReplying(false);
         }
@@ -1311,13 +1285,13 @@ const Header: React.FC = () => {
             <div className="mx-auto max-w-6xl px-4 py-3 lg:ml-64 lg:max-w-none lg:py-2">
                 <div className="space-y-2 lg:hidden">
                     <div className="relative flex h-9 items-center justify-between">
-                        <button type="button" onClick={() => setIsMobileMenuOpen(true)} className="rounded p-2 text-xl text-slate-700" aria-label={headerLabels.controls.openMenu}>☰</button>
+                        <button type="button" onClick={() => setIsMobileMenuOpen(true)} className="rounded p-2 text-xl text-slate-700" aria-label={t(headerLabels.controls.openMenu)}>☰</button>
                         <Link to="/" className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold text-gray-900">ClinIA</Link>
-                        {isAuthenticated ? <span title="Connecté" className="flex h-9 w-9 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600">●</span> : <Link to="/login" className="rounded p-2 text-slate-700" aria-label={headerLabels.nav.login}>◯</Link>}
+                        {isAuthenticated ? <span title={t(headerLabels.controls.connected)} className="flex h-9 w-9 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600">●</span> : <Link to="/login" className="rounded p-2 text-slate-700" aria-label={t(headerLabels.nav.login)}>◯</Link>}
                     </div>
                     <label className="flex justify-center">
                         <span className="sr-only"><HeaderLabel text={headerLabels.controls.language} /></span>
-                        <select className="w-40 rounded border border-gray-300 bg-white px-2 py-1 text-xs" value={locale} onChange={onLanguageChange} disabled={isTranslating} aria-label={headerLabels.controls.language}>
+                        <select className="w-56 max-w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs" value={locale} onChange={onLanguageChange} disabled={isTranslating} aria-label={t(headerLabels.controls.language)}>
                             {languageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                         </select>
                     </label>
@@ -1327,7 +1301,7 @@ const Header: React.FC = () => {
                     <Link to="/" className="flex min-w-0 items-center gap-3">
                         <img
                             src="/logo.png"
-                            alt="ClinIA logo"
+                            alt="ClinIA"
                             className="h-10 w-auto"
                         />
                         <div className="min-w-0">
@@ -1356,7 +1330,7 @@ const Header: React.FC = () => {
                                     value={locale}
                                     onChange={onLanguageChange}
                                     disabled={isTranslating}
-                                    aria-label={headerLabels.controls.language}
+                                    aria-label={t(headerLabels.controls.language)}
                                 >
                                     {languageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                 </select>
@@ -1365,7 +1339,7 @@ const Header: React.FC = () => {
                         {isAuthenticated && user && (
                             <div className="text-right">
                                 <div className="max-w-[260px] truncate text-sm font-medium text-gray-900">
-                                    {user.email || user.id || "Utilisateur"}
+                                    {user.email || user.id || t(headerLabels.authLogsModal.tableUser)}
                                 </div>
                                 <div className="text-xs uppercase tracking-wide text-gray-500">
                                     {user.role}
@@ -1386,14 +1360,14 @@ const Header: React.FC = () => {
                                         }
                                         title={
                                             securityIncidentIndicatorError
-                                                ? securityIncidentLabels.error
+                                                ? t(securityIncidentLabels.error)
                                                 : securityIncidentCount === 1
-                                                    ? securityIncidentLabels.one
+                                                    ? t(securityIncidentLabels.one)
                                                     : securityIncidentCount && securityIncidentCount > 1
-                                                        ? `${securityIncidentCount} ${securityIncidentLabels.manySuffix}`
-                                                        : securityIncidentLabels.none
+                                                        ? `${securityIncidentCount} ${t(securityIncidentLabels.manySuffix)}`
+                                                        : t(securityIncidentLabels.none)
                                         }
-                                        aria-label={securityIncidentLabels.refresh}
+                                        aria-label={t(securityIncidentLabels.refresh)}
                                     >
                                         <span><HeaderLabel text={securityIncidentLabels.label} /></span>
                                         <span className="font-semibold">
@@ -1434,8 +1408,8 @@ const Header: React.FC = () => {
                                 }
                                 title={
                                     forceReal
-                                        ? headerLabels.aiMode.forceRealTitle
-                                        : headerLabels.aiMode.mockTitle
+                                        ? t(headerLabels.aiMode.forceRealTitle)
+                                        : t(headerLabels.aiMode.mockTitle)
                                 }
                             >
                                 <HeaderLabel text={forceReal ? headerLabels.aiMode.real : headerLabels.aiMode.mock} />
@@ -1807,11 +1781,11 @@ const Header: React.FC = () => {
                     <div className="fixed inset-y-0 left-0 z-[60] w-[86vw] max-w-sm space-y-3 overflow-y-auto border-r border-slate-200 bg-white p-4 text-gray-900 shadow-2xl lg:hidden">
                         <div className="flex items-center justify-between border-b border-slate-200 pb-3">
                             <span className="text-lg font-semibold">ClinIA</span>
-                            <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="rounded p-2 text-2xl leading-none" aria-label={headerLabels.controls.close}>×</button>
+                            <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="rounded p-2 text-2xl leading-none" aria-label={t(headerLabels.controls.close)}>×</button>
                         </div>
                         <label className="block">
-                            <span className="sr-only">Rechercher dans le menu</span>
-                            <input type="search" placeholder="Rechercher dans le menu" className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-slate-400" />
+                            <span className="sr-only"><HeaderLabel text={headerLabels.controls.searchMenu} /></span>
+                            <input type="search" placeholder={t(headerLabels.controls.searchMenu)} className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-slate-400" />
                         </label>
                         <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
@@ -1851,7 +1825,7 @@ const Header: React.FC = () => {
                                     value={locale}
                                     onChange={onLanguageChange}
                                     disabled={isTranslating}
-                                    aria-label={headerLabels.controls.language}
+                                    aria-label={t(headerLabels.controls.language)}
                                 >
                                     {languageOptions.map((option) => (
                                         <option key={option.value} value={option.value}>
@@ -2052,7 +2026,7 @@ const Header: React.FC = () => {
                             <p className="text-sm text-gray-500"><HeaderLabel text={headerLabels.activeUsersModal.loading} /></p>
                         ) : activeUsersError ? (
                             <div className="rounded bg-red-50 p-3 text-sm text-red-700">
-                                {activeUsersError}
+                                {t(activeUsersError)}
                             </div>
                         ) : activeUsers.length === 0 ? (
                             <p className="text-sm text-gray-500"><HeaderLabel text={headerLabels.activeUsersModal.empty} /></p>
@@ -2092,7 +2066,7 @@ const Header: React.FC = () => {
                 passwordEventsOnly={authLogPasswordEventsOnly}
                 options={AUTH_LOG_ACTION_OPTIONS}
                 loading={loadingAuthLogs}
-                error={authLogsError}
+                error={authLogsError ? t(authLogsError) : null}
                 logs={authLogs}
                 pagination={authLogPagination}
                 headerLabels={headerLabels}
@@ -2120,11 +2094,11 @@ const Header: React.FC = () => {
 
             <AuthGraphsModal
                 isOpen={showAuthGraphsModal}
-                title={`${headerLabels.authGraphsModal.titlePrefix} - ${AUTH_GRAPH_TYPE_LABELS[authGraphType]}`}
+                title={`${t(headerLabels.authGraphsModal.titlePrefix)} - ${t(AUTH_GRAPH_TYPE_LABELS[authGraphType])}`}
                 startDate={authLogStartDate}
                 endDate={authLogEndDate}
                 loading={loadingAuthGraphs}
-                error={authGraphsError}
+                error={authGraphsError ? t(authGraphsError) : null}
                 graphType={authGraphType}
                 graphPoints={authGraphPoints}
                 graphActions={authGraphActions}
@@ -2152,7 +2126,7 @@ const Header: React.FC = () => {
                 items={clinicianInboxItems}
                 actors={clinicianInboxActors}
                 loading={clinicianInboxLoading}
-                error={clinicianInboxError}
+                error={clinicianInboxError ? t(clinicianInboxError) : null}
                 actorFilter={clinicianInboxActorFilter}
                 categoryFilter={clinicianInboxCategoryFilter}
                 repliedFilter={clinicianInboxRepliedFilter}
@@ -2162,7 +2136,7 @@ const Header: React.FC = () => {
                 replyTargetId={clinicianInboxReplyTargetId}
                 replyMessage={clinicianInboxReplyMessage}
                 replying={clinicianInboxReplying}
-                replySuccess={clinicianInboxReplySuccess}
+                replySuccess={t(clinicianInboxReplySuccess)}
                 onClose={() => { void closeClinicianInboxModal(); }}
                 onRefresh={() => { void loadClinicianInbox(1, true); }}
                 onActorFilterChange={setClinicianInboxActorFilter}
@@ -2189,7 +2163,7 @@ const Header: React.FC = () => {
                 isOpen={showSecurityIncidentsModal}
                 items={securityIncidentItems}
                 loading={securityIncidentLoading}
-                error={securityIncidentError}
+                error={securityIncidentError ? t(securityIncidentError) : null}
                 ackingId={securityIncidentAckingId}
                 acknowledgedFilter={securityIncidentAcknowledgedFilter}
                 typeFilter={securityIncidentTypeFilter}
