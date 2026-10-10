@@ -5,6 +5,15 @@ export const UI_LABELS_FR = {
         unknown: "Inconnu",
         passwordChangeFailed: "Impossible de finaliser le changement de mot de passe.",
     },
+    securityBlocking: {
+        identifyingContent: "Le contenu detecte contient des identifiants patients. Veuillez confirmer explicitement 'J'ai lu et compris' pour continuer.",
+        loggingRequired: "L'incident de securite doit etre journalise avant de continuer.",
+        missingIncident: "Incident de securite manquant. Relancez l'analyse pour continuer.",
+        acknowledgmentFailed: "Impossible d'enregistrer la confirmation de securite. Reessayez ou contactez l'administrateur.",
+        acknowledgedRestart: "Confirmation enregistree. Relancez l'analyse pour continuer.",
+        acknowledgedReplay: "Confirmation enregistree. Analyse relancee avec le meme contenu.",
+        correctedReplay: "Analyse relancee avec les parametres corriges.",
+    },
     residualClinicalUi: {
         proposedOptions: "Options thérapeutiques proposées",
         treatment: "Traitement",
@@ -1856,7 +1865,7 @@ export const UI_LABELS_FR = {
             postalCodePlaceholder: "Ex: H2X 1S1",
         },
         table: {
-            name: "Nom",
+            name: "Nom de la clinique",
             address: "Adresse",
             postalCode: "Code postal",
             phone: "Téléphone",
@@ -2430,7 +2439,7 @@ export const UI_LABELS_FR = {
         details: "Détails",
         diagnosticSuspecte: "Diagnostic suspecté",
         certitude: "Certitude",
-        clinique: "Clinique",
+        clinique: "Vue clinique",
         traitementRecommande: "Traitement recommandé",
         niveauDePreuve: "Niveau de preuve",
         posologie: "Posologie :",

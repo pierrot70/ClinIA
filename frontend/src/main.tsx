@@ -12,8 +12,8 @@ import { ReceptionClinicProvider } from "./contexts/ReceptionClinicContext";
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   // <React.StrictMode>
     <BrowserRouter>
-      <AuthProvider>
-        <HomeI18nProvider>
+      <HomeI18nProvider>
+        <AuthProvider>
           <ClinicalAnalysisNavigationProvider>
             <ReceptionClinicProvider>
               <SecurityIncidentProvider>
@@ -21,8 +21,8 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
               </SecurityIncidentProvider>
             </ReceptionClinicProvider>
           </ClinicalAnalysisNavigationProvider>
-        </HomeI18nProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </HomeI18nProvider>
     </BrowserRouter>
   // </React.StrictMode>
 );

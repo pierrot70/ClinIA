@@ -1,11 +1,14 @@
 import React, { useCallback, useRef, useState } from "react";
 import { useAuth } from "./useAuth";
 import { labels } from "../i18n/uiLabels";
+import { useUiLabelTree } from "./useUiLabels";
+import { UiMessage } from "../components/i18n/UiMessage";
 
 type PendingResolver = ((value: boolean) => void) | null;
 
 export function useSensitiveReauthDialog() {
     const { reauthenticate, user } = useAuth();
+    const copy = useUiLabelTree(labels.auth.sensitiveAction);
     const resolverRef = useRef<PendingResolver>(null);
     const [isOpen, setIsOpen] = useState(false);
     const [password, setPassword] = useState("");
@@ -54,23 +57,23 @@ export function useSensitiveReauthDialog() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4">
             <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
                 <h2 className="text-lg font-semibold text-gray-900">
-                    {labels.auth.sensitiveAction.title}
+                    {copy.title}
                 </h2>
                 <p className="mt-2 text-sm text-gray-600">
-                    {labels.auth.sensitiveAction.description}
+                    {copy.description}
                 </p>
                 <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
                     <div className="font-medium">
-                        {labels.auth.sensitiveAction.connectedAccountPrefix} {user?.email || user?.id || "SUPERADMIN"}
+                        {copy.connectedAccountPrefix} {user?.email || user?.id || "SUPERADMIN"}
                     </div>
                     <div className="mt-1">
-                        {labels.auth.sensitiveAction.helper}
+                        {copy.helper}
                     </div>
                 </div>
 
                 <form onSubmit={onSubmit} className="mt-5 space-y-4">
                     <label className="block text-sm text-gray-700">
-                        {labels.auth.sensitiveAction.passwordLabel}
+                        {copy.passwordLabel}
                         <input
                             type="password"
                             name="current-password"
@@ -85,7 +88,7 @@ export function useSensitiveReauthDialog() {
 
                     {error ? (
                         <div className="rounded bg-red-50 p-3 text-sm text-red-700">
-                            {error}
+                            <UiMessage message={error} />
                         </div>
                     ) : null}
 
@@ -96,8 +99,8 @@ export function useSensitiveReauthDialog() {
                             className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                         >
                             {submitting
-                                ? labels.auth.sensitiveAction.confirming
-                                : labels.auth.sensitiveAction.confirm}
+                                ? copy.confirming
+                                : copy.confirm}
                         </button>
                         <button
                             type="button"
@@ -105,7 +108,7 @@ export function useSensitiveReauthDialog() {
                             disabled={submitting}
                             className="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                         >
-                            {labels.auth.sensitiveAction.cancel}
+                            {copy.cancel}
                         </button>
                     </div>
                 </form>

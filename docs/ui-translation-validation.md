@@ -21,6 +21,18 @@ Les neuf langues proposées sont déclarées dans `frontend/src/i18n/uiLocales.t
 langues peuvent utiliser un ordre différent. Les messages conservés dans l’état
 React doivent garder leur source française et être traduits lors du rendu.
 
+Donner un contexte aux libellés ambigus : « Nom de la clinique » et « Nom »
+pour un nom de famille ne doivent pas partager une traduction. Le contrôle
+de couverture vérifie la présence des traductions et leurs paramètres, pas
+leur sens. Un test de rendu doit vérifier le vocabulaire attendu pour le
+contexte, comme l’en-tête de la liste des établissements en français, anglais
+et espagnol.
+
+Les mêmes précautions s'appliquent à « Clinique » (établissement) et
+« Vue clinique », ainsi qu'à « Traitement... » pour une opération en cours.
+Les tests de contexte vérifient ces sens, les variantes régionales coréennes et
+norvégiennes et les exemples JSON dont les clés restent inchangées.
+
 ## Contrôles automatisés
 
 Depuis la racine du dépôt, sans installation ni accès à la production :
@@ -35,6 +47,11 @@ rapport `/tmp/clinia-ui-translation-coverage.json` distingue les traductions
 manquantes, les valeurs identiques et les exceptions explicites. L’inventaire
 AST `/tmp/clinia-ui-translations-audit.json` recherche aussi les textes hors
 catalogue ; ce contrôle statique ne prouve pas à lui seul le rendu d’une page.
+Il parcourt tous les fichiers JSX/TSX de `frontend/src`, y compris les hooks,
+l'authentification, les contextes et les points d'entrée, ainsi que les fichiers
+TS/JS sous `pages` et `components`. Les setters de messages spécifiques à une
+fonctionnalité sont également contrôlés. Un état servant de clé de catalogue
+est exempté seulement si son type fini et son usage comme index sont détectés.
 
 Le job frontend existant exécute également les contrôles bloquants des catalogues
 et des textes directement rendus détectables par l’analyse statique. Le fichier
@@ -48,11 +65,26 @@ ne nécessitent aucun compte MFA de staging, aucun secret et aucun envoi SMTP.
 Les tests vérifient aussi la restauration du choix et la direction RTL pour
 l’hébreu.
 
-La validation du 10 octobre 2026 couvre 1 971 libellés dans les neuf langues,
-sans traduction manquante ni paramètre perdu. L’analyse de 71 fichiers ne
+Des tests de rendu changent la langue pendant l'affichage des dialogues de
+réauthentification, de fin de session et d'incident de sécurité. D'autres
+vérifient les confirmations de rendez-vous, les reçus, les imports JSON et
+les messages de gestion des utilisateurs en français, anglais et espagnol,
+en conservant les données et identifiants synthétiques inchangés.
+
+La validation du 10 octobre 2026 couvre 1 978 libellés dans les neuf langues,
+sans traduction manquante ni paramètre perdu. L’analyse de 79 fichiers ne
 détecte aucun texte directement rendu hors des règles contrôlées. Elle conserve
-59 avertissements de revue, notamment pour les sources de messages serveur :
+89 avertissements de revue, notamment pour les sources de messages serveur :
 ce résultat ne remplace pas une vérification de tous les états à l’écran.
+
+La compilation Vite ne remplace pas le contrôle TypeScript strict. Celui-ci
+signale des erreurs préexistantes ; la comparaison avec le dernier commit
+ne détecte aucun nouveau diagnostic lié à ces corrections.
+
+Le dernier passage complet réussit : 1 973 tests frontend dans 80 fichiers,
+48 tests backend de traduction, 18 tests du contrôle AST et compilation Vite.
+Ces résultats proviennent de tests locaux et de réponses simulées, sans compte
+de production ni appel à un service de traduction.
 
 ## Cache et erreurs serveur
 

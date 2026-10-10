@@ -1,4 +1,5 @@
 import { UI_LABELS_FR } from "./uiLabels.fr";
+import { normalizeUiLocale } from "./uiLocales";
 
 type Labels = { [K in keyof typeof UI_LABELS_FR.consultations]: string };
 export const CONSULTATION_LABELS: Record<string, Labels> = {
@@ -69,5 +70,5 @@ export const CONSULTATION_LABELS: Record<string, Labels> = {
     },
 };
 export function consultationLabels(locale: string): Labels {
-    return CONSULTATION_LABELS[locale] || CONSULTATION_LABELS["en-CA"];
+    return CONSULTATION_LABELS[normalizeUiLocale(locale)];
 }

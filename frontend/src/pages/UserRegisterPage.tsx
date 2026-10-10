@@ -1,4 +1,5 @@
 import { UiMessage } from "../components/i18n/UiMessage";
+import { getLocalUiMessage } from "../i18n/localUiTranslations";
 import { useUiLabels } from "../hooks/useUiLabels";
 import { translateUiLabelTree } from "../i18n/pageUiLabels";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
@@ -21,6 +22,13 @@ const PASSWORD_MIN_LENGTH = 12;
 
 type NewUserRole = (typeof ROLE_OPTIONS)[number];
 type UserRoleFilter = (typeof USER_ROLE_FILTER_OPTIONS)[number];
+
+// Translate fixed wording at render time, leaving names and credentials intact.
+type UserFeedback = string | {
+    source: string;
+    values: Record<string, string>;
+    suffix?: string;
+};
 
 type AppliedUsersFilters = {
     search: string;
@@ -115,9 +123,22 @@ const UserRegisterPage: React.FC = () => {
     const [resetPassword, setResetPassword] = useState("");
     const [temporaryPasswordResult, setTemporaryPasswordResult] = useState<string | null>(null);
     const [editSaveStatus, setEditSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
-    const [editSaveMessage, setEditSaveMessage] = useState("");
+    const [editSaveMessage, setEditSaveMessage] = useState<UserFeedback>("");
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
+    const [success, setSuccess] = useState<UserFeedback | null>(null);
+
+    function renderFeedback(message: UserFeedback) {
+        if (typeof message === "string") return <UiMessage message={message} />;
+        const text = t(message.source).replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (token, name: string) => {
+            const value = message.values[name];
+            if (value === undefined) return token;
+            if (name === "name" && !value) return t(labels.pageUi.cetUtilisateur);
+            return name === "message"
+                ? getLocalUiMessage(value, uiLocale) ?? t(labels.generalUi.error)
+                : value;
+        });
+        return <>{text}{message.suffix ? t(message.suffix) : ""}</>;
+    }
 
     const USERS_PAGE_SIZE = 10;
     const isPrivilegedRole = (candidateRole: NewUserRole) =>
@@ -309,7 +330,7 @@ const UserRegisterPage: React.FC = () => {
 
         if (editRole === "RECEPTION" && editAssignedClinics.length === 0) {
             setEditSaveStatus("error");
-            setEditSaveMessage(translateUiLabelTree(labels.auth.userManagement.receptionClinicsRequired, t));
+            setEditSaveMessage(labels.auth.userManagement.receptionClinicsRequired);
             return;
         }
 
@@ -347,12 +368,12 @@ const UserRegisterPage: React.FC = () => {
             if (!response.ok) {
                 const failureMessage = payload?.error?.message || labels.pageUi.impossibleDeModifierLUtilisateur;
                 setEditSaveStatus("error");
-                setEditSaveMessage(labels.pageUi.saveFailed.replace("{message}", failureMessage));
+                setEditSaveMessage({ source: labels.pageUi.saveFailed, values: { message: failureMessage } });
                 setError(failureMessage);
                 return;
             }
 
-            const successMessage = labels.pageUi.saveSucceeded.replace("{name}", editedUsername || labels.pageUi.cetUtilisateur);
+            const successMessage = { source: labels.pageUi.saveSucceeded, values: { name: editedUsername } };
             setEditSaveStatus("success");
             setEditSaveMessage(successMessage);
             setSuccess(successMessage);
@@ -433,7 +454,7 @@ const UserRegisterPage: React.FC = () => {
             return;
         }
         if (resetPasswordTooShort) {
-            const message = translateUiLabelTree(labels.auth.userManagement.passwordMinLength, t);
+            const message = labels.auth.userManagement.passwordMinLength;
             setEditSaveStatus("error");
             setEditSaveMessage(message);
             setError(message);
@@ -472,7 +493,7 @@ const UserRegisterPage: React.FC = () => {
                     payload?.error?.message ||
                     labels.pageUi.impossibleDeReinitialiserLeMotDePasse;
                 setEditSaveStatus("error");
-                setEditSaveMessage(labels.pageUi.resetFailed.replace("{message}", failureMessage));
+                setEditSaveMessage({ source: labels.pageUi.resetFailed, values: { message: failureMessage } });
                 setError(failureMessage);
                 return;
             }
@@ -482,15 +503,17 @@ const UserRegisterPage: React.FC = () => {
                 payload?.data?.data?.temporaryPassword ||
                 null;
             if (temporaryPassword) {
-                const successMessage =
-                    labels.pageUi.temporaryPassword.replace("{password}", temporaryPassword) +
-                    labels.pageUi.lUtilisateurDevraLeRemplacerALaPremiereConnexion;
+                const successMessage = {
+                    source: labels.pageUi.temporaryPassword,
+                    values: { password: temporaryPassword },
+                    suffix: labels.pageUi.lUtilisateurDevraLeRemplacerALaPremiereConnexion,
+                };
                 setTemporaryPasswordResult(temporaryPassword);
                 setEditSaveStatus("success");
                 setEditSaveMessage(successMessage);
                 setSuccess(successMessage);
             } else {
-                const successMessage = translateUiLabelTree(labels.auth.userManagement.passwordResetCompleted, t);
+                const successMessage = labels.auth.userManagement.passwordResetCompleted;
                 setEditSaveStatus("success");
                 setEditSaveMessage(successMessage);
                 setSuccess(successMessage);
@@ -597,9 +620,7 @@ const UserRegisterPage: React.FC = () => {
                 return;
             }
 
-            setSuccess(
-                labels.pageUi.userCreated.replace("{name}", payload?.data?.user?.username || username)
-            );
+            setSuccess({ source: labels.pageUi.userCreated, values: { name: payload?.data?.user?.username || username } });
             setUsername("");
             setEmail("");
             setPassword("");
@@ -648,7 +669,7 @@ const UserRegisterPage: React.FC = () => {
 
             {success && (
                 <div className="clinia-fade-feedback mb-4 rounded bg-green-50 p-3 text-sm text-green-700">
-                    {t(success)}
+                    {renderFeedback(success)}
                 </div>
             )}
 
@@ -850,7 +871,7 @@ const UserRegisterPage: React.FC = () => {
                                     ? "✕"
                                     : "..."}
                         </span>
-                        <span>{t(editSaveMessage)}</span>
+                        <span>{renderFeedback(editSaveMessage)}</span>
                     </div>
                 )}
 

@@ -290,7 +290,7 @@ export function ClinicalAnalyzePage() {
     async function handleAcknowledgeBlockingIncident() {
         if (!blockingIncident) {
             setBlockingActionableMessage(
-                "Incident de securite manquant. Relancez l'analyse pour continuer."
+                labels.securityBlocking.missingIncident
             );
             return;
         }
@@ -315,7 +315,7 @@ export function ClinicalAnalyzePage() {
         if ("error" in ackResponse) {
             setBlockingActionableMessage(
                 ackResponse.error.message ||
-                    "Impossible d'enregistrer la confirmation de securite. Reessayez ou contactez l'administrateur."
+                    labels.securityBlocking.acknowledgmentFailed
             );
             setAcknowledgingIncident(false);
             return;
@@ -333,7 +333,7 @@ export function ClinicalAnalyzePage() {
 
         if (!acknowledgedPayload) {
             setBlockingActionableMessage(
-                "Confirmation enregistree. Relancez l'analyse pour continuer."
+                labels.securityBlocking.acknowledgedRestart
             );
             setAcknowledgingIncident(false);
             return;
@@ -351,7 +351,7 @@ export function ClinicalAnalyzePage() {
 
         setLastPayload(acknowledgedPayload);
         setBlockingActionableMessage(
-            "Confirmation enregistree. Analyse relancee avec le meme contenu."
+            labels.securityBlocking.acknowledgedReplay
         );
         const replayBlockingIncident = await analyze(acknowledgedPayload);
         if (replayBlockingIncident) {
@@ -369,7 +369,7 @@ export function ClinicalAnalyzePage() {
         setPendingNeutralizationReview(null);
         setLastPayload(payload);
         setBlockingActionableMessage(
-            "Analyse relancee avec les parametres corriges."
+            labels.securityBlocking.correctedReplay
         );
         const replayBlockingIncident = await analyze(payload);
         if (replayBlockingIncident) {
@@ -1070,7 +1070,7 @@ export function ClinicalAnalyzePage() {
 
             {!blockingIncident && blockingActionableMessage && (
                 <div className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-                    {blockingActionableMessage}
+                    <UiMessage message={blockingActionableMessage} />
                 </div>
             )}
 

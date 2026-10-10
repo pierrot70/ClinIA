@@ -1,4 +1,5 @@
 import { labels } from "../../i18n/uiLabels";
+import { UiMessage } from "../i18n/UiMessage";
 import { useUiLabels } from "../../hooks/useUiLabels";
 import type { SecurityIncidentBlockingData } from "../../types/api";
 
@@ -29,7 +30,7 @@ export function SecurityBlockingAlert({
                     {t(labels.componentUi.alerteSecuriteBloquante)}</h2>
 
                 <p id="security-blocking-description" className="mt-3 text-sm text-slate-800">
-                    {t(blocking.userMessage)}
+                    <UiMessage message={blocking.userMessage} fallback={labels.componentUi.cetteActionEstObligatoirePourReprendreLeWorkflow} />
                 </p>
 
                 <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
@@ -49,7 +50,7 @@ export function SecurityBlockingAlert({
 
                 {actionableMessage && (
                     <p className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                        {t(actionableMessage)}
+                        <UiMessage message={actionableMessage} fallback={labels.securityBlocking.acknowledgmentFailed} />
                     </p>
                 )}
 

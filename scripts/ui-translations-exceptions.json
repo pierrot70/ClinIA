@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "scope": "pages+components",
+  "schemaVersion": 2,
+  "scope": "frontend-renderers",
   "purpose": "Reviewed non-translatable exceptions only. Each future exception requires an explicit reason. No current rendering debt is accepted.",
   "debt": []
 }

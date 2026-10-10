@@ -435,7 +435,7 @@ export function AppointmentsListPage() {
     ) {
         setToast({
             type,
-            message: formatWriteVerificationMessage(message, verification),
+            message,
         });
         setLastWriteVerification(verification ?? null);
         if (toastTimerRef.current) {
@@ -577,13 +577,13 @@ export function AppointmentsListPage() {
                         .replace("{date}", formatUiDate(editDate, uiLocale))
                         .replace("{time}", formatUiTime(editTime, uiLocale)),
                 successMessage: editingPurpose === "reschedule"
-                    ? appointmentLabels.feedback.rescheduled
-                    : t(labels.pageUi.scheduleUpdated),
+                    ? labels.appointmentsList.feedback.rescheduled
+                    : labels.pageUi.scheduleUpdated,
                 errorMessage: (error) =>
                     ["SPECIALIST_ALREADY_BOOKED", "APPOINTMENT_CONFLICT"].includes(
                         error.code
                     )
-                        ? translateUiLabelTree(labels.appointmentsList.edit.slotJustBooked, t)
+                        ? labels.appointmentsList.edit.slotJustBooked
                         : error.message,
                 onError: (error) => {
                     if (
@@ -652,7 +652,12 @@ export function AppointmentsListPage() {
                     role="status"
                 >
                     <div className={toast.type === "success" ? "px-4 py-2" : ""}>
-                        {t(toast.message)}
+                        {toast.type === "error"
+                            ? <UiMessage message={toast.message} />
+                            : formatWriteVerificationMessage(
+                                t(toast.message), lastWriteVerification,
+                                t(labels.pageUi.verificationNumber)
+                            )}
                     </div>
                     {toast.type === "success" && (
                         <div className="px-4 pb-3">
@@ -965,7 +970,7 @@ export function AppointmentsListPage() {
                                                                                 void handleAction(
                                                                                     a._id,
                                                                                     () => requestSpecialistAvailability(a._id),
-                                                                                    { successMessage: appointmentLabels.feedback.availabilityRequestSent }
+                                                                                    { successMessage: labels.appointmentsList.feedback.availabilityRequestSent }
                                                                                 ).then((sent) => {
                                                                                     if (sent) stopEditing();
                                                                                 });
@@ -1053,7 +1058,7 @@ export function AppointmentsListPage() {
                                                             updateAppointmentStatus(a._id, "completed"),
                                                         {
                                                             confirmMessage: appointmentLabels.feedback.confirmCompleted,
-                                                            successMessage: appointmentLabels.feedback.completed,
+                                                            successMessage: labels.appointmentsList.feedback.completed,
                                                         }
                                                     )
                                                 }
@@ -1066,7 +1071,7 @@ export function AppointmentsListPage() {
                                                 className="rounded bg-amber-500 px-2 py-1 text-xs font-semibold text-amber-950 hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-45"
                                                 onClick={() => handleAction(a._id, () => updateAppointmentStatus(a._id, "no_show"), {
                                                     confirmMessage: appointmentLabels.feedback.confirmNoShow,
-                                                    successMessage: appointmentLabels.feedback.noShow,
+                                                    successMessage: labels.appointmentsList.feedback.noShow,
                                                 })}
                                             >
                                                 {localize("noShow", appointmentLabels.actions.markNoShow)}
@@ -1077,7 +1082,7 @@ export function AppointmentsListPage() {
                                                 className="rounded border border-red-400 bg-red-50 px-2 py-1 text-xs font-semibold text-red-800 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-45"
                                                 onClick={() => handleAction(a._id, () => updateAppointmentStatus(a._id, "cancelled", "patient"), {
                                                     confirmMessage: appointmentLabels.feedback.confirmCancelledPatient,
-                                                    successMessage: appointmentLabels.feedback.cancelledPatient,
+                                                    successMessage: labels.appointmentsList.feedback.cancelledPatient,
                                                 })}
                                             >
                                                 {localize("cancelPatient", appointmentLabels.actions.cancelPatient)}
@@ -1088,7 +1093,7 @@ export function AppointmentsListPage() {
                                                 className="rounded bg-red-700 px-2 py-1 text-xs font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-45"
                                                 onClick={() => handleAction(a._id, () => updateAppointmentStatus(a._id, "cancelled", "clinic_emergency"), {
                                                     confirmMessage: appointmentLabels.feedback.confirmCancelledClinicEmergency,
-                                                    successMessage: appointmentLabels.feedback.cancelledClinicEmergency,
+                                                    successMessage: labels.appointmentsList.feedback.cancelledClinicEmergency,
                                                 })}
                                             >
                                                 {localize("cancelClinicEmergency", appointmentLabels.actions.cancelClinicEmergency)}

@@ -638,7 +638,7 @@ export function ClinicalForm({
         setSubmittingTermRequest(false);
         setTermRequestFeedback("error" in response
             ? { type: "error", message: response.error.message }
-            : { type: "success", message: termRequestSentLabel });
+            : { type: "success", message: sourceUiLabels.clinicalTermRequest.sent });
     }
 
     const isHighlighted = (field: string) => highlightFields.includes(field);
@@ -886,14 +886,6 @@ export function ClinicalForm({
         text: clinicalFormLabels.jsonImportAction,
         targetLang,
     });
-    const { translated: jsonImportSuccessLabel } = useTranslation({
-        text: clinicalFormLabels.jsonImportSuccess,
-        targetLang,
-    });
-    const { translated: jsonImportInvalidLabel } = useTranslation({
-        text: clinicalFormLabels.jsonImportInvalid,
-        targetLang,
-    });
     const exampleCaseRequiredHintLabel = reviewedStrings.exampleCaseRequiredHint;
     const exampleCaseSelectionRequiredLabel =
         reviewedStrings.exampleCaseSelectionRequired;
@@ -951,14 +943,6 @@ export function ClinicalForm({
     });
     const { translated: comparisonActionLabel } = useTranslation({
         text: clinicalFormLabels.comparisonAction,
-        targetLang,
-    });
-    const { translated: comparisonSuccessLabel } = useTranslation({
-        text: clinicalFormLabels.comparisonSuccess,
-        targetLang,
-    });
-    const { translated: comparisonInvalidLabel } = useTranslation({
-        text: clinicalFormLabels.comparisonInvalid,
         targetLang,
     });
     const { translated: ethnicityLabel } = useTranslation({
@@ -1049,7 +1033,6 @@ export function ClinicalForm({
     const analyzeButtonLabel = analysisStatusLabels(targetLang).analyze;
     const { translated: analyzingButtonLabel } = useTranslation({ text: "Analyse…", targetLang });
     const { translated: clearPatientDataLabel } = useTranslation({ text: "Effacer les donnees patient", targetLang });
-    const { translated: termRequestSentLabel } = useTranslation({ text: labels.clinicalTermRequest.sent, targetLang, translationKey: "clinicalTermRequest.sent" });
     const { translated: termRequestSendingLabel } = useTranslation({ text: labels.clinicalTermRequest.sending, targetLang, translationKey: "clinicalTermRequest.sending" });
     const { translated: termRequestActionLabel } = useTranslation({ text: labels.clinicalTermRequest.action, targetLang, translationKey: "clinicalTermRequest.action" });
     const { translated: termRequestPrivacyLabel } = useTranslation({ text: labels.clinicalTermRequest.privacy, targetLang, translationKey: "clinicalTermRequest.privacy" });
@@ -1191,7 +1174,7 @@ export function ClinicalForm({
             if (!nextPayload) {
                 setJsonImportFeedback({
                     type: "error",
-                    message: jsonImportInvalidLabel,
+                    message: sourceUiLabels.clinicalDemo.form.jsonImportInvalid,
                 });
                 return;
             }
@@ -1199,12 +1182,12 @@ export function ClinicalForm({
             applyFormData(nextPayload);
             setJsonImportFeedback({
                 type: "success",
-                message: jsonImportSuccessLabel,
+                message: sourceUiLabels.clinicalDemo.form.jsonImportSuccess,
             });
         } catch {
             setJsonImportFeedback({
                 type: "error",
-                message: jsonImportInvalidLabel,
+                message: sourceUiLabels.clinicalDemo.form.jsonImportInvalid,
             });
         }
     }
@@ -1225,7 +1208,7 @@ export function ClinicalForm({
             if (!firstPayload || !secondPayload || !onCompareSubmit) {
                 setComparisonFeedback({
                     type: "error",
-                    message: comparisonInvalidLabel,
+                    message: sourceUiLabels.clinicalDemo.form.comparisonInvalid,
                 });
                 return;
             }
@@ -1233,12 +1216,12 @@ export function ClinicalForm({
             await onCompareSubmit(firstPayload, secondPayload);
             setComparisonFeedback({
                 type: "success",
-                message: comparisonSuccessLabel,
+                message: sourceUiLabels.clinicalDemo.form.comparisonSuccess,
             });
         } catch {
             setComparisonFeedback({
                 type: "error",
-                message: comparisonInvalidLabel,
+                message: sourceUiLabels.clinicalDemo.form.comparisonInvalid,
             });
         }
     }
@@ -1522,7 +1505,7 @@ export function ClinicalForm({
                                         : "text-red-600"
                                 }`}
                             >
-                                {jsonImportFeedback.message}
+                                <UiMessage message={jsonImportFeedback.message} />
                             </p>
                         ) : null}
                     </div>
@@ -1614,7 +1597,7 @@ export function ClinicalForm({
                                                 : "text-red-600"
                                         }`}
                                     >
-                                        {comparisonFeedback.message}
+                                        <UiMessage message={comparisonFeedback.message} />
                                     </p>
                                 ) : null}
                             </div>
@@ -1856,7 +1839,7 @@ export function ClinicalForm({
                         </div>
                     )}
                     {user?.role === "MEDECIN" && listInputs.symptoms.trim() && <p className="text-xs text-gray-500">{termRequestPrivacyLabel}</p>}
-                    {termRequestFeedback && <p role={termRequestFeedback.type === "error" ? "alert" : "status"} className={termRequestFeedback.type === "error" ? "text-xs text-red-700" : "text-xs text-emerald-700"}>{termRequestFeedback.message}</p>}
+                    {termRequestFeedback && <p role={termRequestFeedback.type === "error" ? "alert" : "status"} className={termRequestFeedback.type === "error" ? "text-xs text-red-700" : "text-xs text-emerald-700"}><UiMessage message={termRequestFeedback.message} /></p>}
                 </div>
             </Field>
 

@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { fetchReceptionClinics, type ReceptionClinic } from "../services/receptionApi";
 import { useHomeI18n } from "./HomeI18nContext";
 import { receptionLabel } from "../i18n/receptionLabels";
+import { UiMessage } from "../components/i18n/UiMessage";
 
 const source = labels.receptionClinic;
 const storageKeyFor = (userId: string) => `clinia.reception.active-clinic.${userId}`;
@@ -124,7 +125,7 @@ export function ReceptionClinicProvider({ children }: { children: React.ReactNod
                         </h1>
                         <p className="mt-2 text-sm text-slate-700">{receptionLabel(locale, "selectionDescription", source.selectionDescription)}</p>
                         {isLoading && <p className="mt-4 text-sm text-slate-600">{receptionLabel(locale, "loading", source.loading)}</p>}
-                        {error && <p role="alert" className="mt-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
+                        {error && <p role="alert" className="mt-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"><UiMessage message={error} /></p>}
                         {!isLoading && !error && (
                             <div className="mt-5 space-y-2">
                                 {clinics.map((clinic) => (

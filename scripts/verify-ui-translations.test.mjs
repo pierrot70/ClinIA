@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { inspectSource, compareBaseline } from './verify-ui-translations.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { inspectSource, compareBaseline, uiRendererFiles, UI_AUDIT_SCOPE, UI_AUDIT_SCHEMA_VERSION } from './verify-ui-translations.mjs';
 const inspect=source=>inspectSource('frontend/src/pages/Example.tsx',source);
 test('inventories JSX text, attributes and displayed conditional branches',()=>{
  const report=inspect('const page = <button aria-label="Fermer" title={ready ? "Enregistrer" : "Attendre"}>Connexion {ready ? "Oui" : "Non"}</button>');
@@ -14,6 +17,10 @@ test('excludes dynamic patient data, roles, units, URI, code samples and transla
 test('does not suppress a display literal because another branch calls a translator',()=>{
  assert.deepEqual(inspect('const page=<p>{ready ? t("Connexion") : "Erreur de connexion"}</p>').findings.map(f=>f.text),['Erreur de connexion']);
 });
+test('inspects message setters with feature-specific names',()=>{
+ const report=inspect('setBlockingActionableMessage("Confirmation enregistree.");setClinicSelectionError("Impossible de charger les cliniques.");');
+ assert.equal(report.findings.length,2);
+});
 test('flags local UI definitions, direct notification messages and raw API errors',()=>{
  const report=inspect('const tabs=[{label:"Administration"},{label:"Gestion des patients"}]; const failureMessage="Erreur réseau"; setError(response.error.message || failureMessage); toast.error("Impossible de charger"); window.confirm("Supprimer le compte ?");');
  assert.ok(report.reviewWarnings.some(f=>f.kind==='inline-ui-property'&&f.text==='Gestion des patients'));
@@ -25,13 +32,27 @@ test('same finding id survives line shifts, while repeated copies increase multi
  const source='<p>Connexion</p>';
  assert.equal(inspect(source).findings[0].id,inspect('\n\n'+source).findings[0].id);
  const entry={id:inspect(source).findings[0].id,file:'Example.tsx',kind:'jsx-text',text:'Connexion',count:2};
- const baseline={schemaVersion:1,scope:'pages+components',debt:[{...entry,count:1,reason:'Intentional exception in test'}]};
+ const baseline={schemaVersion:UI_AUDIT_SCHEMA_VERSION,scope:UI_AUDIT_SCOPE,debt:[{...entry,count:1,reason:'Intentional exception in test'}]};
  assert.equal(compareBaseline([entry],baseline)[0].newOccurrences,1);
  assert.deepEqual(compareBaseline([{...entry,count:1,reason:'Intentional exception in test'}],baseline),[]);
 });
 test('invalid baseline and parse failures cannot be reported as clean',()=>{
- assert.throws(()=>compareBaseline([],{schemaVersion:1,scope:'pages+components',debt:[{id:'bad',count:0}]}));
+ assert.throws(()=>compareBaseline([],{schemaVersion:UI_AUDIT_SCHEMA_VERSION,scope:UI_AUDIT_SCOPE,debt:[{id:'bad',count:0}]}));
+ assert.throws(()=>compareBaseline([],{schemaVersion:1,scope:'pages+components',debt:[]}));
  assert.equal(inspect('const page = <div>').status,'parse-error');
+});
+
+test('discovers renderers in hooks, auth, contexts and application entry files',()=>{
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'clinia-i18n-renderers-'));
+ try {
+  const expected=['hooks/useDialog.tsx','auth/AuthContext.tsx','contexts/WarningContext.tsx','App.tsx','pages/Home.tsx','components/Banner.ts'];
+  for(const file of [...expected,'hooks/useDialog.test.tsx','contexts/Warning.spec.tsx','services/api.ts']){
+   const target=path.join(directory,file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,file.endsWith('.tsx')?'const page=<p>Connexion</p>':'window.confirm("Connexion")');
+  }
+  const files=uiRendererFiles(directory);
+  assert.deepEqual(files.map(file=>path.relative(directory,file)).sort(),expected.sort());
+  for(const file of files){const report=inspectSource(file,fs.readFileSync(file,'utf8'));assert.equal(report.parseErrors.length,0);assert.equal(report.findings.length,1);}
+ } finally {fs.rmSync(directory,{recursive:true,force:true});}
 });
 
 test('resolves local JSX label variables without following dynamic patient values or cycles',()=>{
@@ -66,6 +87,10 @@ test('known UiMessage literal state remains inventoried without a false raw-rend
 test('typed state setters used as catalog keys are selectors, not rendered prose',()=>{
  const report=inspect('import {getMyWriteReceiptsLabels} from "../i18n/myWriteReceiptsLabels"; const receiptLabels=getMyWriteReceiptsLabels("en-CA"); function Page(){const [errorKind,setError]=useState<""|"copyError"|"loadError">(""); const error=errorKind?receiptLabels.status[errorKind]:""; setError("copyError");setError("loadError");return <p>{error}</p>}');
  assert.equal(report.findings.length,0);
+});
+test('nullable catalog state keeps named feedback keys distinct from displayed prose',()=>{
+ const report=inspect('import {clinicalReviewLabels} from "../i18n/clinicalReviewLabels";function Page(){const copy=clinicalReviewLabels("en-CA");const [feedback,setCopyRequestFeedback]=useState<"copied"|"copyFailed"|null>(null);setCopyRequestFeedback("copied");setCopyRequestFeedback("copyFailed");setCopyRequestFeedback("Erreur de copie");return <p>{feedback?copy[feedback]:null}</p>}');
+ assert.deepEqual(report.findings.map(f=>f.text),['Erreur de copie']);
 });
 test('same key spelling without typed catalog-index evidence and raw prose stay blocked',()=>{
  const report=inspect('import {getMyWriteReceiptsLabels} from "../i18n/myWriteReceiptsLabels"; const receiptLabels=getMyWriteReceiptsLabels("en-CA"); function Page(){const [errorKind,setError]=useState<""|"copyError"|"loadError">(""); setError("loadError");setError("Erreur de copie");return <p>{errorKind}</p>}');

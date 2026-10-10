@@ -31,6 +31,7 @@ import { localizeCoreUiLabel } from "./coreUiLabels";
 import { localizeClinicalUiLabel } from "./clinicalUiLabels";
 import { localizeComponentUiLabel } from "./componentUiLabels";
 import { localizeHeaderUiLabel } from "./headerUiLabels";
+import { localizeSecurityUiLabel } from "./securityUiLabels";
 import { localizeClinicalDemoUiLabel } from "./clinicalDemoUiLabels";
 import { localizeExampleUiLabel } from "./exampleUiLabels";
 import { localizeSchedulingUiLabel } from "./schedulingUiLabels";
@@ -87,9 +88,11 @@ function resolveSourceLabel(source: string, locale: string, key?: string): strin
     const language = baseUiLocale(locale);
     if (language === "fr") return source;
     // Symbols, opaque role identifiers and units have no linguistic content.
-    if (!/[\p{L}]/u.test(source.replace(/\{[^}]+\}/g, ""))
+    if (!/[\p{L}]/u.test(source.replace(/\{[A-Za-z_][A-Za-z0-9_]*\}/g, ""))
         || /^(?:[A-Z][A-Z0-9_]*|kg|cm|mg|mmHg|bpm|ms|s|min|h|lag|Transport|ClinIA)$/.test(source)) return source;
     if (source === UI_LABELS_FR.header.aiMode.mock || source === UI_LABELS_FR.header.aiMode.real) return source;
+    const security = localizeSecurityUiLabel(source, language);
+    if (security) return security;
     const auth = localizeAuthUiLabel(source, language);
     if (auth) return auth;
     const core = localizeCoreUiLabel(source, language);

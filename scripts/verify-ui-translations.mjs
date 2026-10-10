@@ -8,9 +8,11 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(path.join(root, 'frontend/package.json'));
 const ts = require('typescript');
+export const UI_AUDIT_SCOPE = 'frontend-renderers';
+export const UI_AUDIT_SCHEMA_VERSION = 2;
 const uiAttributes = new Set(['title', 'alt', 'placeholder', 'aria-label', 'aria-description', 'label', 'description', 'caption', 'helperText', 'emptyText', 'loadingText', 'errorMessage', 'successMessage', 'confirmText', 'cancelText']);
 const proseProperties = /^(?:label|title|description|caption|message|placeholder|helperText|emptyText|loadingText|errorMessage|successMessage|confirmText|cancelText)$/i;
-const messageSink = /^(?:set(?:Error|Success|Message|Notice|Warning|Feedback|StatusMessage)|(?:window\.)?(?:alert|confirm|prompt)|toast(?:\.(?:error|success|info|warning))?|showToast|notify)$/;
+const messageSink = /^(?:set[A-Za-z0-9]*(?:Error|Success|Message|Notice|Warning|Feedback)|(?:window\.)?(?:alert|confirm|prompt)|toast(?:\.(?:error|success|info|warning))?|showToast|notify)$/;
 const technical = new Set(['ClinIA', 'RAMQ', 'MFA', 'JWT', 'SMTP', 'MongoDB', 'OpenAI', 'API', 'HTTP', 'HTTPS', 'JSON', 'CSV', 'PDF', 'ID', 'OK', 'CA', 'QC', 'kg', 'cm', 'mm', 'm', 'mg', 'g', 'ml', 'mL', 'L', 'mmHg', 'bpm', 'Hz', 'kPa', '°C', 'UI', 'min', 'ms', 's', 'h', 'lag', 'Transport', 'Docker']);
 const normalize = value => value.replace(/\s+/g, ' ').trim();
 const machineMessageKeys = new Set(['error', 'saved', 'loadError']);
@@ -72,7 +74,8 @@ export function inspectSource(file, source) {
   if(ts.isVariableDeclaration(node)&&ts.isArrayBindingPattern(node.name)&&node.name.elements.length===2&&node.initializer&&ts.isCallExpression(node.initializer)&&node.initializer.expression.getText(tree)==='useState') {
    const [state,setter]=node.name.elements, type=node.initializer.typeArguments?.[0];
    const variants=type&&ts.isUnionTypeNode(type)?type.types:type?[type]:[];
-   if(ts.isBindingElement(state)&&ts.isIdentifier(state.name)&&ts.isBindingElement(setter)&&ts.isIdentifier(setter.name)&&variants.length&&variants.every(v=>ts.isLiteralTypeNode(v)&&ts.isStringLiteral(v.literal)))enumStates.push({state:state.name.text,setter:setter.name.text,scope:scopeOf(node),keys:new Set(variants.map(v=>v.literal.text)),indexed:false});
+   const strings=variants.filter(v=>ts.isLiteralTypeNode(v)&&ts.isStringLiteral(v.literal));
+   if(ts.isBindingElement(state)&&ts.isIdentifier(state.name)&&ts.isBindingElement(setter)&&ts.isIdentifier(setter.name)&&strings.length&&variants.every(v=>ts.isLiteralTypeNode(v)&&(ts.isStringLiteral(v.literal)||v.literal.kind===ts.SyntaxKind.NullKeyword)))enumStates.push({state:state.name.text,setter:setter.name.text,scope:scopeOf(node),keys:new Set(strings.map(v=>v.literal.text)),indexed:false});
   }
   ts.forEachChild(node,collectEnumStates);
  }
@@ -140,9 +143,14 @@ export function inspectSource(file, source) {
 function filesUnder(directory){
  return fs.readdirSync(directory,{withFileTypes:true}).flatMap(entry=>{const target=path.join(directory,entry.name);return entry.isDirectory()?filesUnder(target):/\.(?:tsx?|jsx?)$/.test(entry.name)&&!/(?:\.test\.|\.spec\.|\.d\.ts$)/.test(entry.name)?[target]:[];});
 }
+// Dialogs can be rendered by hooks, auth providers, contexts and the app entry,
+// not only by files stored under pages/ or components/.
+export function uiRendererFiles(sourceRoot) {
+ return filesUnder(sourceRoot).filter(file=>/\.(?:tsx|jsx)$/.test(file)||/^(?:pages|components)\//.test(path.relative(sourceRoot,file).split(path.sep).join('/')));
+}
 function occurrences(files){const counts=new Map();for(const file of files)for(const finding of file.findings){const existing=counts.get(finding.id)||{id:finding.id,file:file.file,kind:finding.kind,text:finding.text,count:0};existing.count++;counts.set(finding.id,existing);}return [...counts.values()].sort((a,b)=>a.file.localeCompare(b.file)||a.id.localeCompare(b.id));}
 export function compareBaseline(current,baseline){
- if(baseline.schemaVersion!==1 || baseline.scope!=='pages+components' || !Array.isArray(baseline.debt))throw new Error('Invalid explicit debt baseline');
+ if(baseline.schemaVersion!==UI_AUDIT_SCHEMA_VERSION || baseline.scope!==UI_AUDIT_SCOPE || !Array.isArray(baseline.debt))throw new Error('Invalid explicit debt baseline');
  const accepted=new Map();for(const entry of baseline.debt){if(accepted.has(entry.id)||!Number.isInteger(entry.count)||entry.count<1||typeof entry.reason!=='string'||!entry.reason.trim())throw new Error('Invalid baseline multiplicity');accepted.set(entry.id,entry.count);}
  return current.filter(entry=>entry.count>(accepted.get(entry.id)||0)).map(entry=>({...entry,newOccurrences:entry.count-(accepted.get(entry.id)||0)}));
 }
@@ -150,10 +158,10 @@ function main(args){
  const options={};for(let i=0;i<args.length;i++){const arg=args[i];if(['--output','--baseline','--write-baseline'].includes(arg)){if(!args[i+1]||args[i+1].startsWith('--'))throw new Error(`Missing value ${arg}`);options[arg]=args[++i];}else if(arg==='--check')options[arg]=true;else throw new Error(`Unknown option ${arg}`);}
  if(options['--check']&&!options['--baseline'])throw new Error('--check requires an explicit --baseline');
  if(options['--write-baseline']&&options['--check'])throw new Error('Baseline creation cannot silently accept new debt during a CI check');
- const files=['pages','components'].flatMap(dir=>filesUnder(path.join(root,'frontend/src',dir))).sort().map(file=>inspectSource(path.relative(root,file).split(path.sep).join('/'),fs.readFileSync(file,'utf8')));
+ const files=uiRendererFiles(path.join(root,'frontend/src')).sort().map(file=>inspectSource(path.relative(root,file).split(path.sep).join('/'),fs.readFileSync(file,'utf8')));
  const debt=occurrences(files),newViolations=options['--baseline']?compareBaseline(debt,JSON.parse(fs.readFileSync(options['--baseline'],'utf8'))):debt;
- const report={schemaVersion:1,scope:'pages+components',method:'TypeScript AST; no runtime or human validation',limitations:['No interprocedural dataflow or catalog completeness proof.','Dynamic patient/clinical values are intentionally excluded.','Code/pre samples, technical role tokens, units and URIs are excluded.','Calls to translators are not proof of available translations.','Mocked page/language/state rendering and human review remain required.'],summary:{files:files.length,filesWithFindings:files.filter(f=>f.findings.length).length,findings:files.reduce((n,f)=>n+f.findings.length,0),reviewWarnings:files.reduce((n,f)=>n+f.reviewWarnings.length,0),parseErrors:files.reduce((n,f)=>n+f.parseErrors.length,0),newOccurrences:newViolations.reduce((n,f)=>n+(f.newOccurrences ?? f.count),0)},files,newViolations};
- if(options['--write-baseline'])fs.writeFileSync(options['--write-baseline'],JSON.stringify({schemaVersion:1,scope:'pages+components',purpose:'Reviewed non-translatable exceptions only. Every entry requires a reason; observed debt is never accepted automatically.',debt:[]},null,2)+'\n');
+ const report={schemaVersion:UI_AUDIT_SCHEMA_VERSION,scope:UI_AUDIT_SCOPE,method:'TypeScript AST; no runtime or human validation',limitations:['No interprocedural dataflow or catalog completeness proof.','Dynamic patient/clinical values are intentionally excluded.','Code/pre samples, technical role tokens, units and URIs are excluded.','Calls to translators are not proof of available translations.','Mocked page/language/state rendering and human review remain required.'],summary:{files:files.length,filesWithFindings:files.filter(f=>f.findings.length).length,findings:files.reduce((n,f)=>n+f.findings.length,0),reviewWarnings:files.reduce((n,f)=>n+f.reviewWarnings.length,0),parseErrors:files.reduce((n,f)=>n+f.parseErrors.length,0),newOccurrences:newViolations.reduce((n,f)=>n+(f.newOccurrences ?? f.count),0)},files,newViolations};
+ if(options['--write-baseline'])fs.writeFileSync(options['--write-baseline'],JSON.stringify({schemaVersion:UI_AUDIT_SCHEMA_VERSION,scope:UI_AUDIT_SCOPE,purpose:'Reviewed non-translatable exceptions only. Every entry requires a reason; observed debt is never accepted automatically.',debt:[]},null,2)+'\n');
  const output=JSON.stringify(report,null,2)+'\n';if(options['--output'])fs.writeFileSync(options['--output'],output);else process.stdout.write(output);
  if(options['--check']&&(newViolations.length||report.summary.parseErrors))process.exitCode=1;
 }

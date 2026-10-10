@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HomeI18nContext } from "../../contexts/HomeI18nContext";
 import { HOME_STRINGS_FR } from "../../i18n/homeStrings";
 import { ClinicalForm } from "./ClinicalForm";
+import { UI_LABELS_FR } from "../../i18n/uiLabels.fr";
+import { getLocalUiTranslation } from "../../i18n/localUiTranslations";
 
 vi.mock("../../hooks/useTranslation", () => ({
     useTranslation: ({ text }: { text: string }) => ({
@@ -42,6 +44,57 @@ describe("ClinicalForm", () => {
 
     beforeEach(() => {
         window.localStorage.clear();
+    });
+
+    it("retranslates JSON feedback without changing the imported patient content", () => {
+        const form = UI_LABELS_FR.clinicalDemo.form;
+        const onSubmit = vi.fn();
+        const page = (locale: string) => <HomeI18nContext.Provider value={{ locale, strings: HOME_STRINGS_FR,
+            isTranslating: false, setLocaleFromDropdown: vi.fn(), setLocaleFromVoice: vi.fn() }}>
+            <ClinicalForm onSubmit={onSubmit} loading={false} />
+        </HomeI18nContext.Provider>;
+        const { rerender, container } = render(page("fr-CA"));
+        selectExampleCase("hypertension55");
+        fireEvent.change(screen.getByLabelText(form.jsonImportLabel), { target: { value: "invalid JSON" } });
+        fireEvent.click(screen.getByRole("button", { name: form.jsonImportAction }));
+        expect(screen.getByText(form.jsonImportInvalid)).toBeInTheDocument();
+        for (const locale of ["fr-CA", "en-CA", "es"]) {
+            rerender(page(locale));
+            expect(screen.getByText(getLocalUiTranslation(form.jsonImportInvalid, locale)!)).toBeInTheDocument();
+        }
+        rerender(page("fr-CA"));
+        const patient = { age: 79, sex: "female", diagnosis: "Diagnostic synthétique non traduit",
+            symptoms: ["Symptôme synthétique"], medical_history: [], current_medications: [] };
+        fireEvent.change(screen.getByLabelText(form.jsonImportLabel), { target: { value: JSON.stringify(patient) } });
+        fireEvent.click(screen.getByRole("button", { name: form.jsonImportAction }));
+        expect(screen.getByText(form.jsonImportSuccess)).toBeInTheDocument();
+        for (const locale of ["fr-CA", "en-CA", "es"]) {
+            rerender(page(locale));
+            expect(screen.getByText(getLocalUiTranslation(form.jsonImportSuccess, locale)!)).toBeInTheDocument();
+            expect(container.querySelector("#clinical-diagnosis")).toHaveValue(patient.diagnosis);
+        }
+        expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("updates the result of comparing JSON cases after a language change", async () => {
+        const form = UI_LABELS_FR.clinicalDemo.form;
+        const onCompareSubmit = vi.fn().mockResolvedValue(undefined);
+        const page = (locale: string) => <HomeI18nContext.Provider value={{ locale, strings: HOME_STRINGS_FR,
+            isTranslating: false, setLocaleFromDropdown: vi.fn(), setLocaleFromVoice: vi.fn() }}>
+            <ClinicalForm onSubmit={() => {}} onCompareSubmit={onCompareSubmit} loading={false} />
+        </HomeI18nContext.Provider>;
+        const { rerender } = render(page("fr-CA"));
+        selectExampleCase("hypertension55");
+        fireEvent.click(screen.getByLabelText(form.comparisonToggle));
+        const patient = { age: 55, sex: "male", diagnosis: "Synthetic diagnosis", symptoms: [], medical_history: [], current_medications: [] };
+        fireEvent.change(screen.getByLabelText(form.comparisonCaseOneLabel), { target: { value: JSON.stringify(patient) } });
+        fireEvent.change(screen.getByLabelText(form.comparisonCaseTwoLabel), { target: { value: JSON.stringify(patient) } });
+        fireEvent.click(screen.getByRole("button", { name: form.comparisonAction }));
+        await screen.findByText(form.comparisonSuccess);
+        rerender(page("es"));
+        expect(screen.getByText(getLocalUiTranslation(form.comparisonSuccess, "es")!)).toBeInTheDocument();
+        expect(onCompareSubmit).toHaveBeenCalledTimes(1);
+        expect(onCompareSubmit.mock.calls[0][0].diagnosis).toBe(patient.diagnosis);
     });
 
     it.each(["fr-CA", "en-CA", "ja", "zh", "he", "es", "ko-KR", "vi", "no-NO"])(

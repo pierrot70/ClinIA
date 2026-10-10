@@ -15,6 +15,7 @@ import {
 } from "../services/authService";
 import type { UserRole } from "./roles";
 import { labels } from "../i18n/uiLabels";
+import { useUiLabelTree } from "../hooks/useUiLabels";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 const SESSION_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
@@ -48,6 +49,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const sessionCopy = useUiLabelTree(labels.auth.session);
     const [status, setStatus] = useState<AuthStatus>("loading");
     const [user, setUser] = useState<AuthSession["user"] | null>(null);
     const [warningSecondsLeft, setWarningSecondsLeft] = useState<number | null>(null);
@@ -279,10 +281,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40 px-4">
                     <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
                         <h2 className="text-lg font-semibold text-gray-900">
-                            {labels.auth.session.warningTitle}
+                            {sessionCopy.warningTitle}
                         </h2>
                         <p className="mt-2 text-sm text-gray-600">
-                            {labels.auth.session.warningBody}
+                            {sessionCopy.warningBody}
                         </p>
                         <p className="mt-3 text-sm font-medium text-amber-700">
                             {warningSecondsLeft}s
@@ -295,7 +297,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                                 }}
                                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                             >
-                                {labels.auth.session.warningContinue}
+                                {sessionCopy.warningContinue}
                             </button>
                             <button
                                 type="button"
@@ -304,7 +306,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                                 }}
                                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                             >
-                                {labels.auth.session.warningLogout}
+                                {sessionCopy.warningLogout}
                             </button>
                         </div>
                     </div>
