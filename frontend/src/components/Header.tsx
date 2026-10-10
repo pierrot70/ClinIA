@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import VoiceNavButton from "./VoiceNavButton";
+import { EmailQuotaNotice } from "./admin/EmailQuotaNotice";
 import { OpenAILogsModal } from "./OpenAILogsModal";
 import { AuthLogsModal } from "./admin/AuthLogsModal";
 import { AuthGraphsModal } from "./admin/AuthGraphsModal";
@@ -1443,7 +1444,7 @@ const Header: React.FC = () => {
                     </div>
                 </div>
 
-                <nav className="mt-3 hidden items-center gap-4 text-sm lg:fixed lg:inset-y-0 lg:left-0 lg:mt-0 lg:flex lg:w-64 lg:flex-col lg:items-stretch lg:gap-1 lg:overflow-y-auto lg:border-r lg:border-slate-200 lg:bg-slate-50 lg:px-3 lg:py-5 lg:shadow-xs">
+                <nav className={"mt-3 hidden items-center gap-4 text-sm lg:fixed lg:inset-y-0 lg:left-0 lg:mt-0 lg:flex lg:w-64 lg:flex-col lg:items-stretch lg:gap-1 lg:overflow-y-auto lg:border-r lg:border-slate-200 lg:bg-slate-50 lg:px-3 lg:py-5 lg:shadow-xs" + (showAdminHeaderNav ? " lg:pb-32" : "")}>
                     {showFullHeaderNav && canAccessAdmin && <VoiceNavButton />}
 
                     <Link to="/" className={linkClass("/")}>
@@ -1987,6 +1988,7 @@ const Header: React.FC = () => {
                     </div>
                 )}
             </div>
+            {showAdminHeaderNav && <EmailQuotaNotice />}
             {false && hasMobileBottomNav && (
                 <nav className="order-3 z-50 grid shrink-0 grid-cols-4 border-t border-slate-200 bg-white px-2 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-6px_20px_rgba(15,23,42,0.12)] lg:hidden">
                     <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className={`flex min-h-14 flex-col items-center justify-center rounded-lg text-xs ${location.pathname === "/" || location.pathname === "/clinical-demo" ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-600"}`}>

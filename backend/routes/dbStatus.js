@@ -1,8 +1,14 @@
 import express from "express";
 import { getDbStatus, setBackupProtection } from "../services/dbStatus.js";
+import { getEmailQuotaStatus } from "../services/emailDailyQuota.js";
 import { logSafeError } from "../utils/requestLogSafety.js";
 
 const router = express.Router();
+
+router.get("/email-quota", async (_req, res) => {
+    res.set("Cache-Control", "no-store");
+    return res.status(200).json({ data: await getEmailQuotaStatus() });
+});
 
 router.get("/", async (_req, res) => {
     try {
