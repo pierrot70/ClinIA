@@ -5,6 +5,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { MfaRequiredError, MfaVerificationError } from "../services/authService";
 
+const language = vi.hoisted(() => ({ locale: "fr" }));
+
 const auth = vi.hoisted(() => ({
     completeMfaLogin: vi.fn(),
     isAuthenticated: false,
@@ -29,7 +31,7 @@ vi.mock("../contexts/HomeI18nContext", async () => {
     );
     return {
         ...actual,
-        useHomeI18n: () => ({ locale: "fr" }),
+        useHomeI18n: () => ({ locale: language.locale }),
     };
 });
 
@@ -38,6 +40,7 @@ import LoginPage from "./LoginPage";
 describe("LoginPage MFA recovery codes", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        language.locale = "fr";
         window.sessionStorage.clear();
         auth.isAuthenticated = false;
         auth.user = null;
@@ -248,4 +251,32 @@ describe("LoginPage MFA recovery codes", () => {
             expect(screen.queryByText("Verification a deux facteurs")).not.toBeInTheDocument();
         });
     });
+    it("translates invalid credentials and an existing error when the locale changes", async () => {
+        language.locale = "en-CA";
+        auth.login.mockRejectedValue(new Error("Identifiants invalides."));
+        const { rerender } = render(<MemoryRouter><LoginPage /></MemoryRouter>);
+        fireEvent.submit(document.querySelector("form")!);
+        expect(await screen.findByText("Invalid credentials.")).toBeInTheDocument();
+        expect(screen.queryByText("Identifiants invalides.")).not.toBeInTheDocument();
+        language.locale = "fr-CA";
+        rerender(<MemoryRouter><LoginPage /></MemoryRouter>);
+        expect(await screen.findByText("Identifiants invalides.")).toBeInTheDocument();
+    });
+
+    it("shows English MFA labels and invalid-code errors, then switches back to French", async () => {
+        language.locale = "en-CA";
+        auth.completeMfaLogin.mockRejectedValue(new MfaVerificationError("INVALID_MFA_CODE", "Code MFA invalide."));
+        const { rerender } = render(<MemoryRouter><LoginPage /></MemoryRouter>);
+        fireEvent.submit(document.querySelector("form")!);
+        expect(await screen.findByText("Two-factor verification")).toBeInTheDocument();
+        expect(screen.getByText("Add this key to your authenticator app, then enter the displayed code.")).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText("Verification code or recovery code"), { target: { value: "000000" } });
+        fireEvent.click(screen.getByRole("button", { name: "Verify and sign in" }));
+        expect(await screen.findByText("Invalid MFA code.")).toBeInTheDocument();
+        language.locale = "fr-CA";
+        rerender(<MemoryRouter><LoginPage /></MemoryRouter>);
+        expect(await screen.findByText("Verification a deux facteurs")).toBeInTheDocument();
+        expect(await screen.findByText("Code MFA invalide.")).toBeInTheDocument();
+    });
+
 });

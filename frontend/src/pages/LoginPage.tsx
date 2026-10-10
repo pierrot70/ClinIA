@@ -115,7 +115,21 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     const restrictedTitleLabel = useLoginLabel(labels.auth.session.restrictedTitle, "auth.session.restrictedTitle");
     const restrictedBodyLabel = useLoginLabel(labels.auth.session.restrictedBody, "auth.session.restrictedBody");
     const restrictedUntilPrefixLabel = useLoginLabel(labels.auth.session.restrictedUntilPrefix, "auth.session.restrictedUntilPrefix");
-    const mfaLabels = loginLabels.mfa;
+    const mfaLabels = {
+        title: useLoginLabel(loginLabels.mfa.title, "login.mfa.title"),
+        description: useLoginLabel(loginLabels.mfa.description, "login.mfa.description"),
+        enrollmentDescription: useLoginLabel(loginLabels.mfa.enrollmentDescription, "login.mfa.enrollmentDescription"),
+        manualEntryKey: useLoginLabel(loginLabels.mfa.manualEntryKey, "login.mfa.manualEntryKey"),
+        codeLabel: useLoginLabel(loginLabels.mfa.codeLabel, "login.mfa.codeLabel"),
+        verify: useLoginLabel(loginLabels.mfa.verify, "login.mfa.verify"),
+        challengeExpiredRestart: useLoginLabel(loginLabels.mfa.challengeExpiredRestart, "login.mfa.challengeExpiredRestart"),
+        temporarilyLocked: useLoginLabel(loginLabels.mfa.temporarilyLocked, "login.mfa.temporarilyLocked"),
+        recoveryCodesTitle: useLoginLabel(loginLabels.mfa.recoveryCodesTitle, "login.mfa.recoveryCodesTitle"),
+        recoveryCodesDescription: useLoginLabel(loginLabels.mfa.recoveryCodesDescription, "login.mfa.recoveryCodesDescription"),
+        continue: useLoginLabel(loginLabels.mfa.continue, "login.mfa.continue"),
+    };
+    // Server messages never go to the translation API; only local fallbacks apply.
+    const translatedError = useTranslation({ text: error ?? "", targetLang: locale }).translated;
 
     const redirectTarget = useMemo(() => {
         const from = (location.state as { from?: string } | null)?.from;
@@ -384,7 +398,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
 
             {error && (
                 <div className="mb-4 p-3 rounded bg-red-50 text-red-700 text-sm">
-                    {error}
+                    {translatedError}
                 </div>
             )}
 

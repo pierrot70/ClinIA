@@ -683,6 +683,9 @@ export const UI_LABELS_FR = {
             forgotPassword: "Mot de passe oublie?",
         },
         errors: {
+            invalidCredentials: "Identifiants invalides.",
+            invalidMfaCode: "Code MFA invalide.",
+            mfaVerificationFailed: "Impossible de verifier le code MFA.",
             adminOnly: "Acces reserve aux comptes administrateurs.",
             createFailed: "Impossible de creer le compte.",
             loginFailed:
