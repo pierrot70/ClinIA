@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import mongoose from "mongoose";
 import { EmailDailyQuota } from "../models/EmailDailyQuota.js";
-import { reserveEmailAttempt } from "../services/emailDailyQuota.js";
+import { getEmailQuotaStatus, reserveEmailAttempt } from "../services/emailDailyQuota.js";
 import { sendPasswordRecoveryCode, sendPasswordChangedConfirmation } from "../services/passwordRecoveryEmail.js";
 
 const { sendMail } = vi.hoisted(() => ({ sendMail: vi.fn() }));
@@ -22,6 +22,7 @@ beforeAll(async () => {
     await EmailDailyQuota.createCollection();
 });
 beforeEach(async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     await EmailDailyQuota.deleteMany({});
     sendMail.mockReset().mockResolvedValue({});
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -30,7 +31,7 @@ beforeEach(async () => {
     vi.stubEnv("SMTP_PORT", "2525");
     vi.stubEnv("PASSWORD_RECOVERY_ENABLED", "true");
 });
-afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 afterAll(async () => {
     if (ownsDatabase && mongoose.connection.readyState === 1) await mongoose.connection.dropDatabase();
     await mongoose.disconnect();
@@ -40,10 +41,14 @@ it("permits exactly 150 concurrent reservations, retaining the cap after reconne
     const results = await Promise.allSettled(Array.from({ length: 220 }, () => reserveEmailAttempt()));
     expect(results.filter(r => r.status === "fulfilled")).toHaveLength(150);
     expect(results.filter(r => r.status === "rejected").every(r => r.reason.code === "EMAIL_DAILY_LIMIT_REACHED")).toBe(true);
+    const events = console.warn.mock.calls.map(([, message]) => JSON.parse(message));
+    expect(events.filter(e => e.event === "EMAIL_QUOTA_APPROACHING_LIMIT")).toHaveLength(1);
+    expect(events.filter(e => e.event === "EMAIL_DAILY_LIMIT_REACHED" && e.count === 150)).toHaveLength(1);
     await mongoose.disconnect();
     await mongoose.connect(uri, connectionOptions);
     await expect(reserveEmailAttempt()).rejects.toMatchObject({ code: "EMAIL_DAILY_LIMIT_REACHED" });
     expect((await EmailDailyQuota.findById("2099-01-15")).count).toBe(150);
+    expect(await getEmailQuotaStatus()).toMatchObject({ status: "exhausted", count: 150, remaining: 0 });
 });
 
 it("opens a separate budget at UTC midnight without resetting the previous day", async () => {

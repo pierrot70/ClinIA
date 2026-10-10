@@ -1,4 +1,15 @@
 export const UI_LABELS_FR = {
+    emailQuota: {
+        title: "Quota courriel quotidien",
+        counter: "{count} / {limit} tentatives courriel",
+        remaining: "{remaining} tentatives restantes",
+        day: "Jour UTC : {day}",
+        loading: "Chargement du quota…",
+        warning: "Limite bientôt atteinte",
+        exhausted: "Quota atteint — envois bloqués",
+        unavailable: "Quota indisponible — vérifier le service",
+        normal: "Capacité disponible",
+    },
     analysisStatus: {
         analyze: "Analyser",
         inProgress: "Analyse clinique en cours…",
