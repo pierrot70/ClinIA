@@ -230,3 +230,86 @@ Validation: bash scripts/run-urgentologist-walk-in-integration.sh --reception-sm
 Validation: fenêtre backend | bash -n et trois simulations Docker réussies, sans arrêt de service réel
 
 Validation: production backend sous trafic | 120 requêtes, zéro échec observé, même réservation sans doublon, deux backends healthy, nettoyage confirmé ; sorties utilisateur
+
+Préparation du test de restauration sur WSL Ubuntu, distinct du droplet :
+Docker et Compose disponibles, age présent et permissions de la clé 600.
+La sauvegarde chiffrée du 12 octobre 05:15 UTC a été copiée avec son checksum
+dans un dossier privé hors dépôt. L’utilisateur confirme `SHA256_OK` et
+`DECHIFFREMENT_ET_GZIP_OK`. Aucun contenu de clé ou document sauvegardé
+n’a été fourni au modèle.
+
+Le nouveau script de restauration utilise un conteneur sans réseau ni port,
+un replica set d’un membre et des tmpfs neufs. La suppression TTL est
+désactivée dans cette seule cible ; les index TTL restent restaurés.
+L’audit avant application valide les collections et les trois index critiques.
+La fin des commandes internes est confirmée par un fichier de statut avant
+lecture des rapports, afin de ne pas accepter une sortie Docker prématurée.
+Test local réel sur archive synthétique : restauration et renommage de base
+réussis, trois index unique/partial conformes, document TTL expiré conservé ;
+index absent et ordre de clés incorrect refusés. Conteneur synthétique retiré.
+La restauration de la sauvegarde réelle et la reconstruction applicative sur
+WSL restent à exécuter ; aucune réussite de ces étapes n’est encore revendiquée.
+
+Agent-Contribution: backend | script de restauration isolée et validation avant démarrage applicatif
+Validation: restauration synthétique MongoDB sans réseau | restauration, index conformes et deux cas de refus vérifiés, nettoyage confirmé
+
+Restauration réelle confirmée ensuite sur WSL par l’utilisateur :
+`ISOLATION_OK network=none published_ports=0 fresh_tmpfs=1 ttl_monitor=disabled`,
+`RESTORE_COMMAND_OK`, 31 collections validées, trois index critiques conformes,
+MongoDB 7.0.43 et `ISOLATED_RESTORE_PASSED`. Aucun backend n’avait démarré
+pendant ce contrôle des index.
+
+L’agent a ensuite pu accéder au même moteur Docker local et réaliser la
+reconstruction sans intervention supplémentaire de l’utilisateur. Sources
+propres extraites par `git archive` au commit
+`d19ee7cc75e35c83b8ee24b049c78e18a33950d3` ; images backend et frontend
+reconstruites avec `docker build --no-cache` depuis leurs Dockerfiles production
+et lockfiles, sans environnement local dans le contexte. SHA backend gravé
+dans `/app/build-revision.json`, vérifié identique. Versions réellement chargées :
+Node 24.21.0, Nodemailer 10.0.14, proxy-addr 2.0.8.
+
+Avant application, `audit-isolated-rebuilt-backend.mjs` a contrôlé les index
+contre les schémas du code reconstruit : 23 collections auditées, zéro erreur
+et zéro index supplémentaire. Un instantané des nombres de documents et
+définitions d’index est resté identique avant/après cet audit. `autoIndex` et
+`autoCreate` sont désactivés avant l’import des modèles et pendant le démarrage
+applicatif ; aucune migration réparatrice ne masque une restauration incomplète.
+
+Démarrage du backend reconstruit et de Nginx réussi dans le namespace réseau
+du MongoDB isolé. L’upstream frontend a été adapté de `backend:4000` vers
+`127.0.0.1:4000` dans une image de configuration dérivée : aucun réseau Docker
+ou port public n’a été ajouté. Racine des services en lecture seule, privilèges
+retirés, tmpfs de fonctionnement. Clés JWT/MFA temporaires générées uniquement
+pour le drill, IA simulée et récupération courriel désactivée ; aucune clé
+applicative production ou connexion SMTP réelle utilisée.
+
+Contrôle HTTP confirmé depuis un conteneur de contrôle partageant ce même
+namespace : readiness backend HTTP 200/Mongo connecté, readiness via le proxy
+Nginx HTTP 200/Mongo connecté, frontend HTTP 200 et deux assets compilés
+(JS/CSS) récupérés avec succès. Les trois conteneurs étaient Running, sans
+port publié, avec namespace MongoDB toujours `none`.
+
+Nettoyage réalisé par l’agent après vérification des labels et IDs : frontend,
+backend et MongoDB restauré retirés, données tmpfs et secrets runtime
+temporaires supprimés. Les sauvegardes chiffrées, la clé age originale et les
+preuves privées de restauration sur WSL sont conservées. Les images
+reconstruites sans données runtime sont conservées dans Docker.
+
+Le volet restauration des index et reconstruction applicative isolée est
+validé pour cette sauvegarde et ce SHA. Le périmètre est un replica set MongoDB
+d’un membre, un backend et un frontend ; il ne valide pas la reconstruction
+complète de la topologie HA trois MongoDB/deux backends, la restauration de
+secrets production ou l’utilisation des MFA chiffrées avec les clés originales.
+Aucun RTO de reconstruction ou RPO général n’a été mesuré. La revue clinique
+humaine et la rétention S3 avec exceptions restent ouvertes.
+
+Agent-Contribution: backend | reconstruction des images depuis le commit sauvegardé et audit des schémas restaurés
+Agent-Review: security | absence de ports/egress, secrets temporaires, index automatiques désactivés et nettoyage des conteneurs vérifiés
+Validation: restauration réelle WSL | 31 collections valides, trois index critiques conformes, MongoDB 7.0.43 ; sortie utilisateur
+Validation: reconstruction isolée | SHA d19ee7c, versions Node/Nodemailer/proxy-addr attendues, 23 audits index sans erreur ni extra, frontend/assets/proxy readiness HTTP 200, nettoyage confirmé
+
+Identifiants techniques des images reconstruites :
+
+- Backend : `sha256:22074b09612c4bb943d038ba9dfbd77c35a8e64af04883b8e7479064a7af13f2`.
+- Frontend compilé : `sha256:16d5993206f55a0de6e6afa8fac62fa5739b12a775520da3408cced89c8cf3b9`.
+- Frontend avec upstream local : `sha256:fa75aba4dc5e342bfd5cd76e281d4e7363408533896ea9051deefa2aaeed6ba1`.
