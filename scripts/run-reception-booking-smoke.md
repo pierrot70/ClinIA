@@ -16,6 +16,25 @@ Sur le serveur :
 bash /tmp/run-reception-booking-smoke.sh
 ```
 
+Pour rejouer deux réservations concurrentes après vérification des index et
+d'une sauvegarde récente, copier les deux fichiers locaux à jour puis lancer :
+
+```bash
+bash /tmp/run-reception-booking-smoke.sh --concurrent
+```
+
+Ce mode obtient deux preuves distinctes par deux recherches RAMQ avant de
+lancer les demandes en parallèle. Il exige les statuts 201 et 409 avec
+`RECEPTION_REPLAN_REQUIRED`, vérifie une seule réservation en base, effectue
+le logout et le nettoyage habituel. La confirmation finale est
+`RECEPTION_BOOKING_CONCURRENCY_PASSED`, après `CLEANUP_OK`. Un timeout ou une
+réponse amont ambiguë conserve les mêmes mécanismes de désactivation et reprise
+que le mode séquentiel. Les deux requêtes passent par l'URL publique ; cela ne
+garantit pas qu'elles ont été traitées par des instances différentes.
+
+Validation locale du mode concurrent : huit tests du parcours smoke réussis
+sur MongoDB jetable, dont chevauchement forcé des requêtes et erreur amont 504.
+
 Par défaut, URL `https://clinique-ai.ca` et découverte d'un unique conteneur
 `backend-` hors `backend-replica-`. Si plusieurs correspondent, préciser :
 
@@ -75,7 +94,9 @@ Les comptes/passwords/tokens ne sont pas imprimés ni passés dans les arguments
 curl. Les données de test sont synthétiques ; les audits obligatoires ne sont
 pas effacés. Les cliniques/comptes synthétiques peuvent être visibles brièvement
 par les administrateurs pendant le test. Le résultat est un contrôle séquentiel,
-pas une preuve de concurrence, de basculement ou de revue clinique.
+pas une preuve de concurrence, de basculement ou de revue clinique. Le mode
+`--concurrent` vérifie la concurrence des réservations réception ; il ne
+constitue pas une validation de basculement ou une revue clinique.
 
 ## Validation du script sans production
 

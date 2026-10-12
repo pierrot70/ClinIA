@@ -18,6 +18,7 @@ import { ReceptionBookingProof } from "../models/ReceptionBookingProof.js";
 import { RefreshTokenSession } from "../models/RefreshTokenSession.js";
 
 let server, work, base, owned = false, failure = null;
+let holdBookings = false, concurrentArrivals = [];
 const root = path.resolve(import.meta.dirname, "../..");
 const helperPath = path.join(root, "scripts/reception-booking-smoke-helper.mjs");
 const script = path.join(root, "scripts/run-reception-booking-smoke.sh");
@@ -66,7 +67,13 @@ beforeAll(async () => {
     const app = express();
     app.use(express.json());
     app.get("/api/health/ready", (_, res) => res.json({ data: { status: "ok", dependencies: { mongo: "connected" } } }));
-    app.use("/api/reception", verifyJWT, requireRole("RECEPTION"), loi25DataLeakGuard, (req, res, next) => {
+    app.use("/api/reception", verifyJWT, requireRole("RECEPTION"), loi25DataLeakGuard, async (req, res, next) => {
+        if (holdBookings && req.method === "POST") {
+            await new Promise(resolve => {
+                concurrentArrivals.push(resolve);
+                if (concurrentArrivals.length === 2) concurrentArrivals.forEach(release => release());
+            });
+        }
         if (failure && req.method === "POST") return res.status(failure).json({ error: { code: "TEST_FAILURE" } });
         next();
     }, receptionRouter);
@@ -85,6 +92,8 @@ afterAll(async () => {
 });
 afterEach(async () => {
     failure = null;
+    holdBookings = false;
+    concurrentArrivals = [];
     // Isolate failures between tests, only on the verified disposable database.
     if (owned) {
         expect(mongoose.connection.name).toBe("clinia_walkin_integration");
@@ -166,5 +175,32 @@ it("refuses destructive cleanup of foreign references but still disables owned a
     expect(await AdminUser.countDocuments({ isActive: true })).toBe(0);
     await ReceptionBookingProof.deleteOne({ _id: proof._id });
     expect((await helper("cleanup", id)).code).toBe(0);
+    await expectClean();
+});
+
+it("accepts one of two overlapping bookings with distinct proofs and cleans all fixtures", async () => {
+    holdBookings = true;
+    const result = await run("--concurrent");
+    expect(concurrentArrivals).toHaveLength(2);
+    expect(result, result.out + result.err).toMatchObject({ code: 0 });
+    expect(result.out).toContain("LOOKUP_PROOFS_OK distinct=2");
+    expect(result.out).toMatch(/CONCURRENT_RESPONSES A=(201 B=409|409 B=201)/);
+    expect(result.out).toContain("CONCURRENT_REFUSAL HTTP=409 RECEPTION_REPLAN_REQUIRED");
+    expect(result.out).toContain("BOOKING_DB_OK count=1");
+    expect(result.out).toContain("CLEANUP_OK operational_fixtures=0 audits=retained");
+    expect(result.out).toContain("RECEPTION_BOOKING_CONCURRENCY_PASSED");
+    await expectClean();
+});
+it("quarantines concurrent upstream errors without claiming success and supports cleanup", async () => {
+    holdBookings = true;
+    failure = 504;
+    const result = await run("--concurrent");
+    expect(concurrentArrivals).toHaveLength(2);
+    expect(result.code).toBe(1);
+    expect(result.out).toContain("CLEANUP_UNCONFIRMED");
+    expect(result.out).not.toContain("RECEPTION_BOOKING_CONCURRENCY_PASSED");
+    expect(await AdminUser.countDocuments({ isActive: true })).toBe(0);
+    const id = result.out.match(/^RUN_ID=(.+)$/m)[1];
+    expect((await run("--cleanup", id)).code).toBe(0);
     await expectClean();
 });
