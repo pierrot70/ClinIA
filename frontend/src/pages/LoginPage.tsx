@@ -532,7 +532,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                     <input
                         id="email"
                         type={registerMode && !adminOnly ? "email" : "text"}
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                        className="w-full border border-slate-300 rounded-lg bg-white px-3 py-2 text-sm text-slate-900"
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         autoComplete={registerMode && !adminOnly ? "email" : "username"}
@@ -547,7 +547,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                     <input
                         id="password"
                         type="password"
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                        className="w-full border border-slate-300 rounded-lg bg-white px-3 py-2 text-sm text-slate-900"
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
                         autoComplete="current-password"

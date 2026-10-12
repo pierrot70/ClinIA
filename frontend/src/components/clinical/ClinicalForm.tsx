@@ -1,3 +1,4 @@
+import { exampleConceptSource, localizeClinicalFormFieldLabel } from "../../i18n/clinicalFormFieldLabels";
 import { useUiLabelTree } from "../../hooks/useUiLabels";
 import { UiMessage } from "../i18n/UiMessage";
 import { analysisStatusLabels } from "../../i18n/analysisStatusLabels";
@@ -466,6 +467,7 @@ export function ClinicalForm({
         ClinicalField | ""
     >("");
     const [selectedExampleCase, setSelectedExampleCase] = useState("");
+    const [isExamplePresentation, setIsExamplePresentation] = useState(false);
     const [hasRestoredClinicalData, setHasRestoredClinicalData] = useState(
         restoreInitialDataForCorrection && Boolean(initialData)
     );
@@ -587,7 +589,8 @@ export function ClinicalForm({
         setForm((prev) => ({ ...prev, [key]: value }));
     }
 
-    function applyFormData(payload: ClinicalPayload) {
+    function applyFormData(payload: ClinicalPayload, examplePresentation = false) {
+        setIsExamplePresentation(examplePresentation);
         const nextForm = clonePayload(payload);
         if (!nextForm.country && browserCountryCode) {
             nextForm.country = browserCountryCode;
@@ -754,7 +757,7 @@ export function ClinicalForm({
 
         const selectedCase = EXAMPLE_CASES[caseId];
         if (selectedCase) {
-            applyFormData(selectedCase);
+            applyFormData(selectedCase, true);
         }
     }
 
@@ -1012,24 +1015,25 @@ export function ClinicalForm({
         text: clinicalFormLabels.ethnicityOptions.preferNotToSay,
         targetLang,
     });
-    const { translated: weightLabel } = useTranslation({ text: "Poids du patient (kg)", targetLang });
-    const { translated: heightLabel } = useTranslation({ text: "Taille du patient (cm)", targetLang });
-    const { translated: diagnosisLabel } = useTranslation({ text: "Diagnostic / motif clinique principal", targetLang });
-    const { translated: symptomsLabel } = useTranslation({ text: "Symptomes principaux", targetLang });
-    const { translated: medicalHistoryLabel } = useTranslation({ text: "Antecedents medicaux", targetLang });
-    const { translated: medicationsLabel } = useTranslation({ text: "Medication actuelle", targetLang });
-    const { translated: diagnosisHelpLabel } = useTranslation({ text: "Entrez le diagnostic confirme ou le motif clinique principal, exemple: cancer gastrique", targetLang });
-    const { translated: ageHelpLabel } = useTranslation({ text: "Entrez l'age du patient, exemple: 55", targetLang });
-    const { translated: sexHelpLabel } = useTranslation({ text: "Selectionnez le sexe clinique pertinent pour l'analyse", targetLang });
-    const { translated: weightHelpLabel } = useTranslation({ text: "Entrez une valeur numerique, exemple: 92", targetLang });
-    const { translated: heightHelpLabel } = useTranslation({ text: "Entrez une valeur numerique, exemple: 175", targetLang });
+    const fieldLabels = useUiLabelTree(sourceUiLabels.clinicalFormFields);
+    const weightLabel = fieldLabels.weight;
+    const heightLabel = fieldLabels.height;
+    const diagnosisLabel = fieldLabels.diagnosis;
+    const symptomsLabel = fieldLabels.symptoms;
+    const medicalHistoryLabel = fieldLabels.medicalHistory;
+    const medicationsLabel = fieldLabels.medications;
+    const diagnosisHelpLabel = fieldLabels.diagnosisHelp;
+    const ageHelpLabel = fieldLabels.ageHelp;
+    const sexHelpLabel = fieldLabels.sexHelp;
+    const weightHelpLabel = fieldLabels.weightHelp;
+    const heightHelpLabel = fieldLabels.heightHelp;
     const { translated: ageRangeLabel } = useTranslation({ text: clinicalFormLabels.ageRange, targetLang, translationKey: "clinicalDemo.form.ageRange" });
     const { translated: weightRangeLabel } = useTranslation({ text: clinicalFormLabels.weightRange, targetLang, translationKey: "clinicalDemo.form.weightRange" });
     const { translated: heightRangeLabel } = useTranslation({ text: clinicalFormLabels.heightRange, targetLang, translationKey: "clinicalDemo.form.heightRange" });
     const { translated: rangeErrorLabel } = useTranslation({ text: clinicalFormLabels.rangeError, targetLang, translationKey: "clinicalDemo.form.rangeError" });
-    const { translated: symptomsHelpLabel } = useTranslation({ text: "Separez chaque symptome par une virgule, exemple: fatigue, polydipsie", targetLang });
-    const { translated: medicalHistoryHelpLabel } = useTranslation({ text: "Conditions ou diagnostics connus, separes par des virgules", targetLang });
-    const { translated: medicationsHelpLabel } = useTranslation({ text: "Noms des medicaments en cours, separes par des virgules", targetLang });
+    const symptomsHelpLabel = fieldLabels.symptomsHelp;
+    const medicalHistoryHelpLabel = fieldLabels.medicalHistoryHelp;
+    const medicationsHelpLabel = fieldLabels.medicationsHelp;
     const analyzeButtonLabel = analysisStatusLabels(targetLang).analyze;
     const { translated: analyzingButtonLabel } = useTranslation({ text: "Analyse…", targetLang });
     const { translated: clearPatientDataLabel } = useTranslation({ text: "Effacer les donnees patient", targetLang });
@@ -1132,13 +1136,33 @@ export function ClinicalForm({
             label: reviewedStrings.clinicalFields.endocrinology,
         },
     ];
+    function displayConcept(term: string): string {
+        const source = exampleConceptSource(term);
+        return source ? localizeClinicalFormFieldLabel(source, targetLang) ?? term : term;
+    }
+    function presentExampleValue(value: string, field: "diagnosis" | "symptoms" | "medical_history" | "current_medications"): string {
+        if (!isExamplePresentation) return value;
+        const example = EXAMPLE_CASES[selectedExampleCase];
+        const allowed = field === "diagnosis" ? [example?.diagnosis] : example?.[field] ?? [];
+        return value.split(",").map(term => allowed.includes(term.trim()) ? term.replace(term.trim(), displayConcept(term.trim())) : term).join(",");
+    }
+    function canonicalExampleValue(value: string, field: "diagnosis" | "symptoms" | "medical_history" | "current_medications"): string {
+        if (!isExamplePresentation) return value;
+        const example = EXAMPLE_CASES[selectedExampleCase];
+        const allowed = field === "diagnosis" ? [example?.diagnosis ?? ""] : example?.[field] ?? [];
+        return value.split(",").map(term => {
+            const match = allowed.find(canonical => displayConcept(canonical) === term.trim());
+            return match ? term.replace(term.trim(), match) : term;
+        }).join(",");
+    }
+
     const exampleCaseOptions = [
-        { value: "hypertension55", label: EXAMPLE_CASES.hypertension55.diagnosis },
-        { value: "gastricCancer59", label: EXAMPLE_CASES.gastricCancer59.diagnosis },
-        { value: "mononucleosis35", label: EXAMPLE_CASES.mononucleosis35.diagnosis },
-        { value: "cataract72", label: EXAMPLE_CASES.cataract72.diagnosis },
-        { value: "majorDepression42", label: EXAMPLE_CASES.majorDepression42.diagnosis },
-        { value: "diabetesType255", label: EXAMPLE_CASES.diabetesType255.diagnosis },
+        { value: "hypertension55", label: displayConcept(EXAMPLE_CASES.hypertension55.diagnosis) },
+        { value: "gastricCancer59", label: displayConcept(EXAMPLE_CASES.gastricCancer59.diagnosis) },
+        { value: "mononucleosis35", label: displayConcept(EXAMPLE_CASES.mononucleosis35.diagnosis) },
+        { value: "cataract72", label: displayConcept(EXAMPLE_CASES.cataract72.diagnosis) },
+        { value: "majorDepression42", label: displayConcept(EXAMPLE_CASES.majorDepression42.diagnosis) },
+        { value: "diabetesType255", label: displayConcept(EXAMPLE_CASES.diabetesType255.diagnosis) },
     ].filter(
         (option) => EXAMPLE_CASE_FIELDS[option.value] === selectedClinicalField
     );
@@ -1733,8 +1757,8 @@ export function ClinicalForm({
                         maxLength={160}
                         placeholder={reviewedStrings.diagnosisPlaceholder}
                         autoComplete="off"
-                        value={form.diagnosis ?? ""}
-                        onChange={(e) => update("diagnosis", e.target.value)}
+                        value={presentExampleValue(form.diagnosis ?? "", "diagnosis")}
+                        onChange={(e) => update("diagnosis", canonicalExampleValue(e.target.value, "diagnosis"))}
                     />
                 </div>
             </Field>
@@ -1826,10 +1850,10 @@ export function ClinicalForm({
                         maxLength={725}
                         placeholder={reviewedStrings.symptomsPlaceholder}
                         autoComplete="off"
-                        value={listInputs.symptoms}
+                        value={presentExampleValue(listInputs.symptoms, "symptoms")}
                         onFocus={() => setShowSymptomSuggestions(true)}
                         onChange={(e) =>
-                            updateListField("symptoms", e.target.value)
+                            updateListField("symptoms", canonicalExampleValue(e.target.value, "symptoms"))
                         }
                     />
                     {showSymptomSuggestions && (
@@ -1858,9 +1882,9 @@ export function ClinicalForm({
                         maxLength={725}
                         placeholder={reviewedStrings.medicalHistoryPlaceholder}
                         autoComplete="off"
-                        value={listInputs.medical_history}
+                        value={presentExampleValue(listInputs.medical_history, "medical_history")}
                         onChange={(e) =>
-                            updateListField("medical_history", e.target.value)
+                            updateListField("medical_history", canonicalExampleValue(e.target.value, "medical_history"))
                         }
                     />
                 </div>
@@ -1880,9 +1904,9 @@ export function ClinicalForm({
                         maxLength={725}
                         placeholder={reviewedStrings.medicationsPlaceholder}
                         autoComplete="off"
-                        value={listInputs.current_medications}
+                        value={presentExampleValue(listInputs.current_medications, "current_medications")}
                         onChange={(e) =>
-                            updateListField("current_medications", e.target.value)
+                            updateListField("current_medications", canonicalExampleValue(e.target.value, "current_medications"))
                         }
                     />
                 </div>

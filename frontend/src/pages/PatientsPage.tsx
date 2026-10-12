@@ -1038,8 +1038,9 @@ export function PatientsPage() {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                             <input
-                                className="border rounded p-2"
+                                className="border rounded bg-white p-2 placeholder:text-slate-500"
                                 placeholder={ui.filterLastNamePlaceholder}
+                                aria-label={ui.filterLastNamePlaceholder}
                                 value={filterNom}
                                 onChange={(e) => {
                                     setPage(1);
@@ -1047,8 +1048,9 @@ export function PatientsPage() {
                                 }}
                             />
                             <input
-                                className="border rounded p-2"
+                                className="border rounded bg-white p-2 placeholder:text-slate-500"
                                 placeholder={ui.filterFirstNamePlaceholder}
+                                aria-label={ui.filterFirstNamePlaceholder}
                                 value={filterPrenom}
                                 onChange={(e) => {
                                     setPage(1);
@@ -1056,8 +1058,9 @@ export function PatientsPage() {
                                 }}
                             />
                             <input
-                                className="border rounded p-2"
+                                className="border rounded bg-white p-2 placeholder:text-slate-500"
                                 placeholder={ui.filterAddressPlaceholder}
+                                aria-label={ui.filterAddressPlaceholder}
                                 value={filterAddresse}
                                 onChange={(e) => {
                                     setPage(1);
@@ -1065,8 +1068,9 @@ export function PatientsPage() {
                                 }}
                             />
                             <input
-                                className="border rounded p-2"
+                                className="border rounded bg-white p-2 placeholder:text-slate-500"
                                 placeholder={ui.filterPhonePlaceholder}
+                                aria-label={ui.filterPhonePlaceholder}
                                 value={filterTelephone}
                                 onChange={(e) => {
                                     setPage(1);
@@ -1074,8 +1078,9 @@ export function PatientsPage() {
                                 }}
                             />
                             <input
-                                className="border rounded p-2"
+                                className="border rounded bg-white p-2 placeholder:text-slate-500"
                                 placeholder={ui.filterRamqPlaceholder}
+                                aria-label={ui.filterRamqPlaceholder}
                                 value={filterRamq}
                                 onChange={(e) => {
                                     setPage(1);
@@ -1118,7 +1123,7 @@ export function PatientsPage() {
                         ))}
                     </div>
 
-                    <div className="hidden overflow-hidden rounded border md:block">
+                    <div className="hidden overflow-x-auto rounded border md:block">
                         <table className="w-full text-sm">
                             <thead className="bg-gray-100 text-gray-700">
                                 <tr>

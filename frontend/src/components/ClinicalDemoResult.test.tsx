@@ -4,8 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 import ClinicalDemoResult from "./ClinicalDemoResult";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 
+const { captureTreatmentTable, captureQuestionCard } = vi.hoisted(() => ({ captureTreatmentTable: vi.fn(), captureQuestionCard: vi.fn() }));
+
 vi.mock("./AITreatmentTable", () => ({
-    default: () => <div data-testid="ai-treatment-table" />,
+    default: (props: unknown) => {
+        captureTreatmentTable(props);
+        return <div data-testid="ai-treatment-table" />;
+    },
 }));
 
 vi.mock("./TreatmentCard", () => ({
@@ -13,18 +18,10 @@ vi.mock("./TreatmentCard", () => ({
 }));
 
 vi.mock("./QuestionCard", () => ({
-    default: ({
-        question,
-        answer,
-    }: {
-        question: string;
-        answer: string;
-    }) => (
-        <div data-testid="question-card">
-            <div>{question}</div>
-            <div>{answer}</div>
-        </div>
-    ),
+    default: (props: { question: string; answer: string; language: string }) => {
+        captureQuestionCard(props);
+        return <div data-testid="question-card"><div>{props.question}</div><div>{props.answer}</div></div>;
+    },
 }));
 
 vi.mock("./ClinicalRelevanceByAgeChart", () => ({
@@ -32,6 +29,31 @@ vi.mock("./ClinicalRelevanceByAgeChart", () => ({
 }));
 
 describe("ClinicalDemoResult", () => {
+    it("passes the selected locale to contextual questions after switching from English to Spanish", () => {
+        const data = { summary: "Synthetic summary", treatments: [{ name: "Inhibiteur SGLT2" }], questions: [] };
+        const view = (locale: string) => <HomeI18nContext.Provider value={{ locale } as any}><ClinicalDemoResult demoData={data as any} /></HomeI18nContext.Provider>;
+        const { rerender } = render(view("en-CA"));
+        fireEvent.click(screen.getByRole("button", { name: /Clinical questions to explore/i }));
+        expect(captureQuestionCard.mock.lastCall![0].language).toBe("en-CA");
+        rerender(view("es"));
+        expect(screen.getByText("Preguntas clínicas contextuales")).toBeInTheDocument();
+        expect(captureQuestionCard.mock.lastCall![0]).toMatchObject({ language: "es", question: "¿Por qué Inhibiteur SGLT2 destaca como opción para discutir?" });
+        expect(screen.queryByText("Contextual clinical questions")).not.toBeInTheDocument();
+    });
+
+    it("keeps treatment indicators out of contraindications and preserves listed contraindications", () => {
+        render(<HomeI18nContext.Provider value={{ locale: "en-CA" } as any}>
+            <ClinicalDemoResult demoData={{ treatments: [
+                { name: "Synthetic option A", flags: ["wellTolerated", "monitoring"] },
+                { name: "Synthetic option B", flags: ["wellTolerated"], contraindications: ["Listed contraindication"] },
+            ], questions: [] } as any} />
+        </HomeI18nContext.Provider>);
+        fireEvent.click(screen.getByRole("button", { name: /Alternatives and recommendations/i }));
+        const { treatments } = captureTreatmentTable.mock.lastCall![0];
+        expect(treatments[0].contraindications).toEqual([]);
+        expect(treatments[0].flags).toEqual(["wellTolerated", "monitoring"]);
+        expect(treatments[1].contraindications).toEqual(["Listed contraindication"]);
+    });
     it.each([{}, { clinical_summary: "Additional clinical details" }, { treatments: [{ name: "Treatment A" }] }])("shows alternatives and red flags immediately in every result layout: %j", layout => {
         render(<HomeI18nContext.Provider value={{ locale: "en-CA" } as any}>
             <ClinicalDemoResult demoData={{ ...layout, alternatives: [{ name: "Alternative A", reason: "Consider patient context." }], red_flags: ["Urgent assessment required."] } as any} />
@@ -63,7 +85,7 @@ describe("ClinicalDemoResult", () => {
         ).toBeInTheDocument();
     });
 
-    it("uses English inside opened sections for a non-French locale", () => {
+    it("uses Spanish inside opened sections when Spanish is selected", () => {
         render(
             <HomeI18nContext.Provider value={{ locale: "es" } as any}>
                 <ClinicalDemoResult
@@ -79,17 +101,17 @@ describe("ClinicalDemoResult", () => {
         fireEvent.click(
             screen.getByRole("button", { name: /Resumen clínico del paciente/i })
         );
-        expect(screen.getByText("AI clinical summary")).toBeInTheDocument();
+        expect(screen.getByText("Resumen clínico de IA")).toBeInTheDocument();
 
         fireEvent.click(
             screen.getByRole("button", { name: /Alternativas y recomendaciones/i })
         );
-        expect(screen.getByText("AI recommendations")).toBeInTheDocument();
+        expect(screen.getByText("Recomendaciones de IA")).toBeInTheDocument();
 
         fireEvent.click(
             screen.getByRole("button", { name: /Preguntas clínicas para explorar/i })
         );
-        expect(screen.getByText("Other AI recommendations")).toBeInTheDocument();
+        expect(screen.getByText("Otras recomendaciones de IA")).toBeInTheDocument();
     });
 
     it("uses deterministic English labels for simulated result content", () => {

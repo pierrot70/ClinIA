@@ -29,7 +29,7 @@ function TreatmentRow({
     const fixed = UI_LABELS_FR.residualClinicalUi;
     const contraindications = Array.isArray(treatment.contraindications)
         ? treatment.contraindications.join(", ")
-        : treatment.contraindications;
+        : typeof treatment.contraindications === "string" ? treatment.contraindications : "";
     const nameTranslation = useTranslation({ text: treatment.name, targetLang: language });
     const justificationTranslation = useTranslation({ text: treatment.justification, targetLang: language });
     const contraindicationsTranslation = useTranslation({ text: contraindications, targetLang: language });
@@ -40,7 +40,9 @@ function TreatmentRow({
             : translated;
     const name = safeEnglish(treatment.name, nameTranslation.translated, nameTranslation.loading, t(fixed.clinicalOption));
     const justification = safeEnglish(treatment.justification, justificationTranslation.translated, justificationTranslation.loading, t(fixed.rationaleInSource));
-    const displayedContraindications = safeEnglish(contraindications, contraindicationsTranslation.translated, contraindicationsTranslation.loading, t(fixed.noneListed));
+    const displayedContraindications = contraindications?.trim()
+        ? safeEnglish(contraindications, contraindicationsTranslation.translated, contraindicationsTranslation.loading, t(fixed.noneListed))
+        : t(fixed.noneListed);
 
     return (
         <tr className="border">
@@ -55,12 +57,13 @@ const AITreatmentTable: React.FC<AITreatmentTableProps> = ({ treatments, languag
     const { t } = useUiLabels(language);
     const fixed = UI_LABELS_FR.residualClinicalUi;
     return (
-        <div className="p-6 bg-white shadow-lg rounded-xl border border-gray-200">
+        <div className="min-w-0 p-4 sm:p-6 bg-white shadow-lg rounded-xl border border-gray-200">
             <h2 className="text-xl font-semibold mb-4 text-blue-700">
                 {t(fixed.proposedOptions)}
             </h2>
 
-            <table className="w-full border-collapse text-sm">
+            <div className="max-w-full overflow-x-auto">
+            <table className="w-full min-w-[28rem] border-collapse text-sm">
                 <thead>
                 <tr className="bg-gray-100">
                     <th className="p-3 border">{t(fixed.treatment)}</th>
@@ -75,6 +78,7 @@ const AITreatmentTable: React.FC<AITreatmentTableProps> = ({ treatments, languag
                 ))}
                 </tbody>
             </table>
+            </div>
         </div>
     );
 };

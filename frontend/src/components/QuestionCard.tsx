@@ -1,6 +1,7 @@
 import React from "react";
 import { ChevronRight } from "lucide-react";
 import { useTranslation } from "../hooks/useTranslation";
+import { getSimulatedClinicalContent } from "../i18n/simulatedClinicalContent";
 import {
   getImmediateEnglishClinicalContent,
   shouldHideFrenchSourceInEnglish,
@@ -9,13 +10,13 @@ import {
 interface Props {
   question: string;
   answer: string;
-  language?: "fr" | "en";
+  language?: string;
 }
 
 const QuestionCard: React.FC<Props> = ({ question, answer, language = "fr" }) => {
   const questionTranslation = useTranslation({ text: question, targetLang: language });
   const answerTranslation = useTranslation({ text: answer, targetLang: language });
-  const english = language === "en";
+  const english = language.toLowerCase().split("-")[0] === "en";
   const displayEnglishText = (
     source: string,
     translated: string,
@@ -39,13 +40,13 @@ const QuestionCard: React.FC<Props> = ({ question, answer, language = "fr" }) =>
         "Additional clinical question"
       )
     : questionTranslation.translated;
-  const displayedAnswer = english
+  const displayedAnswer = getSimulatedClinicalContent(answer, language) ?? (english
     ? displayEnglishText(
         answer,
         answerTranslation.translated,
         "Review the clinical details provided for this question."
       )
-    : answerTranslation.translated;
+    : answerTranslation.translated);
 
   return (
     <details className="bg-white border border-gray-200 rounded-xl p-3 shadow-xs">

@@ -1,3 +1,5 @@
+import { exampleConceptSource, localizeClinicalFormFieldLabel } from "../../i18n/clinicalFormFieldLabels";
+import { EXAMPLE_CASES } from "../../data/clinicalExampleCases";
 import { analysisStatusLabels } from "../../i18n/analysisStatusLabels";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -98,27 +100,45 @@ describe("ClinicalForm", () => {
     });
 
     it.each(["fr-CA", "en-CA", "ja", "zh", "he", "es", "ko-KR", "vi", "no-NO"])(
-        "keeps the hypertension example medical terms in English for %s", (locale) => {
+        "localizes the hypertension example display while submitting canonical terms for %s", async (locale) => {
+            const onSubmit = vi.fn();
             const { container } = render(
                 <HomeI18nContext.Provider value={{ locale, strings: HOME_STRINGS_FR, isTranslating: false,
                     setLocaleFromDropdown: vi.fn(), setLocaleFromVoice: vi.fn() }}>
-                    <ClinicalForm onSubmit={() => {}} loading={false} />
+                    <ClinicalForm onSubmit={onSubmit} loading={false} />
                 </HomeI18nContext.Provider>
             );
-            fireEvent.change(container.querySelector("#clinical-field")!, {
-                target: { value: "generalMedicine" },
-            });
-            expect(screen.getByRole("option", { name: "Hypertension" })).toBeInTheDocument();
-            fireEvent.change(container.querySelector("#clinical-example-case")!, {
-                target: { value: "hypertension55" },
-            });
-            expect(screen.getByLabelText("Diagnostic / motif clinique principal")).toHaveValue("Hypertension");
-            expect(screen.getByLabelText("Symptomes principaux")).toHaveValue("Headache, Elevated blood pressure");
-            expect(screen.getByLabelText("Antecedents medicaux")).toHaveValue("Dyslipidemia");
-            expect(screen.getByLabelText("Medication actuelle")).toHaveValue("None");
-            expect(screen.getByRole("button", { name: analysisStatusLabels(locale).analyze })).toBeVisible();
+            fireEvent.change(container.querySelector("#clinical-field")!, { target: { value: "generalMedicine" } });
+            const display = (term: string) => localizeClinicalFormFieldLabel(exampleConceptSource(term)!, locale)!;
+            expect(screen.getByRole("option", { name: display("Hypertension") })).toBeInTheDocument();
+            fireEvent.change(container.querySelector("#clinical-example-case")!, { target: { value: "hypertension55" } });
+            expect(container.querySelector("#clinical-diagnosis")).toHaveValue(display("Hypertension"));
+            expect(container.querySelector("#clinical-symptoms")).toHaveValue([display("Headache"), display("Elevated blood pressure")].join(", "));
+            expect(container.querySelector("#clinical-medical-history")).toHaveValue(display("Dyslipidemia"));
+            expect(container.querySelector("#clinical-current-medications")).toHaveValue(display("None"));
+            fireEvent.click(screen.getByRole("button", { name: analysisStatusLabels(locale).analyze }));
+            await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+            expect(onSubmit.mock.calls[0][0]).toMatchObject(EXAMPLE_CASES.hypertension55);
         }
     );
+
+    it("preserves edited example values and canonical symptoms when the language changes", async () => {
+        const onSubmit = vi.fn();
+        const page = (locale: string) => <HomeI18nContext.Provider value={{ locale, strings: HOME_STRINGS_FR,
+            isTranslating: false, setLocaleFromDropdown: vi.fn(), setLocaleFromVoice: vi.fn() }}>
+            <ClinicalForm onSubmit={onSubmit} loading={false} />
+        </HomeI18nContext.Provider>;
+        const { container, rerender } = render(page("fr-CA"));
+        selectExampleCase("hypertension55");
+        fireEvent.change(container.querySelector("#clinical-diagnosis")!, { target: { value: "Synthetic edited value " } });
+        fireEvent.change(container.querySelector("#clinical-symptoms")!, { target: { value: "Céphalée, Pression artérielle élevée, Synthetic edited symptom" } });
+        rerender(page("he"));
+        expect(container.querySelector("#clinical-diagnosis")).toHaveValue("Synthetic edited value ");
+        expect(container.querySelector("#clinical-symptoms")).toHaveValue("כאב ראש, לחץ דם מוגבר, Synthetic edited symptom");
+        fireEvent.click(screen.getByRole("button", { name: analysisStatusLabels("he").analyze }));
+        await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+        expect(onSubmit.mock.calls[0][0]).toMatchObject({ diagnosis: "Synthetic edited value ", symptoms: ["Headache", "Elevated blood pressure", "Synthetic edited symptom"] });
+    });
 
     it("shows only the example case picker before a selection is made", () => {
         const onSubmit = vi.fn();
@@ -283,9 +303,9 @@ describe("ClinicalForm", () => {
         expect(screen.getByLabelText("Age du patient")).toHaveValue(59);
         expect(screen.getByLabelText("Sexe")).toHaveValue("female");
         expect(screen.getByLabelText("Diagnostic / motif clinique principal")).toHaveValue(
-            "Gastric cancer"
+            "Cancer gastrique"
         );
-        expect(screen.getByLabelText("Antecedents medicaux")).toHaveValue("Anemia");
+        expect(screen.getByLabelText("Antecedents medicaux")).toHaveValue("Anémie");
     });
 
     it("imports a clinical payload from a pasted JSON object", () => {
@@ -509,7 +529,7 @@ describe("ClinicalForm", () => {
 
         expect(screen.getByLabelText("Age du patient")).toHaveValue(55);
         expect(screen.getByLabelText("Diagnostic / motif clinique principal")).toHaveValue(
-            "Type 2 diabetes"
+            "Diabète de type 2"
         );
         expect(screen.getByLabelText("Antecedents medicaux")).toHaveValue(
             "Hypertension"

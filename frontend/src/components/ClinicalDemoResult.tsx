@@ -324,7 +324,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   const hasReviewedResultStrings = ["fr", "en", "es", "ja", "zh", "he", "ko", "vi", "no"].includes(baseTargetLang);
   const resultStrings = getClinicalResultStrings(targetLang);
   const contentLanguage: "fr" | "en" = baseTargetLang === "fr" ? "fr" : "en";
-  const contentStrings = getClinicalResultStrings(contentLanguage);
+  const contentStrings = resultStrings;
   const resultLabels = labels.clinicalDemo.resultAccordions;
   const comparisonLabels = labels.clinicalDemo.comparison;
   const { translated: reverifyActionLabel } = useTranslation({
@@ -626,7 +626,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
     indication: t.indication ?? t.justification ?? "",
     dosage: t.dosage ?? "",
     duration: t.duration ?? "",
-    contraindications: t.contraindications || t.flags || [],
+    contraindications: t.contraindications || [],
     monitoring: t.monitoring ?? [],
     evidence_level: t.evidence_level ?? "C",
     justification: t.summary || t.indication || t.justification || "-",
@@ -829,7 +829,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
               key={i}
               question={q.question ?? q}
               answer={q.answer ?? ""}
-              language={contentLanguage}
+              language={targetLang}
             />
           ))}
         </div>

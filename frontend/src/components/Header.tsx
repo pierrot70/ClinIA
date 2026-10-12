@@ -1308,14 +1308,14 @@ const Header: React.FC = () => {
                             <div className="truncate font-semibold text-lg leading-tight">
                                 ClinIA
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className="hidden text-xs text-gray-500 xl:block">
                                 <HeaderLabel text={headerLabels.brand.subtitle} />
                             </div>
                         </div>
                     </Link>
 
-                    <div className="flex items-center gap-3">
-                        <div className="absolute left-1/2 -translate-x-1/2">
+                    <div className="flex min-w-0 items-center gap-2">
+                        <div className="relative shrink-0">
                             {showPublicLanguageTip && (
                                 <div className="absolute right-0 top-full z-[100] mt-3 w-72 rounded-xl border border-cyan-500 bg-cyan-50 p-4 text-sm text-cyan-950 shadow-2xl">
                                     <div className="mb-2 text-base font-semibold"><HeaderLabel text={headerLabels.controls.language} /></div>
@@ -1324,9 +1324,9 @@ const Header: React.FC = () => {
                                 </div>
                             )}
                             <label className="flex items-center gap-2 text-gray-600">
-                                <span className="text-xs"><HeaderLabel text={headerLabels.controls.language} /></span>
+                                <span className="hidden text-xs 2xl:inline"><HeaderLabel text={headerLabels.controls.language} /></span>
                                 <select
-                                    className={"rounded border bg-white px-2 py-1 text-xs transition " + (showPublicLanguageTip ? "border-emerald-500 ring-2 ring-emerald-200" : "border-gray-300")}
+                                    className={"w-40 rounded border bg-white px-2 py-1 text-xs transition xl:w-52 " + (showPublicLanguageTip ? "border-emerald-500 ring-2 ring-emerald-200" : "border-gray-300")}
                                     value={locale}
                                     onChange={onLanguageChange}
                                     disabled={isTranslating}
@@ -1337,8 +1337,8 @@ const Header: React.FC = () => {
                             </label>
                         </div>
                         {isAuthenticated && user && (
-                            <div className="text-right">
-                                <div className="max-w-[260px] truncate text-sm font-medium text-gray-900">
+                            <div className="min-w-0 text-right">
+                                <div className="max-w-[120px] truncate text-sm font-medium text-gray-900 xl:max-w-[180px]">
                                     {user.email || user.id || t(headerLabels.authLogsModal.tableUser)}
                                 </div>
                                 <div className="text-xs uppercase tracking-wide text-gray-500">
