@@ -89,6 +89,41 @@ pas tranchées : l'utilisateur ne sait pas encore si l'archive doit être
 préservée pour un incident ou le déploiement actif/précédent. Aucun changement
 Lifecycle ni suppression n'a été effectué. Le point P2 reste ouvert.
 
+### Reprise de la rétention après restauration isolée
+
+Le 12 octobre, l'utilisateur a explicitement confirmé que l'archive du
+19 septembre peut expirer le 19 mars 2027 : les exceptions mentionnées
+ci-dessus sont levées pour ce lot. La règle préparée cible exclusivement
+`technical-evidence/2026-09-19/` avec une date UTC, sans expiration ajoutée
+pour les sauvegardes MongoDB ou les autres lots.
+
+Le script `scripts/configure-technical-evidence-retention.py` prépare puis,
+avec `--apply`, applique la configuration en préservant les règles existantes.
+Il vérifie les deux objets attendus, refuse les erreurs d'accès ambiguës et
+relit toutes les règles après application. Cinq tests locaux ont réussi
+(préservation/idempotence, conflit d'ID, changement d'inventaire, distinction
+entre absence Lifecycle et refus d'accès, contrôle du terminal sans accès seek). Ils utilisent des réponses simulées,
+pas le bucket réel.
+
+La session de l'agent ne dispose pas de l'accès SSH du WSL au droplet
+(`Permission denied`). Le transfert et l'exécution distante sont donc à faire
+par l'utilisateur. Celui-ci a ensuite fourni le résultat distant :
+
+```text
+EVIDENCE_DIR=/root/clinia-s3-retention-7c_8tqn2
+PLAN_OK objects=2 prefix=technical-evidence/2026-09-19/ expiration_utc=2027-03-19T00:00:00Z mongo_excluded=true
+LIFECYCLE_APPLIED
+S3_RETENTION_VERIFIED expiration=2027-03-19 existing_rules_preserved=true objects_present=2
+```
+
+La configuration Lifecycle est donc appliquée et vérifiée en lecture retour
+pour ce lot autorisé. Les règles existantes sont préservées ; la règle ajoutée
+exclut MongoDB. Les deux objets sont toujours présents. Le contrôle initial
+du terminal a été corrigé (`r` au lieu de `r+`) avant la saisie des clés et
+l'application. L'expiration future effective n'est pas encore observable.
+Le point P2 est terminé pour le lot inventorié ; chaque nouveau lot doit
+faire l'objet de la même revue des exceptions et d'une échéance calendaire.
+
 ## Préparation de la mesure de basculement
 
 L'utilisateur a fourni le nouvel état du déploiement : les backends
