@@ -3,10 +3,12 @@
 import { createHash, randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 const [action, run] = process.argv.slice(2);
+const expectedAppointment = process.argv[4] || "";
 let mongoose;
 try {
     if (!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(run || "")) throw new Error("invalid_run");
     if (!["seed", "verify", "cleanup", "disable"].includes(action)) throw new Error("invalid_action");
+    if (expectedAppointment && !/^[a-f0-9]{24}$/.test(expectedAppointment)) throw new Error("invalid_appointment");
     const load = file => import(pathToFileURL(`${process.cwd()}/${file}`).href);
     ({ default: mongoose } = await load("node_modules/mongoose/index.js"));
     const { default: bcrypt } = await load("node_modules/bcryptjs/index.js");
@@ -74,6 +76,7 @@ try {
                 for (const [model, filter] of roots) if (!await model.exists(filter).session(session)) throw new Error("missing_fixture");
                 const filter = { patient: ids.patient, specialist: ids.specialist, clinique: ids.clinic };
                 if (await Appointment.countDocuments(filter).session(session) !== 1 || await Appointment.countDocuments({ ...filter, status: "scheduled" }).session(session) !== 1) throw new Error("appointment_count");
+                if (expectedAppointment && !await Appointment.exists({ ...filter, _id: expectedAppointment, status: "scheduled" }).session(session)) throw new Error("appointment_changed");
             }, options);
             console.log("BOOKING_DB_OK count=1");
         } else {

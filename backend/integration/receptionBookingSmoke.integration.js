@@ -18,7 +18,8 @@ import { ReceptionBookingProof } from "../models/ReceptionBookingProof.js";
 import { RefreshTokenSession } from "../models/RefreshTokenSession.js";
 
 let server, work, base, owned = false, failure = null;
-let holdBookings = false, concurrentArrivals = [];
+let holdBookings = false, concurrentArrivals = [], observationFailure = null;
+let lookupUserAgents = [];
 const root = path.resolve(import.meta.dirname, "../..");
 const helperPath = path.join(root, "scripts/reception-booking-smoke-helper.mjs");
 const script = path.join(root, "scripts/run-reception-booking-smoke.sh");
@@ -68,6 +69,7 @@ beforeAll(async () => {
     app.use(express.json());
     app.get("/api/health/ready", (_, res) => res.json({ data: { status: "ok", dependencies: { mongo: "connected" } } }));
     app.use("/api/reception", verifyJWT, requireRole("RECEPTION"), loi25DataLeakGuard, async (req, res, next) => {
+        if (req.method === "GET") lookupUserAgents.push(req.headers["user-agent"]);
         if (holdBookings && req.method === "POST") {
             await new Promise(resolve => {
                 concurrentArrivals.push(resolve);
@@ -75,6 +77,9 @@ beforeAll(async () => {
             });
         }
         if (failure && req.method === "POST") return res.status(failure).json({ error: { code: "TEST_FAILURE" } });
+        if (observationFailure && req.method === "GET" && await mongoose.connection.db.collection("appointments").countDocuments()) {
+            return res.status(observationFailure).json({ data: { existingAppointments: [] } });
+        }
         next();
     }, receptionRouter);
     server = app.listen(0, "127.0.0.1");
@@ -94,6 +99,8 @@ afterEach(async () => {
     failure = null;
     holdBookings = false;
     concurrentArrivals = [];
+    observationFailure = null;
+    lookupUserAgents = [];
     // Isolate failures between tests, only on the verified disposable database.
     if (owned) {
         expect(mongoose.connection.name).toBe("clinia_walkin_integration");
@@ -202,5 +209,46 @@ it("quarantines concurrent upstream errors without claiming success and supports
     expect(await AdminUser.countDocuments({ isActive: true })).toBe(0);
     const id = result.out.match(/^RUN_ID=(.+)$/m)[1];
     expect((await run("--cleanup", id)).code).toBe(0);
+    await expectClean();
+});
+
+it("observes the exact acknowledged booking and retains only minimized timing evidence", async () => {
+    const result = await run("--observe-seconds", "5");
+    expect(result, result.out + result.err).toMatchObject({ code: 0 });
+    expect(result.out).toContain("BOOKING_PERSISTENCE_OK same_appointment=1 duplicates=0");
+    const file = result.out.match(/^TRAFFIC_EVIDENCE=(.+)$/m)[1];
+    try {
+        const rows = (await readFile(file, "utf8")).trim().split("\n").map(line => JSON.parse(line));
+        expect(rows.length).toBeGreaterThanOrEqual(5);
+        expect(rows.every(row => row.http === 200 && row.booking_unchanged)).toBe(true);
+        expect(Object.keys(rows[0])).toEqual(["sequence", "utc", "elapsed_seconds", "duration_ms", "http", "booking_unchanged", "error_code"]);
+        expect(rows.every(row => row.error_code === null)).toBe(true);
+        expect(lookupUserAgents).toHaveLength(rows.length + 1);
+        expect(new Set(lookupUserAgents).size).toBe(1);
+        expect(lookupUserAgents[0]).toMatch(/^curl\//);
+    } finally { await rm(file); }
+    await expectClean();
+});
+it("refuses a successful observation when lookup no longer returns the acknowledged booking", async () => {
+    observationFailure = 200;
+    const result = await run("--observe-seconds", "5");
+    expect(result.code).toBe(1);
+    expect(result.out).toContain('"invalid_responses": true');
+    expect(result.out).not.toContain("RECEPTION_BOOKING_SMOKE_PASSED");
+    expect(result.out).toContain("CLEANUP_OK");
+    await rm(result.out.match(/^TRAFFIC_EVIDENCE=(.+)$/m)[1]);
+    await expectClean();
+});
+it("retains recovery fixtures for ambiguous observation errors without erasing acknowledged evidence", async () => {
+    observationFailure = 503;
+    const result = await run("--observe-seconds", "5");
+    expect(result.code).toBe(1);
+    expect(result.out).toContain('"ambiguous_requests": true');
+    expect(result.out).toContain("BOOKING_PERSISTENCE_OK");
+    expect(result.out).toContain("CLEANUP_UNCONFIRMED");
+    expect(result.out).not.toContain("RECEPTION_BOOKING_SMOKE_PASSED");
+    const id = result.out.match(/^RUN_ID=(.+)$/m)[1];
+    expect((await run("--cleanup", id)).code).toBe(0);
+    await rm(result.out.match(/^TRAFFIC_EVIDENCE=(.+)$/m)[1]);
     await expectClean();
 });

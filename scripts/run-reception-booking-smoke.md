@@ -98,7 +98,110 @@ pas une preuve de concurrence, de basculement ou de revue clinique. Le mode
 `--concurrent` vérifie la concurrence des réservations réception ; il ne
 constitue pas une validation de basculement ou une revue clinique.
 
+## Observation d'une réservation pendant un basculement
+
+Copier aussi `reception-failover-observer.py` à côté des deux scripts smoke,
+puis lancer d'abord une référence sans arrêt de service :
+
+```bash
+BACKEND_CONTAINER=NOM_EXACT_BACKEND_REPLICA \
+BASE_URL=https://clinique-ai.ca \
+bash /tmp/run-reception-booking-smoke.sh --observe-seconds 15
+```
+
+Le parcours crée une réservation synthétique par l'API, note son acquittement,
+puis relit le patient avec la session réception toutes les secondes lorsque
+les réponses sont rapides. Chaque requête a un timeout de cinq secondes ;
+la cadence ralentit pendant un timeout. Le journal JSONL en mode 600 contient
+uniquement séquence, UTC, temps monotone relatif, durée, statut HTTP et résultat
+du contrôle. Il reste disponible après nettoyage, sans corps HTTP, RAMQ, token,
+identifiant patient ou identifiant de rendez-vous. Un code d'erreur technique
+connu peut être enregistré ; aucun message ou corps d'erreur n'est conservé.
+L'observateur utilise le même client curl et les mêmes fichiers d'en-tête et
+de requête que la recherche initiale, sans suivre les redirections. Python
+gère seulement la cadence, la vérification du résultat et le journal minimisé.
+
+`OBSERVATION_READY` marque le début de la fenêtre d'observation (5 à 600 secondes).
+Le compte et la réservation restent actifs pendant cette fenêtre. Après celle-ci,
+le helper vérifie le même identifiant acquitté et exactement une réservation,
+puis le script ferme la session et nettoie. Choisir une fenêtre assez longue
+pour couvrir arrêt, reprise et au moins cinq réponses correctes consécutives.
+Utiliser la réplique pour les helpers si le backend principal doit être arrêté.
+Ne pas arrêter le conteneur qui exécute les helpers.
+
+`observed_gap_seconds` mesure la fenêtre entre la dernière réponse correcte
+avant une série d'échecs et la première de cinq réponses correctes consécutives.
+C'est une mesure échantillonnée, pas le RTO exact. Les temps UTC permettent
+de la corréler aux horaires d'arrêt et de reprise enregistrés séparément.
+Une réponse 200 avec une réservation absente ou différente fait échouer le test.
+Un timeout, 408 ou 5xx conserve le répertoire de récupération et désactive les
+comptes : ne lancer `--cleanup RUN_ID` qu'après fin des traitements ou redémarrage
+des backends ayant pu traiter les requêtes. Le journal minimisé est conservé
+indépendamment du répertoire de récupération.
+
+Cette observation vérifie une écriture acquittée avant l'observation et le
+parcours authentifié pendant la fenêtre. Elle ne crée pas de nouvelles
+réservations en continu, ne mesure pas la capacité maximale et ne démontre pas
+un RPO général. La référence sans panne ne valide pas un basculement.
+
+### Fenêtre d'arrêt du backend principal
+
+Après une référence réussie, `run-backend-failover-window.sh --run` peut
+être exécuté dans une seconde connexion SSH pendant une observation de
+300 secondes. Il exige les noms exacts des deux backends, le conteneur MongoDB
+contenant les identifiants administratifs (`MONGO_STATUS_CONTAINER`),
+le SHA attendu et la confirmation explicite
+`CONFIRM_PRODUCTION_FAILOVER_DRILL=RUN_CLINIA_FAILOVER_DRILL`.
+
+Avant tout arrêt : les deux backends doivent être healthy au SHA attendu,
+MongoDB doit avoir exactement un PRIMARY et deux SECONDARY sains, avec un
+retard maximum de dix secondes. La lecture `replSetGetStatus` utilise le driver
+du backend réplique. Les identifiants administratifs du conteneur MongoDB sont
+filtrés par jq et transmis directement sur stdin au processus ponctuel, sans
+les afficher, les écrire sur disque ou les passer dans les arguments. Copier
+`mongo-replica-preflight.mjs` à côté du script fenêtre. Les droits du compte
+applicatif restent inchangés ; aucune création d'index n'est permise.
+Le compte administrateur utilisé est `root` par défaut, comme dans les
+sauvegardes ; `MONGO_ADMIN_USERNAME` permet de préciser un autre compte
+validé. Le nom d'initialisation du conteneur n'est pas utilisé comme preuve
+du nom réel du compte existant.
+Le mode `--check` effectue ces seuls
+contrôles, sans arrêt et sans exiger la confirmation du drill. Une erreur
+MongoDB affiche un code technique et bloque toute action sur les services.
+Les identifiants Docker sont épinglés. Le
+principal est arrêté avec un délai de grâce de dix secondes, maintenu arrêté
+vingt secondes, puis redémarré. Les événements UTC sont affichés et les deux
+backends doivent redevenir healthy. Une interruption INT/TERM/HUP ou un échec
+de stop déclenche une tentative de redémarrage du conteneur épinglé.
+
+Lancer la fenêtre seulement après au moins cinq lectures HTTP 200 et pendant
+que l'observation est encore active. Conserver les sorties des deux terminaux.
+`BACKEND_WINDOW_COMPLETED` confirme la fenêtre d'arrêt et le retour de santé ;
+la disponibilité et la réservation doivent être évaluées avec le journal de
+trafic séparé. Aucun conteneur MongoDB n'est arrêté par ce script.
+
+Validation locale de la fenêtre : syntaxe Bash et trois simulations Docker
+(parcours normal, SHA incorrect refusé avant stop, échec de stop après action
+du daemon suivi de la tentative de reprise). Aucune panne réelle provoquée
+par l'agent.
+
+Correction après la première tentative : le passage du code à mongosh via
+`--file /dev/stdin` n'avait pas produit de contrôle confirmé sur le droplet.
+Il est remplacé par le driver backend, avec contrôle préalable séparé. Cinq
+simulations passent : lecture seule, parcours normal, SHA incorrect, échec
+MongoDB bloquant et reprise après échec de stop. L'observateur affiche
+maintenant le temps écoulé et restant et traite Ctrl+C sans traceback ; une
+interruption conserve toujours les fixtures pour récupération.
+
+Agent-Contribution: backend | observation authentifiée et contrôle du même rendez-vous acquitté après la fenêtre
+Agent-Review: security | journal minimisé, absence de suivi de redirection avec Authorization, récupération conservée sur résultat ambigu
+
 ## Validation du script sans production
+
+Validation locale du 12 octobre 2026 : onze tests réussis et nettoyage du
+conteneur MongoDB jetable confirmé. Les trois nouveaux scénarios vérifient
+la persistance du même rendez-vous, un contenu incohérent malgré HTTP 200,
+et la conservation des fixtures après une erreur 503 pendant l'observation.
 
 ```bash
 bash scripts/run-urgentologist-walk-in-integration.sh --reception-smoke

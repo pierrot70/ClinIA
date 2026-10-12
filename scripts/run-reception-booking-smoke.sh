@@ -16,15 +16,23 @@ if [[ -z "$container" ]]; then
   [[ ${#containers[@]} == 1 ]] || { echo 'ERROR set BACKEND_CONTAINER to one exact backend name'; exit 1; }
   container="${containers[0]}"
 fi
-helper() { docker exec -i -w /app "$container" node --input-type=module - "$1" "$run_id" < "$script_dir/reception-booking-smoke-helper.mjs"; }
+helper() { docker exec -i -w /app "$container" node --input-type=module - "$1" "$run_id" "${2:-}" < "$script_dir/reception-booking-smoke-helper.mjs"; }
 if [[ "${1:-}" == --cleanup && $# == 2 ]]; then
   run_id="$2"
   helper cleanup
   exit
 fi
 concurrent=0
+observe_seconds=0
 if [[ "${1:-}" == --concurrent ]]; then concurrent=1; shift; fi
-[[ $# == 0 ]] || { echo 'Usage: bash run-reception-booking-smoke.sh [--concurrent | --cleanup UUID]'; exit 1; }
+if [[ "${1:-}" == --observe-seconds && $# == 2 && "$concurrent" == 0 ]]; then
+  observe_seconds="$2"
+  [[ "$observe_seconds" =~ ^[0-9]{1,3}$ ]] && (( 10#$observe_seconds >= 5 && 10#$observe_seconds <= 600 )) || { echo 'ERROR observation duration must be 5..600 seconds'; exit 1; }
+  observe_seconds=$((10#$observe_seconds))
+  command -v python3 >/dev/null && [[ -f "$script_dir/reception-failover-observer.py" ]] || { echo 'ERROR observer or python3 missing'; exit 1; }
+  shift 2
+fi
+[[ $# == 0 ]] || { echo 'Usage: bash run-reception-booking-smoke.sh [--concurrent | --observe-seconds 5..600 | --cleanup UUID]'; exit 1; }
 run_id="$(cat /proc/sys/kernel/random/uuid)"
 work="$(mktemp -d /tmp/clinia-booking-smoke.XXXXXXXX)"
 printf '%s\n' "$run_id" > "$work/run-id"
@@ -139,10 +147,25 @@ else
   request 201 /api/reception/walk-in-bookings --header "@$work/auth-header" --header 'Content-Type: application/json' --data-binary "@$work/booking.json"
   jq -e --slurpfile fixture "$work/fixture.json" '.data.patient._id == $fixture[0].patientId and (.data.appointment._id | type == "string")' "$work/response.json" >/dev/null || fail 'booking mismatch'
   echo 'BOOKING_OK HTTP=201'
+  booking_ack_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  appointment_id="$(jq -er '.data.appointment._id' "$work/response.json")"
   request 403 /api/reception/walk-in-bookings --header "@$work/auth-header" --header 'Content-Type: application/json' --data-binary "@$work/booking.json"
   jq -e '.error.code == "RECEPTION_LOOKUP_REQUIRED"' "$work/response.json" >/dev/null || fail 'unexpected replay refusal'
   echo 'REPLAY_REFUSED HTTP=403 RECEPTION_LOOKUP_REQUIRED'
 fi
 helper verify
+if (( observe_seconds )); then
+  evidence="/tmp/clinia-failover-traffic-$run_id.jsonl"
+  printf 'BOOKING_ACK_UTC=%s\nTRAFFIC_EVIDENCE=%s\nOBSERVATION_READY duration_seconds=%s\n' "$booking_ack_utc" "$evidence" "$observe_seconds"
+  in_flight=1
+  observer_status=0
+  python3 "$script_dir/reception-failover-observer.py" "$BASE_URL" "$work" "$appointment_id" "$observe_seconds" "$evidence" || observer_status=$?
+  in_flight=0
+  if (( observer_status == 3 )); then uncertain=1; fi
+  # Recheck the exact acknowledged appointment ID, not merely a count.
+  helper verify "$appointment_id" || { uncertain=1; fail 'post-observation booking verification failed'; }
+  echo 'BOOKING_PERSISTENCE_OK same_appointment=1 duplicates=0'
+  (( observer_status == 0 )) || fail 'observation recorded failures; review summary and recovery instructions'
+fi
 request 200 /api/auth/logout --request POST --header "@$work/auth-header" --cookie "$work/cookies"
 echo 'LOGOUT_OK'
