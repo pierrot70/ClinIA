@@ -855,7 +855,7 @@ export function ClinicalForm({
     const clinicalParametersHelpLabel = reviewedStrings.clinicalParametersHelp;
     const { translated: incompleteDataLabel } = useTranslation({ text: "Données cliniques incomplètes", targetLang });
     const { translated: exampleCaseTooltipLabel } = useTranslation({ text: commentLabels.exampleCaseTooltip, targetLang });
-    const { translated: ageLabel } = useTranslation({ text: "Age du patient", targetLang });
+    const { translated: ageLabel } = useTranslation({ text: labels.clinicalFormFields.age, targetLang });
     const { translated: sexLabel } = useTranslation({ text: "Sexe", targetLang });
     const { translated: countryLabel } = useTranslation({
         text: clinicalFormLabels.countryLabel,
@@ -972,8 +972,8 @@ export function ClinicalForm({
         text: clinicalFormLabels.diabetesParamsAnalyzeHint,
         targetLang,
     });
-    const { translated: maleLabel } = useTranslation({ text: "Homme", targetLang });
-    const { translated: femaleLabel } = useTranslation({ text: "Femme", targetLang });
+    const { translated: maleLabel } = useTranslation({ text: labels.clinicalFormFields.male, targetLang });
+    const { translated: femaleLabel } = useTranslation({ text: labels.clinicalFormFields.female, targetLang });
     const { translated: otherLabel } = useTranslation({ text: "Autre", targetLang });
     const { translated: caucasianLabel } = useTranslation({
         text: clinicalFormLabels.ethnicityOptions.caucasian,
@@ -1036,7 +1036,7 @@ export function ClinicalForm({
     const medicationsHelpLabel = fieldLabels.medicationsHelp;
     const analyzeButtonLabel = analysisStatusLabels(targetLang).analyze;
     const { translated: analyzingButtonLabel } = useTranslation({ text: "Analyse…", targetLang });
-    const { translated: clearPatientDataLabel } = useTranslation({ text: "Effacer les donnees patient", targetLang });
+    const { translated: clearPatientDataLabel } = useTranslation({ text: labels.clinicalFormFields.clearPatientData, targetLang });
     const { translated: termRequestSendingLabel } = useTranslation({ text: labels.clinicalTermRequest.sending, targetLang, translationKey: "clinicalTermRequest.sending" });
     const { translated: termRequestActionLabel } = useTranslation({ text: labels.clinicalTermRequest.action, targetLang, translationKey: "clinicalTermRequest.action" });
     const { translated: termRequestPrivacyLabel } = useTranslation({ text: labels.clinicalTermRequest.privacy, targetLang, translationKey: "clinicalTermRequest.privacy" });

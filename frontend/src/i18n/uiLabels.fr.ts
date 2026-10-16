@@ -152,6 +152,10 @@ export const UI_LABELS_FR = {
         None: "Aucun",
     },
     clinicalFormFields: {
+        age: "Age du patient",
+        male: "Homme",
+        female: "Femme",
+        clearPatientData: "Effacer les donnees patient",
         weight: "Poids du patient (kg)", height: "Taille du patient (cm)",
         diagnosis: "Diagnostic / motif clinique principal", symptoms: "Symptomes principaux",
         medicalHistory: "Antecedents medicaux", medications: "Medication actuelle",

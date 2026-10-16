@@ -6,6 +6,10 @@ const f = UI_LABELS_FR.clinicalFormFields;
 const c = UI_LABELS_FR.clinicalExampleConceptLabels;
 const s = UI_LABELS_FR.clinicalSymptomLabels;
 export const clinicalFormFieldRows: readonly (readonly string[])[] = [
+[f.age, "Patient age", "Edad del paciente", "환자 나이", "Tuổi người bệnh", "Pasientens alder", "患者の年齢", "患者年龄", "גיל המטופל"],
+[f.male, "Male", "Masculino", "남성", "Nam", "Mann", "男性", "男", "זכר"],
+[f.female, "Female", "Femenino", "여성", "Nữ", "Kvinne", "女性", "女", "נקבה"],
+[f.clearPatientData, "Clear patient data", "Borrar los datos del paciente", "환자 데이터 지우기", "Xóa dữ liệu người bệnh", "Tøm pasientdata", "患者データを消去", "清除患者数据", "ניקוי נתוני המטופל"],
 [f.weight, "Patient weight (kg)", "Peso del paciente (kg)", "환자 체중(kg)", "Cân nặng người bệnh (kg)", "Pasientens vekt (kg)", "患者の体重（kg）", "患者体重（kg）", "משקל המטופל (ק״ג)"],
 [f.height, "Patient height (cm)", "Estatura del paciente (cm)", "환자 키(cm)", "Chiều cao người bệnh (cm)", "Pasientens høyde (cm)", "患者の身長（cm）", "患者身高（cm）", "גובה המטופל (ס״מ)"],
 [f.diagnosis, "Diagnosis / main clinical reason", "Diagnóstico / motivo clínico principal", "진단 / 주요 임상 사유", "Chẩn đoán / lý do lâm sàng chính", "Diagnose / hovedårsak til vurdering", "診断／主な臨床上の理由", "诊断／主要临床原因", "אבחנה / סיבה קלינית עיקרית"],
