@@ -29,6 +29,7 @@ import {
     WriteVerificationReceipt,
 } from "../components/system/WriteVerificationReceipt";
 import { SPECIALTIES } from "../data/specialties";
+import { appointmentSpecialtyLabel } from "../i18n/appointmentSpecialtyLabels";
 
 function useAppointmentsPageLabels(targetLang: string) {
     const source = labels.appointmentsPage;
@@ -798,6 +799,7 @@ export function AppointmentsPage() {
                 </label>
 
                 <select
+                    aria-label={ui.specialtyChoose}
                     className="border rounded p-2"
                     value={specialty}
                     onChange={(e) => {
@@ -810,7 +812,7 @@ export function AppointmentsPage() {
                     </option>
                     {SPECIALTIES.map((item) => (
                         <option key={item} value={item}>
-                            {item}
+                            {appointmentSpecialtyLabel(item, targetLang)}
                         </option>
                     ))}
                 </select>
@@ -840,9 +842,9 @@ export function AppointmentsPage() {
                         }
                     >
                         {recommendationStatus === "NO_SPECIALISTS_FOR_SPECIALTY"
-                            ? ui.recommendationNoSpecialists.replace("{specialty}", specialty)
+                            ? ui.recommendationNoSpecialists.replace("{specialty}", appointmentSpecialtyLabel(specialty, targetLang))
                             : recommendationStatus === "NO_AVAILABLE_SLOTS_FOR_SPECIALTY"
-                                ? ui.recommendationNoAvailability.replace("{specialty}", specialty)
+                                ? ui.recommendationNoAvailability.replace("{specialty}", appointmentSpecialtyLabel(specialty, targetLang))
                                 : ui.recommendationNone}
                     </div>
                 )}

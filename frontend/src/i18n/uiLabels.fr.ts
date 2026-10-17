@@ -1518,6 +1518,17 @@ export const UI_LABELS_FR = {
             dataAccessRequest: "Demande d'accès aux données",
         },
     },
+    appointmentSpecialties: {
+        "Medecin de famille": "Médecin de famille",
+        "Urgentologue": "Urgentologue",
+        "Ophtalmologue": "Ophtalmologue",
+        "Cardiologue": "Cardiologue",
+        "Pneumologue": "Pneumologue",
+        "Neurologue": "Neurologue",
+        "Endocrinologue": "Endocrinologue",
+        "Néphrologue": "Néphrologue",
+        "Rhumatologue": "Rhumatologue",
+    },
     // AppointmentsPage.tsx - page /appointments, création de rendez-vous.
     appointmentsPage: {
         title: "Créer un rendez-vous",
