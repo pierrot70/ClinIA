@@ -1,8 +1,16 @@
+import { UI_LABELS_FR } from "../../i18n/uiLabels.fr";
 import { UiMessage } from "../i18n/UiMessage";
 import React from "react";
 import { useUiLabels } from "../../hooks/useUiLabels";
 
 import type { ClinicianComment } from "../../services/clinicianCommentsApi";
+
+const categorySources: Record<ClinicianComment["category"], string> = {
+    BUG: UI_LABELS_FR.commentsPage.categories.bug,
+    SUGGESTION: UI_LABELS_FR.commentsPage.categories.suggestion,
+    URGENT: UI_LABELS_FR.commentsPage.categories.urgent,
+    INCOMPREHENSION: UI_LABELS_FR.commentsPage.categories.incomprehension,
+};
 
 type InboxRepliedFilter = "" | "yes" | "no";
 
@@ -185,10 +193,9 @@ export function ClinicianInboxModal({
                                 className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
                             >
                                 <option value="">{labels.allFeminine}</option>
-                                <option value="BUG">BUG</option>
-                                <option value="SUGGESTION">SUGGESTION</option>
-                                <option value="URGENT">URGENT</option>
-                                <option value="INCOMPREHENSION">INCOMPREHENSION</option>
+                                {Object.entries(categorySources).map(([value, source]) => (
+                                    <option key={value} value={value}>{t(source)}</option>
+                                ))}
                             </select>
                         </label>
                         <label className="text-sm text-gray-700">
@@ -273,7 +280,7 @@ export function ClinicianInboxModal({
                                                         {item.actorUsername}
                                                         <div className="text-xs text-gray-500">{item.actorRole}</div>
                                                     </td>
-                                                    <td className="px-3 py-2 text-gray-700">{item.category}</td>
+                                                    <td className="px-3 py-2 text-gray-700">{categorySources[item.category] ? t(categorySources[item.category]) : item.category}</td>
                                                     <td className="px-3 py-2 text-gray-700">
                                                         {item.replies.length > 0 ? labels.repliedYes : labels.repliedNo}
                                                     </td>
