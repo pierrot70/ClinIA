@@ -8,7 +8,7 @@ target="${1:-all}"
 step="${2:-all}"
 [[ $# -le 2 ]] || { echo 'Usage: bash scripts/ci-local.sh [all|backend|frontend] [step]' >&2; exit 2; }
 case "$target:$step" in
-    all:all|backend:all|frontend:all|backend:install|frontend:install|backend:audit|frontend:audit|backend:tests|frontend:tests|backend:reauth|backend:mongo|backend:integration|frontend:build) ;;
+    all:all|backend:all|frontend:all|backend:install|frontend:install|backend:audit|frontend:audit|backend:tests|frontend:tests|backend:reauth|backend:mongo|backend:integration|frontend:typecheck|frontend:build) ;;
     *) echo 'Unknown CI target or step.' >&2; exit 2 ;;
 esac
 [[ "${NODE_ENV:-}" != production ]] || { echo 'Run CI on a development or validation host.' >&2; exit 1; }
@@ -47,13 +47,14 @@ run_step() (
             bash "$root/scripts/run-urgentologist-walk-in-integration.sh" --email-quota
             npm run test:validation-report
             ;;
+        typecheck) npm run typecheck ;;
         build) npm run build ;;
     esac
 )
 
 run_component() {
     local component="$1" phase
-    local -a phases=(install audit tests build)
+    local -a phases=(install audit typecheck tests build)
     if [[ "$component" == backend ]]; then phases=(install audit tests reauth mongo integration); fi
     for phase in "${phases[@]}"; do run_step "$component" "$phase"; done
 }
@@ -63,7 +64,7 @@ if [[ "$target" == all ]]; then
     check_docker
     run_component frontend
     run_component backend
-    echo 'CI_LOCAL_PASSED: frontend, backend, audits, build and integration.'
+    echo 'CI_LOCAL_PASSED: frontend, backend, audits, typecheck, build and integration.'
 elif [[ "$step" == all ]]; then
     run_component "$target"
     printf 'CI_COMPONENT_PASSED: %s (not the full CI).\n' "$target"

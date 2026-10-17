@@ -376,7 +376,7 @@ export async function createPatient(
 
 export async function updatePatient(
     id: string,
-    payload: PatientPayload
+    payload: Partial<PatientPayload>
 ): Promise<ApiResponse<Patient>> {
     return withSecurityIncidentGuard(
         (async () => {

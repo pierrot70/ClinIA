@@ -197,7 +197,7 @@ export function WalkInArrivalPage() {
         if (epoch !== requestEpoch.current) return;
         setLoading(false);
 
-        if (response.error) {
+        if ("error" in response) {
             setError(response.error.code === "RECEPTION_REPLAN_REQUIRED" ? replan.conflict : response.error.message);
             return;
         }
@@ -233,7 +233,7 @@ export function WalkInArrivalPage() {
         if (epoch !== requestEpoch.current) return;
         setLoading(false);
 
-        if (response.error) {
+        if ("error" in response) {
             setError(response.error.message);
             return;
         }
@@ -293,7 +293,7 @@ export function WalkInArrivalPage() {
         if (epoch !== requestEpoch.current) return;
         setLoading(false);
 
-        if (response.error) {
+        if ("error" in response) {
             if (response.error.code === "RECEPTION_LOOKUP_REQUIRED") {
                 setSelectedSlot(null);
                 setSelectedPatient(null);

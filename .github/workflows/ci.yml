@@ -62,5 +62,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: bash ../scripts/ci-local.sh frontend install
       - run: bash ../scripts/ci-local.sh frontend audit
+      - name: TypeScript type check
+        run: bash ../scripts/ci-local.sh frontend typecheck
       - run: bash ../scripts/ci-local.sh frontend tests
       - run: bash ../scripts/ci-local.sh frontend build

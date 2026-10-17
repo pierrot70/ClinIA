@@ -53,7 +53,7 @@ export function ClinicalNoteHistory({ patient, onRestored }: ClinicalNoteHistory
         setLoading(true);
         setError("");
         const response = await fetchPatientClinicalNoteVersions(patient._id);
-        if (response.error) {
+        if ("error" in response) {
             setError(response.error.message || copy.error);
             setVersions([]);
         } else if (response.data) {
@@ -71,7 +71,7 @@ export function ClinicalNoteHistory({ patient, onRestored }: ClinicalNoteHistory
         setRestoringId(version.id);
         setError("");
         const response = await restorePatientClinicalNoteVersion(patient._id, version.id);
-        if (response.error) {
+        if ("error" in response) {
             setError(response.error.message || copy.error);
         } else if (response.data) {
             onRestored(response.data);

@@ -59,7 +59,7 @@ export function ReceptionClinicProvider({ children }: { children: React.ReactNod
             const response = await fetchReceptionClinics();
             if (cancelled) return;
             setIsLoading(false);
-            if (response.error) {
+            if ("error" in response) {
                 setError(response.error.message);
                 setSelectionOpen(true);
                 return;

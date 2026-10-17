@@ -119,6 +119,8 @@ type LoginApiResponse = {
         | {
             code?: string;
             message?: string;
+            restrictedUntil?: string;
+            mfaLockedUntil?: string;
         };
     message?: string;
     mfaRequired?: boolean;
@@ -279,9 +281,10 @@ function clearSession({ clearDiagnosticToken = false, clearExpectedUser = true }
 }
 
 function extractAuthSecurityNotice(
-    payload: BasicApiResponse
+    payload: BasicApiResponse | LoginApiResponse
 ): AuthSecurityNotice | null {
-    const code = payload?.error?.code;
+    const error = typeof payload.error === "object" ? payload.error : undefined;
+    const code = error?.code;
 
     if (
         code !== "TOKEN_REVOKED" &&
@@ -295,10 +298,10 @@ function extractAuthSecurityNotice(
     return {
         code,
         message:
-            payload?.error?.message ||
+            error?.message ||
             payload?.message ||
             "Votre session ClinIA a ete interrompue pour raison de securite.",
-        restrictedUntil: payload?.error?.restrictedUntil || null,
+        restrictedUntil: error?.restrictedUntil || null,
     };
 }
 

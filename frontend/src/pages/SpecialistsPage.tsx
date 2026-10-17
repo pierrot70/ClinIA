@@ -272,7 +272,7 @@ export function SpecialistsPage() {
     }, [cliniqueOptions]);
     const [highlightedId, setHighlightedId] = useState<string | null>(null);
     const highlightTimeoutRef = useRef<
-        ReturnType<typeof setTimeout> | null
+        number | null
     >(null);
 
     const [filterNom, setFilterNom] = useState("");

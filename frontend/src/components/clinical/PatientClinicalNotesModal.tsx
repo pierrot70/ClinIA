@@ -83,7 +83,7 @@ export function PatientClinicalNotesModal({ patient, onClose, onSaved }: Patient
                 clinicalNotes: note,
             },
         });
-        if (response.error) {
+        if ("error" in response) {
             setMessage(response.error.message || copy.error);
         } else if (response.data) {
             onSaved(response.data);

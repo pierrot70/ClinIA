@@ -559,7 +559,7 @@ export function ClinicalForm({
                 return;
             }
 
-            setPatientMatches(response.data?.data ?? []);
+            setPatientMatches("data" in response ? response.data.data : []);
             setPatientsLoading(false);
         }
 
@@ -1136,7 +1136,7 @@ export function ClinicalForm({
             label: reviewedStrings.clinicalFields.endocrinology,
         },
     ];
-    function displayConcept(term: string): string {
+    function displayConcept(term: string = ""): string {
         const source = exampleConceptSource(term);
         return source ? localizeClinicalFormFieldLabel(source, targetLang) ?? term : term;
     }

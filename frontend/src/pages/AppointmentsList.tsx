@@ -276,7 +276,7 @@ export function AppointmentsListPage() {
                 editDate,
                 editPatientId,
                 editClinique || undefined,
-                editingId
+                editingId || undefined
             );
 
             if (!cancelled && "data" in response) {
