@@ -55,6 +55,7 @@ describe("appointment specialty display names", () => {
         const select = screen.getByRole("combobox", { name });
         for (const [index, label] of expected.entries()) {
             expect(within(select).getByRole("option", { name: label })).toHaveValue(SPECIALTIES[index]);
+            expect(getLocalUiTranslation(UI_LABELS_FR.appointmentSpecialties[SPECIALTIES[index]], locale)).toBe(label);
         }
         await waitFor(() => expect(api.clinics).toHaveBeenCalledOnce());
     });

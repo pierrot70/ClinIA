@@ -23,3 +23,11 @@ export function appointmentSpecialtyLabel(value: string, locale: string): string
     const index = UI_LOCALES.findIndex(language => baseUiLocale(language) === baseUiLocale(locale));
     return row[index < 0 ? 1 : index];
 }
+
+// The shared coverage audit resolves labels by their versioned French source,
+// whereas the appointment form keeps the canonical API value as its key.
+export function localizeAppointmentSpecialtyLabel(text: string, locale: string): string | null {
+    const row = Object.values(translations).find(values => values[0] === text);
+    const index = UI_LOCALES.findIndex(language => baseUiLocale(language) === baseUiLocale(locale));
+    return row && index >= 0 ? row[index] : null;
+}
