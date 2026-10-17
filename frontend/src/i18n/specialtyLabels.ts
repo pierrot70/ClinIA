@@ -1,38 +1,15 @@
-type SpecialtyLabels = {
-    fr: string;
-    en: string;
-    es: string;
-};
-
-const specialties: Record<string, SpecialtyLabels> = {
-    "medecin de famille": { fr: "Médecin de famille", en: "Family Physician", es: "Médico de familia" },
-    ophtalmologue: { fr: "Ophtalmologue", en: "Ophthalmologist", es: "Oftalmólogo" },
-    cardiologue: { fr: "Cardiologue", en: "Cardiologist", es: "Cardiólogo" },
-    pneumologue: { fr: "Pneumologue", en: "Pulmonologist", es: "Neumólogo" },
-    neurologue: { fr: "Neurologue", en: "Neurologist", es: "Neurólogo" },
-    endocrinologue: { fr: "Endocrinologue", en: "Endocrinologist", es: "Endocrinólogo" },
-    nephrologue: { fr: "Néphrologue", en: "Nephrologist", es: "Nefrólogo" },
-    rhumatologue: { fr: "Rhumatologue", en: "Rheumatologist", es: "Reumatólogo" },
-};
+import { SPECIALTIES } from "../data/specialties";
+import { appointmentSpecialtyLabel } from "./appointmentSpecialtyLabels";
 
 function specialtyKey(value: string) {
-    return value
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .trim()
-        .toLowerCase();
+    return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 }
 
-/**
- * Controlled medical terminology. Only French and Spanish have approved local
- * display names; every other locale deliberately uses the English term.
- */
-export function displaySpecialty(value: string, locale: string) {
-    // New medical specialty uses one English term in every interface language.
-    if (specialtyKey(value) === "urgentologue") return "Emergency Physician";
-    const specialty = specialties[specialtyKey(value)];
-    if (!specialty) return value.trim();
+const canonicalSpecialties = new Map(SPECIALTIES.map(value => [specialtyKey(value), value]));
 
-    const language = locale.toLowerCase().split("-")[0];
-    return language === "fr" ? specialty.fr : language === "es" ? specialty.es : specialty.en;
+// Shared display catalogue for specialty names. Never change stored values,
+// matching logic or the English-only treatment descriptions.
+export function displaySpecialty(value: string, locale: string): string {
+    const canonical = canonicalSpecialties.get(specialtyKey(value));
+    return canonical ? appointmentSpecialtyLabel(canonical, locale) : value.trim();
 }

@@ -6,7 +6,6 @@ import { HOME_STRINGS_FR } from "../i18n/homeStrings";
 import { receptionReplanLabels, receptionReplanTranslations } from "../i18n/receptionReplanLabels";
 import { WalkInArrivalPage } from "./WalkInArrivalPage";
 import { urgentologistLabels, urgentologistTranslations, walkInEmergencyReminder } from "../i18n/urgentologistLabels";
-import { displaySpecialty } from "../i18n/specialtyLabels";
 import { receptionLabel } from "../i18n/receptionLabels";
 import { PAGE_UI_TRANSLATIONS } from "../i18n/pageUiLabels";
 import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
@@ -135,7 +134,6 @@ describe("urgentologist capacity fallback", () => {
         fireEvent.click(screen.getByRole("button", { name: labels.family }));
         expect(screen.getByRole("button", { name: /09:00/ })).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: /10:00/ })).not.toBeInTheDocument();
-        expect(displaySpecialty("Urgentologue", locale)).toBe("Emergency Physician");
     });
 });
 async function lookup() {

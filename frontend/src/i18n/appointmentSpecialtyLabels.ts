@@ -2,7 +2,7 @@ import type { Specialty } from "../data/specialties";
 import { UI_LABELS_FR } from "./uiLabels.fr";
 import { baseUiLocale, UI_LOCALES } from "./uiLocales";
 
-// Local display names for the appointment form. API specialty values and the
+// Shared local display names for appointment and specialist interfaces. API specialty values and the
 // English-only policy for treatment descriptions and other clinical panels stay unchanged.
 const source = UI_LABELS_FR.appointmentSpecialties;
 const translations: Record<Specialty, readonly string[]> = {

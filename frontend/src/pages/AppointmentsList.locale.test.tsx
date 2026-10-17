@@ -1,4 +1,7 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { SPECIALTIES } from "../data/specialties";
+import { UI_LOCALES } from "../i18n/uiLocales";
+import { appointmentSpecialtyLabel } from "../i18n/appointmentSpecialtyLabels";
+import { cleanup, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
@@ -62,5 +65,40 @@ describe("appointment feedback follows the selected language", () => {
         const toast = await screen.findByRole("status");
         expect(toast).toHaveTextContent(getLocalUiTranslation(labels.generalUi.error, "en-CA")!);
         expect(screen.queryByText("Erreur serveur synthétique non répertoriée")).not.toBeInTheDocument();
+    });
+});
+
+describe("appointment list specialty translations", () => {
+    function mockSpecialties() {
+        const meta = { page: 1, limit: 10, total: 9, totalPages: 1 };
+        api.specialists.mockResolvedValue({ data: { data: SPECIALTIES.map((specialite, i) => ({ _id: `specialist-${i}`,
+            prenom: `First${i}`, nom: `Last${i}`, numero_medecin: `SYNTHETIC-${i}`, specialite })), meta } });
+        api.list.mockResolvedValue({ data: { data: SPECIALTIES.map((_, i) => ({ _id: `appointment-${i}`,
+            patientName: `Synthetic patient ${i}`, specialist: `specialist-${i}`, clinique: "synthetic-clinic",
+            date: "2026-10-17", time: "10:00", status: "scheduled" })), meta } });
+    }
+    it.each(UI_LOCALES)("translates specialties in rows and specialist filter options in %s", async locale => {
+        mockSpecialties();
+        render(<Page locale={locale} />);
+        for (const [index, specialty] of SPECIALTIES.entries()) {
+            const name = appointmentSpecialtyLabel(specialty, locale);
+            const option = await screen.findByRole("option", { name: `First${index} Last${index} — ${name}` });
+            expect(option).toHaveValue(`specialist-${index}`);
+            const row = await screen.findByRole("row", { name: new RegExp(`Synthetic patient ${index}`) });
+            expect(within(row).getByRole("cell", { name })).toBeVisible();
+        }
+        expect(api.update).not.toHaveBeenCalled();
+    });
+    it("preserves the specialist identifier when switching language and filtering appointments", async () => {
+        mockSpecialties();
+        const { rerender } = render(<Page locale="en-CA" />);
+        const option = await screen.findByRole("option", { name: "First1 Last1 — Emergency Physician" });
+        const select = option.closest("select")!;
+        fireEvent.change(select, { target: { value: "specialist-1" } });
+        rerender(<Page locale="ja" />);
+        expect(select).toHaveValue("specialist-1");
+        expect(screen.getByRole("option", { name: "First1 Last1 — 救急医" })).toHaveProperty("selected", true);
+        await waitFor(() => expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ specialist: "specialist-1" })));
+        expect(api.update).not.toHaveBeenCalled();
     });
 });
