@@ -103,7 +103,7 @@ export function MyWriteReceiptsPage() {
                 ...(search ? { q: search } : {}),
             });
 
-            if (active && response.data) setPatients(response.data.data);
+            if (active && "data" in response) setPatients(response.data.data);
             if (active) setPatientsLoading(false);
         };
         void loadPatients();
@@ -122,7 +122,7 @@ export function MyWriteReceiptsPage() {
             startDate: startDate || undefined,
             endDate: endDate || undefined,
         });
-        if (response.error) {
+        if ("error" in response) {
             setError("loadError");
             setReceipts([]);
         } else if (response.data) {

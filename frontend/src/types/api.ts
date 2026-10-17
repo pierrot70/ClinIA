@@ -18,6 +18,14 @@ export type ApiErrorCode =
     | "ACCOUNT_TEMPORARILY_RESTRICTED" // Restriction temporaire sur routes sensibles
     | "PASSWORD_RESET_REQUIRED" // Un vrai reset de mot de passe est imposé
     | "PASSWORD_CHANGE_REQUIRED" // Un mot de passe temporaire doit être remplacé
+    | "NETWORK_ERROR"
+    | "SESSION_EXPIRED"
+    | "REFERENCE_CLINIC_REQUIRED"
+    | "APPOINTMENT_RECOMMENDATION_REFRESHED"
+    | "UNAPPROVED_CLINICAL_PROFILE_CONTENT"
+    | "RECEPTION_LOOKUP_REQUIRED"
+    | "PATIENT_ALREADY_EXISTS"
+    | "MAXIMUM_APPOINTMENTS_REACHED"
     | "INTERNAL_ERROR";       // Bug serveur inattendu
 
 /* ------------------------------------------------------------------ */

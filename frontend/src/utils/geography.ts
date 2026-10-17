@@ -5,6 +5,13 @@ export type GeographicCoordinates = {
 
 const EARTH_RADIUS_KM = 6371;
 
+function hasFiniteCoordinates(
+    coordinates: GeographicCoordinates
+): coordinates is { lat: number; long: number } {
+    return typeof coordinates.lat === "number" && Number.isFinite(coordinates.lat)
+        && typeof coordinates.long === "number" && Number.isFinite(coordinates.long);
+}
+
 function toRadians(degrees: number): number {
     return (degrees * Math.PI) / 180;
 }
@@ -14,10 +21,8 @@ export function calculateDistanceKm(
     destination: GeographicCoordinates
 ): number | null {
     if (
-        !Number.isFinite(origin.lat) ||
-        !Number.isFinite(origin.long) ||
-        !Number.isFinite(destination.lat) ||
-        !Number.isFinite(destination.long)
+        !hasFiniteCoordinates(origin) ||
+        !hasFiniteCoordinates(destination)
     ) {
         return null;
     }

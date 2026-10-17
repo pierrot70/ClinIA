@@ -234,7 +234,7 @@ const UserRegisterPage: React.FC = () => {
     useEffect(() => {
         void (async () => {
             const response = await fetchCliniquesPaginated({ limit: 50 });
-            if (response.data) setClinics(response.data.data);
+            if ("data" in response) setClinics(response.data.data);
         })();
     }, []);
 
