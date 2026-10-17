@@ -1,3 +1,4 @@
+import { dbConnectionLabel, dbStatusMessage } from "../i18n/dbStatusMessages";
 import { UiMessage } from "../components/i18n/UiMessage";
 import { useUiLabels } from "../hooks/useUiLabels";
 import { translateUiLabelTree } from "../i18n/pageUiLabels";
@@ -221,11 +222,11 @@ function ReplicaMemberCard({ member }: { member: DbStatusPayload["replicaSet"]["
                 {member.lastHeartbeatMessage && (
                     <div>
                         <span className="font-medium text-gray-700">{replicaLabels.heartbeat}: </span>
-                        <span>{member.lastHeartbeatMessage}</span>
+                        <span>{dbStatusMessage(member.lastHeartbeatMessage, t)}</span>
                     </div>
                 )}
             </div>
-            {member.error && <div className="mt-3 text-xs text-red-700">{member.error}</div>}
+            {member.error && <div className="mt-3 text-xs text-red-700">{dbStatusMessage(member.error, t)}</div>}
         </div>
     );
 }
@@ -603,14 +604,14 @@ export function DbStatusPage() {
                 <MetricCard
                     icon={<Database className="h-5 w-5" />}
                     label={t(labels.pageUi.databaseConnection)}
-                    value={data?.connection.status || t(loading ? labels.pageUi.loading : labels.componentUi.serviceTemporairementIndisponible)}
+                    value={(data ? dbConnectionLabel(data.connection.status, t) : null) || t(loading ? labels.pageUi.loading : labels.componentUi.serviceTemporairementIndisponible)}
                     detail={data?.connection.databaseName ? t(labels.pageUi.databaseHost).replace("{database}", data.connection.databaseName).replace("{host}", data.connection.host || t(labels.pageUi.hostInconnu)) : undefined}
                 />
                 <MetricCard
                     icon={<Activity className="h-5 w-5" />}
                     label={t(labels.pageUi.pingMongo)}
                     value={data?.ping.ok ? "OK" : t(labels.pageUi.nonDisponible)}
-                    detail={data?.ping.latencyMs != null ? `${data.ping.latencyMs} ms` : data?.ping.error || undefined}
+                    detail={data?.ping.latencyMs != null ? `${data.ping.latencyMs} ms` : dbStatusMessage(data?.ping.error, t) || undefined}
                 />
                 <MetricCard
                     icon={<Server className="h-5 w-5" />}
@@ -618,7 +619,7 @@ export function DbStatusPage() {
                     value={replicaSet?.summary ? t(getReplicaStatusLabel(replicaSet.summary.status)) : replicaLabels.notDetected}
                     detail={replicaSet?.available
                         ? `${replicaSet.setName || replicaLabels.detected}, ${replicaLabels.lastKnownPrimary}: ${replicaSet.primary || displayedLastKnownPrimary || replicaLabels.unknownPrimary}`
-                        : replicaSet?.error || replicaSet?.summary?.message || undefined}
+                        : dbStatusMessage(replicaSet?.error || replicaSet?.summary?.message, t) || undefined}
                 />
                 <MetricCard
                     icon={<Clock className="h-5 w-5" />}
@@ -698,7 +699,7 @@ export function DbStatusPage() {
                         </div>
                     </div>
                     <div className="border-t border-gray-100 px-4 py-3 text-sm text-gray-600">
-                        <div>{replicaSet.summary.message}</div>
+                        <div>{dbStatusMessage(replicaSet.summary.message, t)}</div>
                         <div className="mt-1 text-xs text-gray-500">
                             {replicaLabels.lastKnownPrimary}: {displayedLastKnownPrimary || replicaLabels.unknownPrimary}
                         </div>
@@ -788,7 +789,7 @@ export function DbStatusPage() {
                                 </h2>
                             </div>
                             <p className="mt-1 text-sm text-gray-500">
-                                {writeSafetyDrill.message || replicaLabels.writeSafetyDrillIdle}
+                                {dbStatusMessage(writeSafetyDrill.message, t) || replicaLabels.writeSafetyDrillIdle}
                             </p>
                         </div>
                         <TonePill
@@ -869,7 +870,7 @@ export function DbStatusPage() {
                 </div>
                 {data?.backups.error && (
                     <div className="border-b border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                        {data.backups.error}
+                        {dbStatusMessage(data.backups.error, t)}
                     </div>
                 )}
                 <div className="border-b border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
