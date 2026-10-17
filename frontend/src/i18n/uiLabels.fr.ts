@@ -203,6 +203,13 @@ export const UI_LABELS_FR = {
             tooLong: "Le nouveau mot de passe ne doit pas dépasser 72 octets UTF-8. Les caractères accentués et les émojis peuvent compter pour plusieurs octets.",
         },
         userManagement: {
+            roles: {
+                USER: "Utilisateur",
+                RECEPTION: "Réceptionniste",
+                MEDECIN: "Médecin",
+                ADMIN: "Administrateur",
+                SUPERADMIN: "Superadministrateur",
+            },
             mfaRequiredLabel: "Exiger la verification a deux facteurs (MFA)",
             mfaRequiredHelp:
                 "L'utilisateur configurera son application d'authentification a sa prochaine connexion.",

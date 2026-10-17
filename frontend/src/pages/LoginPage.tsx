@@ -1,3 +1,5 @@
+import { userRoleLabel } from "../i18n/userRoleLabels";
+import { useUiLabels } from "../hooks/useUiLabels";
 import { UiMessage } from "../components/i18n/UiMessage";
 import { exceedsNewPasswordByteLimit } from "../auth/passwordPolicy";
 import { passwordPolicyLabels } from "../i18n/passwordPolicyLabels";
@@ -37,6 +39,7 @@ function useLoginLabel(text: string, translationKey: string) {
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
+    const { t } = useUiLabels();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [registerMode, setRegisterMode] = useState(false);
@@ -568,10 +571,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                                 setRegisterRole(event.target.value as UserRole)
                             }
                         >
-                            <option value="MEDECIN">MEDECIN</option>
-                            <option value="USER">USER</option>
-                            <option value="ADMIN">ADMIN</option>
-                            <option value="SUPERADMIN">SUPERADMIN</option>
+                            <option value="MEDECIN">{userRoleLabel("MEDECIN", t)}</option>
+                            <option value="USER">{userRoleLabel("USER", t)}</option>
+                            <option value="ADMIN">{userRoleLabel("ADMIN", t)}</option>
+                            <option value="SUPERADMIN">{userRoleLabel("SUPERADMIN", t)}</option>
                         </select>
                     </div>
                 )}

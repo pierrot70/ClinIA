@@ -1,3 +1,4 @@
+import { userRoleLabel } from "../i18n/userRoleLabels";
 import { UiMessage } from "../components/i18n/UiMessage";
 import { getLocalUiMessage } from "../i18n/localUiTranslations";
 import { useUiLabels } from "../hooks/useUiLabels";
@@ -730,7 +731,7 @@ const UserRegisterPage: React.FC = () => {
                     >
                         {ROLE_OPTIONS.map((value) => (
                             <option key={value} value={value}>
-                                {value}
+                                {userRoleLabel(value, t)}
                             </option>
                         ))}
                     </select>
@@ -828,7 +829,7 @@ const UserRegisterPage: React.FC = () => {
                         >
                             {USER_ROLE_FILTER_OPTIONS.map((value) => (
                                 <option key={value} value={value}>
-                                    {value === "ALL" ? t(labels.pageUi.tousLesRoles) : value}
+                                    {value === "ALL" ? t(labels.pageUi.tousLesRoles) : userRoleLabel(value, t)}
                                 </option>
                             ))}
                         </select>
@@ -897,7 +898,7 @@ const UserRegisterPage: React.FC = () => {
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                     <div>
                                         <div className="text-sm font-semibold text-gray-900">
-                                            {managedUser.username} ({managedUser.role})
+                                            {managedUser.username} ({userRoleLabel(managedUser.role, t)})
                                         </div>
                                         <div className="text-xs text-gray-600">
                                             {managedUser.email || t(labels.pageUi.aucunCourriel)}
@@ -1009,7 +1010,7 @@ const UserRegisterPage: React.FC = () => {
                         >
                             {ROLE_OPTIONS.map((value) => (
                                 <option key={value} value={value}>
-                                    {value}
+                                    {userRoleLabel(value, t)}
                                 </option>
                             ))}
                     </select>

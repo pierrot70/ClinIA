@@ -11,6 +11,12 @@ const a = UI_LABELS_FR.auth.sensitiveAction;
 // French source, then EN, ES, KO, VI, NO, JA, ZH, HE.
 // Fixed administration interface text only, never user data or secrets.
 export const adminUiRows: readonly (readonly string[])[] = [
+    [u.roles.USER, "User", "Usuario", "사용자", "Người dùng", "Bruker", "ユーザー", "用户", "משתמש"],
+    [u.roles.RECEPTION, "Receptionist", "Recepcionista", "접수 담당자", "Nhân viên lễ tân", "Resepsjonist", "受付担当者", "接待员", "פקיד קבלה"],
+    [u.roles.MEDECIN, "Physician", "Médico", "의사", "Bác sĩ", "Lege", "医師", "医生", "רופא"],
+    [u.roles.ADMIN, "Administrator", "Administrador", "관리자", "Quản trị viên", "Administrator", "管理者", "管理员", "מנהל"],
+    [u.roles.SUPERADMIN, "Super administrator", "Superadministrador", "최고 관리자", "Quản trị viên cấp cao", "Superadministrator", "上級管理者", "超级管理员", "מנהל על"],
+
     [m.connected, "Connected", "Conectado", "연결됨", "Đã kết nối", "Tilkoblet", "接続済み", "已连接", "מחובר"],
     [m.disconnected, "Disconnected", "Desconectado", "연결 끊김", "Đã ngắt kết nối", "Frakoblet", "未接続", "已断开", "מנותק"],
     [m.connecting, "Connecting", "Conectando", "연결 중", "Đang kết nối", "Kobler til", "接続中", "正在连接", "מתחבר"],
