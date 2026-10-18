@@ -125,3 +125,19 @@ describe("patient DTO", () => {
         });
     });
 });
+
+
+describe("server-owned reactivation history", () => {
+    const forged = {
+        reactivationHistory: [{ reason: "forged", reactivatedByUserId: "other", reactivatedAt: "2000-01-01", verificationId: "WRV-FORGED" }],
+        reactivatedByUserId: "other", reactivatedAt: "2000-01-01", verificationId: "WRV-FORGED",
+    };
+    it("ignores forged history on patient creation and update", () => {
+        const created = toCreatePatientDTO({ nom: "Synthetic", prenom: "Test", ...forged });
+        for (const field of Object.keys(forged)) expect(created).not.toHaveProperty(field);
+        expect(toUpdatePatientDTO(forged)).toEqual({});
+    });
+    it("accepts only a normalized reason from a restore request", () => {
+        expect(toRestorePatientDTO({ reason: "  Synthetic test  ", ...forged })).toEqual({ reason: "Synthetic test" });
+    });
+});

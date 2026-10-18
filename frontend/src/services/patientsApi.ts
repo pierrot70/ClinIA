@@ -37,7 +37,15 @@ export type HealthInsuranceJurisdiction =
 
 export type PatientCountry = "CA";
 
+export interface PatientReactivation {
+    reason: string;
+    reactivatedAt: string;
+    reactivatedByUserId: string;
+    verificationId?: string | null;
+}
+
 export interface Patient {
+    reactivationHistory?: PatientReactivation[];
     _id: string;
     nom: string;
     prenom: string;

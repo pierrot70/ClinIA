@@ -397,7 +397,7 @@ describe("physician patient restore authorization", () => {
                 action: "PATIENT_RESTORE", operation: "UPDATE",
                 actorUserId: "user-1", actorRole: "MEDECIN", ip: "10.0.0.10",
                 requestId: "request-1", verificationId: expect.stringMatching(/^WRV-/),
-                changedFields: ["archivedAt", "archivedByUserId", "archiveReason"], context: null,
+                changedFields: ["archivedAt", "archivedByUserId", "archiveReason", "reactivationHistory"], context: null,
             }) }
         );
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ meta: expect.objectContaining({ writeVerification: receipt }) }));

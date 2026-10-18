@@ -306,6 +306,7 @@ export function PatientsPage() {
     }, [error, ui.restrictedAccess]);
 
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [reactivationHistory, setReactivationHistory] = useState<NonNullable<Patient["reactivationHistory"]>>([]);
     const [notesPatient, setNotesPatient] = useState<Patient | null>(null);
     const [expandedPatientId, setExpandedPatientId] = useState<string | null>(null);
     const [form, setForm] = useState({
@@ -418,6 +419,7 @@ export function PatientsPage() {
 
     function resetForm() {
         setEditingId(null);
+        setReactivationHistory([]);
         setForm({
             nom: "",
             prenom: "",
@@ -602,6 +604,7 @@ export function PatientsPage() {
 
         const detail = response.data;
         setEditingId(patient._id);
+        setReactivationHistory(detail.reactivationHistory ?? []);
         setViewMode("create");
             setForm({
                 nom: detail.nom ?? "",
@@ -768,7 +771,7 @@ export function PatientsPage() {
                             ? "bg-primary text-white border-primary"
                             : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
                     }`}
-                    onClick={() => setViewMode("create")}
+                    onClick={() => { resetForm(); setViewMode("create"); }}
                 >
                     {ui.createTab}
                 </button>
@@ -1026,6 +1029,43 @@ export function PatientsPage() {
                             </button>
                         )}
                     </div>
+                    {editingId && (
+                        <section aria-labelledby="reactivation-history-title" className="border-t pt-4 space-y-3">
+                            <h2 id="reactivation-history-title" className="font-semibold">
+                                {t(labels.patientsPage.reactivationHistory.title)}
+                            </h2>
+                            {reactivationHistory.length === 0 ? (
+                                <p className="text-sm text-slate-600">{t(labels.patientsPage.reactivationHistory.empty)}</p>
+                            ) : (
+                                <ol className="space-y-3">
+                                    {[...reactivationHistory].reverse().map((entry, index) => (
+                                        <li key={entry.verificationId ?? `${entry.reactivatedAt}-${index}`} className="rounded border bg-white p-3">
+                                            <dl className="space-y-2 text-sm">
+                                                <div>
+                                                    <dt className="font-medium">{t(labels.patientsPage.reactivationHistory.date)}</dt>
+                                                    <dd><time dateTime={entry.reactivatedAt}>{new Date(entry.reactivatedAt).toLocaleString(targetLang)}</time></dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="font-medium">{t(labels.patientsPage.reactivationHistory.reason)}</dt>
+                                                    <dd className="whitespace-pre-wrap break-words">{entry.reason}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="font-medium">{t(labels.patientsPage.reactivationHistory.author)}</dt>
+                                                    <dd className="break-all">{entry.reactivatedByUserId}</dd>
+                                                </div>
+                                                {entry.verificationId && (
+                                                    <div>
+                                                        <dt className="font-medium">{t(labels.patientsPage.reactivationHistory.verification)}</dt>
+                                                        <dd className="break-all">{entry.verificationId}</dd>
+                                                    </div>
+                                                )}
+                                            </dl>
+                                        </li>
+                                    ))}
+                                </ol>
+                            )}
+                        </section>
+                    )}
                 </div>
             )}
 

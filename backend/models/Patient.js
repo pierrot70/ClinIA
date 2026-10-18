@@ -152,6 +152,14 @@ const PatientDocumentSchema = new mongoose.Schema(
     }
 );
 
+// Retained with the clinical record, never in general audit context.
+const PatientReactivationSchema = new mongoose.Schema({
+    reason: { type: String, required: true, trim: true, maxlength: 500 },
+    reactivatedAt: { type: Date, required: true },
+    reactivatedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: "AdminUser", required: true },
+    verificationId: { type: String, default: null, trim: true, maxlength: 120 },
+}, { _id: false });
+
 const PatientSchema = new mongoose.Schema(
     {
         nom: {
@@ -212,6 +220,12 @@ const PatientSchema = new mongoose.Schema(
             default: "",
             trim: true,
             maxlength: 500,
+        },
+        reactivationHistory: {
+            type: [PatientReactivationSchema],
+            default: [],
+            // Loaded explicitly by the authorized detail endpoint only.
+            select: false,
         },
         country: {
             type: String,

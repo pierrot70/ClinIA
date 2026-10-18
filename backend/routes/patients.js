@@ -832,7 +832,7 @@ router.post(
             const transactionAudit = await buildPatientWriteTransactionAudit(req, {
                 action: "PATIENT_RESTORE",
                 operation: "UPDATE",
-                changedFields: ["archivedAt", "archivedByUserId", "archiveReason"],
+                changedFields: ["archivedAt", "archivedByUserId", "archiveReason", "reactivationHistory"],
             });
             const { patient: restored, writeVerification } =
                 await restorePatientWithWriteVerification(req.params.id, reason, req.auth, {

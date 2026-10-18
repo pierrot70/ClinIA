@@ -480,7 +480,7 @@ export async function getPatientById(id, authUser) {
         query = { _id: id, ...buildOwnerScope(authUser) };
     }
 
-    const patient = await Patient.findOne(query).lean();
+    const patient = await Patient.findOne(query, "+reactivationHistory").lean();
 
     if (!patient) {
         throw {
@@ -822,12 +822,15 @@ export async function updatePatientWithWriteVerification(
 async function updatePatientArchiveStateWithWriteVerification(
     id,
     authUser,
-    { query, update, notFoundMessage, audit }
+    { query, update, notFoundMessage, audit, reactivationEntry = null }
 ) {
     return runPatientWriteTransaction(async (session) => {
         const patient = await Patient.findOneAndUpdate(
             { _id: id, ...buildOwnerScope(authUser), ...query },
-            { $set: update },
+            {
+                $set: update,
+                ...(reactivationEntry ? { $push: { reactivationHistory: reactivationEntry } } : {}),
+            },
             { new: true, runValidators: true, session }
         );
         if (!patient) {
@@ -1091,6 +1094,15 @@ export async function archivePatientWithWriteVerification(
     });
 }
 
+function buildReactivationEntry(reason, authUser, audit = null) {
+    return {
+        reason: reason.trim(),
+        reactivatedAt: new Date(),
+        reactivatedByUserId: authUser.userId,
+        verificationId: audit?.verificationId || null,
+    };
+}
+
 export async function restorePatient(id, reason, authUser) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw {
@@ -1118,6 +1130,7 @@ export async function restorePatient(id, reason, authUser) {
                 archivedByUserId: null,
                 archiveReason: "",
             },
+            $push: { reactivationHistory: buildReactivationEntry(reason, authUser) },
         },
         {
             new: true,
@@ -1163,6 +1176,7 @@ export async function restorePatientWithWriteVerification(
             archivedByUserId: null,
             archiveReason: "",
         },
+        reactivationEntry: buildReactivationEntry(reason, authUser, audit),
         notFoundMessage: "Patient archivé introuvable.",
         audit,
     });
