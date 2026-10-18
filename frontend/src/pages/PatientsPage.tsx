@@ -298,6 +298,10 @@ export function PatientsPage() {
             return ui.restrictedAccess;
         }
 
+        if (error.code === "CLINICAL_ACCESS_REQUIRED") {
+            return labels.patientsPage.validation.clinicalAccessRequired;
+        }
+
         return error.message;
     }, [error, ui.restrictedAccess]);
 

@@ -6,6 +6,15 @@ type PatientPageFallback = Record<string, string>;
 const form = UI_LABELS_FR.patientsPage.form;
 // French source, then EN, ES, KO, VI, NO, JA, ZH, HE; never patient-entered values.
 export const patientFormRows: Array<readonly [string, string, string, string, string, string, string, string, string]> = [
+    [UI_LABELS_FR.patientsPage.validation.clinicalAccessRequired,
+        "Delegated read-only clinical authorization is required to access patient records. The SUPERADMIN role alone does not grant this access.",
+        "Se necesita una autorización clínica delegada de solo lectura para acceder a los expedientes de los pacientes. El rol SUPERADMIN por sí solo no concede este acceso.",
+        "환자 기록에 접근하려면 위임된 읽기 전용 임상 접근 권한이 필요합니다. SUPERADMIN 역할만으로는 이 접근 권한이 부여되지 않습니다.",
+        "Cần có quyền truy cập lâm sàng chỉ đọc được ủy quyền để truy cập hồ sơ bệnh nhân. Chỉ có vai trò SUPERADMIN không cấp quyền truy cập này.",
+        "Delegert klinisk lesetilgang kreves for å få tilgang til pasientjournaler. SUPERADMIN-rollen alene gir ikke denne tilgangen.",
+        "患者記録にアクセスするには、委任された読み取り専用の臨床アクセス権限が必要です。SUPERADMINロールだけでは、このアクセス権限は付与されません。",
+        "访问患者记录需要获得委托的只读临床访问授权。仅有 SUPERADMIN 角色并不授予此访问权限。",
+        "נדרשת הרשאת גישה קלינית מואצלת לקריאה בלבד כדי לגשת לתיקי מטופלים. תפקיד SUPERADMIN לבדו אינו מעניק גישה זו."],
     [form.firstNamePlaceholder, "First name *", "Nombre *", "이름 *", "Tên *", "Fornavn *", "名 *", "名字 *", "שם פרטי *"],
     [form.lastNamePlaceholder, "Last name *", "Apellido *", "성 *", "Họ *", "Etternavn *", "姓 *", "姓氏 *", "שם משפחה *"],
     [form.ramqPlaceholder, "Health insurance number (optional)", "Número de seguro médico (opcional)", "건강보험 번호 (선택 사항)", "Số bảo hiểm y tế (không bắt buộc)", "Helseforsikringsnummer (valgfritt)", "健康保険番号（任意）", "医疗保险号码（可选）", "מספר ביטוח בריאות (לא חובה)"],
