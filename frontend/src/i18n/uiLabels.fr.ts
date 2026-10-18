@@ -1801,6 +1801,14 @@ export const UI_LABELS_FR = {
             restrictedAccess:
                 "Acces temporairement restreint: ClinIA a bloque cette zone sensible apres une activite inhabituelle detectee sur ce compte. Reessayez plus tard ou contactez un SUPERADMIN.",
         },
+        reactivationHistory: {
+            title: "Historique des réactivations",
+            empty: "Aucune réactivation enregistrée.",
+            date: "Date de réactivation",
+            reason: "Motif de réactivation",
+            author: "Auteur (identifiant)",
+            verification: "Numéro de vérification",
+        },
         form: {
             editTitle: "Modifier un patient",
             createTitle: "Créer un patient",

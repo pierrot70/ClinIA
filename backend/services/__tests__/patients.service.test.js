@@ -83,6 +83,7 @@ const {
     updatePatientWithWriteVerification,
     archivePatientWithWriteVerification,
     restorePatientWithWriteVerification,
+    getPatientById,
     archivePatient,
     restorePatient,
     listPatients,
@@ -383,6 +384,10 @@ describe("patients service audit logs", () => {
                     archivedByUserId: null,
                     archiveReason: "",
                 },
+                $push: { reactivationHistory: {
+                    reason: "Demande administrative", reactivatedAt: expect.any(Date),
+                    reactivatedByUserId: "507f1f77bcf86cd799439011", verificationId: null,
+                } },
             },
             expect.objectContaining({ new: true, runValidators: true })
         );
@@ -494,6 +499,7 @@ describe("patients service audit logs", () => {
             telephone: "5145550101",
             archivedAt: null,
             courriel: "jane@example.test",
+            reactivationHistory: [{ reason: "Private synthetic reason" }],
             documents: [{ title: "rapport-confidentiel.pdf" }],
             secure_request_profile: {
                 clinicalNotes: "Note clinique confidentielle",
@@ -516,6 +522,7 @@ describe("patients service audit logs", () => {
             archivedAt: null,
         }]);
         expect(JSON.stringify(result.data)).not.toContain("clinicalNotes");
+        expect(JSON.stringify(result.data)).not.toContain("reactivationHistory");
         expect(JSON.stringify(result.data)).not.toContain("rapport-confidentiel.pdf");
     });
 
@@ -744,7 +751,11 @@ describe("physician restoration ownership and traceability", () => {
         const result = await restorePatientWithWriteVerification(patientId, "  Synthetic test completed  ", physician, { audit });
         expect(PatientModel.findOneAndUpdate).toHaveBeenCalledWith(
             { _id: patientId, ownerUserId: physician.userId, archivedAt: { $ne: null } },
-            { $set: { archivedAt: null, archivedByUserId: null, archiveReason: "" } },
+            { $set: { archivedAt: null, archivedByUserId: null, archiveReason: "" },
+                $push: { reactivationHistory: {
+                    reason: "Synthetic test completed", reactivatedAt: expect.any(Date),
+                    reactivatedByUserId: physician.userId, verificationId: "WRV-OWNER-RESTORE",
+                } } },
             { new: true, runValidators: true, session: transactionSession }
         );
         expect(recordPatientAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
@@ -799,5 +810,44 @@ describe("physician restoration ownership and traceability", () => {
             .rejects.toThrow("synthetic audit failure");
         expect(transactionSession.withTransaction).toHaveBeenCalledTimes(1);
         expect(transactionSession.endSession).toHaveBeenCalledTimes(1);
+    });
+});
+
+
+describe("retained reactivation history", () => {
+    const id = "507f1f77bcf86cd799439012";
+    const physician = { userId: "507f1f77bcf86cd799439011", role: "MEDECIN" };
+    const audit = { action: "PATIENT_RESTORE", operation: "UPDATE", verificationId: "WRV-HISTORY",
+        actorUserId: physician.userId, actorRole: physician.role, changedFields: ["reactivationHistory"], context: null };
+
+    it("appends each cycle without overwriting earlier reasons and keeps free text out of audits", async () => {
+        const persisted = { _id: id, reactivationHistory: [] };
+        PatientModel.findOneAndUpdate.mockImplementation(async (query, update) => {
+            expect(query).toEqual({ _id: id, ownerUserId: physician.userId, archivedAt: { $ne: null } });
+            persisted.reactivationHistory.push(update.$push.reactivationHistory);
+            return persisted;
+        });
+        await restorePatientWithWriteVerification(id, "  First synthetic reason  ", physician, { audit });
+        await restorePatientWithWriteVerification(id, "Second synthetic reason", physician, { audit: { ...audit, verificationId: "WRV-HISTORY-2" } });
+        expect(persisted.reactivationHistory.map(e => e.reason)).toEqual(["First synthetic reason", "Second synthetic reason"]);
+        expect(persisted.reactivationHistory[1]).toEqual({ reason: "Second synthetic reason", reactivatedAt: expect.any(Date),
+            reactivatedByUserId: physician.userId, verificationId: "WRV-HISTORY-2" });
+        expect(recordPatientAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ context: null, session: transactionSession }));
+        expect(JSON.stringify(recordPatientAuditEvent.mock.calls)).not.toContain("synthetic reason");
+        expect(JSON.stringify(recordWriteOperationAuditEvent.mock.calls)).not.toContain("synthetic reason");
+    });
+
+    it("loads retained history explicitly only in the authorized patient detail query", async () => {
+        const stored = { _id: id, reactivationHistory: [{ reason: "Stored synthetic reason" }] };
+        patientFindOne.mockReturnValue({ lean: vi.fn().mockResolvedValue(stored) });
+        expect(await getPatientById(id, physician)).toBe(stored);
+        expect(patientFindOne).toHaveBeenCalledWith({ _id: id, ownerUserId: physician.userId }, "+reactivationHistory");
+    });
+
+    it("does not load history for a SUPERADMIN without delegated clinical access", async () => {
+        getActiveDelegatedPatientAccess.mockResolvedValue(null);
+        await expect(getPatientById(id, { userId: "superadmin", role: "SUPERADMIN" }))
+            .rejects.toMatchObject({ code: "CLINICAL_ACCESS_REQUIRED" });
+        expect(patientFindOne).not.toHaveBeenCalled();
     });
 });
