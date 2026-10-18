@@ -1,11 +1,12 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { UI_LOCALES } from "../i18n/uiLocales";
 import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 import { getLocalUiTranslation } from "../i18n/localUiTranslations";
 import TreatmentCard from "./TreatmentCard";
+import TreatmentDetails from "../pages/TreatmentDetails";
 import AITreatmentTable from "./AITreatmentTable";
 import ClinicalDemoResult from "./ClinicalDemoResult";
 import { ClinicalResultPage } from "../pages/ClinicalResultPage";
@@ -49,6 +50,63 @@ describe("clinical source language and multilingual UI", () => {
         }
         const heading = getLocalUiTranslation(UI_LABELS_FR.residualClinicalUi.proposedOptions, locale)!;
         expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
+    });
+
+    it.each(UI_LOCALES.flatMap(locale => [
+        { locale, source: "  Always recommended as a first-line option.  " },
+        { locale, source: "  Justification historique rédigée en français.  " },
+    ]))("preserves justification verbatim from card to detail with empty fields in $locale: $source", ({ locale, source }) => {
+        const sparse = { ...treatment, summary: " \t ", details: "", indication: "", justification: source };
+        render(<Wrapper locale={locale}><Routes>
+            <Route path="/" element={<TreatmentCard treatment={sparse} sourceMode="real" />} />
+            <Route path="/treatment/:id" element={<TreatmentDetails />} />
+        </Routes></Wrapper>);
+        const cardText = screen.getByText(source.trim());
+        expect(cardText.textContent).toBe(source);
+        expect(cardText).toHaveAttribute("translate", "no");
+        fireEvent.click(screen.getByRole("link", { name: getLocalUiTranslation(UI_LABELS_FR.componentUi.details, locale)! }));
+        const detailText = screen.getByText(source.trim());
+        expect(detailText.textContent).toBe(source);
+        expect(detailText).toHaveAttribute("translate", "no");
+        expect(translatedSources).not.toContain(source);
+    });
+
+    it("keeps manually opened result content available during pointer travel and navigates to treatment details", () => {
+        vi.stubGlobal("matchMedia", vi.fn(() => ({
+            matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+        })));
+        render(<Wrapper locale="en-CA"><Routes>
+            <Route path="/" element={<ClinicalDemoResult demoData={{ treatments: [treatment] } as any} />} />
+            <Route path="/treatment/:id" element={<TreatmentDetails />} />
+        </Routes></Wrapper>);
+        const toggle = screen.getByRole("button", { name: /Alternatives and recommendations/i });
+        const section = toggle.closest("section")!;
+        expect(toggle).toHaveAttribute("aria-expanded", "false");
+        fireEvent.mouseEnter(section);
+        expect(toggle).toHaveAttribute("aria-expanded", "false");
+        fireEvent.click(toggle);
+        expect(toggle).toHaveAttribute("aria-expanded", "true");
+        fireEvent.mouseLeave(section);
+        expect(toggle).toHaveAttribute("aria-expanded", "true");
+        fireEvent.click(toggle);
+        expect(toggle).toHaveAttribute("aria-expanded", "false");
+        fireEvent.click(toggle);
+        fireEvent.mouseLeave(section);
+        fireEvent.click(screen.getByRole("link", { name: "Details" }));
+        expect(screen.getByRole("heading", { level: 1, name: treatment.name })).toBeInTheDocument();
+        expect(screen.getByText(treatment.details)).toHaveAttribute("translate", "no");
+    });
+
+    it.each(UI_LOCALES)("keeps a localized missing explanation outside protected clinical content in card and detail in %s", locale => {
+        const empty = { ...treatment, summary: " \t ", details: "", justification: " ", indication: "\n" };
+        render(<Wrapper locale={locale}><Routes>
+            <Route path="/" element={<TreatmentCard treatment={empty} />} />
+            <Route path="/treatment/:id" element={<TreatmentDetails />} />
+        </Routes></Wrapper>);
+        const fallback = getLocalUiTranslation(UI_LABELS_FR.pageUi.aucunDetailSupplementaireFourniPourCetteOption, locale)!;
+        expect(screen.getByText(fallback).closest('[translate="no"]')).toBeNull();
+        fireEvent.click(screen.getByRole("link", { name: getLocalUiTranslation(UI_LABELS_FR.componentUi.details, locale)! }));
+        expect(screen.getByText(fallback).closest('[translate="no"]')).toBeNull();
     });
 
     it.each(UI_LOCALES)("keeps the empty contraindications UI label outside protected medical content in %s", locale => {

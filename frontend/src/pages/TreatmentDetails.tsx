@@ -14,6 +14,7 @@ type DetailTreatment = {
   class?: string;
   details?: string;
   summary?: string;
+  justification?: string;
   indication?: string;
   dosage?: string;
   duration?: string;
@@ -138,6 +139,9 @@ const TreatmentDetails: React.FC = () => {
     );
   }
 
+  const explanation = [treatment.details, treatment.summary, treatment.justification, treatment.indication].find(
+    value => typeof value === "string" && value.trim().length > 0
+  );
   const flags = Array.isArray(treatment.flags) ? treatment.flags : [];
   const monitoringItems = normalizeList(treatment.monitoring);
   const contraindicationItems = normalizeList(treatment.contraindications);
@@ -198,12 +202,11 @@ const TreatmentDetails: React.FC = () => {
       <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs text-sm text-gray-700 space-y-3">
         <h2 className="text-sm font-semibold text-gray-800">
           {t(labels.pageUi.commentInterpreterCesInformations)}</h2>
-        <p dir="auto" translate="no">
-          {treatment.details ??
-            treatment.summary ??
-            treatment.indication ??
-            t(labels.pageUi.aucunDetailSupplementaireFourniPourCetteOption)}
-        </p>
+        {explanation ? (
+          <p dir="auto" translate="no">{explanation}</p>
+        ) : (
+          <p>{t(labels.pageUi.aucunDetailSupplementaireFourniPourCetteOption)}</p>
+        )}
         {treatment.dosage || treatment.duration ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>

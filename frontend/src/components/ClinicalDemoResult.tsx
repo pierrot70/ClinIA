@@ -68,16 +68,10 @@ function ResultAccordion({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const supportsHover =
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
   return (
     <section
       className="rounded-xl border border-gray-200 bg-white shadow-xs"
-      onMouseEnter={supportsHover ? () => setOpen(true) : undefined}
-      onMouseLeave={supportsHover ? () => setOpen(false) : undefined}
     >
       <button
         type="button"

@@ -14,6 +14,7 @@ interface Props {
 }
 
 type ClinicalTreatmentCardData = Treatment & {
+  justification?: string;
   evidence_level?: EvidenceLevel;
   monitoring?: string[];
   contraindications?: string[] | string;
@@ -84,6 +85,9 @@ const TreatmentCard: React.FC<Props> = ({ treatment, sourceMode, realAI, languag
   const flags = Array.isArray(treatment.flags) ? treatment.flags : [];
   const relevanceLabel = getClinicalRelevanceLabel(treatment, "fr");
   const sourceFootnote = getSourceFootnote(sourceMode, realAI, "fr");
+  const summary = [treatment.summary, treatment.justification].find(
+    value => typeof value === "string" && value.trim().length > 0
+  );
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3 shadow-xs">
@@ -102,12 +106,13 @@ const TreatmentCard: React.FC<Props> = ({ treatment, sourceMode, realAI, languag
         </div>
       </div>
 
-      <p dir="auto" translate="no" className="text-sm text-gray-700">{treatment.summary}</p>
+      {summary ? (
+        <p dir="auto" translate="no" className="text-sm text-gray-700">{summary}</p>
+      ) : (
+        <p className="text-sm text-gray-700">{t(labels.pageUi.aucunDetailSupplementaireFourniPourCetteOption)}</p>
+      )}
 
       <div className="flex flex-wrap gap-2 text-xs">
-        <span className="px-2 py-1 rounded-full bg-green-50 text-green-700 border border-green-100">
-          {t(labels.componentUi.firstLine)}
-        </span>
         {flags.includes("wellTolerated") && (
           <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
             {t(labels.componentUi.bienTolere)}

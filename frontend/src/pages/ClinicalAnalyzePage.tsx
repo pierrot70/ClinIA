@@ -597,7 +597,7 @@ export function ClinicalAnalyzePage() {
 
     function buildComparisonHeading(label: string, payload: ClinicalPayload) {
         return `${label} - ${payload.diagnosis || comparisonLabels.fallbackHeading}${
-            payload.age ? `, ${new Intl.NumberFormat(targetLang, { style: "unit", unit: "year", unitDisplay: "long" }).format(payload.age)}` : ""
+            payload.age ? `, ${reviewLabels.age}: ${new Intl.NumberFormat(targetLang).format(payload.age)}` : ""
         }`;
     }
 
