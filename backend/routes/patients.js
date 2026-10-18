@@ -760,7 +760,8 @@ router.patch("/:id", async (req, res) => {
 
 router.delete(
     "/:id",
-    requireRole(AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
+    // The transactional service also requires ownerUserId from the session.
+    requireRole(AUTH_ROLES.MEDECIN, AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN),
     async (req, res) => {
         try {
             const { reason } = toArchivePatientDTO(req.body);

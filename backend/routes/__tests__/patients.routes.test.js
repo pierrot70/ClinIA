@@ -294,3 +294,83 @@ describe("patient routes atomic write receipts", () => {
         );
     });
 });
+
+
+// Execute the real route middleware as well as the handler. Calling only the
+// final handler would miss a regression in the role guard itself.
+async function runArchiveRoute(req, res) {
+    const route = router.stack.find(entry => entry.route?.methods?.delete && entry.route.path === "/:id").route;
+    for (const layer of route.stack) {
+        let advanced = false;
+        await layer.handle(req, res, () => { advanced = true; });
+        if (!advanced) break;
+    }
+}
+
+describe("physician patient archive authorization", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        dto.toArchivePatientDTO.mockReset().mockReturnValue({ reason: "Synthetic test completed" });
+        services.archivePatientWithWriteVerification.mockReset().mockResolvedValue({
+            patient: { _id: "synthetic-patient" }, writeVerification: receipt,
+        });
+        getReplicaSetStatus.mockResolvedValue(replicaSet);
+    });
+
+    it("allows MEDECIN through the real DELETE guard and passes session ownership and audit identity", async () => {
+        const req = request({ params: { id: "synthetic-patient" }, body: { reason: "Synthetic test completed", ownerUserId: "other-doctor" } });
+        const res = makeRes();
+        await runArchiveRoute(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(services.archivePatientWithWriteVerification).toHaveBeenCalledWith(
+            "synthetic-patient", "Synthetic test completed", req.auth,
+            { audit: expect.objectContaining({
+                action: "PATIENT_ARCHIVE", operation: "UPDATE",
+                actorUserId: "user-1", actorRole: "MEDECIN", ip: "10.0.0.10",
+                requestId: "request-1", verificationId: expect.stringMatching(/^WRV-/),
+                changedFields: ["archivedAt", "archivedByUserId", "archiveReason"], context: null,
+            }) }
+        );
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ meta: expect.objectContaining({ writeVerification: receipt }) }));
+    });
+
+    it.each(["USER", "RECEPTION"])("rejects %s before the archival service", async role => {
+        const res = makeRes();
+        await runArchiveRoute(request({ auth: { userId: "synthetic-user", role } }), res);
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(services.archivePatientWithWriteVerification).not.toHaveBeenCalled();
+        expect(dto.toArchivePatientDTO).not.toHaveBeenCalled();
+    });
+
+    it("rejects requests without authentication before the archival service", async () => {
+        const res = makeRes();
+        await runArchiveRoute(request({ auth: undefined }), res);
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(services.archivePatientWithWriteVerification).not.toHaveBeenCalled();
+    });
+
+    it("rejects a missing reason without any mutation", async () => {
+        dto.toArchivePatientDTO.mockImplementation(() => { throw { code: "INVALID_INPUT", message: "Motif requis" }; });
+        const res = makeRes();
+        await runArchiveRoute(request(), res);
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(services.archivePatientWithWriteVerification).not.toHaveBeenCalled();
+    });
+
+    it("returns a non-disclosing not-found response for a record outside the physician scope", async () => {
+        services.archivePatientWithWriteVerification.mockRejectedValue({ code: "NOT_FOUND", message: "Patient introuvable." });
+        const res = makeRes();
+        await runArchiveRoute(request({ params: { id: "foreign-patient" } }), res);
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.json).toHaveBeenCalledWith({ error: { code: "NOT_FOUND", message: "Patient introuvable.", retryable: false } });
+    });
+
+    it("does not grant physician restoration rights", () => {
+        const route = router.stack.find(entry => entry.route?.methods?.post && entry.route.path === "/:id/restore").route;
+        const res = makeRes();
+        const next = vi.fn();
+        route.stack[0].handle(request(), res, next);
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(next).not.toHaveBeenCalled();
+    });
+});
