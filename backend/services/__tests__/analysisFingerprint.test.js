@@ -22,7 +22,16 @@ describe("makeDiagnosisFingerprint", () => {
 it("does not reuse legacy analysis fingerprints after the English reference policy change", () => {
     const input = { diagnosis: "Hypertension", patient: { symptoms: ["headache"] }, model: "mock" };
     const legacy = crypto.createHash("sha256").update(JSON.stringify(input)).digest("hex");
-    expect(CLINICAL_CONTENT_POLICY_VERSION).toBe("english-reference-v1");
+    expect(CLINICAL_CONTENT_POLICY_VERSION).toBe("english-reference-v3");
     expect(makeDiagnosisFingerprint(input)).not.toBe(legacy);
     expect(makeDiagnosisFingerprint(input)).toBe(makeDiagnosisFingerprint(input));
+});
+
+
+it.each(["english-reference-v1", "english-reference-v2"])("separates corrected content from cached %s results without modifying input", previousPolicy => {
+    const input = { diagnosis: "Type 2 diabetes", patient: { symptoms: ["Polydipsia", "Polyuria", "Fatigue"] }, model: "mock" };
+    const snapshot = JSON.stringify(input);
+    const previous = crypto.createHash("sha256").update(JSON.stringify({ ...input, contentPolicy: previousPolicy })).digest("hex");
+    expect(makeDiagnosisFingerprint(input)).not.toBe(previous);
+    expect(JSON.stringify(input)).toBe(snapshot);
 });

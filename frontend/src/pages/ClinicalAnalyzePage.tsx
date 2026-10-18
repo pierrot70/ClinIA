@@ -597,7 +597,7 @@ export function ClinicalAnalyzePage() {
 
     function buildComparisonHeading(label: string, payload: ClinicalPayload) {
         return `${label} - ${payload.diagnosis || comparisonLabels.fallbackHeading}${
-            payload.age ? `, ${payload.age} ans` : ""
+            payload.age ? `, ${new Intl.NumberFormat(targetLang, { style: "unit", unit: "year", unitDisplay: "long" }).format(payload.age)}` : ""
         }`;
     }
 
@@ -610,13 +610,13 @@ export function ClinicalAnalyzePage() {
 
     function formatSexLabel(value?: ClinicalPayload["sex"]) {
         if (value === "male") {
-            return "Homme";
+            return reviewLabels.male;
         }
         if (value === "female") {
-            return "Femme";
+            return reviewLabels.female;
         }
         if (value === "other") {
-            return "Autre";
+            return reviewLabels.other;
         }
         return comparisonLabels.quickViewNotSpecified;
     }
@@ -1220,7 +1220,7 @@ export function ClinicalAnalyzePage() {
                         </section>
                     ) : null}
                     <ClinicalForm
-                        key={targetLang + openaiModel}
+                        key={openaiModel}
                         onSubmit={handleSubmit}
                         onCompareSubmit={handleCompareSubmit}
                         loading={loading}

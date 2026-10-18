@@ -51,6 +51,13 @@ describe("clinical source language and multilingual UI", () => {
         expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
     });
 
+    it.each(UI_LOCALES)("keeps the empty contraindications UI label outside protected medical content in %s", locale => {
+        render(<Wrapper locale={locale}><AITreatmentTable treatments={[{ ...treatment, contraindications: [] }]} /></Wrapper>);
+        const fallback = getLocalUiTranslation(UI_LABELS_FR.residualClinicalUi.noneListed, locale)!;
+        expect(screen.getByText(fallback).closest('[translate="no"]')).toBeNull();
+        expect(screen.getByText(treatment.justification).closest('[translate="no"]')).not.toBeNull();
+    });
+
     it.each(UI_LOCALES)("preserves diagnosis, rationale and patient summary in %s", locale => {
         const diagnosis = "English diagnostic hypothesis.";
         const rationale = "English diagnostic rationale.";

@@ -13,7 +13,9 @@ export async function buildMockAnalyzeResponse({
     reqAuth = null,
     persist = true,
 }) {
-    const mock = getMockForDiagnosis(diagnosisSeed || diagnosis);
+    // An explicit diagnosis takes precedence over symptom-derived context.
+    const primaryConcern = typeof diagnosis === "string" ? diagnosis.trim() : "";
+    const mock = getMockForDiagnosis(primaryConcern || diagnosisSeed);
     const analysis = normalizeClinicalAnalysis(mock, {
         model: "mock",
         primaryConcern: diagnosis,

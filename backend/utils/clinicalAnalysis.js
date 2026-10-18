@@ -157,6 +157,9 @@ export function normalizeClinicalAnalysis(
         ? merged.treatments.map((treatment) => ({
             name: treatment?.name ?? "Unspecified treatment",
             indication: treatment?.indication ?? "",
+            // Preserve authored rationale as its own field; do not reinterpret
+            // it as an indication or generate replacement clinical content.
+            justification: treatment?.justification ?? "",
             dosage: treatment?.dosage ?? "",
             duration: treatment?.duration ?? "",
             contraindications: Array.isArray(treatment?.contraindications)

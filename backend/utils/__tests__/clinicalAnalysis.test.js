@@ -124,3 +124,14 @@ it("preserves existing authored clinical text in its original language", () => {
     expect(output.patient_summary.plain_language).toBe(note);
     expect(output.clinical_summary).toBe(note);
 });
+
+
+it("preserves a historical French treatment rationale verbatim without reclassifying it", () => {
+    const rationale = "Justification originale : option à discuter selon le contexte clinique.";
+    const raw = { treatments: [{ name: "Option historique", justification: rationale }] };
+    const before = JSON.stringify(raw);
+    const output = normalizeClinicalAnalysis(raw);
+    expect(output.treatments[0].justification).toBe(rationale);
+    expect(output.treatments[0].indication).toBe("");
+    expect(JSON.stringify(raw)).toBe(before);
+});

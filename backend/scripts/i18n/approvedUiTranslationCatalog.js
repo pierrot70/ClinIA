@@ -5,7 +5,7 @@ export const APPROVED_UI_TRANSLATION_CATALOG = Object.freeze([
     {
         key: "app.landing.subtitle",
         namespace: "app-landing",
-        text: "Accelerer la recherche. Comparer les alternatives. Verifier les references.",
+        text: "Accélérer la recherche. Comparer les alternatives. Vérifier les références.",
     },
     {
         key: "app.landing.supportingText",
@@ -44,12 +44,12 @@ export const APPROVED_UI_TRANSLATION_CATALOG = Object.freeze([
     {
         key: "clinicalDemo.intro.tagline",
         namespace: "clinical-demo",
-        text: "Accelerer. Comparer. Verifier.",
+        text: "Accélérer. Comparer. Vérifier.",
     },
     {
         key: "clinicalDemo.intro.subtitle",
         namespace: "clinical-demo",
-        text: "Recherche clinique plus rapide. Alternatives comparables. References consultables.",
+        text: "Recherche clinique plus rapide. Alternatives comparables. Références consultables.",
     },
     {
         key: "clinicalDemo.comments.leaveComment",
@@ -156,7 +156,7 @@ export const APPROVED_UI_TRANSLATION_CATALOG = Object.freeze([
     { key: "header.controls.reset", namespace: "header", text: "Reinitialiser" },
     { key: "header.publicHome.languageTooltip", namespace: "header", text: "Vous pouvez sélectionner la langue de votre choix." },
     { key: "header.aiMode.real", namespace: "header", text: "IA réelle" },
-    { key: "header.aiMode.mock", namespace: "header", text: "IA mock" },
+    { key: "header.aiMode.mock", namespace: "header", text: "IA simulée" },
     { key: "header.aiMode.forceRealTitle", namespace: "header", text: "Forcer IA réelle" },
     { key: "header.aiMode.mockTitle", namespace: "header", text: "Utiliser le mode mock" },
     { key: "header.nav.home", namespace: "header", text: "Accueil" },
@@ -179,7 +179,7 @@ export const APPROVED_UI_TRANSLATION_CATALOG = Object.freeze([
     { key: "header.nav.openaiAudits", namespace: "header", text: "Audits OpenAI" },
     { key: "header.nav.dbAudits", namespace: "header", text: "Audits BD" },
     { key: "header.nav.myWriteReceipts", namespace: "header", text: "Mes reçus" },
-    { key: "header.nav.dbStatus", namespace: "header", text: "Etat BD" },
+    { key: "header.nav.dbStatus", namespace: "header", text: "État BD" },
     { key: "header.nav.users", namespace: "header", text: "Utilisateurs" },
     { key: "header.nav.logout", namespace: "header", text: "Déconnexion" },
     { key: "header.appManagement.activeUsers", namespace: "header", text: "Montrer Usager Actif" },

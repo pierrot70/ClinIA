@@ -18,7 +18,23 @@ describe('submitted analysis context', () => {
   expect(screen.getByRole('region',{name:t.submitted})).toBeVisible();
   for(const value of ['55','92','175','Hypertension','Headache','Dyslipidemia',t.male,t.missing]) expect(screen.getByText(value)).toBeVisible();
   expect(screen.getByText(t.age)).toBeVisible();
+  for (const value of ['55','92','175','Hypertension','Headache','Dyslipidemia']) {
+   expect(screen.getByText(value)).toHaveAttribute('translate', 'no');
+  }
+  for (const value of [t.male,t.missing]) {
+   expect(screen.getByText(value).closest('[translate="no"]')).toBeNull();
+  }
   expect(screen.queryByText('SECRET-ACK')).not.toBeInTheDocument();
+ });
+ it('protects authored source text even when it equals the missing UI label', () => {
+  const t = clinicalReviewLabels('en');
+  render(<SubmittedClinicalContext context={{...context,diagnosis:t.missing}} locale="en" />);
+  const diagnosis = screen.getByText(t.diagnosis).closest('div')!.querySelector('dd')!;
+  const medications = screen.getByText(t.medications).closest('div')!.querySelector('dd')!;
+  expect(diagnosis).toHaveTextContent(t.missing);
+  expect(diagnosis).toHaveAttribute('translate','no');
+  expect(medications).toHaveTextContent(t.missing);
+  expect(medications.closest('[translate="no"]')).toBeNull();
  });
  it('does not invent missing measurements or show a missing age as zero', () => {
   render(<SubmittedClinicalContext context={{...context,age:0,weight:undefined,height:undefined}} locale="en-CA" />);

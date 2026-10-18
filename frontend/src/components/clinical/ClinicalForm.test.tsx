@@ -1,3 +1,4 @@
+const { listApprovedTermsMock } = vi.hoisted(() => ({ listApprovedTermsMock: vi.fn() }));
 import { EXAMPLE_CASES } from "../../data/clinicalExampleCases";
 import { analysisStatusLabels } from "../../i18n/analysisStatusLabels";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -15,6 +16,11 @@ vi.mock("../../hooks/useTranslation", () => ({
         loading: false,
         error: null,
     }),
+}));
+
+vi.mock("../../services/clinicalTermsApi", async importOriginal => ({
+    ...await importOriginal<typeof import("../../services/clinicalTermsApi")>(),
+    listApprovedClinicalTerms: listApprovedTermsMock,
 }));
 
 vi.mock("../../hooks/useAuth", () => ({
@@ -45,6 +51,33 @@ describe("ClinicalForm", () => {
 
     beforeEach(() => {
         window.localStorage.clear();
+        listApprovedTermsMock.mockReset().mockResolvedValue({ data: [] });
+    });
+
+    it.each(["en-CA", "es", "he"])("localizes the suggestions panel while preserving canonical medical terms in %s", async locale => {
+        let resolveTerms!: (value: any) => void;
+        listApprovedTermsMock.mockReturnValue(new Promise(resolve => { resolveTerms = resolve; }));
+        const { container } = render(<HomeI18nContext.Provider value={{ locale } as any}>
+            <ClinicalForm onSubmit={() => {}} loading={false} restoreInitialDataForCorrection initialData={{
+                age: 55, sex: "male", diagnosis: "Synthetic diagnosis",
+                symptoms: [], medical_history: [], current_medications: [],
+            }} />
+        </HomeI18nContext.Provider>);
+        const input = container.querySelector("#clinical-symptoms")!;
+        fireEvent.focus(input);
+        const source = UI_LABELS_FR.clinicalTermRequest;
+        const title = getLocalUiTranslation(source.suggestionsTitle, locale)!;
+        expect(screen.getByLabelText(title)).toBeInTheDocument();
+        expect(screen.getByText(getLocalUiTranslation(source.suggestionsLoading, locale)!)).toBeInTheDocument();
+        resolveTerms({ data: [{ field: "symptoms", canonicalValue: "English canonical symptom", aliases: ["symptôme français"] }] });
+        const term = await screen.findByRole("button", { name: "English canonical symptom" });
+        expect(screen.queryByText(source.suggestionsTitle)).not.toBeInTheDocument();
+        expect(screen.queryByText(source.suggestionsLoading)).not.toBeInTheDocument();
+        fireEvent.click(term);
+        expect(input).toHaveValue("English canonical symptom");
+        fireEvent.focus(input);
+        expect(await screen.findByText(getLocalUiTranslation(source.suggestionsEmpty, locale)!)).toBeInTheDocument();
+        expect(screen.queryByText(source.suggestionsEmpty)).not.toBeInTheDocument();
     });
 
     it("retranslates JSON feedback without changing the imported patient content", () => {
@@ -567,7 +600,7 @@ describe("ClinicalForm", () => {
 
         selectExampleCase("diabetesType255");
 
-        fireEvent.click(screen.getByRole("button", { name: "Parametres diabete type 2" }));
+        fireEvent.click(screen.getByRole("button", { name: UI_LABELS_FR.clinicalFormFields.diabetesParametersButton }));
 
         expect(
             screen.getByRole("heading", {

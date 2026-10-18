@@ -1034,10 +1034,11 @@ export function ClinicalForm({
     const analyzeButtonLabel = analysisStatusLabels(targetLang).analyze;
     const { translated: analyzingButtonLabel } = useTranslation({ text: "Analyse…", targetLang });
     const { translated: clearPatientDataLabel } = useTranslation({ text: labels.clinicalFormFields.clearPatientData, targetLang });
+    const termRequestLabels = useUiLabelTree(sourceUiLabels.clinicalTermRequest);
     const { translated: termRequestSendingLabel } = useTranslation({ text: labels.clinicalTermRequest.sending, targetLang, translationKey: "clinicalTermRequest.sending" });
     const { translated: termRequestActionLabel } = useTranslation({ text: labels.clinicalTermRequest.action, targetLang, translationKey: "clinicalTermRequest.action" });
     const { translated: termRequestPrivacyLabel } = useTranslation({ text: labels.clinicalTermRequest.privacy, targetLang, translationKey: "clinicalTermRequest.privacy" });
-    const { translated: diabetesModalButtonLabel } = useTranslation({ text: "Parametres diabete type 2", targetLang });
+    const diabetesModalButtonLabel = fieldLabels.diabetesParametersButton;
     const { translated: diabetesModalTitleLabel } = useTranslation({ text: "Parametres cliniques supplementaires - Diabete Type 2", targetLang });
     const { translated: diabetesModalDescriptionLabel } = useTranslation({ text: "Ajustez ces parametres pour enrichir l'analyse sans alourdir les donnees cliniques principales.", targetLang });
     const { translated: cardiovascularRiskLabel } = useTranslation({ text: "Risque cardiovasculaire", targetLang });
@@ -1854,9 +1855,9 @@ export function ClinicalForm({
                         }
                     />
                     {showSymptomSuggestions && (
-                        <div className="rounded border border-blue-200 bg-blue-50 p-3" aria-label={labels.clinicalTermRequest.suggestionsTitle}>
-                            <p className="mb-2 text-xs font-medium text-blue-950">{labels.clinicalTermRequest.suggestionsTitle}</p>
-                            {symptomSuggestionsError ? <p role="alert" className="text-xs text-red-700"><UiMessage message={symptomSuggestionsError} /></p> : symptomSuggestions.length === 0 ? <p className="text-xs text-gray-600">{labels.clinicalTermRequest.suggestionsLoading}</p> : visibleSymptomSuggestions.length === 0 ? <p className="text-xs text-gray-600">{labels.clinicalTermRequest.suggestionsEmpty}</p> : <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">{visibleSymptomSuggestions.map((suggestion) => { const displayLabel = displaySymptomLabel(suggestion.canonicalValue, targetLang); return <button key={suggestion.canonicalValue} type="button" onClick={() => addSymptomSuggestion(displayLabel)} className="rounded border border-blue-300 bg-white px-2 py-1 text-xs text-blue-800 hover:bg-blue-100">{displayLabel}</button>; })}</div>}
+                        <div className="rounded border border-blue-200 bg-blue-50 p-3" aria-label={termRequestLabels.suggestionsTitle}>
+                            <p className="mb-2 text-xs font-medium text-blue-950">{termRequestLabels.suggestionsTitle}</p>
+                            {symptomSuggestionsError ? <p role="alert" className="text-xs text-red-700"><UiMessage message={symptomSuggestionsError} /></p> : symptomSuggestions.length === 0 ? <p className="text-xs text-gray-600">{termRequestLabels.suggestionsLoading}</p> : visibleSymptomSuggestions.length === 0 ? <p className="text-xs text-gray-600">{termRequestLabels.suggestionsEmpty}</p> : <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">{visibleSymptomSuggestions.map((suggestion) => { const displayLabel = displaySymptomLabel(suggestion.canonicalValue, targetLang); return <button key={suggestion.canonicalValue} type="button" onClick={() => addSymptomSuggestion(displayLabel)} className="rounded border border-blue-300 bg-white px-2 py-1 text-xs text-blue-800 hover:bg-blue-100">{displayLabel}</button>; })}</div>}
                         </div>
                     )}
                     {user?.role === "MEDECIN" && listInputs.symptoms.trim() && <p className="text-xs text-gray-500">{termRequestPrivacyLabel}</p>}

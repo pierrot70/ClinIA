@@ -1,7 +1,7 @@
 import crypto from "crypto";
 
 // Keep historical results intact while separating newly generated English content.
-export const CLINICAL_CONTENT_POLICY_VERSION = "english-reference-v1";
+export const CLINICAL_CONTENT_POLICY_VERSION = "english-reference-v3";
 
 export function makeDiagnosisFingerprint({ diagnosis, patient, model }) {
     return crypto

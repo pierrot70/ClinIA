@@ -30,7 +30,7 @@ function TreatmentRow({
         <tr className="border">
             <td dir="auto" translate="no" className="p-3 border font-semibold">{treatment.name}</td>
             <td dir="auto" translate="no" className="p-3 border">{treatment.justification}</td>
-            <td dir="auto" translate="no" className="p-3 border text-red-600">{contraindications?.trim() ? contraindications : t(fixed.noneListed)}</td>
+            <td className="p-3 border text-red-600">{contraindications?.trim() ? <span dir="auto" translate="no">{contraindications}</span> : t(fixed.noneListed)}</td>
         </tr>
     );
 }
