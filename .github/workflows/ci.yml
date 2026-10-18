@@ -11,7 +11,31 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Classify changes and check documentation
+    runs-on: ubuntu-latest
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test CI routing and documentation checks
+        run: python3 -m unittest discover -s scripts -p 'test_*documentation.py'
+      - name: Test change classification
+        run: python3 -m unittest discover -s scripts -p 'test_classify_ci_changes.py'
+      - name: Classify the complete event diff
+        id: classify
+        run: python3 scripts/classify-ci-changes.py --output /tmp/clinia-ci-changes.json
+      - name: Check Markdown format and local links
+        run: python3 scripts/check-documentation.py --changes /tmp/clinia-ci-changes.json
+
   backend:
+    needs: changes
+    if: ${{ always() }}
     name: Backend tests and audit
     runs-on: ubuntu-latest
     env:
@@ -23,23 +47,43 @@ jobs:
       run:
         working-directory: backend
     steps:
+      - name: Require successful routing and documentation validation
+        working-directory: ${{ github.workspace }}
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+        run: |
+          test "$CHANGES_RESULT" = success
+          case "$DOCS_ONLY" in
+            true) echo "Documentation checks passed; application tests are not required." ;;
+            false) echo "Application validation required." ;;
+            *) echo "Invalid classification output." >&2; exit 1 ;;
+          esac
       - uses: actions/checkout@v4
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
       - uses: actions/setup-node@v4
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: bash ../scripts/ci-local.sh backend install
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
       - run: bash ../scripts/ci-local.sh backend audit
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
       - run: bash ../scripts/ci-local.sh backend tests
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
       - name: Authentication service isolation (regression seed 3)
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
         run: bash ../scripts/ci-local.sh backend reauth
       - name: Prepare disposable MongoDB integration image
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
         run: bash ../scripts/ci-local.sh backend mongo
       - name: Disposable MongoDB integration (email quota and booking concurrency)
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
         run: bash ../scripts/ci-local.sh backend integration
       - name: Archive minimized validation evidence (also on failure)
-        if: always()
+        if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.docs_only == 'false' }}
         uses: actions/upload-artifact@v4
         with:
           name: reception-validation-${{ github.sha }}
@@ -48,21 +92,42 @@ jobs:
           retention-days: 30
 
   frontend:
+    needs: changes
+    if: ${{ always() }}
     name: Frontend tests, build and audit
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
     steps:
+      - name: Require successful routing and documentation validation
+        working-directory: ${{ github.workspace }}
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+        run: |
+          test "$CHANGES_RESULT" = success
+          case "$DOCS_ONLY" in
+            true) echo "Documentation checks passed; application tests are not required." ;;
+            false) echo "Application validation required." ;;
+            *) echo "Invalid classification output." >&2; exit 1 ;;
+          esac
       - uses: actions/checkout@v4
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
       - uses: actions/setup-node@v4
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: bash ../scripts/ci-local.sh frontend install
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
       - run: bash ../scripts/ci-local.sh frontend audit
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
       - name: TypeScript type check
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
         run: bash ../scripts/ci-local.sh frontend typecheck
       - run: bash ../scripts/ci-local.sh frontend tests
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
       - run: bash ../scripts/ci-local.sh frontend build
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
