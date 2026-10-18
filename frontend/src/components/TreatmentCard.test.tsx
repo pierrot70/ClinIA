@@ -66,7 +66,7 @@ describe("TreatmentCard", () => {
         expect(screen.getByText("Base sur des donnees simulees")).toBeInTheDocument();
     });
 
-    it("never exposes known French scenario content when English is selected", () => {
+    it("preserves historical source content when English UI is selected", () => {
         render(
             <MemoryRouter>
                 <TreatmentCard
@@ -88,11 +88,11 @@ describe("TreatmentCard", () => {
             </MemoryRouter>
         );
 
-        expect(screen.getByText("Metformin")).toBeInTheDocument();
-        expect(screen.getByText("Clinical reassessment")).toBeInTheDocument();
+        expect(screen.getByText("Metformine")).toBeInTheDocument();
+        expect(screen.getByText("Reevaluation clinique")).toBeInTheDocument();
         expect(
-            screen.getByText(/May be reasonable when glycemic control is adequate/)
+            screen.getByText(/Peut etre raisonnable si le controle glycemique/)
         ).toBeInTheDocument();
-        expect(screen.queryByText(/Peut etre raisonnable/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/May be reasonable/)).not.toBeInTheDocument();
     });
 });

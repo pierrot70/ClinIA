@@ -24,9 +24,9 @@ describe("clinical demo scenarios", () => {
             },
         });
 
-        expect(scenario.treatments[0]?.name).toBe("Metformine");
+        expect(scenario.treatments[0]?.name).toBe("Metformin");
         expect(scenario.treatments.map((item) => item.name)).toContain(
-            "Reevaluation d'une option GLP-1"
+            "Reassessment of a GLP-1 option"
         );
         expect(scenario.treatments.map((item) => item.name)).not.toContain("Amlodipine");
         expect(scenario.relevanceByAgeChart?.ageBuckets).toEqual([
@@ -38,7 +38,7 @@ describe("clinical demo scenarios", () => {
         ]);
         expect(
             scenario.relevanceByAgeChart?.series.find(
-                (item) => item.name === "Metformine"
+                (item) => item.name === "Metformin"
             )?.values
         ).toEqual([5, 5, 5, 4, 4]);
         expect(scenario.relevanceByAgeChart?.sources).toHaveLength(4);
@@ -79,21 +79,21 @@ describe("clinical demo scenarios", () => {
         });
 
         expect(frailScenario.relevanceByAgeChart?.subtitle).toContain(
-            "profil plus age et fragile"
+            "older, frail profile"
         );
         expect(
             stableScenario.relevanceByAgeChart?.series.find(
-                (item) => item.name === "Poursuite prudente de la strategie actuelle"
+                (item) => item.name === "Cautious continuation of the current strategy"
             )?.values
         ).toEqual([2, 2, 3, 4, 4]);
         expect(
             frailScenario.relevanceByAgeChart?.series.find(
-                (item) => item.name === "Poursuite prudente de la strategie actuelle"
+                (item) => item.name === "Cautious continuation of the current strategy"
             )?.values
         ).toEqual([2, 2, 3, 4, 5]);
         expect(
             frailScenario.relevanceByAgeChart?.series.find(
-                (item) => item.name === "Metformine"
+                (item) => item.name === "Metformin"
             )?.values
         ).toEqual([5, 5, 4, 3, 2]);
     });
@@ -114,17 +114,42 @@ describe("clinical demo scenarios", () => {
         });
 
         expect(scenario.relevanceByAgeChart?.subtitle).toContain(
-            "profil cardio-renal a haut risque"
+            "high-risk cardiorenal profile"
         );
         expect(
             scenario.relevanceByAgeChart?.series.find(
-                (item) => item.name === "Inhibiteur SGLT2"
+                (item) => item.name === "SGLT2 inhibitor"
             )?.values
         ).toEqual([3, 4, 5, 5, 5]);
         expect(
             scenario.relevanceByAgeChart?.series.find(
-                (item) => item.name === "Poursuite prudente de la strategie actuelle"
+                (item) => item.name === "Cautious continuation of the current strategy"
             )?.values
         ).toEqual([1, 2, 2, 3, 3]);
+    });
+    it("preserves matching and chart values for equivalent English and French contexts", () => {
+        const french = getClinicalDemoScenario({ diagnosis: "Diabete de type 2", age: 62,
+            diabetes_context: { cardiovascular_risk: "Tres eleve", renal_function: "Reduction moderee a importante", fragility: "Faible", tolerance: "Bonne tolerance", glycemic_goals: "Individualises" } });
+        const english = getClinicalDemoScenario({ diagnosis: "Type 2 diabetes", age: 62,
+            diabetes_context: { cardiovascular_risk: "Very high", renal_function: "Moderate to severe reduction", fragility: "Low", tolerance: "Well tolerated", glycemic_goals: "Individualized" } });
+        expect(english).toEqual(french);
+        expect(getClinicalDemoScenario({ diagnosis: "Type 2 diabetes", age: 60,
+            diabetes_context: { fragility: "High", tolerance: "Limited", cardiovascular_risk: "High", renal_function: "Preserved", glycemic_goals: "Individualized" } }).relevanceByAgeChart?.subtitle).toContain("older, frail profile");
+    });
+
+    it("keeps simulated English content and safety qualifiers across diagnoses", () => {
+        for (const diagnosis of ["Hypertension", "Cataract", "Gastric cancer", "Infectious mononucleosis", "Major depressive disorder", "Type 2 diabetes"]) {
+            const scenario = getClinicalDemoScenario({ diagnosis });
+            expect(scenario.questions.every(({ answer }) => answer.startsWith("Simulated data:"))).toBe(true);
+            expect(scenario.treatments.every(({ details }) => details.startsWith("Simulated data:"))).toBe(true);
+        }
+        const diabetes = getClinicalDemoScenario({ diagnosis: "Type 2 diabetes" });
+        expect(diabetes.treatments.find(({id}) => id === "glp1-review")?.details).toContain("without automatically replacing metformin or the physician's clinical judgment");
+        expect(diabetes.relevanceByAgeChart?.subtitle).toContain("Does not represent a quantitative measure of efficacy");
+    });
+    it("does not classify low frailty as a frail profile from an English substring", () => {
+        const scenario = getClinicalDemoScenario({ diagnosis: "Type 2 diabetes", age: 60,
+            diabetes_context: { fragility: "Low frailty", tolerance: "Well tolerated", cardiovascular_risk: "Moderate", renal_function: "Preserved", glycemic_goals: "Individualized" } });
+        expect(scenario.relevanceByAgeChart?.subtitle).not.toContain("older, frail profile");
     });
 });

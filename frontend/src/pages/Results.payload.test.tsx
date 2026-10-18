@@ -115,7 +115,7 @@ describe("Results payload forwarding", () => {
       expect(analyzeMock).toHaveBeenCalledWith({
         age: 55,
         sex: "male",
-        symptoms: ["Hypertension essentielle"],
+        symptoms: ["Essential hypertension"],
         medical_history: [],
         current_medications: [],
         forceReal: false,

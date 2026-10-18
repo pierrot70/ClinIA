@@ -29,7 +29,7 @@ vi.mock("./ClinicalRelevanceByAgeChart", () => ({
 }));
 
 describe("ClinicalDemoResult", () => {
-    it("passes the selected locale to contextual questions after switching from English to Spanish", () => {
+    it("keeps English clinical questions while UI switches from English to Spanish", () => {
         const data = { summary: "Synthetic summary", treatments: [{ name: "Inhibiteur SGLT2" }], questions: [] };
         const view = (locale: string) => <HomeI18nContext.Provider value={{ locale } as any}><ClinicalDemoResult demoData={data as any} /></HomeI18nContext.Provider>;
         const { rerender } = render(view("en-CA"));
@@ -37,7 +37,7 @@ describe("ClinicalDemoResult", () => {
         expect(captureQuestionCard.mock.lastCall![0].language).toBe("en-CA");
         rerender(view("es"));
         expect(screen.getByText("Preguntas clínicas contextuales")).toBeInTheDocument();
-        expect(captureQuestionCard.mock.lastCall![0]).toMatchObject({ language: "es", question: "¿Por qué Inhibiteur SGLT2 destaca como opción para discutir?" });
+        expect(captureQuestionCard.mock.lastCall![0]).toMatchObject({ language: "es", question: "Why does Inhibiteur SGLT2 stand out as an option to discuss?" });
         expect(screen.queryByText("Contextual clinical questions")).not.toBeInTheDocument();
     });
 
@@ -227,10 +227,10 @@ describe("ClinicalDemoResult", () => {
             screen.getByText("Questions cliniques contextuelles")
         ).toBeInTheDocument();
         expect(
-            screen.getByText("Quel est le profil clinique principal retenu ici ?")
+            screen.getByText("What is the main clinical profile identified here?")
         ).toBeInTheDocument();
         expect(
-            screen.getByText(/Pourquoi Inhibiteur SGLT2 ressort-il comme option à discuter/)
+            screen.getByText(/Why does Inhibiteur SGLT2 stand out as an option to discuss/)
         ).toBeInTheDocument();
         expect(
             screen.queryByText("Questions fréquentes (simulation)")

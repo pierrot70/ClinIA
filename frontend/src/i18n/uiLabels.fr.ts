@@ -15,6 +15,7 @@ export const UI_LABELS_FR = {
         correctedReplay: "Analyse relancee avec les parametres corriges.",
     },
     residualClinicalUi: {
+        englishSourceNotice: "Le contenu médical de référence et les réponses simulées sont rédigés en anglais et affichés sans traduction.",
         proposedOptions: "Options thérapeutiques proposées",
         treatment: "Traitement",
         rationale: "Justification",

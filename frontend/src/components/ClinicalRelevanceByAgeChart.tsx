@@ -11,8 +11,6 @@ import {
   YAxis,
 } from "recharts";
 import ClinicalReferenceList from "./ClinicalReferenceList";
-import { useTranslation } from "../hooks/useTranslation";
-import { shouldHideFrenchSourceInEnglish } from "../i18n/clinicalContentEnglish";
 
 type ClinicalRelevanceLevel = 1 | 2 | 3 | 4 | 5;
 
@@ -45,23 +43,6 @@ const SERIES_COLORS = [
   "#65a30d",
 ];
 
-const ENGLISH_CHART_LABELS: Record<string, string> = {
-  [labels.componentUi.faiblePertinence]: "Low relevance",
-  [labels.componentUi.aConsiderer]: "Consider",
-  [labels.componentUi.pertinenceModeree]: "Moderate relevance",
-  [labels.componentUi.souventPertinente]: "Often relevant",
-  [labels.componentUi.pertinenceContextuelleElevee]: "High contextual relevance",
-  "Metformine": "Metformin",
-  [labels.componentUi.poursuitePrudenteDeLaStrategieActuelle]: "Careful continuation of the current strategy",
-  [labels.componentUi.inhibiteurSGLT2]: "SGLT2 inhibitor",
-  [labels.componentUi.optionGLP1]: "GLP-1 option",
-  [labels.componentUi.modeDeVie]: "Lifestyle measures",
-};
-
-function displayChartLabel(value: string, language: "fr" | "en") {
-  return language === "en" ? ENGLISH_CHART_LABELS[value] || value : value;
-}
-
 const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = ({
   title,
   subtitle,
@@ -73,32 +54,13 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
   language = "fr",
 }) => {
     const { locale: uiLocale, t } = useUiLabels(language);
-  const english = language === "en";
-  const titleTranslation = useTranslation({ text: title, targetLang: language });
-  const subtitleTranslation = useTranslation({ text: subtitle, targetLang: language });
-  const interpretationTranslation = useTranslation({
-    text: interpretationNote,
-    targetLang: language,
-  });
-  const safeEnglish = (source: string, translated: string, loading: boolean, fallback: string) =>
-    english && (loading || translated === source || shouldHideFrenchSourceInEnglish(translated))
-      ? fallback
-      : translated;
-  const displayedTitle = safeEnglish(title, titleTranslation.translated, titleTranslation.loading, "Relative clinical relevance by age and context");
-  const displayedSubtitle = safeEnglish(subtitle, subtitleTranslation.translated, subtitleTranslation.loading, "Contextual ClinIA synthesis based on recognized guidance.");
-  const displayedInterpretationNote = safeEnglish(
-    interpretationNote,
-    interpretationTranslation.translated,
-    interpretationTranslation.loading,
-    "This visual supports contextual clinical interpretation and does not replace physician judgment."
-  );
   const [highlightedSeries, setHighlightedSeries] = useState<string | null>(null);
 
   const chartData = ageBuckets.map((ageBucket, index) => {
     const row: Record<string, string | number> = { ageBucket };
 
     for (const item of series) {
-      row[displayChartLabel(item.name, language)] = item.values[index];
+      row[item.name] = item.values[index];
     }
 
     return row;
@@ -111,10 +73,10 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
   return (
     <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
       <div className="flex flex-col gap-2 mb-4">
-        <h2 className="text-sm font-semibold text-gray-900">{displayedTitle}</h2>
-        <p className="text-xs text-gray-600">{displayedSubtitle}</p>
-        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          {displayedInterpretationNote}
+        <h2 dir="auto" translate="no" className="text-sm font-semibold text-gray-900">{title}</h2>
+        <p dir="auto" translate="no" className="text-xs text-gray-600">{subtitle}</p>
+        <p dir="auto" translate="no" className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          {interpretationNote}
         </p>
       </div>
 
@@ -135,7 +97,7 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
               domain={[1, 5]}
               ticks={[1, 2, 3, 4, 5]}
               tickFormatter={(value) =>
-                t(levelLabels[value as ClinicalRelevanceLevel])
+                levelLabels[value as ClinicalRelevanceLevel]
               }
               width={148}
               tick={{ fontSize: 11, fill: "#4b5563" }}
@@ -144,7 +106,7 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
             />
             <Tooltip
               formatter={(value) =>
-                t(levelLabels[value as ClinicalRelevanceLevel])
+                levelLabels[value as ClinicalRelevanceLevel]
               }
               labelFormatter={(label) => `${t(labels.componentUi.age)}: ${label}`}
               contentStyle={{
@@ -157,7 +119,7 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
               <Line
                 key={item.name}
                 type="monotone"
-                dataKey={displayChartLabel(item.name, language)}
+                dataKey={item.name}
                 stroke={SERIES_COLORS[index % SERIES_COLORS.length]}
                 strokeWidth={highlightedSeries === item.name ? 4 : 2.5}
                 strokeOpacity={
@@ -196,7 +158,7 @@ const ClinicalRelevanceByAgeChart: React.FC<ClinicalRelevanceByAgeChartProps> = 
                 style={{ backgroundColor: SERIES_COLORS[index % SERIES_COLORS.length] }}
                 aria-hidden="true"
               />
-              {displayChartLabel(item.name, language)}
+              {item.name}
             </button>
           );
         })}

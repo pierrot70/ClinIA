@@ -1,3 +1,5 @@
+import { CLINICAL_COMPARISON_CONTENT } from "../i18n/clinicalComparisonContent";
+import { ClinicalContentNotice } from "./clinical/ClinicalContentNotice";
 import React, { useContext, useState } from "react";
 import AITreatmentTable from "./AITreatmentTable";
 import TreatmentCard from "./TreatmentCard";
@@ -12,14 +14,10 @@ import { clinicalReviewLabels } from "../i18n/clinicalReviewLabels";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { getClinicalResultStrings } from "../i18n/clinicalResultStrings";
 import { labels } from "../i18n/uiLabels";
-import { useTranslation } from "../hooks/useTranslation";
 import { UiMessage } from "./i18n/UiMessage";
+import { useTranslation } from "../hooks/useTranslation";
 import { useUiLabels } from "../hooks/useUiLabels";
 import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
-import {
-  getImmediateEnglishClinicalContent,
-  shouldHideFrenchSourceInEnglish,
-} from "../i18n/clinicalContentEnglish";
 
 // Type hybride pour compatibilité ascendante
 type ClinicalDemoResultData = Partial<ClinicalAnalysis> & {
@@ -122,7 +120,7 @@ function SectionReferences({
   );
 }
 
-function TranslatedContentText({
+function SourceContentText({
   text,
   language,
   className,
@@ -131,24 +129,15 @@ function TranslatedContentText({
   language: "fr" | "en";
   className?: string;
 }) {
-  const { t } = useUiLabels(language);
   const sourceText = typeof text === "string" ? text : "";
-  const translation = useTranslation({ text: sourceText, targetLang: language });
-  const translated =
-    language === "en" &&
-    (translation.loading ||
-      translation.translated === sourceText ||
-      shouldHideFrenchSourceInEnglish(translation.translated))
-      ? getImmediateEnglishClinicalContent(sourceText) || t(UI_LABELS_FR.residualClinicalUi.detailsInSource)
-      : translation.translated;
 
   if (sourceText) {
-    return <p className={className}>{translated}</p>;
+    return <p dir="auto" translate="no" className={className}>{sourceText}</p>;
   }
 
   if (text && typeof text === "object") {
     return (
-      <pre className={className}>
+      <pre dir="auto" translate="no" className={className}>
         {JSON.stringify(text, null, 2)}
       </pre>
     );
@@ -157,26 +146,17 @@ function TranslatedContentText({
   return null;
 }
 
-function TranslatedContentSpan({
+function SourceContentSpan({
   text,
   language,
 }: {
   text: unknown;
   language: "fr" | "en";
 }) {
-  const { t } = useUiLabels(language);
   const sourceText = typeof text === "string" ? text : "";
-  const translation = useTranslation({ text: sourceText, targetLang: language });
-  const translated =
-    language === "en" &&
-    (translation.loading ||
-      translation.translated === sourceText ||
-      shouldHideFrenchSourceInEnglish(translation.translated))
-      ? getImmediateEnglishClinicalContent(sourceText) || t(UI_LABELS_FR.residualClinicalUi.detailsInSource)
-      : translation.translated;
 
   if (sourceText) {
-    return <>{translated}</>;
+    return <span dir="auto" translate="no">{sourceText}</span>;
   }
 
   return text && typeof text === "object" ? <>{JSON.stringify(text)}</> : null;
@@ -189,23 +169,10 @@ function SuggestedTreatmentDescription({
   treatmentName: string;
   language: "fr" | "en";
 }) {
-  const { t } = useUiLabels(language);
-  const nameTranslation = useTranslation({
-    text: treatmentName,
-    targetLang: language,
-  });
-  const displayedName =
-    language === "en" &&
-    (nameTranslation.loading ||
-      nameTranslation.translated === treatmentName ||
-      shouldHideFrenchSourceInEnglish(nameTranslation.translated))
-      ? getImmediateEnglishClinicalContent(treatmentName) || t(UI_LABELS_FR.residualClinicalUi.clinicalOption)
-      : nameTranslation.translated;
-
   return (
     <>
-      <span className="font-semibold">{displayedName}</span>
-      {t(UI_LABELS_FR.residualClinicalUi.prioritySuffix)}
+      <span dir="auto" translate="no" className="font-semibold">{treatmentName}</span>
+      <span lang="en" translate="no">{CLINICAL_COMPARISON_CONTENT.suggestedTreatmentSuffix}</span>
     </>
   );
 }
@@ -244,6 +211,18 @@ function truncateText(value: string, maxLength = 220) {
   }
 
   return `${value.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+function getClinicalResultEnglishQuestion(source: string): string {
+  const fixed = UI_LABELS_FR.residualClinicalUi;
+  const english: Record<string, string> = {
+    [fixed.mainProfileQuestion]: "What is the main clinical profile identified here?",
+    [fixed.optionQuestion]: "Why does {name} stand out as an option to discuss?",
+    [fixed.monitoringQuestion]: "Which monitoring points should be considered?",
+    [fixed.contraindicationsQuestion]: "Which contraindications should be considered?",
+    [fixed.optionContext]: "Review this option in the clinical context provided.",
+  };
+  return english[source] ?? source;
 }
 
 function buildDynamicQuestions({
@@ -380,7 +359,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   const dynamicQuestions = buildDynamicQuestions({
     summary,
     treatments: normalizedTreatments as Array<Record<string, any>>,
-    t,
+    t: (source: string) => getClinicalResultEnglishQuestion(source),
   });
   const renderedQuestions = dynamicQuestions.length > 0 ? dynamicQuestions : normalizedQuestions;
 
@@ -393,6 +372,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
 
     return (
       <div className="space-y-6">
+            <ClinicalContentNotice />
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-6 rounded-xl text-center">
           <h2 className="text-lg font-semibold mb-2">{t(UI_LABELS_FR.residualClinicalUi.analysisErrorTitle)}</h2>
           <p className="mb-2"><UiMessage message={error} /></p>
@@ -440,11 +420,12 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   if (normalizedTreatments.length === 0 && hasIADetails) {
     return (
       <div className="space-y-6">
+        <ClinicalContentNotice />
         <ClinicalSafetySections alternatives={demoData?.alternatives} redFlags={demoData?.red_flags} />
         <ResultAccordion title={summarySectionTitle} hint={summarySectionHint} defaultOpen={false}>
           <SubmittedClinicalContext context={patientContext} locale={targetLang} />
           <h2 className="text-lg font-semibold mb-2">{patientSummaryLabel}</h2>
-          <TranslatedContentText
+          <SourceContentText
             text={summary}
             language={contentLanguage}
             className="text-gray-700 text-sm mb-4"
@@ -452,7 +433,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
           {clinical_summary && (
             <div className="bg-gray-50 border rounded-lg p-3 mb-2">
               <h3 className="font-semibold text-sm mb-1">{contentStrings.aiClinicalSummary}</h3>
-              <TranslatedContentText
+              <SourceContentText
                 text={clinical_summary}
                 language={contentLanguage}
                 className="text-xs text-gray-700 whitespace-pre-wrap"
@@ -477,7 +458,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                 <h3 className="font-semibold text-sm mb-1">{contentStrings.recommendations}</h3>
                 {typeof recommendations === 'string' && (
                   <div className="text-xs text-gray-800 mb-1">
-                    <TranslatedContentSpan text={recommendations} language={contentLanguage} />
+                    <SourceContentSpan text={recommendations} language={contentLanguage} />
                   </div>
                 )}
                 {Array.isArray(recommendations) && (
@@ -485,14 +466,14 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                     {recommendations.map((item: any, i: number) => (
                       <li key={i}>
                         {typeof item === 'string'
-                          ? <TranslatedContentSpan text={item} language={contentLanguage} />
+                          ? <SourceContentSpan text={item} language={contentLanguage} />
                           : JSON.stringify(item)}
                       </li>
                     ))}
                   </ul>
                 )}
                 {typeof recommendations === 'object' && !Array.isArray(recommendations) && recommendations !== null && (
-                  <pre className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(recommendations, null, 2)}</pre>
+                  <pre dir="auto" translate="no" className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(recommendations, null, 2)}</pre>
                 )}
               </div>
             )}
@@ -502,7 +483,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                 <h3 className="font-semibold text-sm mb-1">{contentStrings.initialEvaluation}</h3>
                 {typeof initial_evaluation_recommendations === 'string' && (
                   <div className="text-xs text-gray-800 mb-1">
-                    <TranslatedContentSpan text={initial_evaluation_recommendations} language={contentLanguage} />
+                    <SourceContentSpan text={initial_evaluation_recommendations} language={contentLanguage} />
                   </div>
                 )}
                 {Array.isArray(initial_evaluation_recommendations) && (
@@ -510,14 +491,14 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                     {initial_evaluation_recommendations.map((item: any, i: number) => (
                       <li key={i}>
                         {typeof item === 'string'
-                          ? <TranslatedContentSpan text={item} language={contentLanguage} />
+                          ? <SourceContentSpan text={item} language={contentLanguage} />
                           : JSON.stringify(item)}
                       </li>
                     ))}
                   </ul>
                 )}
                 {typeof initial_evaluation_recommendations === 'object' && !Array.isArray(initial_evaluation_recommendations) && initial_evaluation_recommendations !== null && (
-                  <pre className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(initial_evaluation_recommendations, null, 2)}</pre>
+                  <pre dir="auto" translate="no" className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(initial_evaluation_recommendations, null, 2)}</pre>
                 )}
               </div>
             )}
@@ -527,7 +508,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                 <h3 className="font-semibold text-sm mb-1">{contentStrings.treatmentOptions}</h3>
                 {typeof treatment_options === 'string' && (
                   <div className="text-xs text-gray-800 mb-1">
-                    <TranslatedContentSpan text={treatment_options} language={contentLanguage} />
+                    <SourceContentSpan text={treatment_options} language={contentLanguage} />
                   </div>
                 )}
                 {Array.isArray(treatment_options) && (
@@ -535,14 +516,14 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                     {treatment_options.map((item: any, i: number) => (
                       <li key={i}>
                         {typeof item === 'string'
-                          ? <TranslatedContentSpan text={item} language={contentLanguage} />
+                          ? <SourceContentSpan text={item} language={contentLanguage} />
                           : JSON.stringify(item)}
                       </li>
                     ))}
                   </ul>
                 )}
                 {typeof treatment_options === 'object' && !Array.isArray(treatment_options) && treatment_options !== null && (
-                  <pre className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(treatment_options, null, 2)}</pre>
+                  <pre dir="auto" translate="no" className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(treatment_options, null, 2)}</pre>
                 )}
               </div>
             )}
@@ -552,7 +533,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                 <h3 className="font-semibold text-sm mb-1">{contentStrings.followUpAndMonitoring}</h3>
                 {typeof follow_up_and_monitoring === 'string' && (
                   <div className="text-xs text-gray-800 mb-1">
-                    <TranslatedContentSpan text={follow_up_and_monitoring} language={contentLanguage} />
+                    <SourceContentSpan text={follow_up_and_monitoring} language={contentLanguage} />
                   </div>
                 )}
                 {Array.isArray(follow_up_and_monitoring) && (
@@ -560,14 +541,14 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                     {follow_up_and_monitoring.map((item: any, i: number) => (
                       <li key={i}>
                         {typeof item === 'string'
-                          ? <TranslatedContentSpan text={item} language={contentLanguage} />
+                          ? <SourceContentSpan text={item} language={contentLanguage} />
                           : JSON.stringify(item)}
                       </li>
                     ))}
                   </ul>
                 )}
                 {typeof follow_up_and_monitoring === 'object' && !Array.isArray(follow_up_and_monitoring) && follow_up_and_monitoring !== null && (
-                  <pre className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(follow_up_and_monitoring, null, 2)}</pre>
+                  <pre dir="auto" translate="no" className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(follow_up_and_monitoring, null, 2)}</pre>
                 )}
               </div>
             )}
@@ -590,7 +571,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                 <div className="font-semibold text-xs text-blue-800 mb-1">{key.replace(/_/g, ' ')}</div>
                 {typeof value === 'string' && (
                   <div className="text-xs text-gray-800 mb-1">
-                    <TranslatedContentSpan text={value} language={contentLanguage} />
+                    <SourceContentSpan text={value} language={contentLanguage} />
                   </div>
                 )}
                 {Array.isArray(value) && (
@@ -598,14 +579,14 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                     {value.map((item: any, i: number) => (
                       <li key={i}>
                         {typeof item === 'string'
-                          ? <TranslatedContentSpan text={item} language={contentLanguage} />
+                          ? <SourceContentSpan text={item} language={contentLanguage} />
                           : JSON.stringify(item)}
                       </li>
                     ))}
                   </ul>
                 )}
                 {typeof value === 'object' && !Array.isArray(value) && value !== null && (
-                  <pre className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(value, null, 2)}</pre>
+                  <pre dir="auto" translate="no" className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(value, null, 2)}</pre>
                 )}
               </div>
             ))}
@@ -635,6 +616,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
 
   return (
     <div className="space-y-6">
+      <ClinicalContentNotice />
       <ClinicalSafetySections alternatives={demoData?.alternatives} redFlags={demoData?.red_flags} />
       <ResultAccordion title={summarySectionTitle} hint={summarySectionHint} defaultOpen={false}>
           <SubmittedClinicalContext context={patientContext} locale={targetLang} />
@@ -669,7 +651,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
             ) : null}
           </div>
         </div>
-        <TranslatedContentText
+        <SourceContentText
           text={summary}
           language={contentLanguage}
           className="text-gray-700 text-sm mb-4"
@@ -677,7 +659,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
         {clinical_summary && (
           <div className="bg-gray-50 border rounded-lg p-3 mb-2">
             <h3 className="font-semibold text-sm mb-1">{contentStrings.aiClinicalSummary}</h3>
-            <TranslatedContentText
+            <SourceContentText
               text={clinical_summary}
               language={contentLanguage}
               className="text-xs text-gray-700 whitespace-pre-wrap"
@@ -696,7 +678,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
               <h3 className="font-semibold text-sm mb-1">{contentStrings.recommendations}</h3>
               {typeof recommendations === 'string' && (
                 <div className="text-xs text-gray-800 mb-1">
-                  <TranslatedContentSpan text={recommendations} language={contentLanguage} />
+                  <SourceContentSpan text={recommendations} language={contentLanguage} />
                 </div>
               )}
               {Array.isArray(recommendations) && (
@@ -704,14 +686,14 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                   {recommendations.map((item: any, i: number) => (
                     <li key={i}>
                       {typeof item === 'string'
-                        ? <TranslatedContentSpan text={item} language={contentLanguage} />
+                        ? <SourceContentSpan text={item} language={contentLanguage} />
                         : JSON.stringify(item)}
                     </li>
                   ))}
                 </ul>
               )}
               {typeof recommendations === 'object' && !Array.isArray(recommendations) && recommendations !== null && (
-                <pre className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(recommendations, null, 2)}</pre>
+                <pre dir="auto" translate="no" className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(recommendations, null, 2)}</pre>
               )}
             </div>
           )}
@@ -720,7 +702,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
               <h3 className="font-semibold text-sm mb-1">{contentStrings.initialEvaluation}</h3>
               <ul className="list-disc pl-5 text-xs text-gray-800">
                 {initial_evaluation_recommendations.map((item: string, i: number) => (
-                  <li key={i}><TranslatedContentSpan text={item} language={contentLanguage} /></li>
+                  <li key={i}><SourceContentSpan text={item} language={contentLanguage} /></li>
                 ))}
               </ul>
             </div>
@@ -732,7 +714,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                 <div key={key} className="mb-2">
                   <div className="font-semibold text-xs text-emerald-800 mb-1">{key.replace(/_/g, ' ')}</div>
                   <div className="text-xs text-gray-800 mb-1">
-                    <TranslatedContentSpan
+                    <SourceContentSpan
                       text={String(value.recommendation || "")}
                       language={contentLanguage}
                     />
@@ -740,7 +722,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
                   {Array.isArray(value.details) && (
                     <ul className="list-disc pl-5 text-xs text-gray-800">
                       {value.details.map((d: string, j: number) => (
-                      <li key={j}><TranslatedContentSpan text={d} language={contentLanguage} /></li>
+                      <li key={j}><SourceContentSpan text={d} language={contentLanguage} /></li>
                       ))}
                     </ul>
                   )}
@@ -753,7 +735,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
               <h3 className="font-semibold text-sm mb-1">{contentStrings.followUpAndMonitoring}</h3>
               <ul className="list-disc pl-5 text-xs text-gray-800">
                 {follow_up_and_monitoring.map((item: string, i: number) => (
-                  <li key={i}><TranslatedContentSpan text={item} language={contentLanguage} /></li>
+                  <li key={i}><SourceContentSpan text={item} language={contentLanguage} /></li>
                 ))}
               </ul>
             </div>

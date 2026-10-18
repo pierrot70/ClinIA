@@ -1,11 +1,5 @@
 import React from "react";
 import { ChevronRight } from "lucide-react";
-import { useTranslation } from "../hooks/useTranslation";
-import { getSimulatedClinicalContent } from "../i18n/simulatedClinicalContent";
-import {
-  getImmediateEnglishClinicalContent,
-  shouldHideFrenchSourceInEnglish,
-} from "../i18n/clinicalContentEnglish";
 
 interface Props {
   question: string;
@@ -14,50 +8,17 @@ interface Props {
 }
 
 const QuestionCard: React.FC<Props> = ({ question, answer, language = "fr" }) => {
-  const questionTranslation = useTranslation({ text: question, targetLang: language });
-  const answerTranslation = useTranslation({ text: answer, targetLang: language });
-  const english = language.toLowerCase().split("-")[0] === "en";
-  const displayEnglishText = (
-    source: string,
-    translated: string,
-    fallback: string
-  ) => {
-    const immediate = getImmediateEnglishClinicalContent(source);
-    if (immediate) return immediate;
-    if (!shouldHideFrenchSourceInEnglish(source)) return source;
-    if (
-      translated !== source &&
-      !shouldHideFrenchSourceInEnglish(translated)
-    ) {
-      return translated;
-    }
-    return fallback;
-  };
-  const displayedQuestion = english
-    ? displayEnglishText(
-        question,
-        questionTranslation.translated,
-        "Additional clinical question"
-      )
-    : questionTranslation.translated;
-  const displayedAnswer = getSimulatedClinicalContent(answer, language) ?? (english
-    ? displayEnglishText(
-        answer,
-        answerTranslation.translated,
-        "Review the clinical details provided for this question."
-      )
-    : answerTranslation.translated);
 
   return (
     <details className="bg-white border border-gray-200 rounded-xl p-3 shadow-xs">
       <summary className="flex items-center justify-between gap-2 cursor-pointer">
-        <span className="text-sm font-medium text-gray-800">
-          {displayedQuestion}
+        <span dir="auto" translate="no" className="text-sm font-medium text-gray-800">
+          {question}
         </span>
         <ChevronRight className="w-4 h-4 text-gray-400 group-open:rotate-90 transition-transform" />
       </summary>
-      <div className="mt-2 text-sm text-gray-700">
-        {displayedAnswer}
+      <div dir="auto" translate="no" className="mt-2 text-sm text-gray-700">
+        {answer}
       </div>
     </details>
   );

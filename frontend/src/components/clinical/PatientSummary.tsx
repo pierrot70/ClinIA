@@ -29,7 +29,7 @@ export function PatientSummary({ summary }: { summary: any }) {
                     {t(labels.componentUi.clinique)}</button>
             </div>
 
-            <p className="text-sm text-gray-700">
+            <p dir="auto" translate="no" className="text-sm text-gray-700">
                 {mode === "plain"
                     ? summary.plain_language
                     : summary.clinical_language}

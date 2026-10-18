@@ -21,13 +21,13 @@ export function ClinicalSafetySections({ alternatives, redFlags, targetLang }: {
     return <>
         {flags.length > 0 && <section aria-label={labels.redFlags} className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-900">
             <h2 className="text-lg font-semibold">{labels.redFlags}</h2>
-            <ul className="mt-2 list-disc pl-5">{flags.map((flag, index) => <li key={index}>{flag}</li>)}</ul>
+            <ul className="mt-2 list-disc pl-5">{flags.map((flag, index) => <li dir="auto" translate="no" key={index}>{flag}</li>)}</ul>
         </section>}
         {options.length > 0 && <section aria-label={labels.alternatives} className="rounded-xl border border-gray-200 bg-white p-4">
             <h2 className="text-lg font-semibold">{labels.alternatives}</h2>
             <ul className="mt-2 space-y-3">{options.map((option, index) => <li key={index}>
-                <h3 className="font-medium">{option.name}</h3>
-                {typeof option.reason === "string" && option.reason.trim() && <p className="text-sm text-gray-700">{option.reason}</p>}
+                <h3 dir="auto" translate="no" className="font-medium">{option.name}</h3>
+                {typeof option.reason === "string" && option.reason.trim() && <p dir="auto" translate="no" className="text-sm text-gray-700">{option.reason}</p>}
             </li>)}</ul>
         </section>}
     </>;

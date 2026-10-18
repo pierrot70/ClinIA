@@ -1,3 +1,4 @@
+import { CLINICAL_COMPARISON_CONTENT } from "../i18n/clinicalComparisonContent";
 import { useUiLabelTree } from "../hooks/useUiLabels";
 import { UiMessage } from "../components/i18n/UiMessage";
 import { UiText } from "../components/i18n/UiText";
@@ -649,44 +650,44 @@ export function ClinicalAnalyzePage() {
 
         const profileParts: string[] = [
             payload.age >= 75
-                ? comparisonLabels.microSummaryAgeOlder
-                : comparisonLabels.microSummaryAgeYounger,
+                ? CLINICAL_COMPARISON_CONTENT.microSummaryAgeOlder
+                : CLINICAL_COMPARISON_CONTENT.microSummaryAgeYounger,
         ];
 
-        if (fragility.includes("elev")) {
-            profileParts.push(comparisonLabels.microSummaryFragilityHigh);
-        } else if (fragility.includes("faible")) {
-            profileParts.push(comparisonLabels.microSummaryFragilityLow);
+        if ((fragility.includes("elev") || ["high", "high frailty", "frail"].includes(fragility))) {
+            profileParts.push(CLINICAL_COMPARISON_CONTENT.microSummaryFragilityHigh);
+        } else if ((fragility.includes("faible") || ["low", "low frailty"].includes(fragility))) {
+            profileParts.push(CLINICAL_COMPARISON_CONTENT.microSummaryFragilityLow);
         } else {
-            profileParts.push(comparisonLabels.microSummaryFragilityNeutral);
+            profileParts.push(CLINICAL_COMPARISON_CONTENT.microSummaryFragilityNeutral);
         }
 
-        if (cardioRisk.includes("tres eleve") || cardioRisk.includes("haut")) {
-            profileParts.push(comparisonLabels.microSummaryCardioHigh);
-        } else if (cardioRisk.includes("modere") || cardioRisk.includes("eleve")) {
-            profileParts.push(comparisonLabels.microSummaryCardioModerate);
+        if (cardioRisk.includes("tres eleve") || cardioRisk.includes("haut") || ["high", "very high"].includes(cardioRisk)) {
+            profileParts.push(CLINICAL_COMPARISON_CONTENT.microSummaryCardioHigh);
+        } else if (cardioRisk.includes("modere") || cardioRisk.includes("eleve") || ["moderate", "moderate to high"].includes(cardioRisk)) {
+            profileParts.push(CLINICAL_COMPARISON_CONTENT.microSummaryCardioModerate);
         } else {
-            profileParts.push(comparisonLabels.microSummaryCardioNeutral);
+            profileParts.push(CLINICAL_COMPARISON_CONTENT.microSummaryCardioNeutral);
         }
 
-        let priority: string = comparisonLabels.microSummaryPriorityGlycemia;
-        if (cardioRisk.includes("tres eleve") || cardioRisk.includes("haut")) {
-            priority = comparisonLabels.microSummaryPriorityCardio;
-        } else if (fragility.includes("elev")) {
-            priority = comparisonLabels.microSummaryPriorityFrailty;
+        let priority: string = CLINICAL_COMPARISON_CONTENT.microSummaryPriorityGlycemia;
+        if (cardioRisk.includes("tres eleve") || cardioRisk.includes("haut") || ["high", "very high"].includes(cardioRisk)) {
+            priority = CLINICAL_COMPARISON_CONTENT.microSummaryPriorityCardio;
+        } else if ((fragility.includes("elev") || ["high", "high frailty", "frail"].includes(fragility))) {
+            priority = CLINICAL_COMPARISON_CONTENT.microSummaryPriorityFrailty;
         }
 
-        let caution: string = comparisonLabels.microSummaryCautionGeneral;
-        if (renalFunction.includes("reduction") || renalFunction.includes("moderee")) {
-            caution = comparisonLabels.microSummaryCautionRenal;
-        } else if (fragility.includes("elev")) {
-            caution = comparisonLabels.microSummaryCautionFrailty;
+        let caution: string = CLINICAL_COMPARISON_CONTENT.microSummaryCautionGeneral;
+        if (renalFunction.includes("reduction") || renalFunction.includes("moderee") || ["reduced", "moderately reduced"].includes(renalFunction)) {
+            caution = CLINICAL_COMPARISON_CONTENT.microSummaryCautionRenal;
+        } else if ((fragility.includes("elev") || ["high", "high frailty", "frail"].includes(fragility))) {
+            caution = CLINICAL_COMPARISON_CONTENT.microSummaryCautionFrailty;
         }
 
         return [
-            `${comparisonLabels.microSummaryProfilePrefix}: ${profileParts.join(", ")}`,
-            `${comparisonLabels.microSummaryPriorityPrefix}: ${priority}`,
-            `${comparisonLabels.microSummaryCautionPrefix}: ${caution}`,
+            `${CLINICAL_COMPARISON_CONTENT.microSummaryProfilePrefix}: ${profileParts.join(", ")}`,
+            `${CLINICAL_COMPARISON_CONTENT.microSummaryPriorityPrefix}: ${priority}`,
+            `${CLINICAL_COMPARISON_CONTENT.microSummaryCautionPrefix}: ${caution}`,
         ];
     }
 
@@ -697,30 +698,30 @@ export function ClinicalAnalyzePage() {
         const renalFunction =
             payload.diabetes_context?.renal_function?.toLowerCase() || "";
 
-        if (renalFunction.includes("reduction") || renalFunction.includes("moderee")) {
+        if (renalFunction.includes("reduction") || renalFunction.includes("moderee") || ["reduced", "moderately reduced"].includes(renalFunction)) {
             return {
-                icon: comparisonLabels.primaryAlertKidneyIcon,
-                message: comparisonLabels.primaryAlertKidney,
+                icon: CLINICAL_COMPARISON_CONTENT.primaryAlertKidneyIcon,
+                message: CLINICAL_COMPARISON_CONTENT.primaryAlertKidney,
             };
         }
 
-        if (fragility.includes("elev")) {
+        if ((fragility.includes("elev") || ["high", "high frailty", "frail"].includes(fragility))) {
             return {
-                icon: comparisonLabels.primaryAlertFrailtyIcon,
-                message: comparisonLabels.primaryAlertFrailty,
+                icon: CLINICAL_COMPARISON_CONTENT.primaryAlertFrailtyIcon,
+                message: CLINICAL_COMPARISON_CONTENT.primaryAlertFrailty,
             };
         }
 
-        if (cardioRisk.includes("tres eleve") || cardioRisk.includes("haut")) {
+        if (cardioRisk.includes("tres eleve") || cardioRisk.includes("haut") || ["high", "very high"].includes(cardioRisk)) {
             return {
-                icon: comparisonLabels.primaryAlertCardioIcon,
-                message: comparisonLabels.primaryAlertCardio,
+                icon: CLINICAL_COMPARISON_CONTENT.primaryAlertCardioIcon,
+                message: CLINICAL_COMPARISON_CONTENT.primaryAlertCardio,
             };
         }
 
         return {
-            icon: comparisonLabels.primaryAlertGeneralIcon,
-            message: comparisonLabels.primaryAlertGeneral,
+            icon: CLINICAL_COMPARISON_CONTENT.primaryAlertGeneralIcon,
+            message: CLINICAL_COMPARISON_CONTENT.primaryAlertGeneral,
         };
     }
 

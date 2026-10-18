@@ -4,19 +4,19 @@
       "hyperten",
       "hta"
     ],
-    "patient_summary": "Votre tension est élevée. Une combinaison de changements de mode de vie et de médicaments peut aider à la réduire.",
+    "patient_summary": "Your blood pressure is high. A combination of lifestyle changes and medication can help lower it.",
     "treatments": [
       {
-        "name": "Modifications du mode de vie",
-        "justification": "Toujours recommandé en première intention.",
+        "name": "Lifestyle changes",
+        "justification": "Always recommended as a first-line option.",
         "contraindications": [],
         "efficacy": 55
       },
       {
         "name": "Amlodipine",
-        "justification": "Calcium-bloquant efficace chez les patients plus âgés.",
+        "justification": "An effective calcium channel blocker in older patients.",
         "contraindications": [
-          "Hypotension sévère"
+          "Severe hypotension"
         ],
         "efficacy": 82
       }
@@ -28,27 +28,27 @@
       "glyc",
       "type 2"
     ],
-    "patient_summary": "Votre glycémie est élevée, ce qui indique un diabète de type 2. Hourra.",
+    "patient_summary": "This simulated example concerns elevated blood glucose in a type 2 diabetes context.",
     "treatments": [
       {
-        "name": "Metformine",
-        "justification": "Traitement de première intentions.",
+        "name": "Metformin",
+        "justification": "First-line treatment.",
         "contraindications": [
-          "Insuffisance rénale sévère"
+          "Severe renal impairment"
         ],
         "efficacy": 90
       },
       {
-        "name": "Poursuite prudente de la stratégie actuelle",
-        "justification": "Peut être raisonnable si le contrôle glycémique est adéquat et la tolérance bonne.",
+        "name": "Cautious continuation of the current strategy",
+        "justification": "May be reasonable if glycemic control is adequate and tolerability is good.",
         "contraindications": [],
         "efficacy": 68
       },
       {
-        "name": "Réévaluation d'une option GLP-1",
-        "justification": "Peut être discutée selon le poids, le risque cardio-métabolique et les objectifs glycémiques, sans remplacer le jugement clinique.",
+        "name": "Reassessment of a GLP-1 option",
+        "justification": "May be discussed based on weight, cardiometabolic risk and glycemic goals, without replacing clinical judgment.",
         "contraindications": [
-          "Prudence si contexte clinique incomplet"
+          "Caution if the clinical context is incomplete"
         ],
         "efficacy": 74
       }
@@ -60,13 +60,13 @@
       "ldl",
       "dyslip"
     ],
-    "patient_summary": "Votre taux de cholestérol LDL est trop élevé.",
+    "patient_summary": "Your LDL cholesterol level is too high.",
     "treatments": [
       {
-        "name": "Statines",
-        "justification": "Traitement de référence pour réduire les LDL.",
+        "name": "Statins",
+        "justification": "A standard treatment for lowering LDL.",
         "contraindications": [
-          "Maladie hépatique"
+          "Liver disease"
         ],
         "efficacy": 85
       }
@@ -78,21 +78,21 @@
       "cardia",
       "icc"
     ],
-    "patient_summary": "Vous présentez une insuffisance cardiaque. Certains traitements protègent le cœur et réduisent les hospitalisations.",
+    "patient_summary": "You have heart failure. Some treatments protect the heart and reduce hospitalizations.",
     "treatments": [
       {
-        "name": "Inhibiteurs SGLT2",
-        "justification": "Diminuent les hospitalisations et la mortalité.",
+        "name": "SGLT2 inhibitors",
+        "justification": "Reduce hospitalizations and mortality.",
         "contraindications": [
-          "Insuffisance rénale sévère"
+          "Severe renal impairment"
         ],
         "efficacy": 85
       },
       {
-        "name": "Bêtabloquants",
-        "justification": "Réduisent la charge de travail du cœur.",
+        "name": "Beta blockers",
+        "justification": "Reduce the heart's workload.",
         "contraindications": [
-          "Asthme sévère"
+          "Severe asthma"
         ],
         "efficacy": 75
       }
@@ -102,11 +102,11 @@
     "match": [
       "asth"
     ],
-    "patient_summary": "Vous présentez un asthme. Le traitement améliore la respiration.",
+    "patient_summary": "You have asthma. Treatment improves breathing.",
     "treatments": [
       {
-        "name": "Corticostéroïdes inhalés",
-        "justification": "Traitement de base de l'asthme.",
+        "name": "Inhaled corticosteroids",
+        "justification": "Baseline asthma treatment.",
         "contraindications": [],
         "efficacy": 90
       }
@@ -114,7 +114,7 @@
   },
   "_fallback": {
     "match": [],
-    "patient_summary": "Aucun mock spécifique trouvé. Exemple générique.",
+    "patient_summary": "No specific mock found. Generic example.",
     "treatments": []
   }
 }

@@ -1,4 +1,4 @@
-import { exampleConceptSource, localizeClinicalFormFieldLabel } from "../../i18n/clinicalFormFieldLabels";
+import { ClinicalContentNotice } from "./ClinicalContentNotice";
 import { useUiLabelTree } from "../../hooks/useUiLabels";
 import { UiMessage } from "../i18n/UiMessage";
 import { analysisStatusLabels } from "../../i18n/analysisStatusLabels";
@@ -108,11 +108,8 @@ function normalizeCatalogTerm(value: string | undefined) {
         .replace(/\s+/g, " ");
 }
 
-function displaySymptomLabel(canonicalValue: string, locale: string) {
-    if (!locale.startsWith("fr")) return canonicalValue;
-    return labels.clinicalSymptomLabels[
-        canonicalValue as keyof typeof labels.clinicalSymptomLabels
-    ] ?? canonicalValue;
+function displaySymptomLabel(canonicalValue: string, _locale: string) {
+    return canonicalValue;
 }
 
 function formatList(values: string[] | undefined) {
@@ -1137,8 +1134,7 @@ export function ClinicalForm({
         },
     ];
     function displayConcept(term: string = ""): string {
-        const source = exampleConceptSource(term);
-        return source ? localizeClinicalFormFieldLabel(source, targetLang) ?? term : term;
+        return term;
     }
     function presentExampleValue(value: string, field: "diagnosis" | "symptoms" | "medical_history" | "current_medications"): string {
         if (!isExamplePresentation) return value;
@@ -1282,6 +1278,7 @@ export function ClinicalForm({
 
     return (
         <div className="bg-white p-6 rounded border space-y-6">
+            <ClinicalContentNotice />
             {warningMessage && (
                 <div className="border border-orange-300 bg-orange-50 p-4 rounded text-orange-800">
                     <p className="font-medium">{incompleteDataLabel}</p>
@@ -1357,7 +1354,7 @@ export function ClinicalForm({
                                         {patientSearchLabel}
                                     </label>
                                     <InfoTooltip label={helpButtonLabel}>{patientSearchHelpLabel}</InfoTooltip>
-                                    <input
+                                    <input translate="no"
                                         id="clinical-patient-search"
                                         className="input w-full"
                                         value={patientSearch}
@@ -1500,7 +1497,7 @@ export function ClinicalForm({
                     <p className="text-xs text-gray-500">
                         {jsonImportHelpLabel}
                     </p>
-                    <textarea
+                    <textarea translate="no"
                         id="clinical-json-import"
                         maxLength={10000}
                         className="input min-h-36 w-full font-mono text-xs"
@@ -1539,7 +1536,7 @@ export function ClinicalForm({
             <Field highlight={isHighlighted("comparison_json_import")}>
                 <div className="space-y-3 rounded-xl border border-dashed border-sky-200 bg-sky-50/60 p-4">
                     <label className="flex items-center gap-3 text-sm font-medium text-gray-700">
-                        <input
+                        <input translate="no"
                             type="checkbox"
                             checked={comparisonModeEnabled}
                             onChange={(e) => {
@@ -1577,7 +1574,7 @@ export function ClinicalForm({
                             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                 <label className="space-y-1 text-sm text-gray-700">
                                     <span className="font-medium">{comparisonCaseOneLabel}</span>
-                                    <textarea
+                                    <textarea translate="no"
                                         className="input min-h-40 w-full font-mono text-xs"
                                         placeholder={jsonImportPlaceholderLabel}
                                         value={comparisonJsonCaseOne}
@@ -1591,7 +1588,7 @@ export function ClinicalForm({
                                 </label>
                                 <label className="space-y-1 text-sm text-gray-700">
                                     <span className="font-medium">{comparisonCaseTwoLabel}</span>
-                                    <textarea
+                                    <textarea translate="no"
                                         className="input min-h-40 w-full font-mono text-xs"
                                         placeholder={jsonImportPlaceholderLabel}
                                         value={comparisonJsonCaseTwo}
@@ -1642,7 +1639,7 @@ export function ClinicalForm({
                         <p id="clinical-age-range" className={ageOutOfRange ? "text-xs font-medium text-red-700" : "text-xs text-gray-500"}>
                             {ageRangeLabel} {ageOutOfRange ? rangeErrorLabel : ""}
                         </p>
-                        <input
+                        <input translate="no"
                             id="clinical-age"
                             type="number"
                             min={0}
@@ -1751,7 +1748,7 @@ export function ClinicalForm({
                     <p className="text-xs text-gray-500">
                         {diagnosisHelpLabel}
                     </p>
-                    <input
+                    <input translate="no"
                         id="clinical-diagnosis"
                         className="input w-full"
                         maxLength={160}
@@ -1775,7 +1772,7 @@ export function ClinicalForm({
                         <p id="clinical-weight-range" className={weightOutOfRange ? "text-xs font-medium text-red-700" : "text-xs text-gray-500"}>
                             {weightRangeLabel} {weightOutOfRange ? rangeErrorLabel : ""}
                         </p>
-                        <input
+                        <input translate="no"
                             id="clinical-weight"
                             type="number"
                             min={0.5}
@@ -1807,7 +1804,7 @@ export function ClinicalForm({
                         <p id="clinical-height-range" className={heightOutOfRange ? "text-xs font-medium text-red-700" : "text-xs text-gray-500"}>
                             {heightRangeLabel} {heightOutOfRange ? rangeErrorLabel : ""}
                         </p>
-                        <input
+                        <input translate="no"
                             id="clinical-height"
                             type="number"
                             min={20}
@@ -1844,7 +1841,7 @@ export function ClinicalForm({
                     <p className="text-xs text-gray-500">
                         {symptomsHelpLabel}
                     </p>
-                    <input
+                    <input translate="no"
                         id="clinical-symptoms"
                         className="input w-full"
                         maxLength={725}
@@ -1876,7 +1873,7 @@ export function ClinicalForm({
                     <p className="text-xs text-gray-500">
                         {medicalHistoryHelpLabel}
                     </p>
-                    <input
+                    <input translate="no"
                         id="clinical-medical-history"
                         className="input w-full"
                         maxLength={725}
@@ -1898,7 +1895,7 @@ export function ClinicalForm({
                     <p className="text-xs text-gray-500">
                         {medicationsHelpLabel}
                     </p>
-                    <input
+                    <input translate="no"
                         id="clinical-current-medications"
                         className="input w-full"
                         maxLength={725}
@@ -1939,7 +1936,7 @@ export function ClinicalForm({
                         <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
                             <label className="space-y-1 text-sm text-gray-700">
                                 <span className="font-medium">{weightLabel}</span>
-                                <input
+                                <input translate="no"
                                     type="number"
                                     className="input w-full"
                                     value={diabetesModalValues.weight}
@@ -1954,7 +1951,7 @@ export function ClinicalForm({
 
                             <label className="space-y-1 text-sm text-gray-700">
                                 <span className="font-medium">{cardiovascularRiskLabel}</span>
-                                <input
+                                <input translate="no"
                                     className="input w-full"
                                     value={diabetesModalValues.cardiovascular_risk}
                                     onChange={(e) =>
@@ -1968,7 +1965,7 @@ export function ClinicalForm({
 
                             <label className="space-y-1 text-sm text-gray-700">
                                 <span className="font-medium">{renalFunctionLabel}</span>
-                                <input
+                                <input translate="no"
                                     className="input w-full"
                                     value={diabetesModalValues.renal_function}
                                     onChange={(e) =>
@@ -1982,7 +1979,7 @@ export function ClinicalForm({
 
                             <label className="space-y-1 text-sm text-gray-700">
                                 <span className="font-medium">{fragilityLabel}</span>
-                                <input
+                                <input translate="no"
                                     className="input w-full"
                                     value={diabetesModalValues.fragility}
                                     onChange={(e) =>
@@ -1996,7 +1993,7 @@ export function ClinicalForm({
 
                             <label className="space-y-1 text-sm text-gray-700">
                                 <span className="font-medium">{toleranceLabel}</span>
-                                <input
+                                <input translate="no"
                                     className="input w-full"
                                     value={diabetesModalValues.tolerance}
                                     onChange={(e) =>
@@ -2010,7 +2007,7 @@ export function ClinicalForm({
 
                             <label className="space-y-1 text-sm text-gray-700">
                                 <span className="font-medium">{glycemicGoalsLabel}</span>
-                                <input
+                                <input translate="no"
                                     className="input w-full"
                                     value={diabetesModalValues.glycemic_goals}
                                     onChange={(e) =>
@@ -2061,7 +2058,7 @@ export function ClinicalForm({
                             <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <label className="space-y-1 text-sm text-gray-700">
                                     <span className="font-medium">{ageLabel}</span>
-                                    <input
+                                    <input translate="no"
                                         type="number"
                                         className="input w-full"
                                         value={comparisonCaseEditor.age}
@@ -2144,7 +2141,7 @@ export function ClinicalForm({
                                 </label>
                                 <label className="space-y-1 text-sm text-gray-700 md:col-span-2">
                                     <span className="font-medium">{diagnosisLabel}</span>
-                                    <input
+                                    <input translate="no"
                                         className="input w-full"
                                         value={comparisonCaseEditor.diagnosis}
                                         onChange={(e) =>
@@ -2158,7 +2155,7 @@ export function ClinicalForm({
                                 </label>
                                 <label className="space-y-1 text-sm text-gray-700 md:col-span-2">
                                     <span className="font-medium">{symptomsLabel}</span>
-                                    <input
+                                    <input translate="no"
                                         className="input w-full"
                                         value={comparisonCaseEditor.symptoms}
                                         onChange={(e) =>
@@ -2172,7 +2169,7 @@ export function ClinicalForm({
                                 </label>
                                 <label className="space-y-1 text-sm text-gray-700 md:col-span-2">
                                     <span className="font-medium">{medicalHistoryLabel}</span>
-                                    <input
+                                    <input translate="no"
                                         className="input w-full"
                                         value={comparisonCaseEditor.medical_history}
                                         onChange={(e) =>
@@ -2219,7 +2216,7 @@ export function ClinicalForm({
                                 </label>
                                 <label className="space-y-1 text-sm text-gray-700">
                                     <span className="font-medium">{cardiovascularRiskLabel}</span>
-                                    <input
+                                    <input translate="no"
                                         className="input w-full"
                                         value={comparisonCaseEditor.cardiovascular_risk}
                                         onChange={(e) =>
@@ -2236,7 +2233,7 @@ export function ClinicalForm({
                                 </label>
                                 <label className="space-y-1 text-sm text-gray-700">
                                     <span className="font-medium">{renalFunctionLabel}</span>
-                                    <input
+                                    <input translate="no"
                                         className="input w-full"
                                         value={comparisonCaseEditor.renal_function}
                                         onChange={(e) =>
@@ -2253,7 +2250,7 @@ export function ClinicalForm({
                                 </label>
                                 <label className="space-y-1 text-sm text-gray-700">
                                     <span className="font-medium">{fragilityLabel}</span>
-                                    <input
+                                    <input translate="no"
                                         className="input w-full"
                                         value={comparisonCaseEditor.fragility}
                                         onChange={(e) =>
@@ -2267,7 +2264,7 @@ export function ClinicalForm({
                                 </label>
                                 <label className="space-y-1 text-sm text-gray-700">
                                     <span className="font-medium">{toleranceLabel}</span>
-                                    <input
+                                    <input translate="no"
                                         className="input w-full"
                                         value={comparisonCaseEditor.tolerance}
                                         onChange={(e) =>
@@ -2281,7 +2278,7 @@ export function ClinicalForm({
                                 </label>
                                 <label className="space-y-1 text-sm text-gray-700 md:col-span-2">
                                     <span className="font-medium">{glycemicGoalsLabel}</span>
-                                    <input
+                                    <input translate="no"
                                         className="input w-full"
                                         value={comparisonCaseEditor.glycemic_goals}
                                         onChange={(e) =>
