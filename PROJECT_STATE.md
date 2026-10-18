@@ -1,5 +1,21 @@
 # État du projet ClinIA
 
+## Validation production du 18 octobre 2026
+
+- Version applicative finale : `8da14f2fb14063514fde396440f511aec7600423`,
+  confirmée dans le dépôt VS Code/Dev Container, sur GitHub `coolify` et comme
+  commit actif dans Coolify ; déploiement terminé, readiness HTTP 200 et MongoDB connecté.
+- Corrections déployées : typage et contrôle TypeScript dans le CI, message
+  d'accès clinique délégué SUPERADMIN, archivage/réactivation des propres
+  dossiers du médecin, schéma d'audit et conservation du motif de réactivation.
+- Motif `desarchivage 1` relu après rechargement avec auteur, date et reçu.
+  Le dossier fictif `TESTPROD-20261018-CBCC598` est finalement archivé et absent
+  des actifs ; reçu final `WRV-MVDWSDZS-9DEB70562E31`.
+- Validation de la correction avant fusion : 885 tests backend, 2 196 frontend,
+  typecheck, traductions, build et CI GitHub réussis. Retest de production sur
+  le commit de fusion confirmé. Portée fonctionnelle et limites détaillées dans
+  le [bilan de production du 18 octobre](docs/production-validation-20261018.md).
+
 ## Vérifications du 4 octobre et prochain point
 
 - `f63c817` confirmé en lecture seule sur les deux backends.
