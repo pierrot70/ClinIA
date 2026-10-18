@@ -1779,6 +1779,7 @@ export const UI_LABELS_FR = {
             archived: "Dossiers archivés",
         },
         validation: {
+            clinicalAccessRequired: "Une autorisation clinique déléguée en lecture est nécessaire pour accéder aux dossiers patients. Le rôle SUPERADMIN seul ne donne pas cet accès.",
             invalidServerResponse:
                 "Réponse serveur invalide (pagination manquante).",
             invalidLatitude: "Latitude invalide.",
