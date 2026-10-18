@@ -364,13 +364,73 @@ describe("physician patient archive authorization", () => {
         expect(res.status).toHaveBeenCalledWith(404);
         expect(res.json).toHaveBeenCalledWith({ error: { code: "NOT_FOUND", message: "Patient introuvable.", retryable: false } });
     });
+});
 
-    it("does not grant physician restoration rights", () => {
-        const route = router.stack.find(entry => entry.route?.methods?.post && entry.route.path === "/:id/restore").route;
+
+async function runRestoreRoute(req, res) {
+    const route = router.stack.find(entry => entry.route?.methods?.post && entry.route.path === "/:id/restore").route;
+    for (const layer of route.stack) {
+        let advanced = false;
+        await layer.handle(req, res, () => { advanced = true; });
+        if (!advanced) break;
+    }
+}
+
+describe("physician patient restore authorization", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        dto.toRestorePatientDTO.mockReset().mockReturnValue({ reason: "Synthetic reactivation test" });
+        services.restorePatientWithWriteVerification.mockReset().mockResolvedValue({
+            patient: { _id: "synthetic-patient" }, writeVerification: receipt,
+        });
+        getReplicaSetStatus.mockResolvedValue(replicaSet);
+    });
+
+    it("allows MEDECIN through the real POST guard and passes session ownership and audit identity", async () => {
+        const req = request({ params: { id: "synthetic-patient" }, body: { reason: "Synthetic reactivation test", ownerUserId: "other-doctor" } });
         const res = makeRes();
-        const next = vi.fn();
-        route.stack[0].handle(request(), res, next);
+        await runRestoreRoute(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(services.restorePatientWithWriteVerification).toHaveBeenCalledWith(
+            "synthetic-patient", "Synthetic reactivation test", req.auth,
+            { audit: expect.objectContaining({
+                action: "PATIENT_RESTORE", operation: "UPDATE",
+                actorUserId: "user-1", actorRole: "MEDECIN", ip: "10.0.0.10",
+                requestId: "request-1", verificationId: expect.stringMatching(/^WRV-/),
+                changedFields: ["archivedAt", "archivedByUserId", "archiveReason"], context: null,
+            }) }
+        );
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ meta: expect.objectContaining({ writeVerification: receipt }) }));
+    });
+
+    it.each(["USER", "RECEPTION"])("rejects %s before the restoration service", async role => {
+        const res = makeRes();
+        await runRestoreRoute(request({ auth: { userId: "synthetic-user", role } }), res);
         expect(res.status).toHaveBeenCalledWith(403);
-        expect(next).not.toHaveBeenCalled();
+        expect(services.restorePatientWithWriteVerification).not.toHaveBeenCalled();
+        expect(dto.toRestorePatientDTO).not.toHaveBeenCalled();
+    });
+
+    it("rejects requests without authentication before the restoration service", async () => {
+        const res = makeRes();
+        await runRestoreRoute(request({ auth: undefined }), res);
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(services.restorePatientWithWriteVerification).not.toHaveBeenCalled();
+    });
+
+    it("rejects a missing reason without any mutation", async () => {
+        dto.toRestorePatientDTO.mockImplementation(() => { throw { code: "INVALID_INPUT", message: "Motif requis" }; });
+        const res = makeRes();
+        await runRestoreRoute(request(), res);
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(services.restorePatientWithWriteVerification).not.toHaveBeenCalled();
+    });
+
+    it("returns a non-disclosing not-found response for a record outside the physician scope", async () => {
+        services.restorePatientWithWriteVerification.mockRejectedValue({ code: "NOT_FOUND", message: "Patient archivé introuvable." });
+        const res = makeRes();
+        await runRestoreRoute(request({ params: { id: "foreign-patient" } }), res);
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.json).toHaveBeenCalledWith({ error: { code: "NOT_FOUND", message: "Patient archivé introuvable.", retryable: false } });
     });
 });

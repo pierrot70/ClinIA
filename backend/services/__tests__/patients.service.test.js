@@ -716,3 +716,79 @@ describe("physician archival ownership and traceability", () => {
         expect(transactionSession.endSession).toHaveBeenCalledTimes(1);
     });
 });
+
+
+describe("physician restoration ownership and traceability", () => {
+    const physician = { userId: "owner-physician", role: "MEDECIN" };
+    const patientId = "507f1f77bcf86cd799439012";
+    const audit = {
+        action: "PATIENT_RESTORE", operation: "UPDATE", verificationId: "WRV-OWNER-RESTORE",
+        clientMutationId: null, actorUserId: physician.userId, actorUsername: "synthetic.doctor",
+        actorRole: "MEDECIN", ip: "10.0.0.10", requestId: "restore-request", instanceId: "test-instance",
+        requestPath: "/api/patients/:id/restore", changedFields: ["archivedAt", "archivedByUserId", "archiveReason"],
+        context: null, replicaSet: null,
+    };
+    beforeEach(() => { PatientModel.findOneAndUpdate.mockReset(); });
+
+    it("reactivates only the session physician's archived record with transactional audit and receipt", async () => {
+        PatientModel.findOneAndUpdate.mockResolvedValue({ _id: patientId });
+        const result = await restorePatientWithWriteVerification(patientId, "  Synthetic test completed  ", physician, { audit });
+        expect(PatientModel.findOneAndUpdate).toHaveBeenCalledWith(
+            { _id: patientId, ownerUserId: physician.userId, archivedAt: { $ne: null } },
+            { $set: { archivedAt: null, archivedByUserId: null, archiveReason: "" } },
+            { new: true, runValidators: true, session: transactionSession }
+        );
+        expect(recordPatientAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+            action: "PATIENT_RESTORE", actorUserId: physician.userId, actorRole: "MEDECIN", ip: "10.0.0.10",
+            context: null, session: transactionSession, throwOnError: true,
+        }));
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+            collectionName: "patients", operation: "UPDATE", actorUserId: physician.userId,
+            verificationId: "WRV-OWNER-RESTORE", session: transactionSession, throwOnError: true,
+        }));
+        expect(result.writeVerification).toEqual({ status: "CONFIRMED", verificationId: "WRV-OWNER-RESTORE", clientMutationId: null });
+        expect(transactionSession.withTransaction).toHaveBeenCalledWith(expect.any(Function), { writeConcern: expect.objectContaining({ w: "majority" }) });
+    });
+
+    it("cannot reactivate another physician's record and produces no success audit or receipt", async () => {
+        const foreignRecord = { _id: patientId, ownerUserId: "another-physician" };
+        PatientModel.findOneAndUpdate.mockImplementation(async query =>
+            query._id === foreignRecord._id && query.ownerUserId === foreignRecord.ownerUserId ? foreignRecord : null);
+        await expect(restorePatientWithWriteVerification(patientId, "Synthetic test completed", physician, { audit }))
+            .rejects.toMatchObject({ code: "NOT_FOUND" });
+        expect(PatientModel.findOneAndUpdate).toHaveBeenCalledWith(
+            { _id: patientId, ownerUserId: physician.userId, archivedAt: { $ne: null } }, expect.any(Object), expect.any(Object));
+        expect(recordPatientAuditEvent).not.toHaveBeenCalled();
+        expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
+        expect(foreignRecord).toEqual({ _id: patientId, ownerUserId: "another-physician" });
+    });
+
+    it("does not reactivate an already active record or emit a success audit", async () => {
+        const activeRecord = { _id: patientId, ownerUserId: physician.userId, archivedAt: null };
+        PatientModel.findOneAndUpdate.mockImplementation(async query =>
+            query.archivedAt?.$ne === null && activeRecord.archivedAt !== null ? activeRecord : null);
+        await expect(restorePatientWithWriteVerification(patientId, "Synthetic reactivation test", physician, { audit }))
+            .rejects.toMatchObject({ code: "NOT_FOUND" });
+        expect(PatientModel.findOneAndUpdate).toHaveBeenCalledWith(
+            { _id: patientId, ownerUserId: physician.userId, archivedAt: { $ne: null } }, expect.any(Object), expect.any(Object));
+        expect(recordPatientAuditEvent).not.toHaveBeenCalled();
+        expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
+    });
+
+    it.each(["", "   ", null, "x".repeat(501)])("rejects invalid restore reason %j before starting a transaction", async reason => {
+        await expect(restorePatientWithWriteVerification(patientId, reason, physician, { audit }))
+            .rejects.toMatchObject({ code: "INVALID_INPUT" });
+        expect(startSession).not.toHaveBeenCalled();
+        expect(PatientModel.findOneAndUpdate).not.toHaveBeenCalled();
+    });
+
+    it.each(["patient", "receipt"])("propagates %s audit failures from the transaction instead of returning success", async kind => {
+        PatientModel.findOneAndUpdate.mockResolvedValue({ _id: patientId });
+        (kind === "patient" ? recordPatientAuditEvent : recordWriteOperationAuditEvent)
+            .mockRejectedValueOnce(new Error("synthetic audit failure"));
+        await expect(restorePatientWithWriteVerification(patientId, "Synthetic test completed", physician, { audit }))
+            .rejects.toThrow("synthetic audit failure");
+        expect(transactionSession.withTransaction).toHaveBeenCalledTimes(1);
+        expect(transactionSession.endSession).toHaveBeenCalledTimes(1);
+    });
+});
