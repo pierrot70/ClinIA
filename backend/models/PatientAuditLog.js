@@ -8,6 +8,7 @@ const PatientAuditLogSchema = new mongoose.Schema(
                 "PATIENT_CREATE",
                 "PATIENT_UPDATE",
                 "PATIENT_ARCHIVE",
+                "PATIENT_RESTORE",
                 "PATIENT_DELETE",
                 "RECEPTION_RAMQ_LOOKUP",
                 "CONSULTATION_READ",
