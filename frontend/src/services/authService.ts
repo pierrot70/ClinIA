@@ -1,3 +1,4 @@
+import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 import type { UserRole } from "../auth/roles";
 import { API_URL } from "./config";
 
@@ -335,6 +336,12 @@ function getResponsePayload(data: LoginApiResponse): LoginApiResponse {
 
 function getErrorMessage(data: LoginApiResponse, fallback: string): string {
     const payload = getResponsePayload(data);
+
+    // A rejected identifier and a rejected password share the same neutral UI
+    // message. Select the versioned label by code, never translate server prose.
+    if (typeof payload.error === "object" && payload.error?.code === "INVALID_CREDENTIALS") {
+        return UI_LABELS_FR.loginPage.errors.invalidCredentials;
+    }
 
     if (typeof payload.error === "string" && payload.error.trim()) {
         return payload.error;

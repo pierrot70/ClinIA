@@ -23,7 +23,7 @@ function buildFallbackPayload(): ClinicalPayload {
     return {
         age: 55,
         sex: "male",
-        symptoms: ["Hypertension essentielle"],
+        symptoms: ["Essential hypertension"],
         medical_history: [],
         current_medications: [],
     };
@@ -45,7 +45,7 @@ const Results: React.FC = () => {
                     Array.isArray(navigationAnalysis.payload.symptoms) &&
                     navigationAnalysis.payload.symptoms.length > 0
                         ? navigationAnalysis.payload.symptoms
-                        : ["Hypertension essentielle"],
+                        : ["Essential hypertension"],
             } satisfies ClinicalPayload;
         }
 

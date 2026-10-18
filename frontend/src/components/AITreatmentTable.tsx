@@ -1,11 +1,6 @@
 import React from "react";
-import { useTranslation } from "../hooks/useTranslation";
 import { useUiLabels } from "../hooks/useUiLabels";
 import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
-import {
-    getImmediateEnglishClinicalContent,
-    shouldHideFrenchSourceInEnglish,
-} from "../i18n/clinicalContentEnglish";
 
 export interface Treatment {
     name: string;
@@ -30,25 +25,12 @@ function TreatmentRow({
     const contraindications = Array.isArray(treatment.contraindications)
         ? treatment.contraindications.join(", ")
         : typeof treatment.contraindications === "string" ? treatment.contraindications : "";
-    const nameTranslation = useTranslation({ text: treatment.name, targetLang: language });
-    const justificationTranslation = useTranslation({ text: treatment.justification, targetLang: language });
-    const contraindicationsTranslation = useTranslation({ text: contraindications, targetLang: language });
-    const english = language === "en";
-    const safeEnglish = (source: string, translated: string, loading: boolean, fallback: string) =>
-        english && (loading || translated === source || shouldHideFrenchSourceInEnglish(translated))
-            ? getImmediateEnglishClinicalContent(source) || fallback
-            : translated;
-    const name = safeEnglish(treatment.name, nameTranslation.translated, nameTranslation.loading, t(fixed.clinicalOption));
-    const justification = safeEnglish(treatment.justification, justificationTranslation.translated, justificationTranslation.loading, t(fixed.rationaleInSource));
-    const displayedContraindications = contraindications?.trim()
-        ? safeEnglish(contraindications, contraindicationsTranslation.translated, contraindicationsTranslation.loading, t(fixed.noneListed))
-        : t(fixed.noneListed);
 
     return (
         <tr className="border">
-            <td className="p-3 border font-semibold">{name}</td>
-            <td className="p-3 border">{justification}</td>
-            <td className="p-3 border text-red-600">{displayedContraindications}</td>
+            <td dir="auto" translate="no" className="p-3 border font-semibold">{treatment.name}</td>
+            <td dir="auto" translate="no" className="p-3 border">{treatment.justification}</td>
+            <td className="p-3 border text-red-600">{contraindications?.trim() ? <span dir="auto" translate="no">{contraindications}</span> : t(fixed.noneListed)}</td>
         </tr>
     );
 }

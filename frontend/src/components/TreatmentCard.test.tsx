@@ -1,3 +1,4 @@
+import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -5,6 +6,25 @@ import { MemoryRouter } from "react-router-dom";
 import TreatmentCard from "./TreatmentCard";
 
 describe("TreatmentCard", () => {
+    it.each([
+        { flags: [] },
+        { flags: ["wellTolerated", "monitoring"] as const },
+    ])("does not infer first-line status while preserving supplied flags: $flags", ({ flags }) => {
+        render(<MemoryRouter><TreatmentCard treatment={{
+            id: "synthetic-option", name: "Synthetic option", shortName: "Option",
+            class: "Source class", summary: "Source summary", details: "Source details",
+            efficacy: 0.5, sideEffectScore: 10, flags: [...flags],
+        }} /></MemoryRouter>);
+        expect(screen.queryByText(UI_LABELS_FR.componentUi.firstLine)).not.toBeInTheDocument();
+        for (const [flag, label] of [
+            ["wellTolerated", UI_LABELS_FR.componentUi.bienTolere],
+            ["monitoring", UI_LABELS_FR.componentUi.surveillanceRequise],
+        ] as const) {
+            if ((flags as readonly string[]).includes(flag)) expect(screen.getByText(label)).toBeInTheDocument();
+            else expect(screen.queryByText(label)).not.toBeInTheDocument();
+        }
+    });
+
     it("shows a stronger clinical relevance label for evidence-backed options", () => {
         render(
             <MemoryRouter>
@@ -66,7 +86,7 @@ describe("TreatmentCard", () => {
         expect(screen.getByText("Base sur des donnees simulees")).toBeInTheDocument();
     });
 
-    it("never exposes known French scenario content when English is selected", () => {
+    it("preserves historical source content when English UI is selected", () => {
         render(
             <MemoryRouter>
                 <TreatmentCard
@@ -88,11 +108,11 @@ describe("TreatmentCard", () => {
             </MemoryRouter>
         );
 
-        expect(screen.getByText("Metformin")).toBeInTheDocument();
-        expect(screen.getByText("Clinical reassessment")).toBeInTheDocument();
+        expect(screen.getByText("Metformine")).toBeInTheDocument();
+        expect(screen.getByText("Reevaluation clinique")).toBeInTheDocument();
         expect(
-            screen.getByText(/May be reasonable when glycemic control is adequate/)
+            screen.getByText(/Peut etre raisonnable si le controle glycemique/)
         ).toBeInTheDocument();
-        expect(screen.queryByText(/Peut etre raisonnable/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/May be reasonable/)).not.toBeInTheDocument();
     });
 });

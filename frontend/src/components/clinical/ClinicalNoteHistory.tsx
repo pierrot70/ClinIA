@@ -99,7 +99,7 @@ export function ClinicalNoteHistory({ patient, onRestored }: ClinicalNoteHistory
                     {loading ? <p className="text-sm text-gray-600">{copy.loading}</p> : versions.length === 0 ? <p className="text-sm text-gray-600">{copy.empty}</p> : <div className="space-y-3">
                         {versions.map((version, index) => <article key={version.id} className="border border-gray-200 p-4">
                             <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-sm font-semibold text-gray-950">{copy.version} {version.version} · {t(changeTypeLabel(version))}{index === 0 ? ` · ${copy.current}` : ""}</div><div className="mt-1 text-xs text-gray-500">{copy.savedAt} {formatDate(version.createdAt, locale)} · {copy.author} {version.actorUsernameMasked}</div></div><button type="button" disabled={restoringId === version.id} onClick={() => void restore(version)} className="inline-flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"><RotateCcw className="h-4 w-4" />{restoringId === version.id ? copy.restoring : copy.restore}</button></div>
-                            <pre className="mt-3 whitespace-pre-wrap break-words border-t border-gray-100 pt-3 font-sans text-sm leading-6 text-gray-800">{version.note || "-"}</pre>
+                            <pre translate="no" className="mt-3 whitespace-pre-wrap break-words border-t border-gray-100 pt-3 font-sans text-sm leading-6 text-gray-800">{version.note || "-"}</pre>
                         </article>)}
                     </div>}
                 </div>

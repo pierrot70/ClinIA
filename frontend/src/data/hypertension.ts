@@ -5,57 +5,57 @@ export const hypertensionTreatments: Treatment[] = [
     id: "indapamide",
     name: "Indapamide",
     shortName: "Indapamide",
-    class: "Diurétique thiazidique-like",
+    class: "Thiazide-like diuretic",
     efficacy: 0.94,
     sideEffectScore: 25,
     summary:
-      "Agent de première ligne avec un très bon contrôle tensionnel et un profil d'effets secondaires généralement favorable.",
+      "A first-line agent with very good blood pressure control and a generally favorable side effect profile.",
     details:
-      "Données simulées : dans les essais randomisés, l'indapamide montre une réduction significative de la pression artérielle, avec un impact positif sur les événements cardiovasculaires à long terme. Une surveillance électrolytique périodique est recommandée.",
+      "Simulated data: in randomized trials, indapamide shows a significant reduction in blood pressure, with a positive impact on long-term cardiovascular events. Periodic electrolyte monitoring is recommended.",
     flags: ["wellTolerated"]
   },
   {
     id: "amlodipine",
     name: "Amlodipine",
     shortName: "Amlodipine",
-    class: "Inhibiteur calcique",
+    class: "Calcium channel blocker",
     efficacy: 0.89,
     sideEffectScore: 35,
     summary:
-      "Bien tolérée, particulièrement utile chez les patients avec angor stable ou maladie coronarienne.",
+      "Well tolerated, particularly useful in patients with stable angina or coronary artery disease.",
     details:
-      "Données simulées : l'amlodipine contrôle efficacement la tension artérielle. Elle peut entraîner des oedèmes périphériques légers. Utile chez les patients plus âgés ou avec comorbidités cardiaques.",
+      "Simulated data: amlodipine effectively controls blood pressure. It may cause mild peripheral edema. Useful in older patients or those with cardiac comorbidities.",
     flags: ["wellTolerated"]
   },
   {
     id: "candesartan",
     name: "Candesartan",
     shortName: "Candesartan",
-    class: "Antagoniste des récepteurs de l'angiotensine II (ARA)",
+    class: "Angiotensin II receptor blocker (ARB)",
     efficacy: 0.85,
     sideEffectScore: 30,
     summary:
-      "Option privilégiée en cas de diabète ou de néphropathie, avec un bon profil de protection rénale (données simulées).",
+      "A preferred option in diabetes or nephropathy, with a good renal protection profile (simulated data).",
     details:
-      "Données simulées : le candesartan réduit la pression artérielle et offre un effet néphroprotecteur dans certains profils de patients. Une surveillance de la fonction rénale et du potassium est recommandée.",
+      "Simulated data: candesartan lowers blood pressure and provides a nephroprotective effect in certain patient profiles. Monitoring of renal function and potassium is recommended.",
     flags: ["monitoring"]
   }
 ];
 
 export const anticipatedQuestions = [
   {
-    question: "Que faire si la tension reste élevée après 4 semaines de traitement ?",
+    question: "What should be done if blood pressure remains high after 4 weeks of treatment?",
     answer:
-      "Données simulées : on recommande d'abord de vérifier l'adhésion, l'apport en sel, et la mesure à domicile. Ensuite, augmenter la dose ou ajouter un deuxième agent d'une autre classe peut être envisagé."
+      "Simulated data: first check adherence, salt intake and home measurements. Increasing the dose or adding a second agent from another class may then be considered."
   },
   {
-    question: "Quel traitement privilégier en cas de diabète de type 2 ?",
+    question: "Which treatment is preferred in type 2 diabetes?",
     answer:
-      "Données simulées : un ARA comme le candesartan est souvent privilégié pour sa protection rénale, mais cela dépend du profil global du patient et des lignes directrices locales."
+      "Simulated data: an ARB such as candesartan is often preferred for its renal protection, but this depends on the patient's overall profile and local guidelines."
   },
   {
-    question: "Quelles sont les principales contre-indications à surveiller ?",
+    question: "What are the main contraindications to watch for?",
     answer:
-      "Données simulées : insuffisance rénale avancée, hyperkaliémie, hypotension symptomatique et interactions médicamenteuses spécifiques selon l'agent choisi."
+      "Simulated data: advanced renal impairment, hyperkalemia, symptomatic hypotension and specific drug interactions depending on the selected agent."
   }
 ];

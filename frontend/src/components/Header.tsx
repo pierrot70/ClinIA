@@ -54,8 +54,8 @@ const HEADER_TRANSLATION_KEYS: Record<string, string> = {
     Rechercher: "header.controls.search",
     Reinitialiser: "header.controls.reset",
     "Vous pouvez sélectionner la langue de votre choix.": "header.publicHome.languageTooltip",
-    "AI real": "header.aiMode.real",
-    "AI mock": "header.aiMode.mock",
+    "IA réelle": "header.aiMode.real",
+    "IA simulée": "header.aiMode.mock",
     "Forcer IA réelle": "header.aiMode.forceRealTitle",
     "Utiliser le mode mock": "header.aiMode.mockTitle",
     Accueil: "header.nav.home",
@@ -81,7 +81,7 @@ const HEADER_TRANSLATION_KEYS: Record<string, string> = {
     "Audits OpenAI": "header.nav.openaiAudits",
     "Audits BD": "header.nav.dbAudits",
     "Mes reçus": "header.nav.myWriteReceipts",
-    "Etat BD": "header.nav.dbStatus",
+    "État BD": "header.nav.dbStatus",
     Utilisateurs: "header.nav.users",
     "Déconnexion": "header.nav.logout",
     "Montrer Usager Actif": "header.appManagement.activeUsers",
@@ -1480,7 +1480,8 @@ const Header: React.FC = () => {
                                     <HeaderLabel text={headerLabels.nav.clinicManagement} />
                                     <span className="text-xs">▾</span>
                                 </button>
-                                <div className="absolute right-0 top-full z-10 mt-2 hidden min-w-[160px] rounded-lg border border-gray-200 bg-white shadow-lg transition group-hover:block group-focus-within:block">
+                                <div className="absolute right-0 top-full z-10 hidden min-w-[160px] pt-2 group-hover:block group-focus-within:block">
+                                    <div className="rounded-lg border border-gray-200 bg-white shadow-lg transition">
                                     {[
                                         ...(user?.role === "RECEPTION" ? [{
                                             label: headerLabels.nav.walkInArrival,
@@ -1538,6 +1539,7 @@ const Header: React.FC = () => {
                                         </button>
                                     )}
                                 </div>
+                                </div>
                             </div>
 
                             {showAdminHeaderNav && !showSuperAdminHeaderNav && (
@@ -1549,7 +1551,8 @@ const Header: React.FC = () => {
                                 <HeaderLabel text={headerLabels.nav.appManagement} />
                                 <span className="text-xs">▾</span>
                             </button>
-                            <div className="absolute right-0 top-full z-10 mt-2 hidden min-w-[220px] rounded-lg border border-gray-200 bg-white shadow-lg transition group-hover:block group-focus-within:block">
+                            <div className="absolute right-0 top-full z-10 hidden min-w-[220px] pt-2 group-hover:block group-focus-within:block">
+                                    <div className="rounded-lg border border-gray-200 bg-white shadow-lg transition">
                                 <Link
                                     to="/admin/coordination-requests"
                                     className="block w-full px-4 py-2 text-left text-sm text-violet-800 transition hover:bg-violet-50"
@@ -1557,6 +1560,7 @@ const Header: React.FC = () => {
                                     <HeaderLabel text={headerLabels.appManagement.coordinationRequests} />
                                 </Link>
                             </div>
+                                </div>
                         </div>
                             )}
 
@@ -1569,7 +1573,8 @@ const Header: React.FC = () => {
                                 <HeaderLabel text={headerLabels.nav.appManagement} />
                                 <span className="text-xs">▾</span>
                             </button>
-                            <div className="absolute right-0 top-full z-10 mt-2 hidden min-w-[220px] rounded-lg border border-gray-200 bg-white shadow-lg transition group-hover:block group-focus-within:block">
+                            <div className="absolute right-0 top-full z-10 hidden min-w-[220px] pt-2 group-hover:block group-focus-within:block">
+                                    <div className="rounded-lg border border-gray-200 bg-white shadow-lg transition">
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -1674,6 +1679,7 @@ const Header: React.FC = () => {
                                     <HeaderLabel text={headerLabels.appManagement.forceReopen} />
                                 </button>
                             </div>
+                                </div>
                         </div>
                             )}
 

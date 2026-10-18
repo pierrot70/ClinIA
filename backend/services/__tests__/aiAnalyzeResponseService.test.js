@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { getMockForDiagnosis } from "../../utils/mockLoader.js";
+import { normalizeClinicalAnalysis } from "../../utils/clinicalAnalysis.js";
 
 import {
     buildDegradedAnalyzeResponse,
@@ -169,5 +171,48 @@ describe("aiAnalyzeResponseService", () => {
             })
         );
         expect(JSON.stringify(logger.log.mock.calls)).not.toContain("Migraine");
+    });
+});
+
+
+describe("simulated primary concern selection", () => {
+    it("selects diabetes despite nonspecific symptoms and preserves submitted context", async () => {
+        const patient = { diagnosis: "Type 2 diabetes", symptoms: ["Polydipsia", "Polyuria", "Fatigue"] };
+        const snapshot = JSON.stringify(patient);
+        const persistOrReuseDiagnosis = vi.fn(async payload => ({ ok: true, doc: { output: payload.output } }));
+        const result = await buildMockAnalyzeResponse({
+            diagnosis: patient.diagnosis, diagnosisSeed: patient.symptoms.join(" "),
+            fingerprint: "synthetic-diabetes", patient, neutralizationMeta: null,
+            getMockForDiagnosis, normalizeClinicalAnalysis, persistOrReuseDiagnosis,
+        });
+        expect(result.responsePayload.data.treatments.map(treatment => treatment.name)).toContain("Metformin");
+        const authoredMetformin = getMockForDiagnosis(patient.diagnosis).treatments.find(treatment => treatment.name === "Metformin");
+        const normalizedMetformin = result.responsePayload.data.treatments.find(treatment => treatment.name === "Metformin");
+        expect(authoredMetformin.justification).toBe("First-line treatment.");
+        expect(normalizedMetformin.justification).toBe(authoredMetformin.justification);
+        expect(normalizedMetformin.indication).toBe("");
+        expect(result.responsePayload.data.diagnosis.suspected).toBe("Type 2 diabetes");
+        expect(persistOrReuseDiagnosis).toHaveBeenCalledWith(expect.objectContaining({ input: patient, mode: "mock" }));
+        expect(JSON.stringify(patient)).toBe(snapshot);
+    });
+
+    it("does not let a conflicting symptom seed override the supplied diagnosis", async () => {
+        const selectMock = vi.fn(getMockForDiagnosis);
+        const result = await buildMockAnalyzeResponse({
+            diagnosis: "  Type 2 diabetes  ", diagnosisSeed: "Migraine", patient: {},
+            getMockForDiagnosis: selectMock, normalizeClinicalAnalysis, persist: false,
+        });
+        expect(selectMock).toHaveBeenCalledWith("Type 2 diabetes");
+        expect(result.responsePayload.data.treatments.map(treatment => treatment.name)).toContain("Metformin");
+    });
+
+    it.each([undefined, "", "   "])("retains symptom-only selection without a diagnosis: %j", async diagnosis => {
+        const selectMock = vi.fn(getMockForDiagnosis);
+        const result = await buildMockAnalyzeResponse({
+            diagnosis, diagnosisSeed: "Hypertension", patient: {},
+            getMockForDiagnosis: selectMock, normalizeClinicalAnalysis, persist: false,
+        });
+        expect(selectMock).toHaveBeenCalledWith("Hypertension");
+        expect(result.responsePayload.data.treatments.length).toBeGreaterThan(0);
     });
 });

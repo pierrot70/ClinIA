@@ -31,7 +31,7 @@ export default function AICard({ loading, error, text }: Props) {
     }
 
     return (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 text-sm text-gray-800">
+        <div dir="auto" translate="no" className="bg-white border border-gray-200 rounded-lg p-4 text-sm text-gray-800">
             {text}
         </div>
     );

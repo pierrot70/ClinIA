@@ -14,7 +14,7 @@
       }
     },
     "app.landing.subtitle": {
-      "source": "Accelerer la recherche. Comparer les alternatives. Verifier les references.",
+      "source": "Accélérer la recherche. Comparer les alternatives. Vérifier les références.",
       "translations": {
         "he": "להאיץ את המחקר. להשוות את החלופות. לבדוק את ההפניות.",
         "en": "Accelerate research. Compare alternatives. Verify references.",
@@ -157,7 +157,7 @@
       }
     },
     "clinicalDemo.intro.tagline": {
-      "source": "Accelerer. Comparer. Verifier.",
+      "source": "Accélérer. Comparer. Vérifier.",
       "translations": {
         "en": "Accelerate. Compare. Verify.",
         "he": "להאיץ. להשוות. לאמת.",
@@ -170,7 +170,7 @@
       }
     },
     "clinicalDemo.intro.subtitle": {
-      "source": "Recherche clinique plus rapide. Alternatives comparables. References consultables.",
+      "source": "Recherche clinique plus rapide. Alternatives comparables. Références consultables.",
       "translations": {
         "en": "Faster clinical research. Comparable alternatives. Consultable references.",
         "he": "מחקר קליני מהיר יותר. חלופות דומות. הפניות ניתנות לעיון.",
@@ -1627,7 +1627,7 @@
       "zh": "ClinIA",
       "he": "קליניה"
     },
-    "Accelerer la recherche. Comparer les alternatives. Verifier les references.": {
+    "Accélérer la recherche. Comparer les alternatives. Vérifier les références.": {
       "en": "Accelerate research. Compare alternatives. Verify references.",
       "es": "Acelerar la investigación. Comparar las alternativas. Verificar las referencias.",
       "ko": "연구를 가속화하세요. 대안을 비교하세요. 참고 문헌을 확인하세요.",
@@ -2643,7 +2643,7 @@
     "ClinIA ne presente pas ces resultats au hasard. Utilisez ces references cliniques pour verifier l'analyse et approfondir la lecture.": {
       "en": "ClinIA does not present these results randomly. Use these clinical references to verify the analysis and further your reading."
     },
-    "Accelerer. Comparer. Verifier.": {
+    "Accélérer. Comparer. Vérifier.": {
       "en": "Accelerate. Compare. Verify.",
       "es": "Acelerar. Comparar. Verificar.",
       "ko": "가속화. 비교. 확인.",
@@ -2653,7 +2653,7 @@
       "zh": "加速。比较。验证。",
       "he": "להאיץ. להשוות. לאמת."
     },
-    "Recherche clinique plus rapide. Alternatives comparables. References consultables.": {
+    "Recherche clinique plus rapide. Alternatives comparables. Références consultables.": {
       "es": "Investigación clínica más rápida. Alternativas comparables. Referencias consultables.",
       "ko": "더 빠른 임상 연구. 비교 가능한 대안. 참조 가능.",
       "vi": "Nghiên cứu lâm sàng nhanh hơn. Các lựa chọn thay thế tương đương. Tham khảo có thể tra cứu.",

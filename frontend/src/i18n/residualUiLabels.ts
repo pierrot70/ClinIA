@@ -4,6 +4,7 @@ const l = UI_LABELS_FR.residualClinicalUi;
 // Fixed clinical interface wording, never clinical response or patient content.
 // French source, then EN, ES, KO, VI, NO, JA, ZH, HE.
 export const residualUiRows: readonly (readonly string[])[] = [
+[l.englishSourceNotice, "Reference medical content and simulated responses are written in English and displayed without translation.", "El contenido médico de referencia y las respuestas simuladas se redactan en inglés y se muestran sin traducción.", "의학 참고 콘텐츠와 시뮬레이션 응답은 영어로 작성되며 번역 없이 표시됩니다.", "Nội dung y khoa tham khảo và phản hồi mô phỏng được viết bằng tiếng Anh và hiển thị không qua dịch thuật.", "Medisinsk referanseinnhold og simulerte svar er skrevet på engelsk og vises uten oversettelse.", "医学参考コンテンツとシミュレーション応答は英語で作成され、翻訳せずに表示されます。", "医学参考内容和模拟回复以英语编写，显示时不进行翻译。", "תוכן רפואי לעיון ותשובות מדומות נכתבים באנגלית ומוצגים ללא תרגום."],
 [l.proposedOptions, "Proposed treatment options", "Opciones terapéuticas propuestas", "제안된 치료 선택지", "Các lựa chọn điều trị được đề xuất", "Foreslåtte behandlingsalternativer", "提案された治療選択肢", "建议的治疗选项", "אפשרויות טיפול מוצעות"],
 [l.treatment, "Treatment", "Tratamiento", "치료", "Điều trị", "Behandling", "治療", "治疗", "טיפול"],
 [l.rationale, "Rationale", "Justificación", "근거", "Lý do", "Begrunnelse", "根拠", "理由", "נימוק"],

@@ -1,3 +1,5 @@
+import { HomeI18nContext } from "../contexts/HomeI18nContext";
+import { clinicalReviewLabels } from "../i18n/clinicalReviewLabels";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -105,14 +107,6 @@ vi.mock("../hooks/useTranslation", () => ({
     }),
 }));
 
-vi.mock("../contexts/HomeI18nContext", () => ({
-    HomeI18nContext: {
-        Provider: ({ children }: { children: React.ReactNode }) => children,
-        Consumer: ({ children }: { children: (value: { locale: string }) => React.ReactNode }) =>
-            children({ locale: "fr" }),
-        _currentValue: { locale: "fr" },
-    },
-}));
 
 vi.mock("../services/securityIncidentApi", () => ({
     acknowledgeSecurityIncident: acknowledgeSecurityIncidentMock,
@@ -593,6 +587,31 @@ describe("ClinicalAnalyzePage", () => {
         expect(
             screen.getByRole("link", { name: "Laisser un commentaire" })
         ).toBeInTheDocument();
+    });
+
+    it.each([
+        ["fr-CA", "Âge (années)"], ["en-CA", "Age (years)"], ["es", "Edad (años)"],
+        ["ko-KR", "나이 (세)"], ["vi", "Tuổi (năm)"], ["no-NO", "Alder (år)"],
+        ["ja", "年齢（歳）"], ["zh", "年龄（岁）"], ["he", "גיל (שנים)"],
+    ])("labels comparison age explicitly and localizes sex while preserving diagnosis in %s", async (locale, ageLabel) => {
+        const idle = { result: null, loading: false, error: null, errorCode: null,
+            analyze: vi.fn().mockResolvedValue(undefined), resetAnalysis: vi.fn() };
+        configureClinicalAnalysisSlots({ ...idle }, { ...idle }, { ...idle });
+        render(<MemoryRouter><HomeI18nContext.Provider value={{ locale } as any}>
+            <ClinicalAnalyzePage />
+        </HomeI18nContext.Provider></MemoryRouter>);
+        fireEvent.click(screen.getByRole("button", { name: "compare-clinical-form" }));
+        const sexLabels = clinicalReviewLabels(locale);
+        expect(screen.getAllByText(sexLabels.male).length).toBeGreaterThan(0);
+        expect(screen.getAllByText(sexLabels.female).length).toBeGreaterThan(0);
+        for (const age of [55, 79]) {
+            const expected = "Diabete de type 2, " + ageLabel + ": " + new Intl.NumberFormat(locale).format(age);
+            expect(screen.getAllByRole("heading", { name: name => name.includes(expected) }).length).toBeGreaterThan(0);
+        }
+        expect(screen.queryByRole("heading", { name: /55(?:年|년| years| años| năm)/ })).not.toBeInTheDocument();
+        expect(screen.queryByText("Homme")).not.toBeInTheDocument();
+        expect(screen.queryByText("Femme")).not.toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: /55 ans/ })).not.toBeInTheDocument();
     });
 
     it("shows two age relevance charts in visual comparison mode", async () => {

@@ -6,6 +6,7 @@ const f = UI_LABELS_FR.clinicalFormFields;
 const c = UI_LABELS_FR.clinicalExampleConceptLabels;
 const s = UI_LABELS_FR.clinicalSymptomLabels;
 export const clinicalFormFieldRows: readonly (readonly string[])[] = [
+[f.diabetesParametersButton, "Type 2 diabetes parameters", "Parámetros de la diabetes tipo 2", "제2형 당뇨병 매개변수", "Thông số đái tháo đường típ 2", "Parametere for type 2-diabetes", "2型糖尿病のパラメータ", "2 型糖尿病参数", "פרמטרים לסוכרת מסוג 2"],
 [f.age, "Patient age", "Edad del paciente", "환자 나이", "Tuổi người bệnh", "Pasientens alder", "患者の年齢", "患者年龄", "גיל המטופל"],
 [f.male, "Male", "Masculino", "남성", "Nam", "Mann", "男性", "男", "זכר"],
 [f.female, "Female", "Femenino", "여성", "Nữ", "Kvinne", "女性", "女", "נקבה"],

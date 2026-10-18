@@ -2,27 +2,27 @@
 
 export const mockHypertension = {
     patient_summary:
-        "Votre tension est élevée. Une combinaison de changements de mode de vie et de médicaments peut aider à la réduire.",
+        "Your blood pressure is high. A combination of lifestyle changes and medication can help lower it.",
     treatments: [
         {
-            name: "Modifications du mode de vie",
+            name: "Lifestyle changes",
             justification:
-                "Toujours recommandé avant ou en combinaison avec un traitement médicamenteux.",
+                "Always recommended before or in combination with medication.",
             contraindications: [],
             efficacy: 55
         },
         {
             name: "Amlodipine",
             justification:
-                "Calcium-bloquant efficace chez les patients plus âgés.",
-            contraindications: ["Hypotension sévère"],
+                "An effective calcium channel blocker in older patients.",
+            contraindications: ["Severe hypotension"],
             efficacy: 82
         },
         {
             name: "Ramipril",
             justification:
-                "IEC efficace en première ligne, surtout si atteinte rénale.",
-            contraindications: ["Grossesse", "Angio-œdème"],
+                "An effective first-line ACE inhibitor, especially with renal involvement.",
+            contraindications: ["Pregnancy", "Angioedema"],
             efficacy: 88
         }
     ]
@@ -30,27 +30,27 @@ export const mockHypertension = {
 
 export const mockDiabetes = {
     patient_summary:
-        "Votre glycémie est élevée, ce qui indique un diabète de type 2. Des traitements et des changements de mode de vie peuvent aider à stabiliser votre niveau de sucre.",
+        "This simulated example concerns elevated blood glucose in a type 2 diabetes context. Treatments and lifestyle changes can help stabilize blood glucose.",
     treatments: [
         {
-            name: "Metformine",
+            name: "Metformin",
             justification:
-                "Traitement de première intention recommandé, bien toléré.",
-            contraindications: ["Insuffisance rénale sévère"],
+                "A recommended, well-tolerated first-line treatment.",
+            contraindications: ["Severe renal impairment"],
             efficacy: 90
         },
         {
-            name: "Perte de poids",
+            name: "Weight loss",
             justification:
-                "Peut améliorer la sensibilité à l'insuline et réduire la glycémie.",
+                "May improve insulin sensitivity and lower blood glucose.",
             contraindications: [],
             efficacy: 60
         },
         {
-            name: "Inhibiteurs SGLT2",
+            name: "SGLT2 inhibitors",
             justification:
-                "Favorisent l'élimination du sucre par les urines.",
-            contraindications: ["Antécédents d'infections urinaires sévères"],
+                "Promote glucose excretion in the urine.",
+            contraindications: ["History of severe urinary tract infections"],
             efficacy: 75
         }
     ]
@@ -58,25 +58,25 @@ export const mockDiabetes = {
 
 export const mockCholesterol = {
     patient_summary:
-        "Votre taux de cholestérol est trop élevé. Réduire le LDL aide à diminuer les risques cardiovasculaires.",
+        "Your cholesterol level is too high. Lowering LDL helps reduce cardiovascular risks.",
     treatments: [
         {
-            name: "Statines",
+            name: "Statins",
             justification:
-                "Traitement de référence pour réduire le LDL et les événements cardiovasculaires.",
-            contraindications: ["Maladie hépatique active"],
+                "A standard treatment for reducing LDL and cardiovascular events.",
+            contraindications: ["Active liver disease"],
             efficacy: 85
         },
         {
-            name: "Augmentation de l'activité physique",
-            justification: "Améliore le profil lipidique global.",
+            name: "Increased physical activity",
+            justification: "Improves the overall lipid profile.",
             contraindications: [],
             efficacy: 40
         },
         {
-            name: "Ézétimibe",
+            name: "Ezetimibe",
             justification:
-                "Utilisé si les statines sont insuffisantes ou mal tolérées.",
+                "Used when statins are insufficient or poorly tolerated.",
             contraindications: [],
             efficacy: 65
         }
@@ -85,20 +85,20 @@ export const mockCholesterol = {
 
 export const mockAsthma = {
     patient_summary:
-        "Vous présentez des symptômes d’asthme. Le traitement permet d'améliorer la respiration et de prévenir les crises.",
+        "You have symptoms of asthma. Treatment helps improve breathing and prevent attacks.",
     treatments: [
         {
-            name: "Corticostéroïdes inhalés",
+            name: "Inhaled corticosteroids",
             justification:
-                "Traitement de base pour réduire l'inflammation bronchique.",
+                "Baseline treatment to reduce bronchial inflammation.",
             contraindications: [],
             efficacy: 90
         },
         {
-            name: "Bronchodilatateurs",
+            name: "Bronchodilators",
             justification:
-                "Aident à ouvrir les voies respiratoires en phase aiguë.",
-            contraindications: ["Arythmies sévères"],
+                "Help open the airways during the acute phase.",
+            contraindications: ["Severe arrhythmias"],
             efficacy: 80
         }
     ]
@@ -106,26 +106,26 @@ export const mockAsthma = {
 
 export const mockMigraine = {
     patient_summary:
-        "Vous présentez une migraine. Certains traitements peuvent réduire la douleur et prévenir les crises.",
+        "You have a migraine. Some treatments can reduce pain and prevent attacks.",
     treatments: [
         {
             name: "Triptans",
             justification:
-                "Traitement efficace en phase aiguë des migraines.",
-            contraindications: ["Maladie coronaire"],
+                "An effective treatment for acute migraine attacks.",
+            contraindications: ["Coronary artery disease"],
             efficacy: 75
         },
         {
-            name: "Bêtabloquants",
+            name: "Beta blockers",
             justification:
-                "Utilisés en prévention des crises.",
-            contraindications: ["Asthme sévère"],
+                "Used to prevent attacks.",
+            contraindications: ["Severe asthma"],
             efficacy: 65
         },
         {
-            name: "Repos dans un endroit sombre",
+            name: "Rest in a dark place",
             justification:
-                "Réduit les stimuli aggravant la crise.",
+                "Reduces stimuli that worsen the attack.",
             contraindications: [],
             efficacy: 30
         }
@@ -134,27 +134,27 @@ export const mockMigraine = {
 
 export const mockHeartFailure = {
     patient_summary:
-        "Vous présentez une insuffisance cardiaque. Certains traitements peuvent alléger les symptômes, protéger le cœur et réduire les risques d’hospitalisation.",
+        "You have heart failure. Some treatments can ease symptoms, protect the heart and reduce the risk of hospitalization.",
     treatments: [
         {
-            name: "Inhibiteurs SGLT2 (ex: Dapagliflozine)",
+            name: "SGLT2 inhibitors (e.g., dapagliflozin)",
             justification:
-                "Ont démontré une réduction des hospitalisations et de la mortalité, même chez les non-diabétiques.",
-            contraindications: ["Insuffisance rénale sévère", "Déshydratation"],
+                "Have demonstrated a reduction in hospitalizations and mortality, even in people without diabetes.",
+            contraindications: ["Severe renal impairment", "Dehydration"],
             efficacy: 85
         },
         {
-            name: "Bêtabloquants",
+            name: "Beta blockers",
             justification:
-                "Ralentissent le rythme cardiaque et diminuent la charge de travail du cœur.",
-            contraindications: ["Asthme sévère", "Bradycardie"],
+                "Slow the heart rate and reduce the heart's workload.",
+            contraindications: ["Severe asthma", "Bradycardia"],
             efficacy: 75
         },
         {
-            name: "Diurétiques de l’anse (ex: Furosémide)",
+            name: "Loop diuretics (e.g., furosemide)",
             justification:
-                "Réduisent la congestion, l'œdème et la dyspnée.",
-            contraindications: ["Déshydratation", "Insuffisance rénale aiguë"],
+                "Reduce congestion, edema and dyspnea.",
+            contraindications: ["Dehydration", "Acute renal impairment"],
             efficacy: 65
         }
     ]
@@ -178,13 +178,13 @@ export function getMockForDiagnosis(diagnosis = "") {
     if (d.includes("migra"))
         return mockMigraine;
 
-    if (d.includes("insuffis") || d.includes("cardia") || d.includes("icc"))
+    if (d.includes("insuffis") || d.includes("cardia") || d.includes("icc") || d.includes("heart fail"))
         return mockHeartFailure;
 
     // fallback générique
     return {
         patient_summary:
-            "Aucun mock spécifique trouvé, mais voici un exemple générique.",
+            "No specific mock found; here is a generic example.",
         treatments: []
     };
 }

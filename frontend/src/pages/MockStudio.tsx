@@ -1,3 +1,4 @@
+import { ClinicalContentNotice } from "../components/clinical/ClinicalContentNotice";
 import { UiMessage } from "../components/i18n/UiMessage";
 import { labels } from "../i18n/uiLabels";
 import { useUiLabels } from "../hooks/useUiLabels";
@@ -132,7 +133,7 @@ const MockStudio: React.FC = () => {
 
         const newEntry: MockEntry = {
             match: [newKey],
-            patient_summary: "Résumé patient à personnaliser.",
+            patient_summary: "Patient summary to customize.",
             treatments: [],
         };
 
@@ -164,7 +165,7 @@ const MockStudio: React.FC = () => {
             treatments: [
                 ...prev.treatments,
                 {
-                    name: "Nouveau traitement",
+                    name: "New treatment option",
                     justification: "",
                     contraindications: [],
                     efficacy: 50,
@@ -196,6 +197,7 @@ const MockStudio: React.FC = () => {
     // ------------------------------------------
     return (
         <div className="max-w-6xl mx-auto px-4 py-8 space-y-4">
+            <ClinicalContentNotice />
             <header className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-semibold text-gray-900">
@@ -310,7 +312,7 @@ const MockStudio: React.FC = () => {
                                     {t(labels.pageUi.resumePatient)}</label>
                                 <textarea
                                     className="w-full border rounded-lg px-2 py-1 text-sm min-h-[80px]"
-                                    value={current.patient_summary}
+                                    lang="en" dir="ltr" translate="no" value={current.patient_summary}
                                     onChange={(e) =>
                                         updateCurrentEntry((prev) => ({
                                             ...prev,
@@ -340,7 +342,7 @@ const MockStudio: React.FC = () => {
                                             <input
                                                 type="text"
                                                 className="flex-1 border rounded px-2 py-1 mr-2"
-                                                value={treatment.name}
+                                                lang="en" dir="ltr" translate="no" value={treatment.name}
                                                 onChange={(e) =>
                                                     updateCurrentEntry((prev) => {
                                                         const c = [...prev.treatments];
@@ -362,7 +364,7 @@ const MockStudio: React.FC = () => {
                                                 {t(labels.pageUi.justification)}</label>
                                             <textarea
                                                 className="w-full border rounded px-2 py-1 text-xs"
-                                                value={treatment.justification}
+                                                lang="en" dir="ltr" translate="no" value={treatment.justification}
                                                 onChange={(e) =>
                                                     updateCurrentEntry((prev) => {
                                                         const c = [...prev.treatments];
@@ -383,7 +385,7 @@ const MockStudio: React.FC = () => {
                                                 <input
                                                     type="text"
                                                     className="w-full border rounded px-2 py-1 text-xs"
-                                                    value={treatment.contraindications.join(", ")}
+                                                    lang="en" dir="ltr" translate="no" value={treatment.contraindications.join(", ")}
                                                     onChange={(e) =>
                                                         updateCurrentEntry((prev) => {
                                                             const c = [...prev.treatments];

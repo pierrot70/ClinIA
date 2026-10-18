@@ -15,6 +15,7 @@ export const UI_LABELS_FR = {
         correctedReplay: "Analyse relancee avec les parametres corriges.",
     },
     residualClinicalUi: {
+        englishSourceNotice: "Le contenu médical de référence et les réponses simulées sont rédigés en anglais et affichés sans traduction.",
         proposedOptions: "Options thérapeutiques proposées",
         treatment: "Traitement",
         rationale: "Justification",
@@ -152,6 +153,7 @@ export const UI_LABELS_FR = {
         None: "Aucun",
     },
     clinicalFormFields: {
+        diabetesParametersButton: "Paramètres du diabète de type 2",
         age: "Age du patient",
         male: "Homme",
         female: "Femme",
@@ -307,7 +309,7 @@ export const UI_LABELS_FR = {
         landing: {
             title: "ClinIA",
             subtitle:
-                "Accelerer la recherche. Comparer les alternatives. Verifier les references.",
+                "Accélérer la recherche. Comparer les alternatives. Vérifier les références.",
             supportingText:
                 "ClinIA utilise l'IA pour accelerer la recherche clinique, comparer des alternatives therapeutiques plausibles et presenter des references consultables.",
             clinicalDemoTitle: "Démo clinique",
@@ -479,8 +481,8 @@ export const UI_LABELS_FR = {
             tooltipOk: "OK",
         },
         aiMode: {
-            real: "AI real",
-            mock: "AI mock",
+            real: "IA réelle",
+            mock: "IA simulée",
             forceRealTitle: "Forcer IA réelle",
             mockTitle: "Utiliser le mode mock",
         },
@@ -540,7 +542,7 @@ export const UI_LABELS_FR = {
             openaiAudits: "Audits OpenAI",
             dbAudits: "Audits BD",
             myWriteReceipts: "Mes reçus",
-            dbStatus: "Etat BD",
+            dbStatus: "État BD",
             users: "Utilisateurs",
             logout: "Déconnexion",
         },
@@ -871,9 +873,9 @@ export const UI_LABELS_FR = {
                 "ClinIA ne presente pas ces resultats au hasard. Utilisez ces references cliniques pour verifier l'analyse et approfondir la lecture.",
         },
         intro: {
-            tagline: "Accelerer. Comparer. Verifier.",
+            tagline: "Accélérer. Comparer. Vérifier.",
             subtitle:
-                "Recherche clinique plus rapide. Alternatives comparables. References consultables.",
+                "Recherche clinique plus rapide. Alternatives comparables. Références consultables.",
         },
         cachedResultNotice: {
             title: "Analyse equivalente deja disponible",
@@ -2254,7 +2256,7 @@ export const UI_LABELS_FR = {
         chargementDesMocks: "Chargement des mocks…",
         clinIAMockStudioAdmin: "ClinIA Mock Studio (Admin)",
         editeurDesReponsesSimuleesParDiagnostic: "Éditeur des réponses simulées par diagnostic.",
-        gererLesUtilisateurs: "Gerer les utilisateurs",
+        gererLesUtilisateurs: "Gérer les utilisateurs",
         diagnosticsDisponibles: "Diagnostics disponibles",
         ajouter: "+ Ajouter",
         fallbackUtiliseSiAucuneCorrespondance: "`_fallback` = utilisé si aucune correspondance.",

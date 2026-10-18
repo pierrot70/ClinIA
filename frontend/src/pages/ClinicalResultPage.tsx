@@ -1,3 +1,4 @@
+import { ClinicalContentNotice } from "../components/clinical/ClinicalContentNotice";
 import { UiMessage } from "../components/i18n/UiMessage";
 import { labels } from "../i18n/uiLabels";
 import { UiText } from "../components/i18n/UiText";
@@ -63,6 +64,7 @@ export function ClinicalResultPage({ data, serviceMode, targetLang }: PropsWithL
 
     return (
         <div className="bg-white p-6 rounded border space-y-6">
+            <ClinicalContentNotice />
             {showTranslationError && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
                     <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
@@ -87,23 +89,21 @@ export function ClinicalResultPage({ data, serviceMode, targetLang }: PropsWithL
 
             <section>
                 <h3 className="font-medium">{renderLabel(suspectedDiagnosisLabel, loadingSuspectedDiagnosisLabel)}</h3>
-                <p>
-                    {data.diagnosis?.suspected === "Analyse clinique en cours"
-                        ? useTranslation({ text: "Analyse clinique en cours", targetLang: lang }).translated
-                        : data.diagnosis?.suspected ?? "—"}
+                <p dir="auto" translate="no">
+                    {data.diagnosis?.suspected ?? "—"}
                 </p>
                 {data.diagnosis?.justification && (
-                    <p className="text-sm text-gray-600">
-                        {useTranslation({ text: data.diagnosis.justification, targetLang: lang }).translated}
+                    <p dir="auto" translate="no" className="text-sm text-gray-600">
+                        {data.diagnosis.justification}
                     </p>
                 )}
             </section>
 
             <section>
                 <h3 className="font-medium">{renderLabel(patientSummaryLabel, loadingPatientSummaryLabel)}</h3>
-                <p>
+                <p dir="auto" translate="no">
                     {data.patient_summary?.plain_language
-                        ? useTranslation({ text: data.patient_summary.plain_language, targetLang: lang }).translated
+                        ? data.patient_summary.plain_language
                         : renderLabel(noSummaryLabel, loadingNoSummaryLabel)}
                 </p>
             </section>
@@ -113,7 +113,7 @@ export function ClinicalResultPage({ data, serviceMode, targetLang }: PropsWithL
                 {Array.isArray(data.treatments) && data.treatments.length > 0 ? (
                     <ul className="list-disc ml-5">
                         {data.treatments.map((t, i) => (
-                            <li key={i}>{t?.name ?? "—"}</li>
+                            <li dir="auto" translate="no" key={i}>{t?.name ?? "—"}</li>
                         ))}
                     </ul>
                 ) : (

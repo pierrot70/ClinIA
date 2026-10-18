@@ -1,3 +1,4 @@
+import { getLocalUiTranslation } from "./localUiTranslations";
 import { describe, expect, it } from "vitest";
 import { UI_LABELS_FR } from "./uiLabels.fr";
 import { clinicalDemoUiRows, localizeClinicalDemoUiLabel } from "./clinicalDemoUiLabels";
@@ -7,6 +8,20 @@ function leaves(value: unknown, prefix = ""): [string, string][] {
     return value && typeof value === "object" ? Object.entries(value).flatMap(([key, entry]) => leaves(entry, prefix ? `${prefix}.${key}` : key)) : [];
 }
 describe("clinical demo fixed interface translations", () => {
+    it("uses accented French introduction sources and preserves existing translations", () => {
+        expect(UI_LABELS_FR.clinicalDemo.intro.tagline).toBe("Accélérer. Comparer. Vérifier.");
+        expect(UI_LABELS_FR.clinicalDemo.intro.subtitle).toContain("Références consultables.");
+        expect(UI_LABELS_FR.app.landing.subtitle).toBe("Accélérer la recherche. Comparer les alternatives. Vérifier les références.");
+        const sources = [UI_LABELS_FR.clinicalDemo.intro.tagline, UI_LABELS_FR.clinicalDemo.intro.subtitle, UI_LABELS_FR.app.landing.subtitle];
+        for (const locale of UI_LOCALES) for (const source of sources) {
+            const translated = getLocalUiTranslation(source, locale);
+            expect(translated).toBeTruthy();
+            if (locale !== "fr-CA") expect(translated).not.toBe(source);
+        }
+        expect(getLocalUiTranslation(sources[0], "en-CA")).toBe("Accelerate. Compare. Verify.");
+        expect(getLocalUiTranslation(sources[2], "en-CA")).toBe("Accelerate research. Compare alternatives. Verify references.");
+    });
+
     it("covers every clinicalDemo leaf for every selectable language", () => {
         const missing: string[] = [];
         for (const [key, source] of leaves(UI_LABELS_FR.clinicalDemo)) for (const locale of UI_LOCALES) {

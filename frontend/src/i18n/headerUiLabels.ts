@@ -7,6 +7,11 @@ import { localizeVoiceUiLabel } from "./voiceUiLabels";
 const languages = ["en", "es", "ko", "vi", "no", "ja", "zh", "he"] as const;
 type Row = readonly [string, string, string, string, string, string, string, string];
 const rows: Record<string, Row> = {
+  [UI_LABELS_FR.header.nav.dbAudits]: ["Database audits", "Auditorías de la base de datos", "데이터베이스 감사", "Kiểm toán cơ sở dữ liệu", "Databaserevisjoner", "データベース監査", "数据库审计", "ביקורות מסד נתונים"],
+  [UI_LABELS_FR.header.nav.dbStatus]: ["Database status", "Estado de la base de datos", "데이터베이스 상태", "Trạng thái cơ sở dữ liệu", "Databasestatus", "データベースの状態", "数据库状态", "מצב מסד הנתונים"],
+  [UI_LABELS_FR.header.aiMode.mock]: ["Simulated AI", "IA simulada", "모의 AI", "AI mô phỏng", "Simulert KI", "シミュレーションAI", "模拟 AI", "בינה מלאכותית מדומה"],
+  [UI_LABELS_FR.header.aiMode.real]: ["Live AI", "IA real", "실제 AI", "AI thực", "Reell KI", "実際のAI", "真实 AI", "בינה מלאכותית פעילה"],
+
   "Activer l'arret de l'application dans 30 secondes ? Tous les utilisateurs (sauf SUPERADMIN) seront deconnectes.": ["Shut down the application in 30 seconds? All users except SUPERADMIN will be signed out.", "¿Detener la aplicación en 30 segundos? Se cerrará la sesión de todos los usuarios excepto SUPERADMIN.", "30초 후 애플리케이션을 종료할까요? SUPERADMIN을 제외한 모든 사용자가 로그아웃됩니다.", "Dừng ứng dụng sau 30 giây? Tất cả người dùng trừ SUPERADMIN sẽ bị đăng xuất.", "Stenge applikasjonen om 30 sekunder? Alle brukere unntatt SUPERADMIN blir logget ut.", "30秒後にアプリケーションを停止しますか？SUPERADMIN以外の全ユーザーがログアウトされます。", "30秒后停止应用程序？除SUPERADMIN外，所有用户将被登出。", "להשבית את היישום בעוד 30 שניות? כל המשתמשים פרט ל־SUPERADMIN ינותקו."],
   "Arret de l'application planifie dans 30 secondes pour les utilisateurs non SUPERADMIN.": ["Application shutdown scheduled in 30 seconds for users other than SUPERADMIN.", "Detención de la aplicación programada en 30 segundos para los usuarios distintos de SUPERADMIN.", "SUPERADMIN 이외 사용자에 대해 30초 후 애플리케이션 종료가 예약되었습니다.", "Đã lên lịch dừng ứng dụng sau 30 giây đối với người dùng không phải SUPERADMIN.", "Applikasjonen stenges om 30 sekunder for brukere som ikke er SUPERADMIN.", "SUPERADMIN以外のユーザーに対して、30秒後のアプリケーション停止が予定されました。", "已计划在30秒后为非SUPERADMIN用户停止应用程序。", "השבתת היישום נקבעה לעוד 30 שניות למשתמשים שאינם SUPERADMIN."],
   "Impossible de planifier l'arret de l'application.": ["Unable to schedule application shutdown.", "No se pudo programar la detención de la aplicación.", "애플리케이션 종료를 예약할 수 없습니다.", "Không thể lên lịch dừng ứng dụng.", "Kunne ikke planlegge stenging av applikasjonen.", "アプリケーションの停止を予定できません。", "无法计划停止应用程序。", "לא ניתן לתזמן את השבתת היישום."],
@@ -194,6 +199,6 @@ export function localizeHeaderUiLabel(source: string, locale: string): string | 
     ?? (compiled.bySource as Record<string, Record<string, string>>)[source]?.[language];
   if (validUiTranslation(source, translated)) return translated;
   // Symbols and diagnostic identifiers have no linguistic content.
-  if (["/", "<", ">", "<<", ">>", "IP", "AI real", "AI mock"].includes(source)) return source;
+  if (["/", "<", ">", "<<", ">>", "IP"].includes(source)) return source;
   return null;
 }

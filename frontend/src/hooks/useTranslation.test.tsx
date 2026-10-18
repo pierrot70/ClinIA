@@ -83,11 +83,16 @@ describe("useTranslation", () => {
         expect(translateTextMock).not.toHaveBeenCalled();
     });
     it.each([
-        ["fr-CA", "Accès de soutien"], ["en-CA", "Support access"],
-        ["es", "Acceso de soporte"], ["ko", "지원 접근"],
-        ["vi", "Quyền truy cập hỗ trợ"], ["no", "Støttetilgang"],
-        ["ja", "サポートアクセス"], ["zh", "支持访问"], ["he", "גישה לצורך תמיכה"],
-    ])("localizes support navigation and preserves AI mode identifiers in %s", async (locale, expected) => {
+        ["fr-CA", "Accès de soutien", "IA simulée", "IA réelle"],
+        ["en-CA", "Support access", "Simulated AI", "Live AI"],
+        ["es", "Acceso de soporte", "IA simulada", "IA real"],
+        ["ko", "지원 접근", "모의 AI", "실제 AI"],
+        ["vi", "Quyền truy cập hỗ trợ", "AI mô phỏng", "AI thực"],
+        ["no", "Støttetilgang", "Simulert KI", "Reell KI"],
+        ["ja", "サポートアクセス", "シミュレーションAI", "実際のAI"],
+        ["zh", "支持访问", "模拟 AI", "真实 AI"],
+        ["he", "גישה לצורך תמיכה", "בינה מלאכותית מדומה", "בינה מלאכותית פעילה"],
+    ])("localizes support navigation and AI mode UI labels in %s", async (locale, expected, expectedMock, expectedReal) => {
         const { result, rerender } = renderHook(({ locale }) => ({
             navigation: useTranslation({ text: labels.header.nav.supportAccessInbox, targetLang: locale, translationKey: "header.nav.supportAccessInbox" }),
             mock: useTranslation({ text: labels.header.aiMode.mock, targetLang: locale, translationKey: "header.aiMode.mock" }),
@@ -96,8 +101,8 @@ describe("useTranslation", () => {
         rerender({ locale });
         await waitFor(() => {
             expect(result.current.navigation.translated).toBe(expected);
-            expect(result.current.mock.translated).toBe("AI mock");
-            expect(result.current.real.translated).toBe("AI real");
+            expect(result.current.mock.translated).toBe(expectedMock);
+            expect(result.current.real.translated).toBe(expectedReal);
         });
         expect(translateTextMock).not.toHaveBeenCalled();
     });

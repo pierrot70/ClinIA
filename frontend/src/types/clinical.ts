@@ -71,6 +71,7 @@ export interface ClinicalAnalysis {
 
     treatments: {
         name: string;
+        justification?: string;
         indication: string;
         dosage: string;
         duration: string;

@@ -14,6 +14,7 @@ type DetailTreatment = {
   class?: string;
   details?: string;
   summary?: string;
+  justification?: string;
   indication?: string;
   dosage?: string;
   duration?: string;
@@ -138,6 +139,9 @@ const TreatmentDetails: React.FC = () => {
     );
   }
 
+  const explanation = [treatment.details, treatment.summary, treatment.justification, treatment.indication].find(
+    value => typeof value === "string" && value.trim().length > 0
+  );
   const flags = Array.isArray(treatment.flags) ? treatment.flags : [];
   const monitoringItems = normalizeList(treatment.monitoring);
   const contraindicationItems = normalizeList(treatment.contraindications);
@@ -159,10 +163,10 @@ const TreatmentDetails: React.FC = () => {
         <p className="text-xs text-gray-500 uppercase tracking-wide">
           {t(sourceLabel)}
         </p>
-        <h1 className="text-2xl font-semibold text-gray-900">
+        <h1 dir="auto" translate="no" className="text-2xl font-semibold text-gray-900">
           {treatment.name}
         </h1>
-        <p className="text-sm text-gray-600">{treatment.class ?? t(labels.pageUi.treatment)}</p>
+        <p className="text-sm text-gray-600">{treatment.class ? <span dir="auto" translate="no">{treatment.class}</span> : t(labels.pageUi.treatment)}</p>
       </div>
 
       <section className="grid sm:grid-cols-3 gap-4 text-sm">
@@ -198,23 +202,22 @@ const TreatmentDetails: React.FC = () => {
       <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs text-sm text-gray-700 space-y-3">
         <h2 className="text-sm font-semibold text-gray-800">
           {t(labels.pageUi.commentInterpreterCesInformations)}</h2>
-        <p>
-          {treatment.details ??
-            treatment.summary ??
-            treatment.indication ??
-            t(labels.pageUi.aucunDetailSupplementaireFourniPourCetteOption)}
-        </p>
+        {explanation ? (
+          <p dir="auto" translate="no">{explanation}</p>
+        ) : (
+          <p>{t(labels.pageUi.aucunDetailSupplementaireFourniPourCetteOption)}</p>
+        )}
         {treatment.dosage || treatment.duration ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <div className="text-xs font-semibold uppercase text-gray-500">
                 {t(labels.pageUi.posologie)}</div>
-              <div>{treatment.dosage || t(labels.pageUi.nonPrecisee)}</div>
+              <div dir="auto" translate="no">{treatment.dosage || t(labels.pageUi.nonPrecisee)}</div>
             </div>
             <div>
               <div className="text-xs font-semibold uppercase text-gray-500">
                 {t(labels.pageUi.duree)}</div>
-              <div>{treatment.duration || t(labels.pageUi.nonPrecisee)}</div>
+              <div dir="auto" translate="no">{treatment.duration || t(labels.pageUi.nonPrecisee)}</div>
             </div>
           </div>
         ) : null}
@@ -227,7 +230,7 @@ const TreatmentDetails: React.FC = () => {
           {contraindicationItems.length > 0 ? (
             <ul className="list-disc ml-4 space-y-1 text-sm text-gray-700">
               {contraindicationItems.map((item) => (
-                <li key={item}>{item}</li>
+                <li dir="auto" translate="no" key={item}>{item}</li>
               ))}
             </ul>
           ) : (
@@ -242,7 +245,7 @@ const TreatmentDetails: React.FC = () => {
           {monitoringItems.length > 0 ? (
             <ul className="list-disc ml-4 space-y-1 text-sm text-gray-700">
               {monitoringItems.map((item) => (
-                <li key={item}>{item}</li>
+                <li dir="auto" translate="no" key={item}>{item}</li>
               ))}
             </ul>
           ) : (

@@ -92,7 +92,6 @@ function resolveSourceLabel(source: string, locale: string, key?: string): strin
     // Symbols, opaque role identifiers and units have no linguistic content.
     if (!/[\p{L}]/u.test(source.replace(/\{[A-Za-z_][A-Za-z0-9_]*\}/g, ""))
         || /^(?:[A-Z][A-Z0-9_]*|kg|cm|mg|mmHg|bpm|ms|s|min|h|lag|Transport|ClinIA)$/.test(source)) return source;
-    if (source === UI_LABELS_FR.header.aiMode.mock || source === UI_LABELS_FR.header.aiMode.real) return source;
     const specialty = localizeAppointmentSpecialtyLabel(source, language);
     if (specialty !== null) return specialty;
     const formField = localizeClinicalFormFieldLabel(source, language);

@@ -109,7 +109,7 @@ export function PatientClinicalNotesModal({ patient, onClose, onSaved }: Patient
                     <InfoTooltip label={helpButtonLabel}>{editorHelpLabel}</InfoTooltip>
                 </div>
                 <div>
-                    <textarea id="patient-clinical-note" ref={noteInputRef} value={note} maxLength={10000} onChange={(event) => setNote(event.target.value)} placeholder={copy.placeholder} rows={12} className="mt-2 block w-full resize-y rounded border border-gray-300 px-3 py-2 text-sm leading-6 text-gray-900" />
+                    <textarea translate="no" id="patient-clinical-note" ref={noteInputRef} value={note} maxLength={10000} onChange={(event) => setNote(event.target.value)} placeholder={copy.placeholder} rows={12} className="mt-2 block w-full resize-y rounded border border-gray-300 px-3 py-2 text-sm leading-6 text-gray-900" />
                 </div>
                 {message && <p className={`rounded border p-3 text-sm ${message === labels.patientClinicalNotes.saved ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`}><UiMessage message={message} /></p>}
                 <WriteVerificationReceipt

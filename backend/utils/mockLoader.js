@@ -39,7 +39,7 @@ export function getMockForDiagnosis(diagnosis = "") {
 
     // Fallback générique
     const fallback = mocks["_fallback"] || {
-        patient_summary: "Aucun mock spécifique trouvé.",
+        patient_summary: "No specific simulated response found.",
         treatments: []
     };
 

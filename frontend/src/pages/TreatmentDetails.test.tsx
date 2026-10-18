@@ -5,6 +5,20 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import TreatmentDetails from "./TreatmentDetails";
 
 describe("TreatmentDetails", () => {
+    it.each([
+        { details: " Source details ", summary: "Summary", justification: "Rationale", indication: "Indication", expected: " Source details " },
+        { details: " \t", summary: " Source summary ", justification: "Rationale", indication: "Indication", expected: " Source summary " },
+        { details: "", summary: "", justification: " Source rationale ", indication: "Indication", expected: " Source rationale " },
+        { details: "", summary: " ", justification: "\t", indication: " Source indication ", expected: " Source indication " },
+    ])("selects the first nonempty explanation without modifying it: $expected", fields => {
+        render(<MemoryRouter initialEntries={[{ pathname: "/treatment/source-option", state: {
+            treatment: { id: "source-option", name: "Source option", ...fields },
+        } }]}><Routes><Route path="/treatment/:id" element={<TreatmentDetails />} /></Routes></MemoryRouter>);
+        const explanation = screen.getByText(fields.expected.trim());
+        expect(explanation.textContent).toBe(fields.expected);
+        expect(explanation).toHaveAttribute("translate", "no");
+    });
+
     it("uses treatment state passed from the clinical card", () => {
         render(
             <MemoryRouter
