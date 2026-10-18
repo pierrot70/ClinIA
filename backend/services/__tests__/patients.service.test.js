@@ -573,6 +573,15 @@ describe("patients service audit logs", () => {
         expect(result.logs[0].action).toBe("PATIENT_UPDATE");
     });
 
+    it("allows administrators to filter reactivation audit events", async () => {
+        auditCountDocuments.mockResolvedValue(0);
+        auditFind.mockReturnValue({ sort: vi.fn().mockReturnValue({
+            skip: vi.fn().mockReturnValue({ limit: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue([]) }) }),
+        }) });
+        await listPatientAuditLogs({ authUser: { role: "ADMIN" }, action: "PATIENT_RESTORE" });
+        expect(auditFind).toHaveBeenCalledWith({ $and: [{ action: "PATIENT_RESTORE" }] });
+    });
+
     it("rejects audit access for non-admins", async () => {
         await expect(
             listPatientAuditLogs({

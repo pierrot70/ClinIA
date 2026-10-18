@@ -312,6 +312,7 @@ export async function listPatientAuditLogs({
         "PATIENT_CREATE",
         "PATIENT_UPDATE",
         "PATIENT_ARCHIVE",
+        "PATIENT_RESTORE",
         "PATIENT_DELETE",
     ]);
 
