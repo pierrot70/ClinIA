@@ -1,27 +1,30 @@
 import express from "express";
 import mongoose from "mongoose";
 import { getRequestContext } from "../app/requestContext.js";
+import { deployedVersion } from "../services/validationReports.js";
 
 const router = express.Router();
 
-function buildHealthMeta(req) {
-    return { source: "real", model: "health", ...getRequestContext(req) };
+async function buildHealthMeta(req) {
+    return { source: "real", model: "health", ...getRequestContext(req), deployment: await deployedVersion() };
 }
 
-export function getLiveness(req, res) {
+export async function getLiveness(req, res) {
+    res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({
         data: {
             status: "ok",
             check: "liveness",
         },
-        meta: buildHealthMeta(req),
+        meta: await buildHealthMeta(req),
     });
 }
 
 export function createReadinessHandler({
     connection = mongoose.connection,
 } = {}) {
-    return function getReadiness(req, res) {
+    return async function getReadiness(req, res) {
+        res.setHeader("Cache-Control", "no-store");
         const mongoConnected = connection?.readyState === 1;
 
         return res.status(mongoConnected ? 200 : 503).json({
@@ -32,7 +35,7 @@ export function createReadinessHandler({
                     mongo: mongoConnected ? "connected" : "unavailable",
                 },
             },
-            meta: buildHealthMeta(req),
+            meta: await buildHealthMeta(req),
         });
     };
 }
