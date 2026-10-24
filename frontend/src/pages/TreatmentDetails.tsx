@@ -1,3 +1,4 @@
+import { useClinicalResultReturn } from "../contexts/ClinicalResultReturnContext";
 import { labels } from "../i18n/uiLabels";
 import { useUiLabels } from "../hooks/useUiLabels";
 import { translateUiLabelTree } from "../i18n/pageUiLabels";
@@ -7,7 +8,7 @@ import { hypertensionTreatments } from "../data/hypertension";
 import type { Treatment } from "../data/types";
 import type { EvidenceLevel } from "../types/clinical";
 
-type DetailTreatment = {
+export type DetailTreatment = {
   id: string;
   name: string;
   shortName?: string;
@@ -25,6 +26,8 @@ type DetailTreatment = {
 };
 
 type TreatmentLocationState = {
+  clinicalResultKey?: string;
+  treatmentId?: string;
   treatment?: DetailTreatment;
   sourceMode?: string;
   realAI?: boolean;
@@ -119,6 +122,7 @@ const TreatmentDetails: React.FC = () => {
     const { locale: uiLocale, t } = useUiLabels();
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const resultReturn = useClinicalResultReturn();
   const locationState = (location.state as TreatmentLocationState | null) ?? null;
 
   const fallbackTreatment = normalizeFallbackTreatment(
@@ -126,14 +130,19 @@ const TreatmentDetails: React.FC = () => {
       (t) => t.id === decodeURIComponent(id || "")
     )
   );
-  const treatment = locationState?.treatment ?? fallbackTreatment;
+  const resultKey = locationState?.clinicalResultKey;
+  const snapshot = typeof resultKey === "string" ? resultReturn?.read(resultKey) : undefined;
+  const treatment = resultKey
+    ? snapshot?.treatments.find(item => item.id === locationState?.treatmentId)
+    : locationState?.treatment ?? fallbackTreatment;
+  const returnState = { clinicalResultKey: resultKey ?? "unavailable" };
 
   if (!treatment) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10">
         <p className="text-sm text-gray-600 mb-4">
           {t(labels.pageUi.traitementIntrouvable)}</p>
-        <Link to="/results" className="text-primary text-sm hover:underline">
+        <Link to="/results" state={returnState} className="text-primary text-sm hover:underline">
           {t(labels.pageUi.retourAuxResultats)}</Link>
       </div>
     );
@@ -147,8 +156,8 @@ const TreatmentDetails: React.FC = () => {
   const contraindicationItems = normalizeList(treatment.contraindications);
   const relevanceLabel = getClinicalRelevanceLabel(treatment);
   const sourceLabel = getSourceLabel(
-    locationState?.sourceMode,
-    locationState?.realAI
+    snapshot?.view.sourceMode ?? locationState?.sourceMode,
+    snapshot?.view.realAI ?? locationState?.realAI
   );
   const surveillanceLabel =
     monitoringItems.length >= 2
@@ -255,7 +264,7 @@ const TreatmentDetails: React.FC = () => {
         </div>
       </section>
 
-      <Link to="/results" className="text-primary text-sm hover:underline">
+      <Link to="/results" state={returnState} className="text-primary text-sm hover:underline">
         {t(labels.pageUi.retourAuxResultats)}</Link>
     </div>
   );

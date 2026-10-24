@@ -1,6 +1,7 @@
+import { useClinicalResultReturn } from "../contexts/ClinicalResultReturnContext";
 import { CLINICAL_COMPARISON_CONTENT } from "../i18n/clinicalComparisonContent";
 import { ClinicalContentNotice } from "./clinical/ClinicalContentNotice";
-import React, { useContext, useState } from "react";
+import React, { useContext, useMemo, useState } from "react";
 import AITreatmentTable from "./AITreatmentTable";
 import TreatmentCard from "./TreatmentCard";
 import QuestionCard from "./QuestionCard";
@@ -42,8 +43,9 @@ type ClinicalDemoResultData = Partial<ClinicalAnalysis> & {
   };
 };
 
-interface ClinicalDemoResultProps {
+export interface ClinicalDemoResultProps {
   demoData: ClinicalDemoResultData;
+  alternativesInitiallyOpen?: boolean;
   sourceMode?: string;
   realAI?: boolean;
   patientDisplayName?: string;
@@ -288,7 +290,10 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   canCopyRequest,
   onCopyRequest,
   copyRequestFeedback,
+  alternativesInitiallyOpen = false,
 }) => {
+  const resultReturn = useClinicalResultReturn();
+  const resultKey = useMemo(() => crypto.randomUUID(), [demoData, patientContext, sourceMode, realAI, patientDisplayName]);
   const { t } = useUiLabels();
   const i18n = useContext(HomeI18nContext) || { locale: "fr" };
   const targetLang = i18n.locale;
@@ -443,7 +448,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
         </ResultAccordion>
 
         {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring) && (
-          <ResultAccordion title={recommendationsSectionTitle} hint={recommendationsSectionHint} defaultOpen={false}>
+          <ResultAccordion title={recommendationsSectionTitle} hint={recommendationsSectionHint} defaultOpen={alternativesInitiallyOpen}>
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-xs">
             <h2 className="text-md font-semibold text-emerald-900 mb-2">{contentStrings.aiRecommendations}</h2>
             {/* Bloc générique pour recommendations */}
@@ -663,7 +668,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
       </ResultAccordion>
 
       {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring || mappedTreatments.length > 0) && (
-        <ResultAccordion title={recommendationsSectionTitle} hint={recommendationsSectionHint} defaultOpen={false}>
+        <ResultAccordion title={recommendationsSectionTitle} hint={recommendationsSectionHint} defaultOpen={alternativesInitiallyOpen}>
         {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring) && (
         <section className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-xs mb-4">
           <h2 className="text-md font-semibold text-emerald-900 mb-2">{contentStrings.aiRecommendations}</h2>
@@ -769,6 +774,13 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
           <TreatmentCard
             key={i}
             treatment={t}
+            resultReturn={resultReturn ? {
+              key: resultKey,
+              save: () => resultReturn.save(resultKey, {
+                view: { demoData, patientContext, sourceMode, realAI, patientDisplayName },
+                treatments: mappedTreatments,
+              }),
+            } : undefined}
             sourceMode={sourceMode}
             realAI={realAI}
             language={contentLanguage}

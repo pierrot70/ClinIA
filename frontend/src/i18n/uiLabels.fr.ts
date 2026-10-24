@@ -46,6 +46,9 @@ export const UI_LABELS_FR = {
         unavailable: "Quota indisponible — vérifier le service",
         normal: "Capacité disponible",
     },
+    clinicalResultReturn: {
+        unavailable: "L’analyse précédente n’est plus disponible dans cette session. Revenez au formulaire clinique. Aucune nouvelle analyse n’a été lancée.",
+    },
     analysisStatus: {
         analyze: "Analyser",
         inProgress: "Analyse clinique en cours…",

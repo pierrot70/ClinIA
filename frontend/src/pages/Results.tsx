@@ -1,9 +1,10 @@
+import { useClinicalResultReturn } from "../contexts/ClinicalResultReturnContext";
 import { labels } from "../i18n/uiLabels";
 import { useUiLabels } from "../hooks/useUiLabels";
 import { translateUiLabelTree } from "../i18n/pageUiLabels";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useClinicalAnalysis } from "../hooks/useClinicalAnalysis";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { useClinicalAnalysisNavigation } from "../contexts/ClinicalAnalysisNavigationContext";
 import {
@@ -29,7 +30,7 @@ function buildFallbackPayload(): ClinicalPayload {
     };
 }
 
-const Results: React.FC = () => {
+const ResultsAnalyze: React.FC = () => {
     const { locale: uiLocale, t } = useUiLabels();
 
     const isProd = !!import.meta.env.PROD;
@@ -52,7 +53,7 @@ const Results: React.FC = () => {
         return buildFallbackPayload();
     }, [navigationAnalysis]);
 
-    const { result: analysis, loading: loadingAI, error: errorMessage, analyze } = useClinicalAnalysis();
+    const { result: analysis, loading: loadingAI, error: errorMessage, analyze, responseMeta } = useClinicalAnalysis();
 
     const demoScenario = getClinicalDemoScenario(baseAnalysisPayload);
 
@@ -71,9 +72,7 @@ const Results: React.FC = () => {
         follow_up_and_monitoring: analysis?.follow_up_and_monitoring,
         other_ai_fields: analysis?.other_ai_fields,
     };
-    const [sourceMode, setSourceMode] = useState<
-        "mock" | "real" | "degraded" | "unknown"
-    >("unknown");
+    const sourceMode = responseMeta?.source;
     const [blockingIncident, setBlockingIncident] =
         useState<SecurityIncidentBlockingData | null>(null);
     const [acknowledgingIncident, setAcknowledgingIncident] = useState(false);
@@ -222,7 +221,7 @@ const Results: React.FC = () => {
                     )}
                 </div>
                 <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-2 max-w-2xl">
-                    {t(labels.pageUi.source)}{sourceMode}
+                    {t(labels.pageUi.source)}{sourceMode ?? t(labels.clinicalReview.missing)}
                 </p>
                 {neutralizedMessage && (
                     <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 max-w-2xl">
@@ -250,9 +249,36 @@ const Results: React.FC = () => {
                 sourceMode={sourceMode}
                 realAI={realAI}
                 patientDisplayName={patientDisplayName}
+                patientContext={baseAnalysisPayload}
             />
         </div>
     );
 };
 
+// Decide before mounting the component whose effect starts an analysis.
+function ResultsEntry() {
+    const location = useLocation();
+    const resultReturn = useClinicalResultReturn();
+    const { pendingClinicalAnalysis } = useClinicalAnalysisNavigation();
+    const [requestedAnalysis] = useState(() => pendingClinicalAnalysis);
+    const { t } = useUiLabels();
+    const resultKey = location.state?.clinicalResultKey;
+    if (typeof resultKey === "string") {
+        const snapshot = resultReturn?.read(resultKey);
+        if (snapshot) return <div className="max-w-6xl mx-auto px-4 py-8">
+            <ClinicalDemoResult {...snapshot.view} alternativesInitiallyOpen />
+        </div>;
+    } else if (requestedAnalysis) {
+        return <ResultsAnalyze />;
+    }
+    return <div className="max-w-3xl mx-auto px-4 py-8 space-y-4">
+        <p role="status">{t(labels.clinicalResultReturn.unavailable)}</p>
+        <Link to="/clinical-demo" className="text-primary hover:underline">{t(labels.header.nav.clinicalAnalysis)}</Link>
+    </div>;
+}
+
+const Results: React.FC = () => {
+    const location = useLocation();
+    return <ResultsEntry key={location.key} />;
+};
 export default Results;

@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import Results from "./Results";
@@ -112,14 +112,8 @@ describe("Results payload forwarding", () => {
     renderResults({});
 
     await waitFor(() => {
-      expect(analyzeMock).toHaveBeenCalledWith({
-        age: 55,
-        sex: "male",
-        symptoms: ["Essential hypertension"],
-        medical_history: [],
-        current_medications: [],
-        forceReal: false,
-      });
+      expect(screen.getByRole("status")).toBeInTheDocument();
+      expect(analyzeMock).not.toHaveBeenCalled();
     });
 
     expect(window.sessionStorage.getItem("clinia_results_payload")).toBeNull();

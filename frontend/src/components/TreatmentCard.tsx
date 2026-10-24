@@ -8,12 +8,13 @@ import type { EvidenceLevel } from "../types/clinical";
 
 interface Props {
   treatment: ClinicalTreatmentCardData;
+  resultReturn?: { key: string; save: () => void };
   sourceMode?: string;
   realAI?: boolean;
   language?: "fr" | "en";
 }
 
-type ClinicalTreatmentCardData = Treatment & {
+export type ClinicalTreatmentCardData = Treatment & {
   justification?: string;
   evidence_level?: EvidenceLevel;
   monitoring?: string[];
@@ -79,7 +80,7 @@ function getSourceFootnote(sourceMode: string | undefined, realAI: boolean | und
   return labels.componentUi.baseSurUnContexteCliniqueGenere;
 }
 
-const TreatmentCard: React.FC<Props> = ({ treatment, sourceMode, realAI, language = "fr" }) => {
+const TreatmentCard: React.FC<Props> = ({ treatment, sourceMode, realAI, language = "fr", resultReturn }) => {
     const { locale: uiLocale, t } = useUiLabels(language);
   const english = language === "en";
   const flags = Array.isArray(treatment.flags) ? treatment.flags : [];
@@ -129,11 +130,8 @@ const TreatmentCard: React.FC<Props> = ({ treatment, sourceMode, realAI, languag
         <span>{t(sourceFootnote)}</span>
         <Link
           to={`/treatment/${encodeURIComponent(treatment.id)}`}
-          state={{
-            treatment,
-            sourceMode,
-            realAI,
-          }}
+          state={{ clinicalResultKey: resultReturn?.key, treatmentId: treatment.id }}
+          onClick={resultReturn?.save}
           className="inline-flex items-center gap-1 text-primary hover:underline"
         >
           {t(labels.componentUi.details)}
