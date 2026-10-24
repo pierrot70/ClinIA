@@ -19,6 +19,10 @@ if [[ "${1:-}" == --email-quota ]]; then
     test_config=vitest.emailQuota.config.js
     shift
 fi
+if [[ "${1:-}" == --patient-archive ]]; then
+    test_config=vitest.patientArchive.config.js
+    shift
+fi
 [[ "${NODE_ENV:-}" != production ]] || { echo 'Refusing production mode.' >&2; exit 1; }
 endpoint="${DOCKER_HOST:-$(docker context inspect --format '{{.Endpoints.docker.Host}}')}"
 [[ "$endpoint" == unix://* ]] || { echo 'A local Docker Unix socket is required.' >&2; exit 1; }

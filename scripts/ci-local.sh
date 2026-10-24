@@ -45,6 +45,7 @@ run_step() (
             bash "$root/scripts/run-urgentologist-walk-in-integration.sh" --login-throttle
             bash "$root/scripts/run-urgentologist-walk-in-integration.sh" --recovery-security
             bash "$root/scripts/run-urgentologist-walk-in-integration.sh" --email-quota
+            bash "$root/scripts/run-urgentologist-walk-in-integration.sh" --patient-archive
             npm run test:validation-report
             ;;
         typecheck) npm run typecheck ;;
