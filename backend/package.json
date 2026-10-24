@@ -17,10 +17,10 @@
     "express": "4.22.3",
     "jsonwebtoken": "9.0.2",
     "mongoose": "9.7.4",
-    "nodemailer": "10.0.14",
+    "nodemailer": "10.1.4",
     "openai": "6.9.0"
   },
   "devDependencies": {
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   }
 }
