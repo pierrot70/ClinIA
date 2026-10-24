@@ -53,3 +53,13 @@ describe("TreatmentDetails", () => {
         expect(screen.getByText("Pancreatite active")).toBeInTheDocument();
     });
 });
+
+it("does not interpret missing treatment precautions as standard surveillance or no clinical risk", () => {
+    render(<MemoryRouter initialEntries={[{ pathname: "/treatment/unscoped", state: {
+        treatment: { id: "unscoped", name: "Synthetic unscoped option", contraindications: [], monitoring: [] },
+    } }]}><Routes><Route path="/treatment/:id" element={<TreatmentDetails />} /></Routes></MemoryRouter>);
+    expect(screen.getByText("Non renseigné")).toBeInTheDocument();
+    expect(screen.queryByText("Surveillance standard")).not.toBeInTheDocument();
+    expect(screen.getByText("Aucune contre-indication detaillee fournie.")).toBeInTheDocument();
+    expect(screen.getAllByText("Aucun point de surveillance detaille fourni.").length).toBeGreaterThan(0);
+});

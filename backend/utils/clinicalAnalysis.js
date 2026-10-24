@@ -63,31 +63,18 @@ function buildTreatmentFromString(name, extras = {}) {
     };
 }
 
-function flattenTherapeuticOptions(therapeuticOptions, context = {}) {
+function flattenTherapeuticOptions(therapeuticOptions) {
     if (!therapeuticOptions || typeof therapeuticOptions !== "object") {
         return [];
     }
 
     const treatments = [];
-    const fallbackContraindications = toStringArray(
-        context.contraindications
-            ? Object.values(context.contraindications)
-            : []
-    );
-    const fallbackMonitoring = toStringArray(
-        context.monitoring_considerations
-            ? Object.values(context.monitoring_considerations)
-            : []
-    );
-
     if (Array.isArray(therapeuticOptions.lifestyle_modifications)) {
         for (const item of therapeuticOptions.lifestyle_modifications) {
             if (typeof item === "string" && item.trim()) {
                 treatments.push(
                     buildTreatmentFromString(item, {
                         indication: "Lifestyle modification",
-                        contraindications: fallbackContraindications,
-                        monitoring: fallbackMonitoring,
                     })
                 );
             }
@@ -104,8 +91,10 @@ function flattenTherapeuticOptions(therapeuticOptions, context = {}) {
                             typeof option?.selection_considerations === "string"
                                 ? option.selection_considerations
                                 : "Pharmacologic treatment",
-                        contraindications: fallbackContraindications,
-                        monitoring: fallbackMonitoring,
+                        // These fields are authored on this option, never inferred
+                        // from the analysis-wide context or a medication name.
+                        contraindications: option?.contraindications,
+                        monitoring: option?.monitoring,
                     })
                 );
             }
@@ -113,6 +102,24 @@ function flattenTherapeuticOptions(therapeuticOptions, context = {}) {
     }
 
     return treatments;
+}
+
+// Old cache entries may contain a normalized copy of analysis-wide lists on
+// every derived option. Repair only the complete, exact legacy shape, with
+// the original therapeutic_options still present. Never guess by drug/class.
+function matchesLegacyDerivedTreatments(treatments, derived, context) {
+    if (!Array.isArray(treatments) || !derived.length || treatments.length !== derived.length) return false;
+    const contraindications = toStringArray(context.contraindications ? Object.values(context.contraindications) : []);
+    const monitoring = toStringArray(context.monitoring_considerations ? Object.values(context.monitoring_considerations) : []);
+    if (!contraindications.length && !monitoring.length) return false;
+    return treatments.every((treatment, index) => {
+        if (!treatment || typeof treatment !== "object") return false;
+        const expected = { ...derived[index], contraindications, monitoring };
+        const allowed = new Set([...Object.keys(expected), "justification"]);
+        return Object.keys(treatment).every(key => allowed.has(key))
+            && (treatment.justification === undefined || treatment.justification === "")
+            && Object.entries(expected).every(([key, value]) => JSON.stringify(treatment[key]) === JSON.stringify(value));
+    });
 }
 
 export function extractPrimaryClinicalConcern({ diagnosis, symptoms = [] } = {}) {
@@ -139,6 +146,7 @@ export function normalizeClinicalAnalysis(
     {
         model = process.env.OPENAI_MODEL ?? "fallback",
         primaryConcern = "",
+        repairLegacyDerivedTreatments = false,
     } = {}
 ) {
     const pa = raw?.patient_analysis ?? {};
@@ -151,7 +159,7 @@ export function normalizeClinicalAnalysis(
 
     const merged = { ...liftedOtherAIFields, ...root, ...pa };
 
-    const mappedTherapeuticTreatments = flattenTherapeuticOptions(merged.therapeutic_options, merged);
+    const mappedTherapeuticTreatments = flattenTherapeuticOptions(merged.therapeutic_options);
 
     const explicitTreatments = Array.isArray(merged.treatments)
         ? merged.treatments.map((treatment) => ({
@@ -172,7 +180,9 @@ export function normalizeClinicalAnalysis(
         }))
         : [];
 
-    const treatments = explicitTreatments.length > 0
+    const repairLegacy = repairLegacyDerivedTreatments
+        && matchesLegacyDerivedTreatments(merged.treatments, mappedTherapeuticTreatments, merged);
+    const treatments = explicitTreatments.length > 0 && !repairLegacy
         ? explicitTreatments
         : mappedTherapeuticTreatments.length > 0
             ? mappedTherapeuticTreatments

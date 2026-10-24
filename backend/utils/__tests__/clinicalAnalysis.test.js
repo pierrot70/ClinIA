@@ -74,8 +74,11 @@ describe("clinicalAnalysis utils", () => {
         expect(normalized.treatments).toHaveLength(2);
         expect(normalized.treatments[0].name).toBe("DASH diet");
         expect(normalized.treatments[1].name).toBe("Amlodipine");
-        expect(normalized.treatments[1].monitoring).toContain("Check BP regularly");
-        expect(normalized.treatments[1].contraindications).toContain("Avoid in pregnancy");
+        expect(normalized.treatments[1].monitoring).toEqual([]);
+        expect(normalized.other_ai_fields.monitoring_considerations.blood_pressure).toBe("Check BP regularly");
+        expect(normalized.treatments[1].contraindications).toEqual([]);
+        expect(normalized.treatments[0].contraindications).toEqual([]);
+        expect(normalized.other_ai_fields.contraindications.ace_inhibitors).toBe("Avoid in pregnancy");
     });
 
     it("maps legacy cached other_ai_fields payloads into standard fields", () => {
@@ -106,7 +109,7 @@ describe("clinicalAnalysis utils", () => {
         expect(normalized.diagnosis.suspected).toBe("Analyse clinique en cours");
         expect(normalized.treatments).toHaveLength(1);
         expect(normalized.treatments[0].name).toBe("DASH diet");
-        expect(normalized.treatments[0].monitoring).toContain("Check BP regularly");
+        expect(normalized.treatments[0].monitoring).toEqual([]);
     });
 });
 

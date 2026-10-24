@@ -155,7 +155,7 @@ const TreatmentDetails: React.FC = () => {
       ? labels.pageUi.surveillanceRenforcee
       : monitoringItems.length === 1 || flags.includes("monitoring")
       ? labels.pageUi.surveillanceCiblee
-      : labels.pageUi.surveillanceStandard;
+      : labels.clinicalReview.missing;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10 space-y-6">

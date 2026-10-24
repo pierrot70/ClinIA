@@ -32,12 +32,21 @@ export function resolveCachedDiagnosisState({
         symptoms: cachedDiagnosis?.input?.symptoms,
     });
 
-    const normalizedCachedOutput = cachedDiagnosis?.output
+    const normalizedStoredOutput = cachedDiagnosis?.output
         ? normalizeClinicalAnalysis(cachedDiagnosis.output, {
             model: cachedDiagnosis.model ?? model ?? "cache",
             primaryConcern: cachedPrimaryConcern,
         })
         : null;
+
+    const normalizedCachedOutput = cachedDiagnosis?.output
+        ? normalizeClinicalAnalysis(cachedDiagnosis.output, {
+            model: cachedDiagnosis.model ?? model ?? "cache",
+            primaryConcern: cachedPrimaryConcern,
+            repairLegacyDerivedTreatments: true,
+        })
+        : null;
+    const repairedLegacyReplay = JSON.stringify(normalizedStoredOutput) !== JSON.stringify(normalizedCachedOutput);
 
     const cachedDiagnosisIsPlaceholderReal =
         cachedDiagnosis?.mode === "real" &&
@@ -50,6 +59,8 @@ export function resolveCachedDiagnosisState({
 
     const cacheNeedsUpgrade =
         canReuseCachedDiagnosis &&
+        // Replay repairs must not rewrite the historical stored analysis.
+        !repairedLegacyReplay &&
         JSON.stringify(cachedDiagnosis.output) !==
             JSON.stringify(normalizedCachedOutput);
 
