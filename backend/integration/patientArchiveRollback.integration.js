@@ -201,3 +201,23 @@ describe.each(operations)("MongoDB transactional patient $name", operation => {
         expect(JSON.stringify([...after[PatientAuditLog.collection.name], ...after[WriteOperationAuditLog.collection.name]])).not.toContain(reason);
     });
 });
+
+describe("Patient audit restore filter", () => {
+    it("returns only persisted restoration events and restores all actions when the filter is cleared", async () => {
+        const patient = await seedPatient(false);
+        expect((await mutate(operations[0], patient._id, "Synthetic archive for filter", randomUUID())).status).toBe(200);
+        expect((await mutate(operations[1], patient._id, "Synthetic restore for filter", randomUUID())).status).toBe(200);
+        physician = { ...physician, role: "ADMIN" }; // Fixed actor for this authorized audit-read harness.
+        const filteredResponse = await fetch(`${base}/api/patients/audit-logs?action=PATIENT_RESTORE`);
+        expect(filteredResponse.status).toBe(200);
+        const filtered = (await filteredResponse.json()).data;
+        expect(filtered.pagination.total).toBe(1);
+        expect(filtered.logs).toHaveLength(1);
+        expect(filtered.logs[0]).toMatchObject({ action: "PATIENT_RESTORE", patientId: String(patient._id), outcome: "SUCCESS" });
+        const allResponse = await fetch(`${base}/api/patients/audit-logs`);
+        expect(allResponse.status).toBe(200);
+        const all = (await allResponse.json()).data;
+        expect(all.pagination.total).toBe(3);
+        expect(all.logs.map(log => log.action).sort()).toEqual(["PATIENT_ARCHIVE", "PATIENT_RESTORE", "PATIENT_UPDATE"]);
+    });
+});

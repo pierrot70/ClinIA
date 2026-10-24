@@ -15,6 +15,7 @@ export const patientFormRows: Array<readonly [string, string, string, string, st
         "患者記録にアクセスするには、委任された読み取り専用の臨床アクセス権限が必要です。SUPERADMINロールだけでは、このアクセス権限は付与されません。",
         "访问患者记录需要获得委托的只读临床访问授权。仅有 SUPERADMIN 角色并不授予此访问权限。",
         "נדרשת הרשאת גישה קלינית מואצלת לקריאה בלבד כדי לגשת לתיקי מטופלים. תפקיד SUPERADMIN לבדו אינו מעניק גישה זו."],
+    [UI_LABELS_FR.patientsPage.reactivationHistory.action, "Reactivation", "Reactivación", "재활성화", "Kích hoạt lại", "Reaktivering", "再有効化", "重新启用", "הפעלה מחדש"],
     [UI_LABELS_FR.patientsPage.reactivationHistory.title, "Reactivation history", "Historial de reactivaciones", "재활성화 이력", "Lịch sử kích hoạt lại", "Reaktiveringshistorikk", "再有効化の履歴", "重新启用历史记录", "היסטוריית הפעלה מחדש"],
     [UI_LABELS_FR.patientsPage.reactivationHistory.empty, "No reactivation recorded.", "No hay reactivaciones registradas.", "기록된 재활성화가 없습니다.", "Chưa ghi nhận lần kích hoạt lại nào.", "Ingen reaktivering registrert.", "再有効化の記録はありません。", "暂无重新启用记录。", "לא נרשמה הפעלה מחדש."],
     [UI_LABELS_FR.patientsPage.reactivationHistory.date, "Reactivation date", "Fecha de reactivación", "재활성화 날짜", "Ngày kích hoạt lại", "Reaktiveringsdato", "再有効化日時", "重新启用日期", "תאריך הפעלה מחדש"],

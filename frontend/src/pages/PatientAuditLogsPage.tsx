@@ -17,6 +17,7 @@ const ACTION_OPTIONS = [
     { value: "PATIENT_CREATE", label: labels.pageUi.creation },
     { value: "PATIENT_UPDATE", label: labels.pageUi.modification },
     { value: "PATIENT_ARCHIVE", label: labels.pageUi.archive },
+    { value: "PATIENT_RESTORE", label: labels.patientsPage.reactivationHistory.action },
     { value: "PATIENT_DELETE", label: labels.pageUi.deletion },
 ] as const;
 
@@ -33,6 +34,7 @@ function formatAction(action: PatientAuditLog["action"]) {
     if (action === "PATIENT_CREATE") return labels.pageUi.creation;
     if (action === "PATIENT_UPDATE") return labels.pageUi.modification;
     if (action === "PATIENT_ARCHIVE") return labels.pageUi.archive;
+    if (action === "PATIENT_RESTORE") return labels.patientsPage.reactivationHistory.action;
     if (action === "PATIENT_DELETE") return labels.pageUi.deletion;
     return action;
 }
@@ -74,13 +76,7 @@ export function PatientAuditLogsPage() {
     const [total, setTotal] = useState(0);
     const limit = 20;
 
-    const [action, setAction] = useState<
-        | ""
-        | "PATIENT_CREATE"
-        | "PATIENT_UPDATE"
-        | "PATIENT_ARCHIVE"
-        | "PATIENT_DELETE"
-    >("");
+    const [action, setAction] = useState<PatientAuditLog["action"] | "">("");
     const [patientSearch, setPatientSearch] = useState("");
     const [patientId, setPatientId] = useState("");
     const [actorUserId, setActorUserId] = useState("");
@@ -203,12 +199,7 @@ export function PatientAuditLogsPage() {
                             onChange={(event) => {
                                 setPage(1);
                                 setAction(
-                                    event.target.value as
-                                        | ""
-                                        | "PATIENT_CREATE"
-                                        | "PATIENT_UPDATE"
-                                        | "PATIENT_ARCHIVE"
-                                        | "PATIENT_DELETE"
+                                    event.target.value as PatientAuditLog["action"] | ""
                                 );
                             }}
                         >

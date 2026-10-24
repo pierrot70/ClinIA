@@ -167,6 +167,7 @@ export interface PatientAuditLog {
         | "PATIENT_CREATE"
         | "PATIENT_UPDATE"
         | "PATIENT_ARCHIVE"
+        | "PATIENT_RESTORE"
         | "PATIENT_DELETE";
     outcome: "SUCCESS" | "FAILED";
     actorUserId: string | null;
@@ -473,12 +474,7 @@ export async function restorePatient(
 export async function fetchPatientAuditLogs(params: {
     page?: number;
     limit?: number;
-    action?:
-        | "PATIENT_CREATE"
-        | "PATIENT_UPDATE"
-        | "PATIENT_ARCHIVE"
-        | "PATIENT_DELETE"
-        | "";
+    action?: PatientAuditLog["action"] | "";
     patientId?: string;
     actorUserId?: string;
     startDate?: string;
