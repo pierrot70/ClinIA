@@ -108,7 +108,10 @@ refusé. Vérifier aussi les confirmations, infobulles, titres et textes accessi
 La revue visuelle doit couvrir téléphone, tablette et ordinateur, ainsi que
 l’hébreu : champs, boutons, menus, tableaux et messages longs. La couverture
 des catalogues ne garantit ni la qualité linguistique, ni l’absence de texte
-coupé. Une revue humaine des traductions cliniques reste nécessaire.
+coupé. La qualité des traductions de l’interface et le contenu clinique anglais
+se valident séparément. La [grille de validation médecin](clinical-language-physician-review.md)
+prépare la revue humaine de la politique linguistique, des explications et des alternatives,
+avec conservation des notes dans leur langue originale.
 
 Les contenus médicaux d’exemple explicitement marqués `lang="en"` et
 `translate="no"` conservent leur politique anglaise existante. Les titres,
