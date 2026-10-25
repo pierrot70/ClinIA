@@ -1,3 +1,4 @@
+import { clinicalResultIntegrityLabels } from "./clinicalResultIntegrityLabels";
 import { clinicalProvenanceLabels } from "./clinicalProvenanceLabels";
 import { clinicalResultReturnLabels } from "./clinicalResultReturnLabels";
 import { localizeAppointmentSpecialtyLabel } from "./appointmentSpecialtyLabels";
@@ -65,6 +66,7 @@ function indexedLabels(locale: string) {
         pairTrees(getTree("fr-CA"), getTree(locale), result);
     }
     for (const [source, translated] of [
+        [UI_LABELS_FR.clinicalResultIntegrity, clinicalResultIntegrityLabels(locale)],
         [UI_LABELS_FR.clinicalProvenance, clinicalProvenanceLabels(locale)],
         [UI_LABELS_FR.clinicalResultReturn, clinicalResultReturnLabels(locale)],
         [UI_LABELS_FR.clinicalReview, clinicalReviewLabels(locale)],

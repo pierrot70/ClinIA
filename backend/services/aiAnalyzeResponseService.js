@@ -1,3 +1,5 @@
+import { withholdUnverifiedDiabetesSummaries } from "../utils/clinicalSummarySafety.js";
+
 export async function buildMockAnalyzeResponse({
     diagnosisSeed,
     diagnosis,
@@ -127,7 +129,7 @@ export async function buildPersistedRealAnalyzeResponse({
         return {
             ok: true,
             responsePayload: {
-                data: normalized,
+                data: withholdUnverifiedDiabetesSummaries(normalized, { patient }),
                 meta: {
                     source: "real",
                     model,
@@ -167,7 +169,7 @@ export async function buildPersistedRealAnalyzeResponse({
     }
 
     const responsePayload = {
-        data: persisted.doc.output,
+        data: withholdUnverifiedDiabetesSummaries(persisted.doc.output, { patient }),
         meta: {
             source: "real",
             model,

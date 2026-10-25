@@ -51,12 +51,32 @@ function toStringArray(value) {
         .filter(Boolean);
 }
 
+const OPTION_EXTRA_FIELDS = ["id", "class", "shortName", "summary", "details", "rationale", "explanation", "references", "sources", "source_fields"];
+function authoredOptionFields(option) {
+    if (!option || typeof option !== "object") return {};
+    const mapped = Object.fromEntries(OPTION_EXTRA_FIELDS.filter(key => option[key] !== undefined).map(key => [key, option[key]]));
+    const standard = new Set(["name", "indication", "justification", "dosage", "duration", "contraindications", "monitoring", "evidence_level", "id", "shortName", "class", "flags", "source_fields"]);
+    const textFields = new Set(["indication", "justification", "dosage", "duration", "summary", "details"]);
+    const remaining = Object.fromEntries(Object.entries(option).filter(([key, value]) => !standard.has(key) || (textFields.has(key) && typeof value !== "string")));
+    if (!mapped.source_fields && Object.keys(remaining).length) mapped.source_fields = remaining;
+    for (const key of ["summary", "details", "class", "shortName"]) {
+        if (mapped[key] !== undefined && typeof mapped[key] !== "string") delete mapped[key];
+    }
+    return mapped;
+}
+
+function firstAuthoredText(...values) {
+    return values.find(value => typeof value === "string" && value.trim()) ?? "";
+}
+
 function buildTreatmentFromString(name, extras = {}) {
     return {
+        ...authoredOptionFields(extras),
+        ...(extras.justification !== undefined ? { justification: firstAuthoredText(extras.justification) } : {}),
         name: String(name || "Unspecified treatment").trim() || "Unspecified treatment",
-        indication: extras.indication ?? "",
-        dosage: extras.dosage ?? "",
-        duration: extras.duration ?? "",
+        indication: firstAuthoredText(extras.indication),
+        dosage: firstAuthoredText(extras.dosage),
+        duration: firstAuthoredText(extras.duration),
         contraindications: toStringArray(extras.contraindications),
         monitoring: toStringArray(extras.monitoring),
         evidence_level: extras.evidence_level ?? "C",
@@ -91,6 +111,9 @@ function flattenTherapeuticOptions(therapeuticOptions) {
                             typeof option?.selection_considerations === "string"
                                 ? option.selection_considerations
                                 : "Pharmacologic treatment",
+                        ...authoredOptionFields(option),
+                        ...(option?.justification !== undefined || option?.rationale !== undefined
+                            ? { justification: option.justification ?? option.rationale } : {}),
                         // These fields are authored on this option, never inferred
                         // from the analysis-wide context or a medication name.
                         contraindications: option?.contraindications,
@@ -104,6 +127,26 @@ function flattenTherapeuticOptions(therapeuticOptions) {
     return treatments;
 }
 
+function namedStructuredOptions(value) {
+    if (!value || typeof value !== "object") return [];
+    if (Array.isArray(value)) return value.flatMap(option => {
+        // Arrays here are authored option lists, not a recursive scan of all
+        // nested .name fields (references and monitoring are not treatments).
+        return option && typeof option === "object" && !Array.isArray(option)
+            && typeof option.name === "string" && option.name.trim()
+            ? namedStructuredOptions(option) : [];
+    });
+    if (typeof value.name === "string" && value.name.trim()) {
+        return [buildTreatmentFromString(value.name, {
+            ...value,
+            source_fields: value,
+            justification: firstAuthoredText(value.justification, value.rationale, value.explanation),
+        })];
+    }
+    const containers = ["options", "treatments", "medications", "pharmacologic_treatment", "pharmacologic_options", "pharmacological", "non_pharmacologic_options", "nonpharmacological", "lifestyle_modifications"];
+    return containers.flatMap(key => namedStructuredOptions(value[key]));
+}
+
 // Old cache entries may contain a normalized copy of analysis-wide lists on
 // every derived option. Repair only the complete, exact legacy shape, with
 // the original therapeutic_options still present. Never guess by drug/class.
@@ -114,7 +157,8 @@ function matchesLegacyDerivedTreatments(treatments, derived, context) {
     if (!contraindications.length && !monitoring.length) return false;
     return treatments.every((treatment, index) => {
         if (!treatment || typeof treatment !== "object") return false;
-        const expected = { ...derived[index], contraindications, monitoring };
+        const { name, indication, dosage, duration, evidence_level } = derived[index];
+        const expected = { name, indication, dosage, duration, evidence_level, contraindications, monitoring };
         const allowed = new Set([...Object.keys(expected), "justification"]);
         return Object.keys(treatment).every(key => allowed.has(key))
             && (treatment.justification === undefined || treatment.justification === "")
@@ -160,16 +204,18 @@ export function normalizeClinicalAnalysis(
     const merged = { ...liftedOtherAIFields, ...root, ...pa };
 
     const mappedTherapeuticTreatments = flattenTherapeuticOptions(merged.therapeutic_options);
+    const structuredTreatments = namedStructuredOptions(merged.treatment_options);
 
     const explicitTreatments = Array.isArray(merged.treatments)
         ? merged.treatments.map((treatment) => ({
+            ...authoredOptionFields(treatment),
             name: treatment?.name ?? "Unspecified treatment",
-            indication: treatment?.indication ?? "",
+            indication: firstAuthoredText(treatment?.indication),
             // Preserve authored rationale as its own field; do not reinterpret
             // it as an indication or generate replacement clinical content.
-            justification: treatment?.justification ?? "",
-            dosage: treatment?.dosage ?? "",
-            duration: treatment?.duration ?? "",
+            justification: firstAuthoredText(treatment?.justification, treatment?.rationale, treatment?.explanation),
+            dosage: firstAuthoredText(treatment?.dosage),
+            duration: firstAuthoredText(treatment?.duration),
             contraindications: Array.isArray(treatment?.contraindications)
                 ? treatment.contraindications
                 : [],
@@ -186,7 +232,7 @@ export function normalizeClinicalAnalysis(
         ? explicitTreatments
         : mappedTherapeuticTreatments.length > 0
             ? mappedTherapeuticTreatments
-            : [];
+            : structuredTreatments;
 
     const patientSummaryPlain =
         typeof merged.patient_summary === "string"

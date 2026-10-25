@@ -38,7 +38,7 @@ type ClinicalDemoScenario = {
 type DiabetesChartProfile =
     | "standard"
     | "cardiorenal_high_risk"
-    | "older_frail";
+    | "frailty_reported";
 
 const cataractTreatments: Treatment[] = [
     {
@@ -462,11 +462,11 @@ function buildDiabetesRelevanceByAgeChart(
         });
     }
 
-    if (profile === "older_frail") {
+    if (profile === "frailty_reported") {
         chart.subtitle =
-            "An original ClinIA synthesis for an older, frail profile. Does not represent a quantitative measure of efficacy.";
+            "An original ClinIA synthesis for a profile with explicitly reported frailty. Does not represent a quantitative measure of efficacy.";
         chart.interpretationNote =
-            "In this profile, frailty, tolerability and overall safety matter more. This visual helps contextualize treatment caution, without by itself suggesting a decline in pharmacological efficacy or replacing clinical judgment.";
+            "In this profile, frailty, tolerability and overall safety matter more. This visual helps contextualize treatment caution, without by itself suggesting a decline in pharmacological efficacy or replacing clinical judgment. Reported frailty does not remove the need to assess cardiovascular and renal risks separately.";
         chart.series = chart.series.map((series) => {
             if (series.name === "Metformin") {
                 return { ...series, values: [5, 5, 4, 3, 2] };
@@ -487,6 +487,8 @@ function buildDiabetesRelevanceByAgeChart(
         });
     }
 
+    chart.interpretationNote +=
+        " Age or limited medication tolerability alone does not establish frailty. Missing frailty information does not establish low frailty.";
     return chart;
 }
 
@@ -525,26 +527,20 @@ function getDiabetesChartProfile(
     payload?: Partial<ClinicalPayload> | null
 ): DiabetesChartProfile {
     const diabetesContext = payload?.diabetes_context;
-    const age = typeof payload?.age === "number" ? payload.age : 0;
     const fragility = normalizeOptional(diabetesContext?.fragility);
     const renalFunction = normalizeOptional(diabetesContext?.renal_function);
     const cardiovascularRisk = normalizeOptional(
         diabetesContext?.cardiovascular_risk
     );
-    const tolerance = normalizeOptional(diabetesContext?.tolerance);
+    // Frailty must be explicitly reported. Age, tolerability and missing data
+    // cannot establish it; exact values also avoid matching negated phrases.
+    const hasReportedFrailty = new Set([
+        "elevee", "fragilite elevee", "tres elevee", "high",
+        "high frailty", "very high", "frail", "fragile",
+    ]).has(fragility);
 
-    const isOlderFrailProfile =
-        age >= 75 ||
-        fragility.includes("elevee") ||
-        ["high", "high frailty", "frail"].includes(fragility) ||
-        fragility.includes("fragile") ||
-        tolerance.includes("limitee") ||
-        tolerance.includes("limited") ||
-        tolerance.includes("reassess") ||
-        tolerance.includes("reevaluer");
-
-    if (isOlderFrailProfile) {
-        return "older_frail";
+    if (hasReportedFrailty) {
+        return "frailty_reported";
     }
 
     const isCardiorenalHighRiskProfile =

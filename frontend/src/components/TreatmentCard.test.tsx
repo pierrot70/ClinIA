@@ -25,7 +25,7 @@ describe("TreatmentCard", () => {
         }
     });
 
-    it("shows a stronger clinical relevance label for evidence-backed options", () => {
+    it("does not elevate the relevance badge when option precautions are not provided", () => {
         render(
             <MemoryRouter>
                 <TreatmentCard
@@ -50,11 +50,38 @@ describe("TreatmentCard", () => {
         );
 
         expect(
-            screen.getByText("Pertinence clinique elevee")
+            screen.getByText("Option cliniquement solide")
         ).toBeInTheDocument();
+        expect(screen.queryByText("Pertinence clinique elevee")).not.toBeInTheDocument();
         expect(
             screen.getByText("Base sur une reponse OpenAI reelle")
         ).toBeInTheDocument();
+    });
+
+    it.each([
+        { monitoring: undefined, contraindications: undefined },
+        { monitoring: [], contraindications: [] },
+        { monitoring: ["Supplied monitoring"], contraindications: undefined },
+        { monitoring: undefined, contraindications: ["Supplied restriction"] },
+    ])("does not mistake missing or empty precaution lists for lower clinical risk: %j", fields => {
+        render(<MemoryRouter><TreatmentCard sourceMode="real" treatment={{
+            id: "incomplete-option", name: "Incomplete source option", shortName: "Option",
+            class: "Source class", efficacy: 0.5, sideEffectScore: 10,
+            summary: "Authored summary", details: "Authored details", flags: [],
+            evidence_level: "A", ...fields,
+        }} /></MemoryRouter>);
+        expect(screen.queryByText(UI_LABELS_FR.pageUi.pertinenceCliniqueElevee)).not.toBeInTheDocument();
+        expect(screen.getByText(UI_LABELS_FR.pageUi.optionCliniquementSolide)).toBeInTheDocument();
+    });
+
+    it("uses the higher heuristic badge only with both supplied scoped precaution lists", () => {
+        render(<MemoryRouter><TreatmentCard sourceMode="real" treatment={{
+            id: "scoped-option", name: "Scoped source option", shortName: "Option",
+            class: "Source class", efficacy: 0.5, sideEffectScore: 10,
+            summary: "Authored summary", details: "Authored details", flags: [],
+            evidence_level: "A", monitoring: ["Supplied monitoring"], contraindications: ["Supplied restriction"],
+        }} /></MemoryRouter>);
+        expect(screen.getByText(UI_LABELS_FR.pageUi.pertinenceCliniqueElevee)).toBeInTheDocument();
     });
 
     it("keeps a more cautious label when monitoring and contraindications are heavier", () => {

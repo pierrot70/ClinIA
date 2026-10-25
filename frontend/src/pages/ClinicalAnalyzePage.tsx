@@ -1,5 +1,5 @@
 import { CLINICAL_COMPARISON_CONTENT } from "../i18n/clinicalComparisonContent";
-import { useUiLabelTree } from "../hooks/useUiLabels";
+import { useUiLabels, useUiLabelTree } from "../hooks/useUiLabels";
 import { UiMessage } from "../components/i18n/UiMessage";
 import { UiText } from "../components/i18n/UiText";
 import { analysisStatusLabels } from "../i18n/analysisStatusLabels";
@@ -54,6 +54,7 @@ const REQUEST_BOUNDARY_ERROR_CODES = new Set([
 /* ------------------------------------------------------------------ */
 
 export function ClinicalAnalyzePage() {
+    const { t } = useUiLabels();
     const COMMENT_TRACKING_STORAGE_KEY = "clinia_comment_tracking";
     const { user } = useAuth();
     const canConfigureAi = isAdminRole(user?.role);
@@ -1526,10 +1527,9 @@ export function ClinicalAnalyzePage() {
                                     </ul>
                                 </div>
                                 <p className="mt-3 text-sm text-gray-700 whitespace-pre-wrap">
-                                    {comparisonResultOne?.patient_summary?.plain_language ||
-                                        comparisonScenarioOne.questions?.[0]?.answer ||
-                                        comparisonErrorOne ||
-                                        comparisonLabels.summaryUnavailable}
+                                    {comparisonResultOne?.summary_safety?.status === "withheld"
+                                        ? t(labels.clinicalResultIntegrity.summaryWithheld)
+                                        : comparisonResultOne?.patient_summary?.plain_language || comparisonErrorOne || comparisonLabels.summaryUnavailable}
                                 </p>
                             </article>
                             <article className="rounded-xl border border-gray-200 bg-gray-50 p-4">
@@ -1570,10 +1570,9 @@ export function ClinicalAnalyzePage() {
                                     </ul>
                                 </div>
                                 <p className="mt-3 text-sm text-gray-700 whitespace-pre-wrap">
-                                    {comparisonResultTwo?.patient_summary?.plain_language ||
-                                        comparisonScenarioTwo.questions?.[0]?.answer ||
-                                        comparisonErrorTwo ||
-                                        comparisonLabels.summaryUnavailable}
+                                    {comparisonResultTwo?.summary_safety?.status === "withheld"
+                                        ? t(labels.clinicalResultIntegrity.summaryWithheld)
+                                        : comparisonResultTwo?.patient_summary?.plain_language || comparisonErrorTwo || comparisonLabels.summaryUnavailable}
                                 </p>
                             </article>
                         </div>
@@ -1666,11 +1665,9 @@ export function ClinicalAnalyzePage() {
                         demoData={{
                             alternatives: result?.alternatives,
                             red_flags: result?.red_flags,
-                            treatments:
-                                Array.isArray(result?.treatments) && result.treatments.length > 0
-                                    ? (result.treatments as any[])
-                                    : demoScenario.treatments,
-                            questions: demoScenario.questions,
+                            treatments: result?.treatments ?? [],
+                            questions: [],
+                            summary_safety: result?.summary_safety,
                             summary: result?.patient_summary?.plain_language || undefined,
                             error: error || undefined,
                             errorCode: errorCode || undefined,

@@ -88,3 +88,21 @@ describe("confirmed clinical provenance", () => {
         expect(screen.queryByText("Contexte clinique genere")).not.toBeInTheDocument();
     });
 });
+
+it("shows every distinct authored detail and retains option-scoped source references", () => {
+    const fields={id:"authored",name:"Authored option",details:"Original details",summary:"Original summary",justification:"Original rationale",indication:"Original indication",source_fields:{references:[{name:"Authored source",url:"https://example.test"}]}};
+    render(<MemoryRouter initialEntries={[{pathname:"/treatment/authored",state:{treatment:fields,sourceMode:"real"}}]}><Routes><Route path="/treatment/:id" element={<TreatmentDetails/>}/></Routes></MemoryRouter>);
+    for(const text of [fields.details,fields.summary,fields.justification,fields.indication]) expect(screen.getByText(text)).toHaveAttribute("translate","no");
+    expect(screen.getByText(/Authored source/)).toHaveAttribute("translate","no");
+});
+it("does not present a category-only legacy indication as a complete explanation", () => {
+    render(<MemoryRouter initialEntries={[{pathname:"/treatment/legacy",state:{treatment:{id:"legacy",name:"Legacy option",indication:"Pharmacologic treatment",evidence_level:"A"},sourceMode:"real",cacheHit:true}}]}><Routes><Route path="/treatment/:id" element={<TreatmentDetails/>}/></Routes></MemoryRouter>);
+    expect(screen.getByText("Aucun detail supplementaire fourni pour cette option.")).toBeInTheDocument();
+    expect(screen.queryByText("Pertinence clinique elevee")).not.toBeInTheDocument();
+});
+it("labels a directly linked static example as simulated even when stale navigation metadata says real", () => {
+    render(<MemoryRouter initialEntries={[{pathname:"/treatment/amlodipine",state:{sourceMode:"real",cacheHit:true}}]}><Routes><Route path="/treatment/:id" element={<TreatmentDetails/>}/></Routes></MemoryRouter>);
+    expect(screen.getAllByText("Donnees simulees")).toHaveLength(2);
+    expect(screen.queryByText("Reponse OpenAI reelle")).not.toBeInTheDocument();
+    expect(screen.queryByText("Réponse réutilisée depuis le cache.")).not.toBeInTheDocument();
+});

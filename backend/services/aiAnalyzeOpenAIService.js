@@ -87,7 +87,7 @@ export async function executeOpenAIAnalyze({
         diagnosisLower.includes("diabetes");
 
     const diabetesInstruction = isType2DiabetesCase
-        ? "For type 2 diabetes cases, explicitly structure the response so the clinician can compare: current strategy, whether a GLP-1 option may merit reevaluation, key cardiometabolic factors to review, cautions, and a neutral conclusion. Do not recommend prescribing, do not instruct replacing metformin automatically, do not provide dosing, and keep the final decision explicitly with the clinician."
+        ? "For type 2 diabetes cases, preserve every uncertainty and alternative from the supplied context (for example, preserved OR mildly reduced renal function). An HbA1c target is not a measured HbA1c. Medication tolerability or adherence does not establish glycemic control. Do not claim that diabetes is well controlled or well managed without objective supporting observations. If control, renal function or other necessary observations cannot be established from the supplied data, state that limitation explicitly rather than inferring normality. Keep patient-facing summaries faithful to the supplied facts. Explicitly structure the response so the clinician can compare: current strategy, whether a GLP-1 option may merit reevaluation, key cardiometabolic factors to review, cautions, and a neutral conclusion. Do not recommend prescribing, do not instruct replacing metformin automatically, do not provide dosing, and keep the final decision explicitly with the clinician."
         : "";
     const diabetesContextPrompt = isType2DiabetesCase
         ? buildType2DiabetesContextPrompt(patient)

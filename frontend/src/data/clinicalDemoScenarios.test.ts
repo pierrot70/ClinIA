@@ -79,7 +79,7 @@ describe("clinical demo scenarios", () => {
         });
 
         expect(frailScenario.relevanceByAgeChart?.subtitle).toContain(
-            "older, frail profile"
+            "profile with explicitly reported frailty"
         );
         expect(
             stableScenario.relevanceByAgeChart?.series.find(
@@ -134,7 +134,7 @@ describe("clinical demo scenarios", () => {
             diabetes_context: { cardiovascular_risk: "Very high", renal_function: "Moderate to severe reduction", fragility: "Low", tolerance: "Well tolerated", glycemic_goals: "Individualized" } });
         expect(english).toEqual(french);
         expect(getClinicalDemoScenario({ diagnosis: "Type 2 diabetes", age: 60,
-            diabetes_context: { fragility: "High", tolerance: "Limited", cardiovascular_risk: "High", renal_function: "Preserved", glycemic_goals: "Individualized" } }).relevanceByAgeChart?.subtitle).toContain("older, frail profile");
+            diabetes_context: { fragility: "High", tolerance: "Limited", cardiovascular_risk: "High", renal_function: "Preserved", glycemic_goals: "Individualized" } }).relevanceByAgeChart?.subtitle).toContain("profile with explicitly reported frailty");
     });
 
     it("keeps simulated English content and safety qualifiers across diagnoses", () => {
@@ -150,6 +150,41 @@ describe("clinical demo scenarios", () => {
     it("does not classify low frailty as a frail profile from an English substring", () => {
         const scenario = getClinicalDemoScenario({ diagnosis: "Type 2 diabetes", age: 60,
             diabetes_context: { fragility: "Low frailty", tolerance: "Well tolerated", cardiovascular_risk: "Moderate", renal_function: "Preserved", glycemic_goals: "Individualized" } });
-        expect(scenario.relevanceByAgeChart?.subtitle).not.toContain("older, frail profile");
+        expect(scenario.relevanceByAgeChart?.subtitle).not.toContain("profile with explicitly reported frailty");
     });
+
+    it.each([
+        { age: 78, fragility: "Low", tolerance: "Metformin well tolerated" },
+        { age: 95, fragility: undefined, tolerance: undefined },
+        { age: 78, fragility: "Unknown", tolerance: "Limited" },
+        { age: 55, fragility: "Low", tolerance: "Limited" },
+        { age: 55, fragility: "Faible", tolerance: "Tolerance digestive limitee" },
+        { age: 78, fragility: "non fragile", tolerance: "reassess" },
+        { age: 78, fragility: "not frail", tolerance: "Well tolerated" },
+        { age: 78, fragility: "Low frailty", tolerance: "Well tolerated" },
+    ])("does not infer frailty from age, tolerability, missing or negated context: %j", ({ age, fragility, tolerance }) => {
+        const chart = getClinicalDemoScenario({ diagnosis: "Type 2 diabetes", age,
+            diabetes_context: { fragility, tolerance, cardiovascular_risk: "Moderate", renal_function: "Preserved" },
+        }).relevanceByAgeChart;
+        expect(chart?.subtitle).not.toContain("explicitly reported frailty");
+        expect(chart?.series.find(({name}) => name === "Metformin")?.values).toEqual([5, 5, 5, 4, 4]);
+        expect(chart?.interpretationNote).toContain("Missing frailty information does not establish low frailty");
+    });
+
+    it.each(["High", "High frailty", "Élevée", "Fragilité élevée"])("recognizes explicitly reported frailty independently of age: %s", (fragility) => {
+        const chart = getClinicalDemoScenario({ diagnosis: "Type 2 diabetes", age: 55,
+            diabetes_context: { fragility, tolerance: "Well tolerated" },
+        }).relevanceByAgeChart;
+        expect(chart?.subtitle).toContain("profile with explicitly reported frailty");
+        expect(chart?.interpretationNote).toContain("assess cardiovascular and renal risks separately");
+    });
+
+    it("does not let older age override an explicitly low-frailty cardiorenal context", () => {
+        const chart = getClinicalDemoScenario({ diagnosis: "Type 2 diabetes", age: 78,
+            diabetes_context: { fragility: "Low", cardiovascular_risk: "Very high", renal_function: "Moderate to severe reduction" },
+        }).relevanceByAgeChart;
+        expect(chart?.subtitle).toContain("high-risk cardiorenal profile");
+        expect(chart?.subtitle).not.toContain("explicitly reported frailty");
+    });
+
 });

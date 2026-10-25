@@ -138,3 +138,36 @@ it("preserves a historical French treatment rationale verbatim without reclassif
     expect(output.treatments[0].indication).toBe("");
     expect(JSON.stringify(raw)).toBe(before);
 });
+
+describe("authored option fields and structured response boundaries", () => {
+    it("preserves authored details, rationale and references on explicit and cached normalized options without mutating input", () => {
+        const authored = { name: "Synthetic option", indication: "Option category", justification: " Rationale — sin cambio ", details: " Authored detail ", summary: "Authored summary", references: [{name:"Source title",url:"https://example.test/source"}], monitoring:["Own monitoring"], contraindications:["Own restriction"] };
+        const raw = { treatments:[authored] };
+        const before = structuredClone(raw);
+        const result = normalizeClinicalAnalysis(raw);
+        expect(result.treatments[0]).toMatchObject(authored);
+        expect(normalizeClinicalAnalysis(result).treatments[0]).toMatchObject(authored);
+        expect(raw).toEqual(before);
+    });
+    it("maps explicitly named structured options without treating named references or global monitoring as drugs", () => {
+        const raw = { treatment_options: { references:[{name:"A guideline",url:"https://example.test"}], monitoring:[{name:"Global BP check"}], options:[{name:"Authored option",rationale:"Original rationale",contraindications:["Own only"]}] }, contraindications:{unrelated:["Global restriction"]} };
+        const result = normalizeClinicalAnalysis(raw);
+        expect(result.treatments.map(t=>t.name)).toEqual(["Authored option"]);
+        expect(result.treatments[0]).toMatchObject({justification:"Original rationale",contraindications:["Own only"],monitoring:[]});
+        expect(result.treatment_options).toEqual(raw.treatment_options);
+    });
+    it("retains unrecognized option structures as original fields without inventing named treatments", () => {
+        const raw = { treatment_options:{current_strategy:{recommendation:"Authored recommendation",details:["Original detail"]}, evidence:{name:"A source"}} };
+        const result = normalizeClinicalAnalysis(raw);
+        expect(result.treatments).toEqual([]);
+        expect(result.treatment_options).toEqual(raw.treatment_options);
+    });
+    it("preserves structured rationale in source_fields while keeping display fields string-safe", () => {
+        const rationale={reason:"Original rationale",qualifier:"Uncertain"};
+        const raw={treatment_options:[{name:"Authored option",rationale,details:["Original detail"],references:[{name:"Source"}]}]};
+        const result=normalizeClinicalAnalysis(raw);
+        expect(result.treatments[0].justification).toBe("");
+        expect(result.treatments[0].details).toBeUndefined();
+        expect(result.treatments[0].source_fields).toEqual(raw.treatment_options[0]);
+    });
+});

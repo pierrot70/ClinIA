@@ -181,6 +181,9 @@ describe("aiAnalyzeOpenAIService", () => {
         const request = create.mock.calls[0][0];
         expect(request.messages[0].content).toContain("GLP-1 option may merit reevaluation");
         expect(request.messages[0].content).toContain("Do not recommend prescribing");
+        expect(request.messages[0].content).toContain("An HbA1c target is not a measured HbA1c");
+        expect(request.messages[0].content).toContain("Medication tolerability or adherence does not establish glycemic control");
+        expect(request.messages[0].content).toContain("preserve every uncertainty and alternative");
         expect(request.messages[1].content).toContain("compare continuing the current strategy");
     });
 

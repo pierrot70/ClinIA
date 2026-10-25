@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SubmittedClinicalContext } from './SubmittedClinicalContext';
 import { clinicalReviewLabels, clinicalReviewTranslations } from '../../i18n/clinicalReviewLabels';
 import { UI_LABELS_FR } from '../../i18n/uiLabels.fr';
+import { localizeClinicalFormFieldLabel } from '../../i18n/clinicalFormFieldLabels';
 import ClinicalDemoResult from '../ClinicalDemoResult';
 import { HomeI18nContext } from '../../contexts/HomeI18nContext';
 import type { ClinicalPayload } from '../../types/clinical';
@@ -53,4 +54,24 @@ describe('submitted analysis context', () => {
   // The advanced result layout historically has no export action.
   if(!('clinical_summary' in demoData)) {fireEvent.click(screen.getByRole('button',{name:'Copy request JSON'}));expect(copy).toHaveBeenCalledOnce();}
  });
+ it.each(Object.keys(clinicalReviewTranslations))('preserves submitted diabetes uncertainties and labels in %s without exposing extra fields', locale => {
+  const values = {
+   cardiovascular_risk: 'Moderate to high', renal_function: 'Preserved or mildly reduced',
+   fragility: 'Low', tolerance: 'Metformin well tolerated', glycemic_goals: 'HbA1c < 7% if safe and realistic',
+  };
+  render(<SubmittedClinicalContext locale={locale} context={{...context, diagnosis:'Type 2 diabetes',
+   diabetes_context:{...values, unauthorized:'DO-NOT-EXPOSE'} as any}} />);
+  for(const value of Object.values(values)) {
+   const element=screen.getByText(value);
+   expect(element).toBeVisible();
+   expect(element).toHaveAttribute('translate','no');
+   expect(element).toHaveAttribute('dir','auto');
+  }
+  const f=UI_LABELS_FR.clinicalFormFields;
+  for(const source of [f.cardiovascularRisk,f.renalFunction,f.fragility,f.tolerance,f.glycemicGoals])
+   expect(screen.getByText(localizeClinicalFormFieldLabel(source,locale) ?? source)).toBeVisible();
+  expect(screen.queryByText('DO-NOT-EXPOSE')).not.toBeInTheDocument();
+  expect(screen.queryByText('SECRET-ACK')).not.toBeInTheDocument();
+ });
+
 });

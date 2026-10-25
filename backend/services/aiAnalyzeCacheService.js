@@ -1,3 +1,5 @@
+import { withholdUnverifiedDiabetesSummaries } from "../utils/clinicalSummarySafety.js";
+
 const NON_CLINICAL_FINGERPRINT_KEYS = new Set([
     "forceReal",
     "openaiModel",
@@ -39,18 +41,23 @@ export function resolveCachedDiagnosisState({
         })
         : null;
 
-    const normalizedCachedOutput = cachedDiagnosis?.output
+    const normalizedCachedSource = cachedDiagnosis?.output
         ? normalizeClinicalAnalysis(cachedDiagnosis.output, {
             model: cachedDiagnosis.model ?? model ?? "cache",
             primaryConcern: cachedPrimaryConcern,
             repairLegacyDerivedTreatments: true,
         })
         : null;
-    const repairedLegacyReplay = JSON.stringify(normalizedStoredOutput) !== JSON.stringify(normalizedCachedOutput);
+    const normalizedCachedOutput = withholdUnverifiedDiabetesSummaries(normalizedCachedSource, {
+        patient: { ...cachedDiagnosis?.input, diagnosis: cachedPrimaryConcern },
+        source: cachedDiagnosis?.mode,
+    });
+    const summaryWithheld = normalizedCachedOutput?.summary_safety?.status === "withheld";
+    const repairedLegacyReplay = JSON.stringify(normalizedStoredOutput) !== JSON.stringify(normalizedCachedSource);
 
     const cachedDiagnosisIsPlaceholderReal =
         cachedDiagnosis?.mode === "real" &&
-        isPlaceholderClinicalAnalysis(normalizedCachedOutput);
+        isPlaceholderClinicalAnalysis(normalizedCachedSource);
 
     const canReuseCachedDiagnosis =
         normalizedCachedOutput &&
@@ -61,6 +68,7 @@ export function resolveCachedDiagnosisState({
         canReuseCachedDiagnosis &&
         // Replay repairs must not rewrite the historical stored analysis.
         !repairedLegacyReplay &&
+        !summaryWithheld &&
         JSON.stringify(cachedDiagnosis.output) !==
             JSON.stringify(normalizedCachedOutput);
 

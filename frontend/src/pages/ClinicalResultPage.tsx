@@ -101,11 +101,13 @@ export function ClinicalResultPage({ data, serviceMode, targetLang }: PropsWithL
 
             <section>
                 <h3 className="font-medium">{renderLabel(patientSummaryLabel, loadingPatientSummaryLabel)}</h3>
-                <p dir="auto" translate="no">
+                {data.summary_safety?.status === "withheld" ? (
+                    <p role="status"><UiText text={labels.clinicalResultIntegrity.summaryWithheld} /></p>
+                ) : <p dir="auto" translate="no">
                     {data.patient_summary?.plain_language
                         ? data.patient_summary.plain_language
                         : renderLabel(noSummaryLabel, loadingNoSummaryLabel)}
-                </p>
+                </p>}
             </section>
 
             <section>

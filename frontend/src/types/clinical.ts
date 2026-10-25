@@ -92,6 +92,11 @@ export interface ClinicalAnalysis {
         clinical_language: string;
     };
 
+    summary_safety?: {
+        status: "withheld";
+        reason_codes: string[];
+        scope: "generated_summaries";
+    };
     clinical_summary?: any;
     recommendations?: any;
 

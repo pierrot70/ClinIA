@@ -25,6 +25,36 @@ sur le candidat corrigé. Conserver les cases de revue humaine non évaluées
 jusqu'à son avis explicite. Un résultat technique favorable ne valide ni le
 contenu médical, ni la qualité linguistique, ni un usage clinique réel.
 
+## Corrections issues de la simulation par IA du 25 octobre 2026
+
+La simulation de réviseur demandée par l'utilisateur emploie uniquement des
+cas fictifs (hypertension à 55 ans, diabète à 55 ans, variante à 78 ans avec
+fragilité faible et profil cardiovasculaire élevé à 58 ans). Elle ne remplace
+pas la revue humaine décrite dans cette grille. Les avis humains restent
+non évalués. La version initialement observée est `cc242a8` ; consigner le SHA
+et/ou l'empreinte des modifications effectivement rejouées.
+
+| Point | Comportement corrigé à vérifier au rejeu |
+| --- | --- |
+| SIM-01 Provenance par contenu | Une réponse réelle sans liste de traitements exploitable n'est plus complétée silencieusement par les exemples du frontend. Les options structurées réellement fournies doivent rester visibles avec leurs données et leur provenance. |
+| SIM-02 Fragilité explicitement rapportée | L'âge, la tolérance et une donnée absente ne suffisent plus à établir la fragilité. Les mentions négatives ne doivent pas être interprétées comme une fragilité positive. Les coefficients du graphique restent illustratifs et ne sont pas validés par cette correction. |
+| SIM-03 Complétude et rattachement | Conserver les détails, justifications, précautions, surveillance et références effectivement fournis pour l'option. Les données globales restent séparées. Signaler l'absence d'explication ou de donnée ; une catégorie comme « Pharmacologic treatment » ne constitue pas à elle seule une justification. Aucune information médicale manquante n'est inventée. |
+| SIM-04 Fidélité des résumés | Le contrat d'entrée du diabète contient des objectifs et des éléments de tolérance, mais pas d'observation vérifiée établissant le contrôle glycémique. Les résumés générés des réponses réelles concernées sont retenus avec `summary_safety.status=withheld`, y compris à la relecture du cache. Les paramètres soumis restent visibles. |
+
+La protection SIM-04 est volontairement conservatrice : elle retient aussi
+des résumés génériques ou prudents. Elle ne constitue pas un validateur
+sémantique universel des réponses médicales. Son périmètre est celui des
+champs de résumé reconnus ; les autres textes exigent toujours une lecture
+critique. Les anciennes sorties stockées restent intactes ; la protection
+porte sur la vue retournée, sans correction médicale silencieuse ni nouvel
+appel IA imposé. L'absence de détail dans une ancienne source reste une limite
+de contenu même lorsque son affichage est réparé.
+
+Le rejeu doit distinguer les réponses simulées du staging, les fixtures de
+réponses réelles reconstituées pour les régressions et toute réponse réellement
+observée. Ne pas attribuer aux tests une validation médicale des médicaments,
+des scores, des références scientifiques ou des futures générations.
+
 ## Politique soumise au médecin
 
 | Contenu | Comportement soumis à validation |

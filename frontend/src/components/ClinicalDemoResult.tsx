@@ -132,14 +132,20 @@ function SourceContentText({
     return <p dir="auto" translate="no" className={className}>{sourceText}</p>;
   }
 
-  if (text && typeof text === "object") {
-    return (
-      <pre dir="auto" translate="no" className={className}>
-        {JSON.stringify(text, null, 2)}
-      </pre>
-    );
+  if (Array.isArray(text)) {
+    return <ul className={className}>{text.map((value, index) => <li key={index}>
+      <SourceContentText text={value} language={language} className="whitespace-pre-wrap" />
+    </li>)}</ul>;
   }
-
+  if (text && typeof text === "object") {
+    return <dl className={className}>{Object.entries(text).map(([key, value]) => <div key={key} className="mb-2">
+      <dt dir="auto" translate="no" className="font-semibold">{key}</dt>
+      <dd><SourceContentText text={value} language={language} className="whitespace-pre-wrap" /></dd>
+    </div>)}</dl>;
+  }
+  if (typeof text === "number" || typeof text === "boolean") {
+    return <p dir="auto" translate="no" className={className}>{String(text)}</p>;
+  }
   return null;
 }
 
@@ -340,10 +346,10 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   const {
     treatments,
     questions,
-    summary,
+    summary: suppliedSummary,
     error,
     errorCode,
-    clinical_summary,
+    clinical_summary: suppliedClinicalSummary,
     recommendations,
     initial_evaluation_recommendations,
     treatment_options,
@@ -351,6 +357,12 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
     other_ai_fields,
     relevanceByAgeChart,
   } = demoData || {};
+  const summaryWithheld = demoData?.summary_safety?.status === "withheld";
+  const summary = summaryWithheld ? undefined : suppliedSummary;
+  const clinical_summary = summaryWithheld ? undefined : suppliedClinicalSummary;
+  const summaryWarning = summaryWithheld
+    ? <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">{t(labels.clinicalResultIntegrity.summaryWithheld)}</p>
+    : null;
   // Cached results can predate the current response schema. Treat optional lists
   // defensively so one legacy document cannot blank the whole clinical screen.
   const normalizedTreatments = Array.isArray(treatments) ? treatments : [];
@@ -382,6 +394,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
 
         <ResultAccordion title={summarySectionTitle} hint={summarySectionHint}>
           <SubmittedClinicalContext context={patientContext} locale={targetLang} />
+          {summaryWarning}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold">{patientSummaryLabel}</h2>
@@ -425,6 +438,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
         <ClinicalSafetySections alternatives={demoData?.alternatives} redFlags={demoData?.red_flags} />
         <ResultAccordion title={summarySectionTitle} hint={summarySectionHint} defaultOpen={false}>
           <SubmittedClinicalContext context={patientContext} locale={targetLang} />
+          {summaryWarning}
           <h2 className="text-lg font-semibold mb-2">{patientSummaryLabel}</h2>
           <SourceContentText
             text={summary}
@@ -449,119 +463,21 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
           />
         </ResultAccordion>
 
-        {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring) && (
-          <ResultAccordion title={recommendationsSectionTitle} hint={recommendationsSectionHint} defaultOpen={alternativesInitiallyOpen}>
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-xs">
-            <h2 className="text-md font-semibold text-emerald-900 mb-2">{contentStrings.aiRecommendations}</h2>
-            {/* Bloc générique pour recommendations */}
-            {recommendations && (
-              <div className="mb-2">
-                <h3 className="font-semibold text-sm mb-1">{contentStrings.recommendations}</h3>
-                {typeof recommendations === 'string' && (
-                  <div className="text-xs text-gray-800 mb-1">
-                    <SourceContentSpan text={recommendations} language={contentLanguage} />
-                  </div>
-                )}
-                {Array.isArray(recommendations) && (
-                  <ul className="list-disc pl-5 text-xs text-gray-800">
-                    {recommendations.map((item: any, i: number) => (
-                      <li key={i}>
-                        {typeof item === 'string'
-                          ? <SourceContentSpan text={item} language={contentLanguage} />
-                          : JSON.stringify(item)}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {typeof recommendations === 'object' && !Array.isArray(recommendations) && recommendations !== null && (
-                  <pre dir="auto" translate="no" className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(recommendations, null, 2)}</pre>
-                )}
-              </div>
-            )}
-            {/* Bloc générique pour initial_evaluation_recommendations */}
-            {initial_evaluation_recommendations && (
-              <div className="mb-2">
-                <h3 className="font-semibold text-sm mb-1">{contentStrings.initialEvaluation}</h3>
-                {typeof initial_evaluation_recommendations === 'string' && (
-                  <div className="text-xs text-gray-800 mb-1">
-                    <SourceContentSpan text={initial_evaluation_recommendations} language={contentLanguage} />
-                  </div>
-                )}
-                {Array.isArray(initial_evaluation_recommendations) && (
-                  <ul className="list-disc pl-5 text-xs text-gray-800">
-                    {initial_evaluation_recommendations.map((item: any, i: number) => (
-                      <li key={i}>
-                        {typeof item === 'string'
-                          ? <SourceContentSpan text={item} language={contentLanguage} />
-                          : JSON.stringify(item)}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {typeof initial_evaluation_recommendations === 'object' && !Array.isArray(initial_evaluation_recommendations) && initial_evaluation_recommendations !== null && (
-                  <pre dir="auto" translate="no" className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(initial_evaluation_recommendations, null, 2)}</pre>
-                )}
-              </div>
-            )}
-            {/* Bloc générique pour treatment_options */}
-            {treatment_options && (
-              <div className="mb-2">
-                <h3 className="font-semibold text-sm mb-1">{contentStrings.treatmentOptions}</h3>
-                {typeof treatment_options === 'string' && (
-                  <div className="text-xs text-gray-800 mb-1">
-                    <SourceContentSpan text={treatment_options} language={contentLanguage} />
-                  </div>
-                )}
-                {Array.isArray(treatment_options) && (
-                  <ul className="list-disc pl-5 text-xs text-gray-800">
-                    {treatment_options.map((item: any, i: number) => (
-                      <li key={i}>
-                        {typeof item === 'string'
-                          ? <SourceContentSpan text={item} language={contentLanguage} />
-                          : JSON.stringify(item)}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {typeof treatment_options === 'object' && !Array.isArray(treatment_options) && treatment_options !== null && (
-                  <pre dir="auto" translate="no" className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(treatment_options, null, 2)}</pre>
-                )}
-              </div>
-            )}
-            {/* Bloc générique pour follow_up_and_monitoring */}
-            {follow_up_and_monitoring && (
-              <div className="mb-2">
-                <h3 className="font-semibold text-sm mb-1">{contentStrings.followUpAndMonitoring}</h3>
-                {typeof follow_up_and_monitoring === 'string' && (
-                  <div className="text-xs text-gray-800 mb-1">
-                    <SourceContentSpan text={follow_up_and_monitoring} language={contentLanguage} />
-                  </div>
-                )}
-                {Array.isArray(follow_up_and_monitoring) && (
-                  <ul className="list-disc pl-5 text-xs text-gray-800">
-                    {follow_up_and_monitoring.map((item: any, i: number) => (
-                      <li key={i}>
-                        {typeof item === 'string'
-                          ? <SourceContentSpan text={item} language={contentLanguage} />
-                          : JSON.stringify(item)}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {typeof follow_up_and_monitoring === 'object' && !Array.isArray(follow_up_and_monitoring) && follow_up_and_monitoring !== null && (
-                  <pre dir="auto" translate="no" className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(follow_up_and_monitoring, null, 2)}</pre>
-                )}
-              </div>
-            )}
-            </div>
-            <SectionReferences
-              title={referencesSectionTitle}
-              hint={referencesSectionHint}
-              sources={relevanceByAgeChart?.sources}
-              language={contentLanguage}
-            />
-          </ResultAccordion>
-        )}
+        <ResultAccordion title={recommendationsSectionTitle} hint={recommendationsSectionHint} defaultOpen={alternativesInitiallyOpen}>
+          <div className="space-y-4">
+            <h2 className="font-semibold">{contentStrings.aiRecommendations}</h2>
+            {[
+              [contentStrings.recommendations, recommendations],
+              [contentStrings.initialEvaluation, initial_evaluation_recommendations],
+              [contentStrings.treatmentOptions, treatment_options],
+              [contentStrings.followUpAndMonitoring, follow_up_and_monitoring],
+            ].map(([title, value], index) => hasRenderableValue(value) ? <section key={index}>
+              <h3 className="font-semibold text-sm mb-1">{String(title)}</h3>
+              <SourceContentText text={value} language={contentLanguage} className="text-sm whitespace-pre-wrap" />
+            </section> : null)}
+            <p role="status" className="text-sm text-gray-600">{t(labels.clinicalResultIntegrity.noOptions)}</p>
+          </div>
+        </ResultAccordion>
 
         {other_ai_fields && Object.keys(other_ai_fields).length > 0 && (
           <ResultAccordion title={questionsSectionTitle} hint={questionsSectionHint} defaultOpen={false}>
@@ -611,7 +527,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
     contraindications: t.contraindications || [],
     monitoring: t.monitoring ?? [],
     evidence_level: t.evidence_level ?? "C",
-    justification: t.summary || t.indication || t.justification || "-",
+    justification: t.justification || t.summary || t.details || t.indication || "",
     ...t,
   }));
 
@@ -621,6 +537,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
       <ClinicalSafetySections alternatives={demoData?.alternatives} redFlags={demoData?.red_flags} />
       <ResultAccordion title={summarySectionTitle} hint={summarySectionHint} defaultOpen={false}>
           <SubmittedClinicalContext context={patientContext} locale={targetLang} />
+          {summaryWarning}
         <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold">{patientSummaryLabel}</h2>
           <div className="flex flex-col gap-2 sm:items-end">
@@ -669,80 +586,22 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
         )}
       </ResultAccordion>
 
-      {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring || mappedTreatments.length > 0) && (
+      {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring || mappedTreatments.length > 0 || normalizedTreatments.length === 0) && (
         <ResultAccordion title={recommendationsSectionTitle} hint={recommendationsSectionHint} defaultOpen={alternativesInitiallyOpen}>
         {(recommendations || initial_evaluation_recommendations || treatment_options || follow_up_and_monitoring) && (
-        <section className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-xs mb-4">
-          <h2 className="text-md font-semibold text-emerald-900 mb-2">{contentStrings.aiRecommendations}</h2>
-          {recommendations && (
-            <div className="mb-2">
-              <h3 className="font-semibold text-sm mb-1">{contentStrings.recommendations}</h3>
-              {typeof recommendations === 'string' && (
-                <div className="text-xs text-gray-800 mb-1">
-                  <SourceContentSpan text={recommendations} language={contentLanguage} />
-                </div>
-              )}
-              {Array.isArray(recommendations) && (
-                <ul className="list-disc pl-5 text-xs text-gray-800">
-                  {recommendations.map((item: any, i: number) => (
-                    <li key={i}>
-                      {typeof item === 'string'
-                        ? <SourceContentSpan text={item} language={contentLanguage} />
-                        : JSON.stringify(item)}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {typeof recommendations === 'object' && !Array.isArray(recommendations) && recommendations !== null && (
-                <pre dir="auto" translate="no" className="text-xs text-gray-700 bg-gray-100 rounded p-2 overflow-x-auto">{JSON.stringify(recommendations, null, 2)}</pre>
-              )}
-            </div>
-          )}
-          {initial_evaluation_recommendations && (
-            <div className="mb-2">
-              <h3 className="font-semibold text-sm mb-1">{contentStrings.initialEvaluation}</h3>
-              <ul className="list-disc pl-5 text-xs text-gray-800">
-                {initial_evaluation_recommendations.map((item: string, i: number) => (
-                  <li key={i}><SourceContentSpan text={item} language={contentLanguage} /></li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {treatment_options && (
-            <div className="mb-2">
-              <h3 className="font-semibold text-sm mb-1">{contentStrings.treatmentOptions}</h3>
-              {Object.entries(treatment_options).map(([key, value]: [string, any], i) => (
-                <div key={key} className="mb-2">
-                  <div className="font-semibold text-xs text-emerald-800 mb-1">{key.replace(/_/g, ' ')}</div>
-                  <div className="text-xs text-gray-800 mb-1">
-                    <SourceContentSpan
-                      text={String(value.recommendation || "")}
-                      language={contentLanguage}
-                    />
-                  </div>
-                  {Array.isArray(value.details) && (
-                    <ul className="list-disc pl-5 text-xs text-gray-800">
-                      {value.details.map((d: string, j: number) => (
-                      <li key={j}><SourceContentSpan text={d} language={contentLanguage} /></li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          {follow_up_and_monitoring && (
-            <div className="mb-2">
-              <h3 className="font-semibold text-sm mb-1">{contentStrings.followUpAndMonitoring}</h3>
-              <ul className="list-disc pl-5 text-xs text-gray-800">
-                {follow_up_and_monitoring.map((item: string, i: number) => (
-                  <li key={i}><SourceContentSpan text={item} language={contentLanguage} /></li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </section>
-      )}
+          <section className="space-y-4 rounded border border-emerald-200 bg-emerald-50 p-4">
+            <h2 className="font-semibold">{contentStrings.aiRecommendations}</h2>
+            {[
+              [contentStrings.recommendations, recommendations],
+              [contentStrings.initialEvaluation, initial_evaluation_recommendations],
+              [contentStrings.treatmentOptions, treatment_options],
+              [contentStrings.followUpAndMonitoring, follow_up_and_monitoring],
+            ].map(([title, value], index) => hasRenderableValue(value) ? <section key={index}>
+              <h3 className="font-semibold text-sm mb-1">{String(title)}</h3>
+              <SourceContentText text={value} language={contentLanguage} className="text-sm whitespace-pre-wrap" />
+            </section> : null)}
+          </section>
+        )}
 
       {mappedTreatments.length > 0 && !hasIADetails && (
         <>
@@ -770,6 +629,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
         </>
       )}
 
+      {mappedTreatments.length === 0 && <p role="status" className="text-sm text-gray-600">{t(labels.clinicalResultIntegrity.noOptions)}</p>}
       {/* Cartes de traitements */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {(mappedTreatments ?? []).map((t, i) => (
@@ -805,6 +665,12 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
             sources={relevanceByAgeChart.sources}
             language={contentLanguage}
           />
+        </ResultAccordion>
+      )}
+
+      {other_ai_fields && Object.keys(other_ai_fields).length > 0 && (
+        <ResultAccordion title={contentStrings.otherAiRecommendations} hint={questionsSectionHint} defaultOpen={false}>
+          <SourceContentText text={other_ai_fields} language={contentLanguage} className="text-sm whitespace-pre-wrap" />
         </ResultAccordion>
       )}
 

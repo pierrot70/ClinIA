@@ -169,6 +169,25 @@ describe("ClinicalAnalyzePage", () => {
         expect(screen.getByRole("status")).not.toHaveTextContent(/OpenAI|GPT/i);
     });
 
+    it.each([false, true])("keeps a real response empty rather than substituting demo treatments (cache=%s)", async cacheHit => {
+        authUser = { role: "MEDECIN" };
+        analyzeMock.mockReset().mockResolvedValue(null);
+        const response = { treatments:[], treatment_options:{current_strategy:{recommendation:"Original option context"}}, summary_safety:{status:"withheld",reason_codes:["GLYCEMIC_CONTROL_NOT_ESTABLISHED"],scope:"generated_summaries"} };
+        const slot={ result:null, loading:false,error:null,errorCode:null,responseMeta:null,analyze:analyzeMock,resetAnalysis:vi.fn() };
+        configureClinicalAnalysisSlots({...slot},{...slot},{...slot});
+        analyzeMock.mockImplementation(()=>{hookSlots[0].result=response;hookSlots[0].responseMeta={source:"real",cacheHit};});
+        render(<MemoryRouter><ClinicalAnalyzePage /></MemoryRouter>);
+        await act(async()=>{fireEvent.click(screen.getByRole("button",{name:"submit-clinical-form"}));});
+        if (cacheHit) fireEvent.click(screen.getByRole("button",{name:"Consulter le résultat"}));
+        const props=clinicalResultSpy.mock.lastCall?.[0];
+        expect(props.demoData.treatments).toEqual([]);
+        expect(props.demoData.questions).toEqual([]);
+        expect(props.demoData.treatment_options).toEqual(response.treatment_options);
+        expect(props.demoData.summary_safety).toEqual(response.summary_safety);
+        expect(props.sourceMode).toBe("real");
+        expect(props.cacheHit).toBe(cacheHit);
+    });
+
     it("submits the exact user payload without injecting the demo case", () => {
         analyzeMock.mockReset();
         clinicalFormSpy.mockReset();

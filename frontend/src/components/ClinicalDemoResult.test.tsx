@@ -304,3 +304,29 @@ describe("ClinicalDemoResult", () => {
         ).toBeInTheDocument();
     });
 });
+
+describe("clinical result source integrity", () => {
+    it("shows a localized summary limitation even if a stale cached view still contains generated summary text", () => {
+        render(<HomeI18nContext.Provider value={{locale:"en-CA"} as any}><ClinicalDemoResult sourceMode="real" demoData={{summary:"Unsupported reassuring summary",clinical_summary:"Unsupported clinical summary",treatments:[],summary_safety:{status:"withheld",reason_codes:["GLYCEMIC_CONTROL_NOT_ESTABLISHED"],scope:"generated_summaries"}} as any} /></HomeI18nContext.Provider>);
+        fireEvent.click(screen.getByRole("button",{name:/Patient clinical summary/}));
+        expect(screen.getByRole("status")).toHaveTextContent("Summary withheld");
+        expect(screen.queryByText("Unsupported reassuring summary")).not.toBeInTheDocument();
+        expect(screen.queryByText("Unsupported clinical summary")).not.toBeInTheDocument();
+    });
+    it("renders arbitrary authored option structures without static treatment substitution or array assumptions", () => {
+        const options={current_strategy:{recommendation:"Original recommendation — sin cambio",details:["Original detail"]}};
+        render(<ClinicalDemoResult sourceMode="real" demoData={{treatments:[],treatment_options:options}} />);
+        fireEvent.click(screen.getByRole("button",{name:/Alternatives et recommandations/}));
+        expect(screen.getByText(/Original recommendation — sin cambio/)).toHaveAttribute("translate","no");
+        expect(screen.getByRole("status")).toHaveTextContent("Aucun exemple simulé");
+        expect(screen.queryByTestId("treatment-card")).not.toBeInTheDocument();
+    });
+    it("keeps analysis-wide original context accessible without attaching it to each treatment", () => {
+        render(<ClinicalDemoResult sourceMode="real" demoData={{treatments:[{name:"Scoped option",contraindications:[],monitoring:[]}] as any,follow_up_and_monitoring:{overall:"Original global follow-up"},other_ai_fields:{monitoring_considerations:{global:"Original global monitoring"}}}} />);
+        fireEvent.click(screen.getByRole("button",{name:/Alternatives et recommandations/}));
+        expect(screen.getByText(/Original global follow-up/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button",{name:/Autres recommandations IA/}));
+        expect(screen.getByText(/Original global monitoring/)).toBeInTheDocument();
+        expect(captureTreatmentTable.mock.lastCall?.[0]?.treatments?.[0]?.monitoring ?? []).toEqual([]);
+    });
+});

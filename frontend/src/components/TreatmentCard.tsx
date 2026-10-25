@@ -36,7 +36,7 @@ function getClinicalRelevanceLabel(treatment: ClinicalTreatmentCardData, languag
       ? 1
       : 0;
 
-  if (evidenceLevel === "A" && monitoringCount <= 1 && contraindicationCount <= 1) {
+  if (evidenceLevel === "A" && monitoringCount === 1 && contraindicationCount === 1) {
     return labels.pageUi.pertinenceCliniqueElevee;
   }
 

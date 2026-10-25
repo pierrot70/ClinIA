@@ -1,4 +1,9 @@
 export const UI_LABELS_FR = {
+    clinicalResultIntegrity: {
+        summaryWithheld: "Résumé non affiché : les informations fournies ne permettent pas d'établir le contrôle glycémique. Consultez les paramètres soumis et complétez l'évaluation clinique.",
+        noOptions: "Aucune option thérapeutique structurée fournie dans cette réponse. Aucun exemple simulé n'a été substitué.",
+        sourceFields: "Informations complémentaires de l'option source",
+    },
     clinicalProvenance: {
         unknown: "Provenance non renseignée",
         reused: "Réponse réutilisée depuis le cache.",

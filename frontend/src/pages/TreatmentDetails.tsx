@@ -20,6 +20,7 @@ export type DetailTreatment = {
   dosage?: string;
   duration?: string;
   flags?: string[];
+  source_fields?: Record<string, unknown>;
   contraindications?: string[] | string;
   monitoring?: string[];
   evidence_level?: EvidenceLevel;
@@ -47,7 +48,7 @@ function getClinicalRelevanceLabel(treatment?: DetailTreatment) {
       ? 1
       : 0;
 
-  if (evidenceLevel === "A" && monitoringCount <= 1 && contraindicationCount <= 1) {
+  if (evidenceLevel === "A" && monitoringCount === 1 && contraindicationCount === 1) {
     return labels.pageUi.pertinenceCliniqueElevee;
   }
 
@@ -147,17 +148,20 @@ const TreatmentDetails: React.FC = () => {
     );
   }
 
-  const explanation = [treatment.details, treatment.summary, treatment.justification, treatment.indication].find(
-    value => typeof value === "string" && value.trim().length > 0
-  );
+  // The legacy normalizer uses these exact category labels when no authored
+  // rationale exists. They describe a class of intervention, not an explanation.
+  const categoryLabels = new Set(["Pharmacologic treatment", "Lifestyle modification"]);
+  const explanations = [...new Set([treatment.details, treatment.summary, treatment.justification, treatment.indication].filter(
+    (value): value is string => typeof value === "string" && value.trim().length > 0 && !categoryLabels.has(value)
+  ))];
   const flags = Array.isArray(treatment.flags) ? treatment.flags : [];
   const monitoringItems = normalizeList(treatment.monitoring);
   const contraindicationItems = normalizeList(treatment.contraindications);
   const relevanceLabel = getClinicalRelevanceLabel(treatment);
   const sourceLabel = getSourceLabel(
-    snapshot ? snapshot.view.sourceMode : locationState?.sourceMode
+    snapshot ? snapshot.view.sourceMode : locationState?.treatment ? locationState.sourceMode : fallbackTreatment ? "mock" : undefined
   );
-  const cacheHit = snapshot ? snapshot.view.cacheHit : locationState?.cacheHit;
+  const cacheHit = snapshot ? snapshot.view.cacheHit : locationState?.treatment ? locationState.cacheHit : undefined;
   const surveillanceLabel =
     monitoringItems.length >= 2
       ? labels.pageUi.surveillanceRenforcee
@@ -211,8 +215,8 @@ const TreatmentDetails: React.FC = () => {
       <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs text-sm text-gray-700 space-y-3">
         <h2 className="text-sm font-semibold text-gray-800">
           {t(labels.pageUi.commentInterpreterCesInformations)}</h2>
-        {explanation ? (
-          <p dir="auto" translate="no">{explanation}</p>
+        {explanations.length > 0 ? (
+          explanations.map((explanation, index) => <p key={index} dir="auto" translate="no">{explanation}</p>)
         ) : (
           <p>{t(labels.pageUi.aucunDetailSupplementaireFourniPourCetteOption)}</p>
         )}
@@ -232,6 +236,12 @@ const TreatmentDetails: React.FC = () => {
         ) : null}
       </section>
 
+      {treatment.source_fields && Object.keys(treatment.source_fields).length > 0 && (
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <h2 className="font-semibold text-sm mb-2">{t(labels.clinicalResultIntegrity.sourceFields)}</h2>
+          <pre dir="auto" translate="no" className="whitespace-pre-wrap break-words text-sm">{JSON.stringify(treatment.source_fields, null, 2)}</pre>
+        </section>
+      )}
       <section className="grid gap-4 sm:grid-cols-2">
         <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
           <h2 className="text-sm font-semibold text-gray-800 mb-2">

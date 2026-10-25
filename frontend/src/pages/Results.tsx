@@ -58,11 +58,9 @@ const ResultsAnalyze: React.FC = () => {
     const demoScenario = getClinicalDemoScenario(baseAnalysisPayload);
 
     const demoData = {
-        treatments:
-            Array.isArray(analysis?.treatments) && analysis.treatments.length > 0
-                ? analysis.treatments
-                : demoScenario.treatments,
-        questions: demoScenario.questions,
+        treatments: analysis?.treatments ?? [],
+        questions: [],
+        summary_safety: analysis?.summary_safety,
         summary: analysis?.patient_summary?.plain_language || undefined,
         error: errorMessage || undefined,
         clinical_summary: analysis?.clinical_summary,
