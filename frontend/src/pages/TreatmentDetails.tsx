@@ -30,6 +30,7 @@ type TreatmentLocationState = {
   treatmentId?: string;
   treatment?: DetailTreatment;
   sourceMode?: string;
+  cacheHit?: boolean;
   realAI?: boolean;
 };
 
@@ -72,11 +73,9 @@ function getClinicalRelevanceLabel(treatment?: DetailTreatment) {
   return labels.pageUi.aDiscuter;
 }
 
-function getSourceLabel(sourceMode?: string, realAI?: boolean) {
+function getSourceLabel(sourceMode?: string) {
   if (sourceMode === "real") {
-    return realAI
-      ? labels.pageUi.reponseOpenAIReelle
-      : labels.pageUi.reponseOpenAIReelleMiseEnCache;
+    return labels.pageUi.reponseOpenAIReelle;
   }
 
   if (sourceMode === "degraded") {
@@ -87,7 +86,7 @@ function getSourceLabel(sourceMode?: string, realAI?: boolean) {
     return labels.pageUi.donneesSimulees;
   }
 
-  return labels.pageUi.contexteCliniqueGenere;
+  return labels.clinicalProvenance.unknown;
 }
 
 function normalizeList(value?: string[] | string) {
@@ -156,9 +155,9 @@ const TreatmentDetails: React.FC = () => {
   const contraindicationItems = normalizeList(treatment.contraindications);
   const relevanceLabel = getClinicalRelevanceLabel(treatment);
   const sourceLabel = getSourceLabel(
-    snapshot?.view.sourceMode ?? locationState?.sourceMode,
-    snapshot?.view.realAI ?? locationState?.realAI
+    snapshot ? snapshot.view.sourceMode : locationState?.sourceMode
   );
+  const cacheHit = snapshot ? snapshot.view.cacheHit : locationState?.cacheHit;
   const surveillanceLabel =
     monitoringItems.length >= 2
       ? labels.pageUi.surveillanceRenforcee
@@ -205,6 +204,7 @@ const TreatmentDetails: React.FC = () => {
           </div>
           <p className="text-[11px] text-gray-500 mt-1">
             {t(labels.pageUi.cetteFicheReprendLeContexteDuTraitementAfficheDansLaPageClinique)}</p>
+          {cacheHit === true && <p className="text-xs text-gray-500 mt-1">{t(labels.clinicalProvenance.reused)}</p>}
         </div>
       </section>
 

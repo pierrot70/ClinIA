@@ -38,3 +38,11 @@ describe("local UI translation coverage", () => {
         expect(getLocalUiMessage(message, "en-CA")).toBe("146 attempts remaining");
     });
 });
+
+it.each(UI_LOCALES)("localizes confirmed clinical provenance in %s", locale => {
+    for (const source of Object.values(UI_LABELS_FR.clinicalProvenance)) {
+        const translated = getLocalUiTranslation(source, locale);
+        expect(validUiTranslation(source, translated)).toBe(true);
+        if (locale !== "fr-CA") expect(translated).not.toBe(source);
+    }
+});

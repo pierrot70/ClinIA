@@ -3,7 +3,7 @@ import type { ClinicalDemoResultProps } from "../components/ClinicalDemoResult";
 import type { DetailTreatment } from "../pages/TreatmentDetails";
 import { useAuth } from "../hooks/useAuth";
 
-type ResultView = Pick<ClinicalDemoResultProps, "demoData" | "sourceMode" | "realAI" | "patientContext" | "patientDisplayName">;
+type ResultView = Pick<ClinicalDemoResultProps, "demoData" | "sourceMode" | "cacheHit" | "realAI" | "patientContext" | "patientDisplayName">;
 export type ClinicalResultSnapshot = { view: ResultView; treatments: DetailTreatment[] };
 const Context = createContext<{
     save: (key: string, snapshot: ClinicalResultSnapshot) => void;

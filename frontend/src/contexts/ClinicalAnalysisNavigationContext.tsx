@@ -1,3 +1,4 @@
+import { ClinicalFormDraftProvider } from "./ClinicalFormDraftContext";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ClinicalPayload } from "../types/clinical";
 import { clearLegacyClinicalBrowserStorage } from "../utils/clinicalBrowserStorage";
@@ -52,7 +53,7 @@ export function ClinicalAnalysisNavigationProvider({
 
   return (
     <ClinicalAnalysisNavigationContext.Provider value={value}>
-      {children}
+      <ClinicalFormDraftProvider>{children}</ClinicalFormDraftProvider>
     </ClinicalAnalysisNavigationContext.Provider>
   );
 }

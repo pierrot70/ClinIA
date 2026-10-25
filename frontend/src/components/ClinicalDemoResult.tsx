@@ -47,6 +47,7 @@ export interface ClinicalDemoResultProps {
   demoData: ClinicalDemoResultData;
   alternativesInitiallyOpen?: boolean;
   sourceMode?: string;
+  cacheHit?: boolean;
   realAI?: boolean;
   patientDisplayName?: string;
   patientContext?: ClinicalPayload | null;
@@ -281,6 +282,7 @@ function buildDynamicQuestions({
 const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   demoData,
   sourceMode,
+  cacheHit,
   realAI,
   patientDisplayName,
   patientContext,
@@ -293,7 +295,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
   alternativesInitiallyOpen = false,
 }) => {
   const resultReturn = useClinicalResultReturn();
-  const resultKey = useMemo(() => crypto.randomUUID(), [demoData, patientContext, sourceMode, realAI, patientDisplayName]);
+  const resultKey = useMemo(() => crypto.randomUUID(), [demoData, patientContext, sourceMode, cacheHit, realAI, patientDisplayName]);
   const { t } = useUiLabels();
   const i18n = useContext(HomeI18nContext) || { locale: "fr" };
   const targetLang = i18n.locale;
@@ -777,11 +779,12 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
             resultReturn={resultReturn ? {
               key: resultKey,
               save: () => resultReturn.save(resultKey, {
-                view: { demoData, patientContext, sourceMode, realAI, patientDisplayName },
+                view: { demoData, patientContext, sourceMode, cacheHit, realAI, patientDisplayName },
                 treatments: mappedTreatments,
               }),
             } : undefined}
             sourceMode={sourceMode}
+            cacheHit={cacheHit}
             realAI={realAI}
             language={contentLanguage}
           />

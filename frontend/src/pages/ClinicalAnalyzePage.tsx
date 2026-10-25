@@ -122,6 +122,7 @@ export function ClinicalAnalyzePage() {
 
     const [forceReal, setForceReal] = useState(false);
 
+    const [lastPayloadIsManual, setLastPayloadIsManual] = useState(false);
     const [lastPayload, setLastPayload] =
         useState<ClinicalPayload | null>(null);
     const [comparisonPayloads, setComparisonPayloads] = useState<{
@@ -1222,6 +1223,8 @@ export function ClinicalAnalyzePage() {
                     <ClinicalForm
                         key={openaiModel}
                         onSubmit={handleSubmit}
+                        onDraftOriginChange={setLastPayloadIsManual}
+                        allowDraftPersistence={!shouldRestoreFormForCorrection || lastPayloadIsManual}
                         onCompareSubmit={handleCompareSubmit}
                         loading={loading}
                         compareLoading={comparisonLoading}
@@ -1680,7 +1683,8 @@ export function ClinicalAnalyzePage() {
                             other_ai_fields: result?.other_ai_fields,
                             relevanceByAgeChart: demoScenario.relevanceByAgeChart,
                         }}
-                        sourceMode={serviceMode || undefined}
+                        sourceMode={responseMeta?.source}
+                        cacheHit={responseMeta?.cacheHit}
                         realAI={canConfigureAi && forceReal}
                         canReverify={user?.role === "SUPERADMIN"}
                         onReverify={handleReverifyAnalysis}

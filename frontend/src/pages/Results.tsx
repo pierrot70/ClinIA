@@ -247,6 +247,7 @@ const ResultsAnalyze: React.FC = () => {
             <ClinicalDemoResult
                 demoData={demoData as any}
                 sourceMode={sourceMode}
+                cacheHit={responseMeta?.cacheHit}
                 realAI={realAI}
                 patientDisplayName={patientDisplayName}
                 patientContext={baseAnalysisPayload}

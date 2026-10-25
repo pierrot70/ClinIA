@@ -1,9 +1,10 @@
+import { useClinicalFormDraftState, useClearClinicalFormDraft, useHasClinicalFormDraft } from "../../contexts/ClinicalFormDraftContext";
 import { ClinicalContentNotice } from "./ClinicalContentNotice";
 import { useUiLabelTree } from "../../hooks/useUiLabels";
 import { UiMessage } from "../i18n/UiMessage";
 import { analysisStatusLabels } from "../../i18n/analysisStatusLabels";
 import { DEFAULT_DIABETES_CONTEXT, EXAMPLE_CASES, COMPARISON_CASE_ONE, COMPARISON_CASE_TWO, COMPARISON_MEDICATION_OPTIONS } from "../../data/clinicalExampleCases";
-import { useEffect, useState, useContext } from "react";
+import { useEffect, useState, useContext, useRef } from "react";
 import { useTranslation } from "../../hooks/useTranslation";
 import { useAuth } from "../../hooks/useAuth";
 import { useDebounce } from "../../hooks/useDebounce";
@@ -398,6 +399,26 @@ function buildClinicalPayloadFromComparisonCaseEditor(
     };
 }
 
+export type ClinicalFormDraft = {
+    form: ClinicalPayload;
+    selectedClinicalField: ClinicalField | "";
+    selectedExampleCase: string;
+    isExamplePresentation: boolean;
+    hasRestoredClinicalData: boolean;
+    isDiabetesModalOpen: boolean;
+    jsonImportValue: string;
+    comparisonModeEnabled: boolean;
+    comparisonJsonCaseOne: string;
+    comparisonJsonCaseTwo: string;
+    comparisonJsonModalTarget: "one" | "two" | null;
+    comparisonCaseEditor: ComparisonCaseEditorState | null;
+    diabetesModalValues: {
+        weight: string; cardiovascular_risk: string; renal_function: string;
+        fragility: string; tolerance: string; glycemic_goals: string;
+    };
+    listInputs: { symptoms: string; medical_history: string; current_medications: string };
+};
+
 // --------------------
 // UI helper
 // --------------------
@@ -435,6 +456,8 @@ export function ClinicalForm({
                                  highlightFields = [],
                                  initialData,
                                  restoreInitialDataForCorrection = false,
+                                 allowDraftPersistence = !initialData,
+                                 onDraftOriginChange,
                              }: {
     onSubmit: (payload: ClinicalPayload) => void | Promise<void>;
     onCompareSubmit?: (
@@ -447,37 +470,42 @@ export function ClinicalForm({
     highlightFields?: string[];
     initialData?: ClinicalPayload | null;
     restoreInitialDataForCorrection?: boolean;
+    allowDraftPersistence?: boolean;
+    onDraftOriginChange?: (manual: boolean) => void;
 }) {
     const labels = useUiLabelTree(sourceUiLabels);
     const { isAuthenticated, user } = useAuth();
-    const [form, setForm] = useState<ClinicalPayload>(
-        initialData ?? EMPTY_FORM
-    );
     const [inputMode, setInputMode] = useState<"manual" | "patient">("manual");
+    const clearDraft = useClearClinicalFormDraft();
+    const restoredManualDraft = useHasClinicalFormDraft() && allowDraftPersistence;
+    const patientContextVersion = useRef(0);
+    useEffect(() => () => { patientContextVersion.current += 1; }, []);
+    // Only manual/example values survive navigation; patient contexts never do.
+    const useDraftState = <K extends keyof ClinicalFormDraft,>(key: K, initial: ClinicalFormDraft[K] | (() => ClinicalFormDraft[K])) =>
+        useClinicalFormDraftState(key, initial, inputMode === "manual" && allowDraftPersistence);
+    const [form, setForm] = useDraftState("form", initialData ?? EMPTY_FORM);
     const [patientSearch, setPatientSearch] = useState("");
     const [patientMatches, setPatientMatches] = useState<Patient[]>([]);
     const [patientsLoading, setPatientsLoading] = useState(false);
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
     const [patientSaveError, setPatientSaveError] = useState("");
     const [savingPatientParameters, setSavingPatientParameters] = useState(false);
-    const [selectedClinicalField, setSelectedClinicalField] = useState<
-        ClinicalField | ""
-    >("");
-    const [selectedExampleCase, setSelectedExampleCase] = useState("");
-    const [isExamplePresentation, setIsExamplePresentation] = useState(false);
-    const [hasRestoredClinicalData, setHasRestoredClinicalData] = useState(
+    const [selectedClinicalField, setSelectedClinicalField] = useDraftState("selectedClinicalField", "");
+    const [selectedExampleCase, setSelectedExampleCase] = useDraftState("selectedExampleCase", "");
+    const [isExamplePresentation, setIsExamplePresentation] = useDraftState("isExamplePresentation", false);
+    const [hasRestoredClinicalData, setHasRestoredClinicalData] = useDraftState("hasRestoredClinicalData",
         restoreInitialDataForCorrection && Boolean(initialData)
     );
-    const [isDiabetesModalOpen, setIsDiabetesModalOpen] = useState(false);
+    const [isDiabetesModalOpen, setIsDiabetesModalOpen] = useDraftState("isDiabetesModalOpen", false);
     const [browserCountryCode, setBrowserCountryCode] = useState("");
-    const [jsonImportValue, setJsonImportValue] = useState("");
-    const [comparisonModeEnabled, setComparisonModeEnabled] = useState(false);
-    const [comparisonJsonCaseOne, setComparisonJsonCaseOne] = useState("");
-    const [comparisonJsonCaseTwo, setComparisonJsonCaseTwo] = useState("");
+    const [jsonImportValue, setJsonImportValue] = useDraftState("jsonImportValue", "");
+    const [comparisonModeEnabled, setComparisonModeEnabled] = useDraftState("comparisonModeEnabled", false);
+    const [comparisonJsonCaseOne, setComparisonJsonCaseOne] = useDraftState("comparisonJsonCaseOne", "");
+    const [comparisonJsonCaseTwo, setComparisonJsonCaseTwo] = useDraftState("comparisonJsonCaseTwo", "");
     const [comparisonJsonModalTarget, setComparisonJsonModalTarget] =
-        useState<"one" | "two" | null>(null);
+        useDraftState("comparisonJsonModalTarget", null);
     const [comparisonCaseEditor, setComparisonCaseEditor] =
-        useState<ComparisonCaseEditorState | null>(null);
+        useDraftState("comparisonCaseEditor", null);
     const [jsonImportFeedback, setJsonImportFeedback] = useState<{
         type: "success" | "error";
         message: string;
@@ -486,14 +514,7 @@ export function ClinicalForm({
         type: "success" | "error";
         message: string;
     } | null>(null);
-    const [diabetesModalValues, setDiabetesModalValues] = useState<{
-        weight: string;
-        cardiovascular_risk: string;
-        renal_function: string;
-        fragility: string;
-        tolerance: string;
-        glycemic_goals: string;
-    }>({
+    const [diabetesModalValues, setDiabetesModalValues] = useDraftState("diabetesModalValues", {
         weight: "",
         cardiovascular_risk: DEFAULT_DIABETES_CONTEXT.cardiovascular_risk ?? "",
         renal_function: DEFAULT_DIABETES_CONTEXT.renal_function ?? "",
@@ -501,7 +522,7 @@ export function ClinicalForm({
         tolerance: DEFAULT_DIABETES_CONTEXT.tolerance ?? "",
         glycemic_goals: DEFAULT_DIABETES_CONTEXT.glycemic_goals ?? "",
     });
-    const [listInputs, setListInputs] = useState(() => ({
+    const [listInputs, setListInputs] = useDraftState("listInputs", () => ({
         symptoms: formatList((initialData ?? EMPTY_FORM).symptoms),
         medical_history: formatList(
             (initialData ?? EMPTY_FORM).medical_history
@@ -519,16 +540,29 @@ export function ClinicalForm({
     const [symptomSuggestionsError, setSymptomSuggestionsError] = useState("");
     const debouncedPatientSearch = useDebounce(patientSearch, 250);
 
-    // 🔁 Recharger le formulaire quand un patient est sélectionné
+    useEffect(() => {
+        if (!allowDraftPersistence) clearDraft?.();
+    }, [allowDraftPersistence, clearDraft]);
+
+    // Explicit correction data takes priority. For the same manual context,
+    // retain the exact raw list inputs instead of rebuilding them from arrays.
     useEffect(() => {
         if (initialData) {
-            applyFormData(initialData);
-            setSelectedExampleCase("");
+            const clinicalKeys: Array<keyof ClinicalPayload> = [
+                "age", "sex", "country", "ethnicity", "diagnosis", "weight", "height",
+                "blood_pressure", "symptoms", "medical_history", "current_medications", "diabetes_context",
+            ];
+            const sameManualContext = allowDraftPersistence && restoreInitialDataForCorrection &&
+                clinicalKeys.every(key => JSON.stringify(initialData[key]) === JSON.stringify(form[key]));
+            if (!sameManualContext) {
+                applyFormData(initialData);
+                setSelectedExampleCase("");
+            }
             if (restoreInitialDataForCorrection) {
                 setHasRestoredClinicalData(true);
             }
         }
-    }, [initialData, restoreInitialDataForCorrection]);
+    }, [initialData, restoreInitialDataForCorrection, allowDraftPersistence]);
 
     useEffect(() => {
         let active = true;
@@ -658,15 +692,36 @@ export function ClinicalForm({
     });
 
     function resetPatient() {
+        patientContextVersion.current += 1;
         applyFormData(EMPTY_FORM);
         setSelectedClinicalField("");
         setSelectedExampleCase("");
         setHasRestoredClinicalData(false);
         setIsDiabetesModalOpen(false);
+        setSavingPatientParameters(false);
+        setJsonImportValue("");
+        setComparisonModeEnabled(false);
+        setComparisonJsonCaseOne("");
+        setComparisonJsonCaseTwo("");
+        setComparisonJsonModalTarget(null);
+        setComparisonCaseEditor(null);
+        setDiabetesModalValues({
+            weight: "", cardiovascular_risk: DEFAULT_DIABETES_CONTEXT.cardiovascular_risk ?? "",
+            renal_function: DEFAULT_DIABETES_CONTEXT.renal_function ?? "",
+            fragility: DEFAULT_DIABETES_CONTEXT.fragility ?? "",
+            tolerance: DEFAULT_DIABETES_CONTEXT.tolerance ?? "",
+            glycemic_goals: DEFAULT_DIABETES_CONTEXT.glycemic_goals ?? "",
+        });
+        setJsonImportFeedback(null);
+        setComparisonFeedback(null);
+        clearDraft?.();
     }
 
     async function selectPatient(patient: Patient) {
+        const version = ++patientContextVersion.current;
+        clearDraft?.();
         const response = await fetchPatientById(patient._id);
+        if (version !== patientContextVersion.current) return;
         if ("error" in response) {
             setPatientSaveError(response.error.message);
             return;
@@ -702,6 +757,7 @@ export function ClinicalForm({
             return true;
         }
 
+        const version = patientContextVersion.current;
         setSavingPatientParameters(true);
         setPatientSaveError("");
         const response = await updatePatient(selectedPatient._id, {
@@ -713,6 +769,7 @@ export function ClinicalForm({
                 lastRequestedAt: new Date().toISOString(),
             },
         });
+        if (version !== patientContextVersion.current) return false;
         setSavingPatientParameters(false);
 
         if ("error" in response) {
@@ -734,6 +791,7 @@ export function ClinicalForm({
             return;
         }
 
+        onDraftOriginChange?.(inputMode === "manual" && allowDraftPersistence);
         await onSubmit(form);
     }
 
@@ -1039,15 +1097,15 @@ export function ClinicalForm({
     const { translated: termRequestActionLabel } = useTranslation({ text: labels.clinicalTermRequest.action, targetLang, translationKey: "clinicalTermRequest.action" });
     const { translated: termRequestPrivacyLabel } = useTranslation({ text: labels.clinicalTermRequest.privacy, targetLang, translationKey: "clinicalTermRequest.privacy" });
     const diabetesModalButtonLabel = fieldLabels.diabetesParametersButton;
-    const { translated: diabetesModalTitleLabel } = useTranslation({ text: "Parametres cliniques supplementaires - Diabete Type 2", targetLang });
-    const { translated: diabetesModalDescriptionLabel } = useTranslation({ text: "Ajustez ces parametres pour enrichir l'analyse sans alourdir les donnees cliniques principales.", targetLang });
-    const { translated: cardiovascularRiskLabel } = useTranslation({ text: "Risque cardiovasculaire", targetLang });
-    const { translated: renalFunctionLabel } = useTranslation({ text: "Fonction renale", targetLang });
-    const { translated: fragilityLabel } = useTranslation({ text: "Fragilite", targetLang });
-    const { translated: toleranceLabel } = useTranslation({ text: "Tolerance", targetLang });
-    const { translated: glycemicGoalsLabel } = useTranslation({ text: "Objectifs glycemiques", targetLang });
-    const { translated: saveLabel } = useTranslation({ text: "Enregistrer", targetLang });
-    const { translated: cancelLabel } = useTranslation({ text: "Annuler", targetLang });
+    const diabetesModalTitleLabel = fieldLabels.diabetesModalTitle;
+    const diabetesModalDescriptionLabel = fieldLabels.diabetesModalDescription;
+    const cardiovascularRiskLabel = fieldLabels.cardiovascularRisk;
+    const renalFunctionLabel = fieldLabels.renalFunction;
+    const fragilityLabel = fieldLabels.fragility;
+    const toleranceLabel = fieldLabels.tolerance;
+    const glycemicGoalsLabel = fieldLabels.glycemicGoals;
+    const saveLabel = fieldLabels.save;
+    const cancelLabel = fieldLabels.cancel;
 
     const sexOptions: Array<{ value: Sex; label: string }> = [
         { value: "male", label: maleLabel },
@@ -1167,6 +1225,8 @@ export function ClinicalForm({
     useEffect(() => {
         const browserCountry = getBrowserCountryCode();
         setBrowserCountryCode(browserCountry);
+        // A deliberately empty saved country is still an exact draft value.
+        if (restoredManualDraft) return;
 
         setForm((prev) => {
             if (prev.country) {
@@ -1234,6 +1294,7 @@ export function ClinicalForm({
                 return;
             }
 
+            onDraftOriginChange?.(inputMode === "manual" && allowDraftPersistence);
             await onCompareSubmit(firstPayload, secondPayload);
             setComparisonFeedback({
                 type: "success",
@@ -1322,7 +1383,10 @@ export function ClinicalForm({
                         </button>
                         <button
                             type="button"
-                            onClick={() => setInputMode("patient")}
+                            onClick={() => {
+                                resetPatient();
+                                setInputMode("patient");
+                            }}
                             className={inputMode === "patient" ? "rounded border border-blue-700 bg-blue-700 px-3 py-2 text-sm font-medium text-white" : "rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700"}
                         >
                             {existingPatientEntryLabel}

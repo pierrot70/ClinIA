@@ -604,7 +604,7 @@ describe("ClinicalForm", () => {
 
         expect(
             screen.getByRole("heading", {
-                name: "Parametres cliniques supplementaires - Diabete Type 2",
+                name: UI_LABELS_FR.clinicalFormFields.diabetesModalTitle,
             })
         ).toBeInTheDocument();
 
@@ -613,7 +613,7 @@ describe("ClinicalForm", () => {
             "Moderate to high"
         );
 
-        fireEvent.change(screen.getByLabelText("Tolerance"), {
+        fireEvent.change(screen.getByLabelText(UI_LABELS_FR.clinicalFormFields.tolerance), {
             target: { value: "Tolerance digestive a reevaluer" },
         });
 

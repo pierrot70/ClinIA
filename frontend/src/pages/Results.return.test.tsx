@@ -25,7 +25,7 @@ const data = {
     ].map(t => ({ ...t, indication: "", dosage: "", duration: "", evidence_level: "C" as const })),
     alternatives: [], red_flags: ["Original warning"],
 };
-const view = { demoData: { ...data, summary: data.patient_summary.plain_language }, sourceMode: "mock", realAI: false, patientContext: payload };
+const view = { demoData: { ...data, summary: data.patient_summary.plain_language }, sourceMode: "mock", cacheHit: true, realAI: false, patientContext: payload };
 const analysisCalls = () => transport.fetch.mock.calls.filter(([url]) => String(url).includes("/api/ai/analyze"));
 function LocationProbe() {
     const location = useLocation();
@@ -61,9 +61,12 @@ describe("return to an existing clinical result", () => {
         render(<Harness quick={quick} entry={quick ? "/results" : "/clinical-demo"} />);
         const alternatives = await screen.findByRole("button", { name: /^Alternatives et recommandations/ });
         await act(async () => { await user.click(alternatives); });
+        expect(screen.getAllByText("Réponse réutilisée depuis le cache.")).toHaveLength(2);
+        expect(screen.getAllByText("Base sur des donnees simulees")).toHaveLength(2);
         await act(async () => { await user.click(screen.getAllByRole("link", { name: "Détails" })[0]); });
         expect(await screen.findByRole("heading", { name: "Synthetic option A" })).toBeInTheDocument();
         expect(screen.getByText("A only")).toBeInTheDocument();
+        expect(screen.getByText("Réponse réutilisée depuis le cache.")).toBeInTheDocument();
         const state = JSON.parse(screen.getByTestId("navigation-state").textContent!);
         expect(state).toEqual({ clinicalResultKey: expect.any(String), treatmentId: "synthetic-a" });
         expect(JSON.stringify(state)).not.toContain("Original");
@@ -81,6 +84,7 @@ describe("return to an existing clinical result", () => {
         await act(async () => { await user.click(screen.getAllByRole("link", { name: "Details" })[1]); });
         expect(await screen.findByRole("heading", { name: "Synthetic option B" })).toBeInTheDocument();
         expect(screen.getByText("B only")).toBeInTheDocument();
+        expect(screen.getByText("Response reused from the cache.")).toBeInTheDocument();
         expect(screen.queryByText("A only")).not.toBeInTheDocument();
         await act(async () => { await user.click(screen.getByRole("link", { name: "← Back to results" })); });
         await waitFor(() => expect(screen.getByRole("heading", { name: "Synthetic option A" })).toBeInTheDocument());

@@ -1,4 +1,8 @@
 export const UI_LABELS_FR = {
+    clinicalProvenance: {
+        unknown: "Provenance non renseignée",
+        reused: "Réponse réutilisée depuis le cache.",
+    },
     generalUi: {
         error: "Impossible de traiter cette demande. Vérifiez les informations et contactez l’administration si le problème persiste.",
         translating: "Traduction de l’interface…",
@@ -156,6 +160,15 @@ export const UI_LABELS_FR = {
         None: "Aucun",
     },
     clinicalFormFields: {
+        diabetesModalTitle: "Paramètres cliniques supplémentaires — Diabète de type 2",
+        diabetesModalDescription: "Ajustez ces paramètres pour enrichir l’analyse sans alourdir les données cliniques principales.",
+        cardiovascularRisk: "Risque cardiovasculaire",
+        renalFunction: "Fonction rénale",
+        fragility: "Fragilité",
+        tolerance: "Tolérance",
+        glycemicGoals: "Objectifs glycémiques",
+        save: "Enregistrer",
+        cancel: "Annuler",
         diabetesParametersButton: "Paramètres du diabète de type 2",
         age: "Age du patient",
         male: "Homme",

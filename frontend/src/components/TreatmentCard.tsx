@@ -10,6 +10,7 @@ interface Props {
   treatment: ClinicalTreatmentCardData;
   resultReturn?: { key: string; save: () => void };
   sourceMode?: string;
+  cacheHit?: boolean;
   realAI?: boolean;
   language?: "fr" | "en";
 }
@@ -61,12 +62,9 @@ function getClinicalRelevanceLabel(treatment: ClinicalTreatmentCardData, languag
   return labels.pageUi.aDiscuter;
 }
 
-function getSourceFootnote(sourceMode: string | undefined, realAI: boolean | undefined, language: "fr" | "en") {
-  const english = language === "en";
+function getSourceFootnote(sourceMode: string | undefined) {
   if (sourceMode === "real") {
-    return realAI
-      ? (labels.componentUi.baseSurUneReponseOpenAIReelle)
-      : (labels.componentUi.baseSurUneReponseOpenAIReelleMiseEnCache);
+    return labels.componentUi.baseSurUneReponseOpenAIReelle;
   }
 
   if (sourceMode === "degraded") {
@@ -77,15 +75,15 @@ function getSourceFootnote(sourceMode: string | undefined, realAI: boolean | und
     return labels.componentUi.baseSurDesDonneesSimulees;
   }
 
-  return labels.componentUi.baseSurUnContexteCliniqueGenere;
+  return labels.clinicalProvenance.unknown;
 }
 
-const TreatmentCard: React.FC<Props> = ({ treatment, sourceMode, realAI, language = "fr", resultReturn }) => {
+const TreatmentCard: React.FC<Props> = ({ treatment, sourceMode, cacheHit, language = "fr", resultReturn }) => {
     const { locale: uiLocale, t } = useUiLabels(language);
   const english = language === "en";
   const flags = Array.isArray(treatment.flags) ? treatment.flags : [];
   const relevanceLabel = getClinicalRelevanceLabel(treatment, "fr");
-  const sourceFootnote = getSourceFootnote(sourceMode, realAI, "fr");
+  const sourceFootnote = getSourceFootnote(sourceMode);
   const summary = [treatment.summary, treatment.justification].find(
     value => typeof value === "string" && value.trim().length > 0
   );
@@ -127,7 +125,7 @@ const TreatmentCard: React.FC<Props> = ({ treatment, sourceMode, realAI, languag
       </div>
 
       <div className="flex items-center justify-between pt-1 text-xs text-gray-500">
-        <span>{t(sourceFootnote)}</span>
+        <span>{t(sourceFootnote)}{cacheHit === true && <span className="block">{t(labels.clinicalProvenance.reused)}</span>}</span>
         <Link
           to={`/treatment/${encodeURIComponent(treatment.id)}`}
           state={{ clinicalResultKey: resultReturn?.key, treatmentId: treatment.id }}

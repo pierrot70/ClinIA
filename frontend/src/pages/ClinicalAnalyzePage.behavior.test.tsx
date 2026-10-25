@@ -226,11 +226,16 @@ describe("ClinicalAnalyzePage", () => {
         });
     });
 
-    it.each(["button", "Escape"])("opens a reused result without attesting review via %s", async (dismissMethod) => {
+    it.each([
+        { dismissMethod: "button", source: "real" },
+        { dismissMethod: "Escape", source: "real" },
+        { dismissMethod: "button", source: "mock" },
+        { dismissMethod: "button", source: "degraded" },
+    ])("preserves confirmed $source cache provenance when opening a reused result via $dismissMethod", async ({ dismissMethod, source }) => {
         authUser = { role: "MEDECIN" };
         analyzeMock.mockReset().mockImplementation(() => {
             hookSlots[0].result = { hypothesis: "Hypertension" };
-            hookSlots[0].responseMeta = { cacheHit: true, source: "real", model: "gpt-4.1-mini" };
+            hookSlots[0].responseMeta = { cacheHit: true, source, model: "gpt-4.1-mini" };
         });
         configureClinicalAnalysisSlots(
             {
@@ -297,6 +302,11 @@ describe("ClinicalAnalyzePage", () => {
         expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
         expect(screen.getByTestId("clinical-demo-result")).toBeInTheDocument();
         expect(clinicalResultSpy.mock.lastCall?.[0].patientContext).toEqual(analyzeMock.mock.calls[0][0]);
+        expect(clinicalResultSpy.mock.lastCall?.[0]).toMatchObject({
+            sourceMode: source,
+            cacheHit: true,
+            realAI: false,
+        });
     });
 
     it("replays the same clinical payload with the acknowledged incident ID", async () => {

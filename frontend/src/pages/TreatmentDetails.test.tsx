@@ -63,3 +63,28 @@ it("does not interpret missing treatment precautions as standard surveillance or
     expect(screen.getByText("Aucune contre-indication detaillee fournie.")).toBeInTheDocument();
     expect(screen.getAllByText("Aucun point de surveillance detaille fourni.").length).toBeGreaterThan(0);
 });
+
+describe("confirmed clinical provenance", () => {
+    it.each([
+        { cacheHit: true, realAI: true },
+        { cacheHit: true, realAI: false },
+        { cacheHit: false, realAI: true },
+        { cacheHit: false, realAI: false },
+        { cacheHit: undefined, realAI: false },
+    ])("uses response cache status independently from the real-AI request setting: %j", ({ cacheHit, realAI }) => {
+        render(<MemoryRouter initialEntries={[{ pathname: "/treatment/synthetic", state: {
+            treatment: { id: "synthetic", name: "Synthetic option" }, sourceMode: "real", cacheHit, realAI,
+        } }]}><Routes><Route path="/treatment/:id" element={<TreatmentDetails />} /></Routes></MemoryRouter>);
+        expect(screen.getAllByText("Reponse OpenAI reelle")).toHaveLength(2);
+        expect(screen.queryByText("Réponse réutilisée depuis le cache.") !== null).toBe(cacheHit === true);
+        expect(screen.queryByText("Reponse OpenAI reelle mise en cache")).not.toBeInTheDocument();
+    });
+    it("reports unknown provenance without claiming generation or OpenAI origin", () => {
+        render(<MemoryRouter initialEntries={[{ pathname: "/treatment/synthetic", state: {
+            treatment: { id: "synthetic", name: "Synthetic option" }, realAI: true, cacheHit: true,
+        } }]}><Routes><Route path="/treatment/:id" element={<TreatmentDetails />} /></Routes></MemoryRouter>);
+        expect(screen.getAllByText("Provenance non renseignée")).toHaveLength(2);
+        expect(screen.getByText("Réponse réutilisée depuis le cache.")).toBeInTheDocument();
+        expect(screen.queryByText("Contexte clinique genere")).not.toBeInTheDocument();
+    });
+});

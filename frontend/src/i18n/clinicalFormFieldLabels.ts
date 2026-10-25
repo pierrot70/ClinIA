@@ -6,6 +6,15 @@ const f = UI_LABELS_FR.clinicalFormFields;
 const c = UI_LABELS_FR.clinicalExampleConceptLabels;
 const s = UI_LABELS_FR.clinicalSymptomLabels;
 export const clinicalFormFieldRows: readonly (readonly string[])[] = [
+[f.diabetesModalTitle, "Additional clinical parameters — Type 2 diabetes", "Parámetros clínicos adicionales — Diabetes tipo 2", "추가 임상 매개변수 — 제2형 당뇨병", "Thông số lâm sàng bổ sung — Đái tháo đường típ 2", "Ytterligere kliniske parametere — Diabetes type 2", "追加の臨床パラメータ — 2型糖尿病", "补充临床参数 — 2型糖尿病", "פרמטרים קליניים נוספים — סוכרת מסוג 2"],
+[f.diabetesModalDescription, "Adjust these parameters to enrich the analysis without adding to the main clinical data.", "Ajuste estos parámetros para enriquecer el análisis sin sobrecargar los datos clínicos principales.", "주요 임상 데이터에 부담을 더하지 않고 분석을 보완하도록 이 매개변수를 조정하세요.", "Điều chỉnh các thông số này để bổ sung cho phân tích mà không làm phức tạp dữ liệu lâm sàng chính.", "Juster disse parameterne for å berike analysen uten å gjøre de viktigste kliniske opplysningene mer omfattende.", "主要な臨床データを複雑にせずに分析を充実させるため、これらのパラメータを調整してください。", "调整这些参数以丰富分析，而不增加主要临床数据的负担。", "התאימו פרמטרים אלה כדי להעשיר את הניתוח בלי להכביד על הנתונים הקליניים העיקריים."],
+[f.cardiovascularRisk, "Cardiovascular risk", "Riesgo cardiovascular", "심혈관 위험", "Nguy cơ tim mạch", "Kardiovaskulær risiko", "心血管リスク", "心血管风险", "סיכון לבבי וכלי דם"],
+[f.renalFunction, "Kidney function", "Función renal", "신장 기능", "Chức năng thận", "Nyrefunksjon", "腎機能", "肾功能", "תפקוד כלייתי"],
+[f.fragility, "Frailty", "Fragilidad", "노쇠", "Tình trạng suy yếu", "Skrøpelighet", "フレイル", "衰弱", "שבריריות"],
+[f.tolerance, "Tolerability", "Tolerabilidad", "내약성", "Khả năng dung nạp", "Toleranse", "忍容性", "耐受性", "סבילות"],
+[f.glycemicGoals, "Glycemic goals", "Objetivos glucémicos", "혈당 목표", "Mục tiêu đường huyết", "Blodsukkermål", "血糖管理目標", "血糖控制目标", "יעדי איזון סוכר"],
+[f.save, "Save", "Guardar", "저장", "Lưu", "Lagre", "保存", "保存", "שמירה"],
+[f.cancel, "Cancel", "Cancelar", "취소", "Hủy", "Avbryt", "キャンセル", "取消", "ביטול"],
 [f.diabetesParametersButton, "Type 2 diabetes parameters", "Parámetros de la diabetes tipo 2", "제2형 당뇨병 매개변수", "Thông số đái tháo đường típ 2", "Parametere for type 2-diabetes", "2型糖尿病のパラメータ", "2 型糖尿病参数", "פרמטרים לסוכרת מסוג 2"],
 [f.age, "Patient age", "Edad del paciente", "환자 나이", "Tuổi người bệnh", "Pasientens alder", "患者の年齢", "患者年龄", "גיל המטופל"],
 [f.male, "Male", "Masculino", "남성", "Nam", "Mann", "男性", "男", "זכר"],
