@@ -1,11 +1,12 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { UI_LOCALES } from "../i18n/uiLocales";
 import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 import { getLocalUiTranslation } from "../i18n/localUiTranslations";
-import TreatmentCard from "./TreatmentCard";
+import TreatmentCard, { type ClinicalTreatmentCardData } from "./TreatmentCard";
+import { ClinicalResultReturnProvider, useClinicalResultReturn } from "../contexts/ClinicalResultReturnContext";
 import TreatmentDetails from "../pages/TreatmentDetails";
 import AITreatmentTable from "./AITreatmentTable";
 import ClinicalDemoResult from "./ClinicalDemoResult";
@@ -28,9 +29,28 @@ const treatment = {
     justification: "English clinical rationale.", contraindications: ["English contraindication."],
     efficacy: 0.5, sideEffectScore: 10, flags: [], details: "English source details.",
 };
+function NavigationStateProbe() {
+    const { state } = useLocation();
+    return <output data-testid="navigation-state">{JSON.stringify(state)}</output>;
+}
+// Standalone-card fixtures follow ClinicalDemoResult's caller contract: the
+// click saves the displayed treatment in memory before navigating with a key.
+function NavigableTreatmentCard({ treatment, sourceMode }: { treatment: ClinicalTreatmentCardData; sourceMode?: string }) {
+    const results = useClinicalResultReturn()!;
+    return <TreatmentCard treatment={treatment} sourceMode={sourceMode} resultReturn={{
+        key: "synthetic-result",
+        save: () => results.save("synthetic-result", {
+            view: { demoData: {}, sourceMode }, treatments: [treatment],
+        }),
+    }} />;
+}
+function expectOpaqueTreatmentNavigation(treatmentId: string) {
+    const state = JSON.parse(screen.getByTestId("navigation-state").textContent!);
+    expect(state).toEqual({ clinicalResultKey: expect.any(String), treatmentId });
+}
 function Wrapper({ locale, children }: { locale: string; children: React.ReactNode }) {
     return <MemoryRouter><HomeI18nContext.Provider value={{ locale } as React.ContextType<typeof HomeI18nContext>}>
-        {children}
+        <ClinicalResultReturnProvider><NavigationStateProbe />{children}</ClinicalResultReturnProvider>
     </HomeI18nContext.Provider></MemoryRouter>;
 }
 beforeEach(() => {
@@ -58,13 +78,14 @@ describe("clinical source language and multilingual UI", () => {
     ]))("preserves justification verbatim from card to detail with empty fields in $locale: $source", ({ locale, source }) => {
         const sparse = { ...treatment, summary: " \t ", details: "", indication: "", justification: source };
         render(<Wrapper locale={locale}><Routes>
-            <Route path="/" element={<TreatmentCard treatment={sparse} sourceMode="real" />} />
+            <Route path="/" element={<NavigableTreatmentCard treatment={sparse} sourceMode="real" />} />
             <Route path="/treatment/:id" element={<TreatmentDetails />} />
         </Routes></Wrapper>);
         const cardText = screen.getByText(source.trim());
         expect(cardText.textContent).toBe(source);
         expect(cardText).toHaveAttribute("translate", "no");
         fireEvent.click(screen.getByRole("link", { name: getLocalUiTranslation(UI_LABELS_FR.componentUi.details, locale)! }));
+        expectOpaqueTreatmentNavigation(treatment.id);
         const detailText = screen.getByText(source.trim());
         expect(detailText.textContent).toBe(source);
         expect(detailText).toHaveAttribute("translate", "no");
@@ -93,6 +114,7 @@ describe("clinical source language and multilingual UI", () => {
         fireEvent.click(toggle);
         fireEvent.mouseLeave(section);
         fireEvent.click(screen.getByRole("link", { name: "Details" }));
+        expectOpaqueTreatmentNavigation(treatment.id);
         expect(screen.getByRole("heading", { level: 1, name: treatment.name })).toBeInTheDocument();
         expect(screen.getByText(treatment.details)).toHaveAttribute("translate", "no");
     });
@@ -100,12 +122,13 @@ describe("clinical source language and multilingual UI", () => {
     it.each(UI_LOCALES)("keeps a localized missing explanation outside protected clinical content in card and detail in %s", locale => {
         const empty = { ...treatment, summary: " \t ", details: "", justification: " ", indication: "\n" };
         render(<Wrapper locale={locale}><Routes>
-            <Route path="/" element={<TreatmentCard treatment={empty} />} />
+            <Route path="/" element={<NavigableTreatmentCard treatment={empty} />} />
             <Route path="/treatment/:id" element={<TreatmentDetails />} />
         </Routes></Wrapper>);
         const fallback = getLocalUiTranslation(UI_LABELS_FR.pageUi.aucunDetailSupplementaireFourniPourCetteOption, locale)!;
         expect(screen.getByText(fallback).closest('[translate="no"]')).toBeNull();
         fireEvent.click(screen.getByRole("link", { name: getLocalUiTranslation(UI_LABELS_FR.componentUi.details, locale)! }));
+        expectOpaqueTreatmentNavigation(treatment.id);
         expect(screen.getByText(fallback).closest('[translate="no"]')).toBeNull();
     });
 
