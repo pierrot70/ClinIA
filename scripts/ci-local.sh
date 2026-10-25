@@ -32,6 +32,8 @@ run_step() (
         audit) node "$root/scripts/verify-npm-audit.mjs" ;;
         tests)
             if [[ "$component" == frontend ]]; then
+                node --test "$root/scripts/verify-ui-labels.test.mjs"
+                node "$root/scripts/verify-ui-labels.mjs"
                 node "$root/scripts/verify-ui-translation-coverage.mjs" --check
                 node "$root/scripts/verify-login-translation-catalog.mjs"
                 node --test "$root/scripts/verify-ui-translations.test.mjs"
