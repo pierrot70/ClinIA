@@ -37,6 +37,14 @@ describe("validation report contract", () => {
         r[field] = { cleanup: false, exitCode: 1, unhandledErrors: 1, cases: [] }[field];
         expect(summary(r, r.commit).passed).toBe(false);
     });
+    it.each([0, 6])("rejects partial or surplus evidence for expanded point %s", point => {
+        const missing = fixture();
+        missing.cases = missing.cases.filter(c => c.point !== point || c.index !== EXPECTED[point]);
+        expect(summary(missing, missing.commit).passed).toBe(false);
+        const extra = fixture();
+        extra.cases.push({ point, index: EXPECTED[point] + 1, state: "passed", durationMs: 12 });
+        expect(summary(extra, extra.commit).passed).toBe(false);
+    });
     it("rejects raw payloads, free-text test names, duplicate cases and malformed commits", () => {
         expect(() => validateReport({ ...fixture(), token: "secret" })).toThrow();
         const r = fixture(); r.cases[0].name = "patient name";
@@ -51,7 +59,7 @@ describe("validation report contract", () => {
         const bundle = JSON.parse(evidenceBundle(r));
         for (const entry of Object.values(bundle.files)) expect(sha256(Buffer.from(entry.content, "base64"))).toBe(entry.sha256);
         expect(Buffer.from(bundle.files["report.json"].content, "base64")).toEqual(reportBytes(r));
-        expect(Buffer.from(bundle.files["results.junit.xml"].content, "base64").toString()).toContain('tests="21"');
+        expect(Buffer.from(bundle.files["results.junit.xml"].content, "base64").toString()).toContain('tests="28"');
     });
     it("reads only schema-valid regular archives, excluding symlinks and mismatched identifiers", async () => {
         dir = await mkdtemp(path.join(tmpdir(), "clinia-report-test-")); vi.stubEnv("CLINIA_VALIDATION_REPORT_DIR", dir);

@@ -5,7 +5,7 @@ export const POINTS = [
     "Last urgentologist place (19 to 20)", "Booking, cancellation and rescheduling",
     "API authorization", "Atomic rollback and minimized audits",
 ];
-export const EXPECTED = [3, 1, 2, 1, 4, 8, 2];
+export const EXPECTED = [9, 1, 2, 1, 4, 8, 3];
 export const SHA = /^[a-f0-9]{40}$/;
 export const RUN_ID = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const integer = n => Number.isSafeInteger(n) && n >= 0;
