@@ -4,6 +4,14 @@ import mongoose from "mongoose";
 /* Appointment Schema                                                  */
 /* ------------------------------------------------------------------ */
 
+// Administrative patient statement, separate from clinical visit closure.
+const AttendanceResolutionSchema = new mongoose.Schema({
+    outcome: { type: String, enum: ["attended", "not_attended"], required: true },
+    recordedAt: { type: Date, required: true },
+    recordedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: "AdminUser", required: true },
+    source: { type: String, enum: ["patient_statement"], required: true },
+}, { _id: false, strict: "throw" });
+
 const AppointmentSchema = new mongoose.Schema(
     {
         /** Identifiant patient */
@@ -85,6 +93,8 @@ const AppointmentSchema = new mongoose.Schema(
             enum: ["patient", "clinic_emergency"],
             default: undefined,
         },
+
+        attendanceResolution: { type: AttendanceResolutionSchema, default: undefined },
 
         /** Chaînage auditable lorsqu'un rendez-vous est reporté */
         rescheduledTo: {

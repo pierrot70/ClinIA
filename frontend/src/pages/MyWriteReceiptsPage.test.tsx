@@ -4,9 +4,10 @@ import { MyWriteReceiptsPage } from "./MyWriteReceiptsPage";
 import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 import { getMyWriteReceiptsLabels, getReceiptLabelFallback, receiptLabelRows } from "../i18n/myWriteReceiptsLabels";
 
-const mocks = vi.hoisted(() => ({ locale: "fr-CA", fetch: vi.fn(), patients: vi.fn() }));
+const mocks = vi.hoisted(() => ({ locale: "fr-CA", role: "MEDECIN", fetch: vi.fn(), patients: vi.fn() }));
 vi.mock("../contexts/HomeI18nContext", () => ({ useHomeI18n: () => ({ locale: mocks.locale }) }));
 vi.mock("../services/writeOperationAuditsApi", () => ({ fetchMyWriteReceipts: mocks.fetch }));
+vi.mock("../hooks/useAuth", () => ({ useAuth: () => ({ user: { role: mocks.role } }) }));
 vi.mock("../services/patientsApi", () => ({ fetchPatientsPaginated: mocks.patients }));
 
 const receipt = {
@@ -22,7 +23,7 @@ function leaves(value: object): string[] {
 }
 
 describe("my write receipts localization", () => {
-    beforeEach(() => { vi.clearAllMocks(); mocks.locale = "fr-CA"; mocks.fetch.mockResolvedValue(response()); });
+    beforeEach(() => { vi.clearAllMocks(); mocks.locale = "fr-CA"; mocks.role = "MEDECIN"; mocks.fetch.mockResolvedValue(response()); });
     afterEach(cleanup);
 
     it("covers every French source, without duplicate dictionary rows", () => {
@@ -79,5 +80,75 @@ describe("my write receipts localization", () => {
         rerender(<MyWriteReceiptsPage />);
         expect(screen.getAllByText(results.status.loadError)).toHaveLength(2);
         expect(screen.queryByText("Erreur serveur")).not.toBeInTheDocument();
+    });
+});
+
+
+describe("reception personal receipts", () => {
+    beforeEach(() => { vi.clearAllMocks(); mocks.locale = "fr-CA"; mocks.role = "RECEPTION"; mocks.fetch.mockResolvedValue(response([receipt])); });
+    afterEach(cleanup);
+
+    it.each(["fr-CA", "en-CA", "es", "ko-KR", "vi", "no-NO", "ja", "zh", "he"])("shows own receipts without generic patient directory access in %s", async locale => {
+        mocks.locale = locale;
+        render(<MyWriteReceiptsPage />);
+        const ui = getMyWriteReceiptsLabels(locale);
+        await waitFor(() => expect(screen.getAllByRole("button", { name: results.actions.showDetails })).toHaveLength(2));
+        expect(screen.getByRole("heading", { name: ui.title })).toBeInTheDocument();
+        expect(screen.queryByPlaceholderText(ui.placeholders.patientSearch)).not.toBeInTheDocument();
+        expect(mocks.patients).not.toHaveBeenCalled();
+        fireEvent.change(screen.getByLabelText(ui.filters.collection), { target: { value: "appointments" } });
+        fireEvent.click(screen.getAllByRole("button", { name: ui.actions.search })[0]);
+        await waitFor(() => expect(mocks.fetch).toHaveBeenCalledTimes(2));
+        expect(mocks.fetch).toHaveBeenLastCalledWith(expect.objectContaining({ collectionName: "appointments", patientId: undefined }));
+        expect(mocks.patients).not.toHaveBeenCalled();
+    });
+});
+
+
+describe("receipt date defaults", () => {
+    beforeEach(() => {
+        vi.clearAllMocks(); mocks.locale = "fr-CA"; mocks.role = "RECEPTION";
+        mocks.fetch.mockResolvedValue(response());
+        vi.useFakeTimers({ toFake: ["Date"] });
+    });
+    afterEach(() => { cleanup(); vi.useRealTimers(); });
+
+    it("uses the browser calendar independently of the selected UI language", async () => {
+        const now = new Date("2026-10-31T23:30:00Z");
+        vi.setSystemTime(now);
+        const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        const { rerender } = render(<MyWriteReceiptsPage />);
+        const fr = getMyWriteReceiptsLabels("fr-CA");
+        expect(screen.getByLabelText(fr.filters.startDate)).toHaveValue(day);
+        expect(screen.getByLabelText(fr.filters.endDate)).toHaveValue(day);
+        await waitFor(() => expect(mocks.fetch).toHaveBeenCalledWith(expect.objectContaining({ startDate: day, endDate: day, startAt: expect.any(String), endBefore: expect.any(String) })));
+        mocks.locale = "ja";
+        rerender(<MyWriteReceiptsPage />);
+        const ja = getMyWriteReceiptsLabels("ja");
+        expect(screen.getByLabelText(ja.filters.startDate)).toHaveValue(day);
+        expect(screen.getByLabelText(ja.filters.endDate)).toHaveValue(day);
+        expect(mocks.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("resets to today's dates and sends cleared filters, including after local midnight", async () => {
+        vi.setSystemTime(new Date("2026-10-31T15:00:00Z"));
+        render(<MyWriteReceiptsPage />);
+        const ui = getMyWriteReceiptsLabels("fr-CA");
+        await waitFor(() => expect(mocks.fetch).toHaveBeenCalledTimes(1));
+        fireEvent.change(screen.getByLabelText(ui.filters.startDate), { target: { value: "2025-01-01" } });
+        fireEvent.change(screen.getByLabelText(ui.filters.endDate), { target: { value: "2025-02-01" } });
+        fireEvent.change(screen.getByLabelText(ui.filters.collection), { target: { value: "appointments" } });
+        fireEvent.change(screen.getByLabelText(ui.filters.operation), { target: { value: "CREATE" } });
+        vi.setSystemTime(new Date("2026-11-01T04:30:00Z"));
+        fireEvent.click(screen.getByRole("button", { name: ui.actions.reset }));
+        const now = new Date();
+        const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        expect(screen.getByLabelText(ui.filters.startDate)).toHaveValue(day);
+        expect(screen.getByLabelText(ui.filters.endDate)).toHaveValue(day);
+        await waitFor(() => expect(mocks.fetch).toHaveBeenCalledTimes(2));
+        expect(mocks.fetch).toHaveBeenLastCalledWith({ page: 1, limit: 25, patientId: undefined, operation: "", startDate: day, endDate: day, startAt: expect.any(String), endBefore: expect.any(String) });
+        expect(screen.getByLabelText(ui.filters.collection)).toHaveValue("");
+        expect(screen.getByLabelText(ui.filters.operation)).toHaveValue("");
+        expect(mocks.patients).not.toHaveBeenCalled();
     });
 });

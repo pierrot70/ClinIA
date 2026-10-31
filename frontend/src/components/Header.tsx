@@ -314,6 +314,10 @@ const Header: React.FC = () => {
     // The public header must not disclose clinical, administrative, or
     // development navigation.  Routes remain protected independently.
     const showFullHeaderNav = isAuthenticated;
+    const canAccessClinicalTools = isAuthenticated && ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"].includes(user?.role ?? "");
+    const primaryWorkflowPath = user?.role === "RECEPTION" ? "/walk-in-arrival" : "/clinical";
+    const primaryWorkflowLabel = user?.role === "RECEPTION"
+        ? headerLabels.nav.walkInArrival : headerLabels.nav.clinicalAnalysis;
     const showAdminHeaderNav = canAccessAdmin;
     const showSuperAdminHeaderNav = user?.role === "SUPERADMIN";
     const isPhysicianMobileNav = isAuthenticated && user?.role === "MEDECIN";
@@ -1428,8 +1432,8 @@ const Header: React.FC = () => {
 
                     {showFullHeaderNav && (
                         <>
-                            <Link to="/clinical" className={linkClass("/clinical")}>
-                                <HeaderLabel text={headerLabels.nav.clinicalAnalysis} />
+                            <Link to={primaryWorkflowPath} className={linkClass(primaryWorkflowPath)}>
+                                <HeaderLabel text={primaryWorkflowLabel} />
                             </Link>
 
                             <Link to="/comments" className={linkClass("/comments")}>
@@ -1683,6 +1687,7 @@ const Header: React.FC = () => {
                         </div>
                             )}
 
+                            {canAccessClinicalTools && <>
                             <Link to="/quick" className={linkClass("/quick")}>
                                 <HeaderLabel text={headerLabels.nav.quickMode} />
                             </Link>
@@ -1693,6 +1698,7 @@ const Header: React.FC = () => {
                             >
                                 <HeaderLabel text={headerLabels.nav.patientSummary} />
                             </Link>
+                            </>}
                         </>
                     )}
 
@@ -1849,7 +1855,7 @@ const Header: React.FC = () => {
                                 </div>
                             )}
                             <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.home} /></Link>
-                            <Link to="/clinical" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.clinicalAnalysis} /></Link>
+                            <Link to={primaryWorkflowPath} onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={primaryWorkflowLabel} /></Link>
                             <Link to="/comments" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.comments} /></Link>
                             <Link to="/my-write-receipts" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.myWriteReceipts} /></Link>
                             {user?.role === "MEDECIN" && <Link to="/consultations" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">{consultationLabels(locale).title}</Link>}
@@ -1894,8 +1900,10 @@ const Header: React.FC = () => {
                                     <HeaderLabel text={headerLabels.nav.tools} />
                                 </div>
                             )}
+                            {canAccessClinicalTools && <>
                             <Link to="/quick" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.quickMode} /></Link>
                             <Link to="/patient-summary" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.patientSummary} /></Link>
+                            </>}
                         </div>
 
                         {showAdminHeaderNav && !showSuperAdminHeaderNav && (
@@ -1975,9 +1983,9 @@ const Header: React.FC = () => {
                         <span className="text-base" aria-hidden="true">⌂</span>
                         <HeaderLabel text={headerLabels.nav.home} />
                     </Link>
-                    <Link to="/clinical" onClick={() => setIsMobileMenuOpen(false)} className={`flex min-h-14 flex-col items-center justify-center rounded-lg text-center text-xs ${location.pathname === "/clinical" ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-600"}`}>
+                    <Link to={primaryWorkflowPath} onClick={() => setIsMobileMenuOpen(false)} className={`flex min-h-14 flex-col items-center justify-center rounded-lg text-center text-xs ${location.pathname === primaryWorkflowPath ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-600"}`}>
                         <span className="text-base" aria-hidden="true">✦</span>
-                        <HeaderLabel text={headerLabels.nav.clinicalAnalysis} />
+                        <HeaderLabel text={primaryWorkflowLabel} />
                     </Link>
                     {isPhysicianMobileNav ? (
                         <Link to="/patients" onClick={() => setIsMobileMenuOpen(false)} className={`flex min-h-14 flex-col items-center justify-center rounded-lg text-xs ${location.pathname === "/patients" ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-600"}`}>

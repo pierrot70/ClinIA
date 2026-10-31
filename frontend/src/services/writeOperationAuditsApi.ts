@@ -118,6 +118,8 @@ export type MyWriteReceiptFilters = Pick<
     "page" | "limit" | "startDate" | "endDate" | "collectionName" | "operation"
 > & {
     patientId?: string;
+    startAt?: string;
+    endBefore?: string;
 };
 
 async function toApiError(response: Response): Promise<ApiError> {
@@ -194,6 +196,8 @@ export async function fetchMyWriteReceipts(
     if (params.collectionName) query.set("collectionName", params.collectionName);
     if (params.operation) query.set("operation", params.operation);
     if (params.patientId) query.set("patientId", params.patientId);
+    if (params.startAt) query.set("startAt", params.startAt);
+    if (params.endBefore) query.set("endBefore", params.endBefore);
 
     try {
         const response = await authFetch(

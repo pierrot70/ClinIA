@@ -24,6 +24,8 @@ import { getClinicalResultStrings } from "./clinicalResultStrings";
 import { getCachedResultNoticeLabels } from "./cachedResultNoticeLabels";
 import { consultationLabels } from "./consultationLabels";
 import { urgentologistTranslations } from "./urgentologistLabels";
+import { walkInGuideLabels } from "./walkInGuideLabels";
+import { receptionAttendanceLabels } from "./receptionAttendanceLabels";
 import { receptionReplanLabels } from "./receptionReplanLabels";
 import { validationReportLabels } from "./validationReportLabels";
 import { getQuickModeHeader } from "./quickModeLabels";
@@ -76,6 +78,8 @@ function indexedLabels(locale: string) {
         [UI_LABELS_FR.consultations, consultationLabels(locale)],
         [UI_LABELS_FR.urgentologist, urgentologistTranslations[baseUiLocale(locale)]],
         [UI_LABELS_FR.receptionReplan, receptionReplanLabels(locale)],
+        [UI_LABELS_FR.walkInGuide, walkInGuideLabels(locale)],
+        [UI_LABELS_FR.receptionAttendance, receptionAttendanceLabels(locale)],
         [UI_LABELS_FR.validationReports, validationReportLabels(locale)],
     ]) pairTrees(source, translated, result);
     for (const source of [UI_LABELS_FR.appointmentsList, UI_LABELS_FR.walkInArrival, UI_LABELS_FR.receptionClinic]) {

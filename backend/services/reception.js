@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { issueReceptionBookingProof, consumeReceptionBookingProof } from "./receptionBookingProof.js";
+import { issueReceptionBookingProof, consumeReceptionBookingProof, validateReceptionBookingProof } from "./receptionBookingProof.js";
 
 import { AdminUser } from "../models/AdminUser.js";
 import { Patient } from "../models/Patient.js";
@@ -27,8 +27,14 @@ function replacementConflict() {
     return { code: "RECEPTION_REPLAN_REQUIRED", message: "Le rendez-vous existant a changé ou plusieurs rendez-vous sont planifiés. Recherchez à nouveau le patient avant de replanifier." };
 }
 
-async function pendingAppointments(patientId, clinicId, session = null) {
-    return Appointment.find({ patient: patientId, clinique: clinicId, status: "scheduled" },
+function currentSchedulingDay(now = new Date()) {
+    const today = toSchedulingDateKey(now);
+    if (!today) throw { code: "PERSISTENCE_FAILED", message: "Date de planification indisponible." };
+    return today;
+}
+
+async function pendingAppointments(patientId, clinicId, today, session = null) {
+    return Appointment.find({ patient: patientId, clinique: clinicId, status: "scheduled", date: { $gte: today } },
         { _id: 1, date: 1, time: 1, specialist: 1 }).session(session).sort({ date: 1, time: 1 }).limit(2).lean();
 }
 
@@ -126,15 +132,11 @@ export async function listWalkInFamilyMedicineOptions({
             throw invalidInput("Patient introuvable.");
         }
     }
+    const today = currentSchedulingDay(now);
     const previous = patientId
-        ? validateReplacement(await pendingAppointments(patientId, clinicId), replaceAppointmentId)
+        ? validateReplacement(await pendingAppointments(patientId, clinicId, today), replaceAppointmentId)
         : null;
     if (!patientId && replaceAppointmentId) throw invalidInput("Patient requis pour replanifier.");
-
-    const today = toSchedulingDateKey(now);
-    if (!today) {
-        throw { code: "PERSISTENCE_FAILED", message: "Date de planification indisponible." };
-    }
 
     const specialists = await Specialist.find({
         specialite: { $in: [FAMILY_MEDICINE_SPECIALTY, URGENTOLOGIST_SPECIALTY] },
@@ -241,7 +243,7 @@ export async function listWalkInFamilyMedicineOptions({
 
 // A reception lookup is intentionally exact, limited to an assigned clinic,
 // and returns no clinical profile, contact details, or insurance number.
-export async function findReceptionPatientByRamq({ clinicId, ramq, authUser, audit = {} }) {
+export async function findReceptionPatientByRamq({ clinicId, ramq, authUser, audit = {}, now = new Date() }) {
     await assertReceptionClinicAccess(clinicId, authUser);
 
     const normalizedRamq = normalizePatientIdentifierSearch(ramq);
@@ -268,11 +270,87 @@ export async function findReceptionPatientByRamq({ clinicId, ramq, authUser, aud
         requestPath: audit.requestPath ?? "/api/reception/patient-lookup",
     });
 
-    return patient
-        ? { _id: String(patient._id), nom: patient.nom, prenom: patient.prenom,
-            bookingProof: await issueReceptionBookingProof({ authUser, clinicId, patientId: patient._id }),
-            existingAppointments: (await pendingAppointments(patient._id, clinicId)).map(({ _id, date, time }) => ({ _id: String(_id), date, time })) }
-        : null;
+    if (!patient) return null;
+    // Use one clinic calendar-day snapshot for both sides of this boundary.
+    // Historical scheduled records are signalled, never silently reclassified.
+    const today = currentSchedulingDay(now);
+    const [pending, historical] = await Promise.all([
+        pendingAppointments(patient._id, clinicId, today),
+        Appointment.exists(historicalAttendanceScope(patient._id, clinicId, today)),
+    ]);
+    return { _id: String(patient._id), nom: patient.nom, prenom: patient.prenom,
+        bookingProof: await issueReceptionBookingProof({ authUser, clinicId, patientId: patient._id }),
+        existingAppointments: pending.map(({ _id, date, time }) => ({ _id: String(_id), date, time })),
+        ...(historical ? { hasHistoricalScheduledAppointments: true } : {}),
+    };
+}
+
+const MAX_HISTORICAL_ATTENDANCE_RESULTS = 50;
+
+function historicalAttendanceScope(patientId, clinicId, today) {
+    // Mongo null matches both an absent field and an explicitly null legacy field.
+    return { patient: patientId, clinique: clinicId, status: "scheduled", date: { $lt: today }, attendanceResolution: null };
+}
+
+function assertAttendanceInput({ clinicId, patientId, appointmentId, authUser }) {
+    if (authUser?.role !== "RECEPTION") throw { code: "FORBIDDEN", message: "Accès réservé à la réception." };
+    for (const id of [clinicId, patientId, ...(appointmentId === undefined ? [] : [appointmentId])]) {
+        if (typeof id !== "string" || !/^[a-fA-F0-9]{24}$/.test(id)) throw invalidInput("Identifiant invalide.");
+    }
+}
+
+export async function listReceptionHistoricalAppointments({ clinicId, patientId, bookingProof, authUser, audit = {}, now = new Date() }) {
+    assertAttendanceInput({ clinicId, patientId, authUser });
+    await assertReceptionClinicAccess(clinicId, authUser);
+    await validateReceptionBookingProof({ bookingProof, authUser, clinicId, patientId });
+    if (!await Patient.exists({ _id: patientId, archivedAt: null })) throw invalidInput("Patient introuvable.");
+    const rows = await Appointment.find(historicalAttendanceScope(patientId, clinicId, currentSchedulingDay(now)),
+        { _id: 1, date: 1, time: 1 }).sort({ date: 1, time: 1, _id: 1 }).limit(MAX_HISTORICAL_ATTENDANCE_RESULTS + 1).lean();
+    await recordPatientAuditEvent({ action: "RECEPTION_HISTORY_READ", outcome: "SUCCESS",
+        actorUserId: authUser.userId, actorUsername: authUser.username, actorRole: "RECEPTION",
+        ip: audit.ip ?? null, patientId, requestPath: "/api/reception/historical-appointments/query", throwOnError: true });
+    return { appointments: rows.slice(0, MAX_HISTORICAL_ATTENDANCE_RESULTS).map(({ _id, date, time }) => ({ _id: String(_id), date, time })),
+        hasMore: rows.length > MAX_HISTORICAL_ATTENDANCE_RESULTS };
+}
+
+export async function recordReceptionHistoricalAttendance({ clinicId, patientId, appointmentId, bookingProof, outcome, authUser, audit = {} }) {
+    assertAttendanceInput({ clinicId, patientId, appointmentId, authUser });
+    if (typeof appointmentId !== "string") throw invalidInput("Identifiant de rendez-vous requis.");
+    if (!["attended", "not_attended"].includes(outcome)) throw invalidInput("Déclaration de présence invalide.");
+    await assertReceptionClinicAccess(clinicId, authUser);
+    const session = await mongoose.startSession();
+    try {
+        let result;
+        await session.withTransaction(async () => {
+            await consumeReceptionBookingProof({ bookingProof, authUser, clinicId, patientId, session });
+            const patient = await Patient.findOneAndUpdate({ _id: patientId, archivedAt: null }, { $inc: { __v: 1 } },
+                { session, new: true, projection: { _id: 1 } }).lean();
+            if (!patient) throw invalidInput("Patient introuvable.");
+            const today = currentSchedulingDay();
+            const appointment = await Appointment.findOneAndUpdate({ _id: appointmentId, ...historicalAttendanceScope(patientId, clinicId, today) },
+                { $set: { attendanceResolution: { outcome, recordedAt: new Date(), recordedByUserId: authUser.userId, source: "patient_statement" } } },
+                { session, new: true, runValidators: true, projection: { _id: 1, date: 1, time: 1, attendanceResolution: 1 } }).lean();
+            if (!appointment) throw { code: "RECEPTION_HISTORY_CONFLICT", message: "Ce rendez-vous n’est plus à régulariser. Actualisez la liste." };
+            await recordPatientAuditEvent({ action: "RECEPTION_ATTENDANCE_UPDATE", outcome: "SUCCESS",
+                actorUserId: authUser.userId, actorUsername: authUser.username, actorRole: "RECEPTION",
+                ip: audit.ip ?? null, patientId, changedFields: ["attendanceResolution"],
+                requestPath: "/api/reception/historical-appointments/:id/attendance", session, throwOnError: true });
+            await recordWriteOperationAuditEvent({ verificationId: audit.verificationId ?? null, clientMutationId: audit.clientMutationId ?? null,
+                replicaSet: audit.replicaSet ?? null, collectionName: "appointments", operation: "UPDATE", outcome: "SUCCESS",
+                actorUserId: authUser.userId, actorUsername: authUser.username, actorRole: "RECEPTION", ip: audit.ip ?? null,
+                patientId, resourceId: String(appointment._id), changedFields: ["attendanceResolution"],
+                requestPath: "/api/reception/historical-appointments/:id/attendance", requestId: audit.requestId ?? null, instanceId: audit.instanceId ?? null,
+                writeConcern: CLINICAL_WRITE_CONCERN, session, throwOnError: true });
+            // Rotate the consumed proof atomically so the user can resolve the
+            // next record or continue booking without a new identity lookup.
+            const freshProof = await issueReceptionBookingProof({ authUser, clinicId, patientId, session });
+            result = { appointment: { _id: String(appointment._id), date: appointment.date, time: appointment.time,
+                attendanceResolution: { outcome: appointment.attendanceResolution.outcome } }, bookingProof: freshProof };
+        }, { writeConcern: CLINICAL_WRITE_CONCERN });
+        return { ...result, writeAuditRecorded: true };
+    } finally {
+        await session.endSession();
+    }
 }
 
 // A new walk-in is deliberately written as one Mongo transaction. If the
@@ -353,6 +431,9 @@ export async function createWalkInPatientAndAppointment({
                 throwOnError: true,
             });
             await recordWriteOperationAuditEvent({
+                verificationId: audit.verificationId ?? null,
+                clientMutationId: audit.clientMutationId ?? null,
+                replicaSet: audit.replicaSet ?? null,
                 collectionName: "appointments",
                 operation: "CREATE",
                 outcome: "SUCCESS",
@@ -380,7 +461,8 @@ export async function createWalkInPatientAndAppointment({
                 appointment,
             };
         }, { writeConcern: CLINICAL_WRITE_CONCERN });
-        return result;
+        // Reached only after all required audits and the transaction commit.
+        return { ...result, writeAuditRecorded: true };
     } catch (err) {
         // Match only the patient identity index, never slot/appointment indexes.
         // Do not expose MongoDB messages or key values (patient identifiers).
@@ -438,7 +520,9 @@ export async function createWalkInAppointmentForExistingPatient({
                 throw invalidInput("Patient introuvable.");
             }
 
-            const previous = validateReplacement(await pendingAppointments(patientId, clinicId, session), replaceAppointmentId);
+            // Recompute inside every retry, after the patient lock and proof.
+            const today = currentSchedulingDay();
+            const previous = validateReplacement(await pendingAppointments(patientId, clinicId, today, session), replaceAppointmentId);
             if (previous) {
                 if (String(previous.specialist) === String(specialistId) && previous.date === date && previous.time === time) throw invalidInput("Choisissez un autre créneau.");
                 const changed = await Appointment.updateOne({ _id: previous._id, patient: patientId, clinique: clinicId, status: "scheduled" },
@@ -466,15 +550,22 @@ export async function createWalkInAppointmentForExistingPatient({
                 const oldLink = await Appointment.updateOne({ _id: previous._id }, { $set: { rescheduledTo: appointment._id } }, { session });
                 if (newLink.modifiedCount !== 1 || oldLink.modifiedCount !== 1) throw replacementConflict();
                 await recordWriteOperationAuditEvent({
+                    verificationId: audit.verificationId ?? null,
+                    clientMutationId: audit.clientMutationId ?? null,
+                    replicaSet: audit.replicaSet ?? null,
                     collectionName: "appointments", operation: "UPDATE", outcome: "SUCCESS",
                     actorUserId: authUser.userId, actorUsername: authUser.username, actorRole: "RECEPTION",
                     ip: audit.ip ?? null, resourceId: String(previous._id), patientId: String(patientId),
+                    requestId: audit.requestId ?? null, instanceId: audit.instanceId ?? null,
                     changedFields: ["status", "rescheduledTo"], requestPath: "/api/reception/walk-in-bookings",
                     writeConcern: CLINICAL_WRITE_CONCERN, session, throwOnError: true,
                 });
             }
 
             await recordWriteOperationAuditEvent({
+                verificationId: audit.verificationId ?? null,
+                clientMutationId: audit.clientMutationId ?? null,
+                replicaSet: audit.replicaSet ?? null,
                 collectionName: "appointments",
                 operation: "CREATE",
                 outcome: "SUCCESS",
@@ -502,7 +593,8 @@ export async function createWalkInAppointmentForExistingPatient({
                 appointment,
             };
         }, { writeConcern: CLINICAL_WRITE_CONCERN });
-        return result;
+        // Reached only after all required audits and the transaction commit.
+        return { ...result, writeAuditRecorded: true };
     } finally {
         await session.endSession();
     }

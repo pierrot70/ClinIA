@@ -82,6 +82,8 @@ router.get("/my-receipts", async (req, res) => {
             limit: req.query.limit,
             startDate: req.query.startDate,
             endDate: req.query.endDate,
+            startAt: req.query.startAt,
+            endBefore: req.query.endBefore,
             collectionName: req.query.collectionName,
             operation: req.query.operation,
             patientId: req.query.patientId,

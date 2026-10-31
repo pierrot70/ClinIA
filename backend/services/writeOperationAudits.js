@@ -17,9 +17,9 @@ function assertWriteAuditAccess(authUser) {
     }
 }
 
-function assertClinicianReceiptAccess(authUser) {
-    if (!authUser?.userId || !authUser?.role || !["USER", "MEDECIN", "ADMIN", "SUPERADMIN"].includes(authUser.role)) {
-        throw createWriteAuditError("FORBIDDEN", "Authentification clinique requise.");
+function assertReceiptAccess(authUser) {
+    if (!authUser?.userId || !authUser?.role || !["USER", "RECEPTION", "MEDECIN", "ADMIN", "SUPERADMIN"].includes(authUser.role)) {
+        throw createWriteAuditError("FORBIDDEN", "Authentification requise.");
     }
 }
 
@@ -35,6 +35,51 @@ function parseDateFilter(value, label, endOfDay = false) {
     }
 
     return parsed;
+}
+
+// Explicit receipt bounds are browser-local day boundaries converted to UTC.
+// No server timezone conversion or date normalization is accepted for these.
+function parseReceiptUtcBoundary(value, label) {
+    if (value === undefined) return null;
+    if (typeof value !== "string") {
+        throw createWriteAuditError("INVALID_INPUT", `${label} invalide.`);
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime()) || parsed.toISOString() !== value) {
+        throw createWriteAuditError("INVALID_INPUT", `${label} invalide.`);
+    }
+    return parsed;
+}
+
+function parseReceiptLegacyBoundary(value, label, endOfDay = false) {
+    if (value === undefined || (typeof value === "string" && !value.trim())) return null;
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+        throw createWriteAuditError("INVALID_INPUT", `${label} invalide.`);
+    }
+    const day = value.trim();
+    const calendarDay = new Date(`${day}T00:00:00.000Z`);
+    if (Number.isNaN(calendarDay.getTime()) || calendarDay.toISOString().slice(0, 10) !== day) {
+        throw createWriteAuditError("INVALID_INPUT", `${label} invalide.`);
+    }
+    // Preserve old clients' server-local date interpretation and inclusive end.
+    return parseDateFilter(day, label, endOfDay);
+}
+
+function receiptTimestampFilter({ startAt, endBefore, startDate, endDate }) {
+    const start = startAt !== undefined
+        ? parseReceiptUtcBoundary(startAt, "Borne UTC de debut")
+        : parseReceiptLegacyBoundary(startDate, "Date de debut");
+    const end = endBefore !== undefined
+        ? parseReceiptUtcBoundary(endBefore, "Borne UTC de fin")
+        : parseReceiptLegacyBoundary(endDate, "Date de fin", true);
+    if (start && end && start.getTime() >= end.getTime()) {
+        throw createWriteAuditError("INVALID_INPUT", "La borne de debut doit preceder la borne de fin.");
+    }
+    if (!start && !end) return null;
+    return {
+        ...(start ? { $gte: start } : {}),
+        ...(end ? endBefore !== undefined ? { $lt: end } : { $lte: end } : {}),
+    };
 }
 
 function normalizeEnumFilter(value, allowedValues, label) {
@@ -294,11 +339,13 @@ export async function listMyWriteReceipts({
     limit,
     startDate,
     endDate,
+    startAt,
+    endBefore,
     collectionName,
     operation,
     patientId,
 }) {
-    assertClinicianReceiptAccess(authUser);
+    assertReceiptAccess(authUser);
 
     const parsedPage = Number.parseInt(page, 10) || 1;
     const parsedLimit = Number.parseInt(limit, 10) || DEFAULT_PAGE_LIMIT;
@@ -306,9 +353,8 @@ export async function listMyWriteReceipts({
         throw createWriteAuditError("INVALID_INPUT", "Pagination invalide.");
     }
 
+    const timestamp = receiptTimestampFilter({ startAt, endBefore, startDate, endDate });
     const query = buildWriteAuditQuery({
-        startDate,
-        endDate,
         collectionName,
         operation,
         outcome: "SUCCESS",
@@ -316,6 +362,7 @@ export async function listMyWriteReceipts({
         patientId,
     });
     query.$and = [
+        ...(timestamp ? [{ timestamp }] : []),
         ...(query.$and || []),
         { verificationId: { $ne: null } },
         { collectionName: { $nin: ["patientauditlogs", "patientclinicalnoteversions"] } },

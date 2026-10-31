@@ -88,8 +88,20 @@ const refreshAvailability: Record<string, string> = {
     he: "רענון תורים פנויים",
 };
 
+const historicalAppointmentTranslations: Record<string, Record<"historicalScheduledNotice" | "newArrival", string>> = {
+    en: {"historicalScheduledNotice": "Past appointment with an unresolved status. The history is preserved and does not block a new arrival. A past date does not confirm that the patient was absent.", "newArrival": "Register a new arrival"},
+    es: {"historicalScheduledNotice": "Cita anterior con estado pendiente de regularizar. El historial se conserva y no bloquea una nueva llegada. Una fecha pasada no confirma la ausencia del paciente.", "newArrival": "Registrar una nueva llegada"},
+    ko: {"historicalScheduledNotice": "상태가 정리되지 않은 이전 예약이 있습니다. 이력은 보존되며 새로운 접수를 막지 않습니다. 날짜가 지났다고 환자가 불참한 것으로 확정하지 않습니다.", "newArrival": "새 방문 접수"},
+    vi: {"historicalScheduledNotice": "Lịch hẹn trước đây có trạng thái chưa được cập nhật. Lịch sử được giữ lại và không ngăn tiếp nhận lượt mới. Ngày đã qua không xác nhận bệnh nhân vắng mặt.", "newArrival": "Tiếp nhận lượt mới"},
+    no: {"historicalScheduledNotice": "Tidligere time med uavklart status. Historikken beholdes og hindrer ikke et nytt oppmøte. En passert dato bekrefter ikke at pasienten uteble.", "newArrival": "Registrer nytt oppmøte"},
+    ja: {"historicalScheduledNotice": "過去の予約の状態が未整理です。履歴は保持され、新しい来院受付を妨げません。日付が過ぎただけでは患者の欠席は確定しません。", "newArrival": "新しい来院を受け付ける"},
+    zh: {"historicalScheduledNotice": "过去的预约状态尚未更新。历史记录将保留，不会阻止新的到诊登记。日期已过并不代表患者未到诊。", "newArrival": "登记新的到诊"},
+    he: {"historicalScheduledNotice": "תור קודם שמצבו טרם הוסדר. ההיסטוריה נשמרת ואינה מונעת רישום הגעה חדשה. תאריך שעבר אינו מאשר שהמטופל נעדר.", "newArrival": "רישום הגעה חדשה"},
+};
+
 export function receptionLabel(locale: string, key: string, french: string) {
     const language = locale.toLowerCase().split("-")[0];
+    if (key === "historicalScheduledNotice" || key === "newArrival") return historicalAppointmentTranslations[language]?.[key] ?? french;
     if (key === "refreshAvailability") return refreshAvailability[language] ?? french;
     if (key === "receivingPhysicianUnavailable") return receivingPhysicianUnavailable[language] ?? french;
     return translations[language]?.[key] || availabilityTranslations[language]?.[key] || confirmationTranslations[language]?.[key] || newPatientFormTranslations[language]?.[key] || french;

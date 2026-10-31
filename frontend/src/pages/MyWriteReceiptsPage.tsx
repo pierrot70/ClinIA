@@ -6,9 +6,12 @@ import { fetchPatientsPaginated, type Patient } from "../services/patientsApi";
 import {
     fetchMyWriteReceipts,
     type MyWriteReceipt,
+    type MyWriteReceiptFilters,
     type WriteOperationAuditOperation,
 } from "../services/writeOperationAuditsApi";
 import { useDebounce } from "../hooks/useDebounce";
+import { useAuth } from "../hooks/useAuth";
+import { localReceiptDate, localReceiptBounds } from "../utils/localReceiptDates";
 
 const LIMIT = 25;
 // Receipt results are an English-only technical panel, independent of the filters' locale.
@@ -47,6 +50,8 @@ function formatWriteConcern(receipt: MyWriteReceipt) {
 
 export function MyWriteReceiptsPage() {
     const { locale } = useHomeI18n();
+    const { user } = useAuth();
+    const canSearchPatients = ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"].includes(user?.role ?? "");
     const pageLabels = getMyWriteReceiptsLabels(locale);
     const collectionLabel = (value: string) => pageLabels.collections[value as keyof typeof pageLabels.collections] ?? value;
     const operationLabel = (value: string) => pageLabels.operations[value as keyof typeof pageLabels.operations] ?? value;
@@ -57,8 +62,9 @@ export function MyWriteReceiptsPage() {
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
     const [collectionName, setCollectionName] = useState("");
     const [operation, setOperation] = useState<"" | WriteOperationAuditOperation>("");
-    const [startDate, setStartDate] = useState("");
-    const [endDate, setEndDate] = useState("");
+    const [initialDate] = useState(localReceiptDate);
+    const [startDate, setStartDate] = useState(initialDate);
+    const [endDate, setEndDate] = useState(initialDate);
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
@@ -72,15 +78,20 @@ export function MyWriteReceiptsPage() {
 
     const patientNames = useMemo(
         () => new Map(
-            [...patients, ...(selectedPatient ? [selectedPatient] : [])]
+            (canSearchPatients ? [...patients, ...(selectedPatient ? [selectedPatient] : [])] : [])
                 .map((patient) => [patient._id, `${patient.prenom} ${patient.nom}`.trim()])
         ),
-        [patients, selectedPatient]
+        [patients, selectedPatient, canSearchPatients]
     );
 
     useEffect(() => {
         let active = true;
         const loadPatients = async () => {
+            if (!canSearchPatients) {
+                setPatients([]); setSelectedPatient(null); setPatientId("");
+                setPatientSearch(""); setPatientsLoading(false);
+                return;
+            }
             if (selectedPatient) {
                 if (active) setPatients([]);
                 return;
@@ -108,19 +119,31 @@ export function MyWriteReceiptsPage() {
         };
         void loadPatients();
         return () => { active = false; };
-    }, [debouncedPatientSearch, selectedPatient]);
+    }, [debouncedPatientSearch, selectedPatient, canSearchPatients]);
 
-    const loadReceipts = async (requestedPage = page) => {
+    const loadReceipts = async (requestedPage = page, filters?: Omit<MyWriteReceiptFilters, "page" | "limit">) => {
         setLoading(true);
         setError("");
-        const response = await fetchMyWriteReceipts({
-            page: requestedPage,
-            limit: LIMIT,
+        const query = filters ?? {
             patientId: patientId || undefined,
             collectionName: collectionName || undefined,
             operation,
             startDate: startDate || undefined,
             endDate: endDate || undefined,
+        };
+        let bounds;
+        try {
+            bounds = localReceiptBounds(query.startDate, query.endDate);
+        } catch {
+            setError("loadError"); setReceipts([]); setLoading(false);
+            return;
+        }
+        const response = await fetchMyWriteReceipts({
+            ...query,
+            ...bounds,
+            patientId: canSearchPatients ? query.patientId : undefined,
+            page: requestedPage,
+            limit: LIMIT,
         });
         if ("error" in response) {
             setError("loadError");
@@ -138,16 +161,19 @@ export function MyWriteReceiptsPage() {
 
     const search = () => { setPage(1); void loadReceipts(1); };
     const reset = () => {
+        const today = localReceiptDate();
         setPatientId("");
         setPatientSearch("");
         setSelectedPatient(null);
         setCollectionName("");
         setOperation("");
-        setStartDate("");
-        setEndDate("");
+        setStartDate(today);
+        setEndDate(today);
         setPage(1);
         setSelectedReceiptId("");
-        window.setTimeout(() => void loadReceipts(1), 0);
+        // Pass the reset snapshot explicitly; the previous render's filter
+        // closure must not be reused for the refresh request.
+        void loadReceipts(1, { startDate: today, endDate: today, operation: "" });
     };
 
     const copy = async (verificationId: string | null) => {
@@ -179,7 +205,7 @@ export function MyWriteReceiptsPage() {
 
             <section className="border border-gray-200 bg-white p-4 shadow-xs">
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    <div className="relative text-sm text-gray-700">
+                    {canSearchPatients && <div className="relative text-sm text-gray-700">
                         <span>{pageLabels.filters.patient}</span>
                         {selectedPatient ? (
                             <div className="mt-1 flex min-h-10 items-center justify-between rounded border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950">
@@ -197,7 +223,7 @@ export function MyWriteReceiptsPage() {
                                 {patients.map((patient) => <button key={patient._id} type="button" onClick={() => { setPatientId(patient._id); setSelectedPatient(patient); setPatientSearch(`${patient.prenom} ${patient.nom}`); setPatients([]); }} className="block w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-sky-50"><span className="font-medium">{patient.prenom} {patient.nom}</span></button>)}
                             </div>}
                         </>}
-                    </div>
+                    </div>}
                     <label className="text-sm text-gray-700">{pageLabels.filters.collection}
                         <select value={collectionName} onChange={(event) => setCollectionName(event.target.value)} className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm">
                             {COLLECTIONS.map((value) => <option key={value || "all"} value={value}>{value ? collectionLabel(value) : pageLabels.filters.allCollections}</option>)}

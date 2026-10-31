@@ -1,4 +1,5 @@
 import type { ApiResponse } from "../types/api";
+import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 import { authFetch } from "./authService";
 import { withSecurityIncidentGuard } from "./securityIncidentGuard";
 
@@ -32,6 +33,7 @@ export interface ReceptionPatient {
     prenom: string;
     bookingProof?: string;
     existingAppointments?: { _id: string; date: string; time: string }[];
+    hasHistoricalScheduledAppointments?: boolean;
 }
 
 export interface CreateWalkInBookingPayload {
@@ -145,6 +147,49 @@ export async function createWalkInBooking(
                     retryable: true,
                 },
             };
+        }
+    })());
+}
+
+export type ReceptionAttendanceOutcome = "attended" | "not_attended";
+export interface ReceptionHistoricalAppointment { _id: string; date: string; time: string }
+export interface ReceptionHistoricalContext { clinic: string; patientId: string; bookingProof: string }
+export interface ReceptionHistoricalAppointmentsResult {
+    appointments: ReceptionHistoricalAppointment[];
+    hasMore: boolean;
+}
+export interface ReceptionAttendanceResult {
+    appointment: ReceptionHistoricalAppointment & { attendanceResolution: { outcome: ReceptionAttendanceOutcome } };
+    bookingProof: string;
+}
+
+export async function fetchReceptionHistoricalAppointments(
+    context: ReceptionHistoricalContext
+): Promise<ApiResponse<ReceptionHistoricalAppointmentsResult>> {
+    return withSecurityIncidentGuard((async () => {
+        try {
+            const response = await authFetch("/api/reception/historical-appointments/query", {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(context),
+            });
+            return (await response.json()) as ApiResponse<ReceptionHistoricalAppointmentsResult>;
+        } catch {
+            return { error: { code: "INTERNAL_ERROR", message: UI_LABELS_FR.receptionAttendance.loadError, retryable: true } };
+        }
+    })());
+}
+
+export async function regularizeReceptionAttendance(
+    appointmentId: string,
+    context: ReceptionHistoricalContext & { outcome: ReceptionAttendanceOutcome }
+): Promise<ApiResponse<ReceptionAttendanceResult>> {
+    return withSecurityIncidentGuard((async () => {
+        try {
+            const response = await authFetch(`/api/reception/historical-appointments/${encodeURIComponent(appointmentId)}/attendance`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(context),
+            });
+            return (await response.json()) as ApiResponse<ReceptionAttendanceResult>;
+        } catch {
+            return { error: { code: "INTERNAL_ERROR", message: UI_LABELS_FR.receptionAttendance.saveError, retryable: true } };
         }
     })());
 }

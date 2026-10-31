@@ -6,11 +6,16 @@ import {
     createWalkInAppointmentForExistingPatient,
     findReceptionPatientByRamq,
     listWalkInFamilyMedicineOptions,
+    listReceptionHistoricalAppointments,
+    recordReceptionHistoricalAttendance,
 } from "../services/reception.js";
 import { toCreatePatientDTO } from "../dto/patient.dto.js";
 import { getRequestContext } from "../app/requestContext.js";
 import { getSafeRequestPath } from "../utils/requestLogSafety.js";
 import { getTrustedRequestIp } from "../utils/requestIp.js";
+import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
+import { getReplicaSetStatus } from "../services/dbStatus.js";
+import { createWriteVerificationContext, buildWriteVerificationMeta } from "../audit/writeVerification.js";
 
 const router = express.Router();
 
@@ -125,6 +130,41 @@ router.get("/patient-lookup", async (req, res) => {
     }
 });
 
+function sendAttendanceError(res, err) {
+    const status = ["FORBIDDEN", "RECEPTION_LOOKUP_REQUIRED"].includes(err.code) ? 403
+        : err.code === "INVALID_INPUT" ? 400 : err.code === "RECEPTION_HISTORY_CONFLICT" ? 409 : 500;
+    return res.status(status).json({ error: { code: status === 500 ? "PERSISTENCE_FAILED" : err.code,
+        message: status === 500 ? "Impossible de traiter la déclaration de présence." : err.message, retryable: status === 500 } });
+}
+
+router.post("/historical-appointments/query", async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    try {
+        const data = await listReceptionHistoricalAppointments({ clinicId: req.body?.clinic, patientId: req.body?.patientId,
+            bookingProof: req.body?.bookingProof, authUser: req.auth, audit: { ip: getTrustedRequestIp(req) } });
+        return res.status(200).json({ data, meta: { source: "real", model: "mongo" } });
+    } catch (err) { return sendAttendanceError(res, err); }
+});
+
+router.patch("/historical-appointments/:id/attendance", async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    // No other field can be interpreted as clinical closure or a correction.
+    if (Object.keys(req.body || {}).some(key => !["clinic", "patientId", "bookingProof", "outcome"].includes(key))) {
+        return res.status(400).json({ error: { code: "INVALID_INPUT", message: "Champ de déclaration invalide.", retryable: false } });
+    }
+    try {
+        const verification = createWriteVerificationContext(req);
+        const requestContext = getRequestContext(req);
+        const replicaSet = await getReplicaSetStatus();
+        const { writeAuditRecorded, ...data } = await recordReceptionHistoricalAttendance({ clinicId: req.body?.clinic,
+            patientId: req.body?.patientId, appointmentId: req.params.id, bookingProof: req.body?.bookingProof, outcome: req.body?.outcome,
+            authUser: req.auth, audit: { ...verification, replicaSet, ip: getTrustedRequestIp(req),
+                requestId: requestContext.requestId, instanceId: requestContext.instanceId } });
+        return res.status(200).json({ data, meta: { source: "real", model: "mongo",
+            writeVerification: buildWriteVerificationMeta({ ...verification, writeAuditRecorded }) } });
+    } catch (err) { return sendAttendanceError(res, err); }
+});
+
 router.post("/walk-in-bookings", async (req, res) => {
     const existingPatientId = req.body?.patientId;
     const commonFieldsAreMissing = !req.body?.specialist || !req.body?.clinic ||
@@ -165,6 +205,9 @@ router.post("/walk-in-bookings", async (req, res) => {
 
     try {
         const requestContext = getRequestContext(req);
+        // One server-generated ID per request, retained across transaction retries.
+        const verification = createWriteVerificationContext(req);
+        const replicaSet = await getReplicaSetStatus();
         const booking = {
             clinicId: req.body.clinic,
             specialistId: req.body.specialist,
@@ -173,6 +216,9 @@ router.post("/walk-in-bookings", async (req, res) => {
             slotType: req.body.slotType,
             authUser: req.auth,
             audit: {
+                ...verification,
+                writeConcern: CLINICAL_WRITE_CONCERN,
+                replicaSet,
                 actorUserId: req.auth?.userId,
                 actorUsername: req.auth?.username,
                 ip: getTrustedRequestIp(req),
@@ -181,7 +227,7 @@ router.post("/walk-in-bookings", async (req, res) => {
                 instanceId: requestContext.instanceId,
             },
         };
-        const data = existingPatientId
+        const { writeAuditRecorded, ...data } = existingPatientId
             ? await createWalkInAppointmentForExistingPatient({
                 ...booking,
                 patientId: existingPatientId,
@@ -194,7 +240,10 @@ router.post("/walk-in-bookings", async (req, res) => {
             });
         return res.status(201).json({
             data,
-            meta: { source: "real", model: "mongo" },
+            meta: {
+                source: "real", model: "mongo",
+                writeVerification: buildWriteVerificationMeta({ ...verification, writeAuditRecorded }),
+            },
         });
     } catch (err) {
         if (

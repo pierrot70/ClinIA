@@ -1,4 +1,5 @@
 import { UiMessage } from "../components/i18n/UiMessage";
+import { ReceptionAttendanceDialog } from "../components/guides/ReceptionAttendanceDialog";
 import { useEffect, useRef, useState } from "react";
 import { useUiLabels } from "../hooks/useUiLabels";
 import { labels } from "../i18n/uiLabels";
@@ -15,7 +16,22 @@ import { isReceptionLabel, receptionLabel } from "../i18n/receptionLabels";
 import { receptionReplanLabels } from "../i18n/receptionReplanLabels";
 import { urgentologistLabels, walkInEmergencyReminder } from "../i18n/urgentologistLabels";
 
+import { GuidedWorkflow } from "../components/guides/GuidedWorkflow";
+import { resolveWalkInGuide, WALK_IN_GUIDE } from "../components/guides/walkInGuide";
+import { walkInGuideLabels } from "../i18n/walkInGuideLabels";
+
 const source = labels.walkInArrival;
+
+function focusGuideTarget(target: HTMLElement | null) {
+    if (!target) return;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView?.({ block: "nearest" });
+}
+
+function clickGuideTarget(target: HTMLButtonElement | null) {
+    // Explicit known control only; never resolve a selector from external text.
+    if (target && !target.disabled) target.click();
+}
 
 function patientName(patient: Pick<ReceptionPatient, "prenom" | "nom">) {
     return `${patient.prenom} ${patient.nom}`.trim();
@@ -142,6 +158,27 @@ export function WalkInArrivalPage() {
     const { t } = useUiLabels(locale);
     const replan = receptionReplanLabels(locale);
     const requestEpoch = useRef(0);
+    const lastLookupKey = useRef("");
+    const automaticLookup = useRef<(automatic?: boolean) => Promise<void>>(async () => {});
+    const [attendancePatient, setAttendancePatient] = useState<ReceptionPatient | null>(null);
+    const [guideActive, setGuideActive] = useState(false);
+    const [detailsReviewed, setDetailsReviewed] = useState(false);
+    const [needsLookup, setNeedsLookup] = useState(false);
+    const guideText = walkInGuideLabels(locale);
+    const ramqInput = useRef<HTMLInputElement>(null);
+    const lookupButton = useRef<HTMLButtonElement>(null);
+    const patientButton = useRef<HTMLButtonElement>(null);
+    const availabilityButton = useRef<HTMLButtonElement>(null);
+    const replacementButton = useRef<HTMLButtonElement>(null);
+    const availabilityRegion = useRef<HTMLDivElement>(null);
+    const identityRegion = useRef<HTMLDivElement>(null);
+    const pendingRegion = useRef<HTMLDivElement>(null);
+    const firstNameInput = useRef<HTMLInputElement>(null);
+    const lastNameInput = useRef<HTMLInputElement>(null);
+    const reviewRegion = useRef<HTMLParagraphElement>(null);
+    const backButton = useRef<HTMLButtonElement>(null);
+    const submitButton = useRef<HTMLButtonElement>(null);
+    const finalWritePending = useRef(false);
     const [replacementId, setReplacementId] = useState<string | undefined>();
     const [rescheduled, setRescheduled] = useState(false);
     const [ramq, setRamq] = useState("");
@@ -163,12 +200,20 @@ export function WalkInArrivalPage() {
 
     function clearSelection() {
         requestEpoch.current++;
+        lastLookupKey.current = "";
+        setAttendancePatient(null);
+        setNeedsLookup(false);
+        setDetailsReviewed(false);
+        setNewPatient({ prenom: "", nom: "" });
         setPatients([]); setSelectedPatient(null); setSelectedSlot(null);
         setWalkInAvailability(null); setReplacementId(undefined); setIsNewPatient(false);
         setLoading(false); setError(""); setMessage(""); setMessageKind(null); setRescheduled(false);
     }
     useEffect(() => {
         clearSelection();
+        setRamq("");
+        setNewPatient({ prenom: "", nom: "" });
+        setGuideActive(false);
         return () => { requestEpoch.current++; };
     }, [clinicId]);
 
@@ -190,6 +235,8 @@ export function WalkInArrivalPage() {
         }
 
         setError("");
+        setSelectedSlot(null);
+        setDetailsReviewed(false);
         setWalkInAvailability(null);
         const epoch = ++requestEpoch.current;
         setLoading(true);
@@ -198,6 +245,7 @@ export function WalkInArrivalPage() {
         setLoading(false);
 
         if ("error" in response) {
+            setNeedsLookup(response.error.code === "RECEPTION_REPLAN_REQUIRED");
             setError(response.error.code === "RECEPTION_REPLAN_REQUIRED" ? replan.conflict : response.error.message);
             return;
         }
@@ -205,7 +253,11 @@ export function WalkInArrivalPage() {
         setWalkInAvailability(response.data || { today: [], future: [] });
     }
 
-    async function searchPatient() {
+    async function searchPatient(automatic = false) {
+        lastLookupKey.current = `${clinicId}:${ramq.trim()}`;
+        setAttendancePatient(null);
+        setNeedsLookup(false);
+        setDetailsReviewed(false);
         const epoch = ++requestEpoch.current;
         setReplacementId(undefined);
         setRescheduled(false);
@@ -234,18 +286,54 @@ export function WalkInArrivalPage() {
         setLoading(false);
 
         if ("error" in response) {
-            setError(response.error.message);
+            if (!automatic) setError(response.error.message);
             return;
         }
 
         const matches = response.data ? [response.data] : [];
         setPatients(matches);
-        if (matches.length === 0) {
+        if (matches[0]?.hasHistoricalScheduledAppointments) setAttendancePatient(matches[0]);
+        // Typing only performs an exact ClinIA lookup. Starting a new patient,
+        // selecting an identity, choosing a slot and saving remain explicit.
+        if (matches.length === 0 && !automatic) {
             setIsNewPatient(true);
             setMessageKind("noPatient");
             await loadWalkInAvailability(clinicId, null, null);
         }
     }
+
+    automaticLookup.current = searchPatient;
+    useEffect(() => {
+        const insurance = ramq.trim();
+        const key = `${clinicId}:${insurance}`;
+        if (!clinicId || clinicsLoading || selectedSlot || insurance.length < 6 || lastLookupKey.current === key) return;
+        const timer = window.setTimeout(() => {
+            if (lastLookupKey.current === key) return;
+            void automaticLookup.current(true);
+        }, 600);
+        return () => window.clearTimeout(timer);
+    }, [ramq, clinicId, clinicsLoading, selectedSlot]);
+
+    function updateAttendanceContext(patientId: string, bookingProof: string, hasUnresolved: boolean) {
+        const update = (patient: ReceptionPatient): ReceptionPatient => patient._id === patientId
+            ? { ...patient, bookingProof, hasHistoricalScheduledAppointments: hasUnresolved } : patient;
+        setPatients(current => current.map(update));
+        setSelectedPatient(current => current ? update(current) : null);
+        setAttendancePatient(current => current ? update(current) : null);
+    }
+
+    const attendanceDialog = attendancePatient ? <ReceptionAttendanceDialog
+        key={`${clinicId}:${attendancePatient._id}`} patient={attendancePatient} clinicId={clinicId} locale={locale}
+        onClose={() => setAttendancePatient(null)}
+        onIdentityConfirmed={patientId => {
+            if (attendancePatient._id === patientId) setSelectedPatient(attendancePatient);
+        }}
+        onUpdated={updateAttendanceContext}
+        onLookupRequired={() => {
+            clearSelection(); setNeedsLookup(true);
+            setError(receptionLabel(locale, "searchPatient", source.searchPatient));
+        }}
+    /> : null;
 
     function confirmSelection() {
         setMessage("");
@@ -258,6 +346,7 @@ export function WalkInArrivalPage() {
     }
 
     async function createPatientAndAppointment() {
+        if (finalWritePending.current) return;
         if (!selectedSlot || !clinicId || !ramq.trim()) {
             setError(source.required);
             return;
@@ -270,6 +359,7 @@ export function WalkInArrivalPage() {
         setError("");
         setLoading(true);
         const epoch = ++requestEpoch.current;
+        finalWritePending.current = true;
         const response = await createWalkInBooking({
             clinic: clinicId,
             specialist: selectedSlot.specialist._id,
@@ -290,10 +380,12 @@ export function WalkInArrivalPage() {
                     },
                 }),
         });
+        finalWritePending.current = false;
         if (epoch !== requestEpoch.current) return;
         setLoading(false);
 
         if ("error" in response) {
+            setNeedsLookup(["PATIENT_ALREADY_EXISTS", "RECEPTION_REPLAN_REQUIRED"].includes(response.error.code));
             if (response.error.code === "RECEPTION_LOOKUP_REQUIRED") {
                 setSelectedSlot(null);
                 setSelectedPatient(null);
@@ -322,6 +414,87 @@ export function WalkInArrivalPage() {
         setIsNewPatient(false);
     }
 
+    const guideStep = resolveWalkInGuide({
+        clinicReady: Boolean(clinicId) && !clinicsLoading,
+        loading,
+        completed: messageKind === "bookingCreated" || rescheduled,
+        hasInsuranceNumber: Boolean(ramq.trim()),
+        patientCount: patients.length,
+        patientSelected: Boolean(selectedPatient),
+        pendingAppointments: pending.length,
+        hasAvailability: Boolean(walkInAvailability),
+        slotSelected: Boolean(selectedSlot),
+        isNewPatient,
+        detailsComplete: Boolean(newPatient.prenom.trim() && newPatient.nom.trim()),
+        detailsReviewed,
+        hasError: Boolean(error),
+        needsLookup,
+    });
+
+    // Focus only when navigating between regions, never when typing a name
+    // becomes non-empty. No effect clicks a control or launches a request.
+    const focusRegion = selectedSlot ? "form"
+        : walkInAvailability ? "slots"
+            : selectedPatient && pending.length ? "pending"
+                : guideStep.key === "availability" ? "availability"
+                    : patients.length ? "identity"
+                : guideStep.key === "done" ? "done" : "lookup";
+    useEffect(() => {
+        if (!guideActive) return;
+        if (focusRegion === "form") focusGuideTarget(selectedPatient ? reviewRegion.current : firstNameInput.current);
+        else if (focusRegion === "slots") focusGuideTarget(availabilityRegion.current);
+        else if (focusRegion === "identity") focusGuideTarget(identityRegion.current);
+        else if (focusRegion === "pending") focusGuideTarget(pendingRegion.current);
+        else if (focusRegion === "availability") focusGuideTarget(availabilityButton.current);
+        else focusGuideTarget(ramqInput.current);
+    }, [guideActive, focusRegion]);
+
+    function runGuideAction() {
+        if (!guideActive || loading || !clinicId || clinicsLoading || guideStep.disabled) return;
+        switch (guideStep.key) {
+            case "lookup": clickGuideTarget(lookupButton.current); break;
+            case "identity": clickGuideTarget(patientButton.current); break;
+            case "availability": clickGuideTarget(availabilityButton.current); break;
+            case "existing": clickGuideTarget(replacementButton.current); break;
+            case "slots": focusGuideTarget(availabilityRegion.current); break;
+            case "details":
+                if (!newPatient.prenom.trim()) focusGuideTarget(firstNameInput.current);
+                else if (!newPatient.nom.trim()) focusGuideTarget(lastNameInput.current);
+                else { setDetailsReviewed(true); focusGuideTarget(reviewRegion.current); }
+                break;
+            case "review":
+                // Intentionally focus only. Saving always requires the user's
+                // separate click on the existing confirmation control.
+                focusGuideTarget(submitButton.current);
+                break;
+            case "problem": clickGuideTarget(backButton.current); break;
+            case "lookupProblem": clearSelection(); break;
+            case "done":
+                setMessageKind(null); setRescheduled(false); setError("");
+                focusGuideTarget(ramqInput.current);
+                break;
+        }
+    }
+
+    const stepKey = guideStep.key;
+    const guideActionLabel = guideText[`${stepKey}Action` as keyof typeof guideText];
+    const guide = <GuidedWorkflow active={guideActive} text={guideText}
+        onStart={() => setGuideActive(true)} onStop={() => setGuideActive(false)}
+        step={{
+            title: guideText[`${stepKey}Title`],
+            description: guideText[`${stepKey}Description`],
+            current: guideStep.current,
+            total: WALK_IN_GUIDE.total,
+            ...(guideActionLabel ? { action: { label: guideActionLabel, disabled: guideStep.disabled, run: runGuideAction } } : {}),
+        }} />;
+    const targetClass = (active: boolean) => guideActive && active ? " outline outline-2 outline-offset-4 outline-blue-500" : "";
+
+    const historicalNotice = selectedPatient?.hasHistoricalScheduledAppointments ? (
+        <p role="status" className="mt-3 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-slate-800">
+            {receptionLabel(locale, "historicalScheduledNotice", source.historicalScheduledNotice)}
+        </p>
+    ) : null;
+
     if (selectedSlot) {
         const clinicName = activeClinic?.nom ?? clinicId;
         return (
@@ -339,10 +512,13 @@ export function WalkInArrivalPage() {
                     </p>
                 </header>
 
+                {attendanceDialog}
+            {guide}
+
                 {error && <p role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"><UiMessage message={error} /></p>}
 
                 <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-xs">
-                    <p className="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-slate-800">
+                    <p ref={reviewRegion} tabIndex={-1} className={"rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-slate-800" + targetClass(guideStep.key === "review")}>
                         {receptionLabel(locale, "selectedSlot", source.selectedSlot)
                             .replace("{specialist}", `${selectedSlot.specialist.prenom} ${selectedSlot.specialist.nom}`)
                             .replace("{date}", selectedSlot.date)
@@ -356,12 +532,13 @@ export function WalkInArrivalPage() {
                         </p>
                     ) : (
                         <>
-                            <div className="grid gap-3 sm:grid-cols-2">
+                            <div className={"grid gap-3 sm:grid-cols-2" + targetClass(guideStep.key === "details")}>
                                 <label className="text-sm font-medium text-slate-800">
                                     {receptionLabel(locale, "firstNameLabel", source.firstNameLabel)}
                                     <input
+                                        ref={firstNameInput}
                                         value={newPatient.prenom}
-                                        onChange={(event) => setNewPatient((current) => ({ ...current, prenom: event.target.value }))}
+                                        onChange={(event) => { setDetailsReviewed(false); setNewPatient((current) => ({ ...current, prenom: event.target.value })); }}
                                         className="mt-1 w-full rounded border border-slate-300 px-3 py-2 font-normal"
                                         autoComplete="given-name"
                                     />
@@ -369,8 +546,9 @@ export function WalkInArrivalPage() {
                                 <label className="text-sm font-medium text-slate-800">
                                     {receptionLabel(locale, "lastNameLabel", source.lastNameLabel)}
                                     <input
+                                        ref={lastNameInput}
                                         value={newPatient.nom}
-                                        onChange={(event) => setNewPatient((current) => ({ ...current, nom: event.target.value }))}
+                                        onChange={(event) => { setDetailsReviewed(false); setNewPatient((current) => ({ ...current, nom: event.target.value })); }}
                                         className="mt-1 w-full rounded border border-slate-300 px-3 py-2 font-normal"
                                         autoComplete="family-name"
                                     />
@@ -383,11 +561,12 @@ export function WalkInArrivalPage() {
                         </>
                     )}
 
+                    {historicalNotice}
                     <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => { setSelectedSlot(null); setError(""); }} disabled={loading} className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-50">
+                        <button ref={backButton} type="button" onClick={() => { setSelectedSlot(null); setDetailsReviewed(false); if (error) setWalkInAvailability(null); setError(""); }} disabled={loading} className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-50">
                             {receptionLabel(locale, "backToAvailability", source.backToAvailability)}
                         </button>
-                        <button type="button" onClick={() => void createPatientAndAppointment()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
+                        <button ref={submitButton} type="button" onClick={() => void createPatientAndAppointment()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
                             {loading
                                 ? receptionLabel(locale, "creatingPatientAndAppointment", source.creatingPatientAndAppointment)
                                 : replacementId ? replan.confirm : selectedPatient
@@ -407,31 +586,35 @@ export function WalkInArrivalPage() {
                 <p className="mt-1 text-sm text-slate-600">{receptionLabel(locale, "description", source.description)}</p>
             </header>
 
+            {attendanceDialog}
+            {guide}
+
             {(message || messageKind) && <p role="status" className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{messageKind === "bookingCreated" ? receptionLabel(locale, "existingBookingCreated", source.existingBookingCreated) : messageKind === "noPatient" || isReceptionLabel(message, "noPatient", source.noPatient) ? receptionLabel(locale, "noPatient", source.noPatient) : message}</p>}
             {error && <p role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{(isReceptionLabel(error, "noPatient", source.noPatient) || /active patient.*health insurance/i.test(error)) ? receptionLabel(locale, "noPatient", source.noPatient) : error}</p>}
 
             <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-xs">
                 <label className="mb-1 block text-sm font-medium text-slate-800" htmlFor="walk-in-ramq">{receptionLabel(locale, "ramqLabel", source.ramqLabel)}</label>
-                <div className="flex gap-2">
-                    <input id="walk-in-ramq" value={ramq} onChange={(event) => { clearSelection(); setRamq(event.target.value); }} placeholder={t(source.ramqPlaceholder)} className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2" />
-                    <button type="button" onClick={() => void searchPatient()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{receptionLabel(locale, "searchPatient", source.searchPatient)}</button>
+                <div className={"flex gap-2" + targetClass(guideStep.key === "lookup")}>
+                    <input ref={ramqInput} id="walk-in-ramq" value={ramq} onChange={(event) => { clearSelection(); setRamq(event.target.value); }} placeholder={t(source.ramqPlaceholder)} className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2" />
+                    <button ref={lookupButton} type="button" onClick={() => void searchPatient()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{receptionLabel(locale, "searchPatient", source.searchPatient)}</button>
                 </div>
 
                 {patients.length > 0 && (
-                    <div className="mt-3 space-y-1">
+                    <div ref={identityRegion} tabIndex={-1} className={"mt-3 space-y-1" + targetClass(guideStep.key === "identity")}>
                         {patients.map((patient) => (
-                            <button key={patient._id} disabled={loading} type="button" onClick={() => { setSelectedPatient(patient); setReplacementId(undefined); setMessage(""); setWalkInAvailability(null); }} className={`block w-full rounded border px-3 py-2 text-left text-sm ${selectedPatient?._id === patient._id ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:bg-slate-50"}`}>
+                            <button ref={patients.length === 1 ? patientButton : undefined} key={patient._id} disabled={loading} type="button" onClick={() => { setSelectedPatient(patient); setSelectedSlot(null); setDetailsReviewed(false); setReplacementId(undefined); setMessage(""); setError(""); setWalkInAvailability(null); }} className={`block w-full rounded border px-3 py-2 text-left text-sm ${selectedPatient?._id === patient._id ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:bg-slate-50"}`}>
                                 {patientName(patient)} <span className="float-right text-blue-700">{receptionLabel(locale, "selectPatient", source.selectPatient)}</span>
                             </button>
                         ))}
                     </div>
                 )}
                 {selectedPatient && <p className="mt-3 text-sm text-slate-700">{receptionLabel(locale, "selectedPatient", source.selectedPatient).replace("{name}", patientName(selectedPatient))}</p>}
+                {historicalNotice}
                 {rescheduled && <p role="status">{replan.success}</p>}
-                {pending.length > 0 && <div role="status" className="mt-4 space-y-2 rounded border border-amber-300 bg-amber-50 p-4">
+                {pending.length > 0 && <div ref={pendingRegion} tabIndex={-1} role="status" className={"mt-4 space-y-2 rounded border border-amber-300 bg-amber-50 p-4" + targetClass(guideStep.key === "existing" || guideStep.key === "ambiguous")}>
                     <p>{pending.length > 1 ? replan.conflict : replan.notice.replace("{date}", pending[0].date).replace("{time}", pending[0].time)}</p>
-                    <p>{replan.kept}</p>
-                    {pending.length === 1 && <button type="button" disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-white" onClick={() => {
+                    {pending.length === 1 && <p>{replan.kept}</p>}
+                    {pending.length === 1 && <button ref={replacementButton} type="button" disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-white" onClick={() => {
                         setSelectedPatient(existingPatient); setReplacementId(pending[0]._id);
                         void loadWalkInAvailability(clinicId, existingPatient._id, pending[0]._id);
                     }}>{replan.start}</button>}
@@ -455,17 +638,17 @@ export function WalkInArrivalPage() {
                             <h2 className="font-medium text-amber-950">{receptionLabel(locale, "newPatientTitle", source.newPatientTitle)}</h2>
                             <p className="mt-1 text-sm text-amber-900">{receptionLabel(locale, "newPatientDescription", source.newPatientDescription)}</p>
                         </div>
-                        <button type="button" onClick={() => void loadWalkInAvailability()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{walkInAvailability ? receptionLabel(locale, "refreshAvailability", source.refreshAvailability) : receptionLabel(locale, "searchAvailability", source.searchAvailability)}</button>
+                        <button ref={availabilityButton} type="button" onClick={() => void loadWalkInAvailability()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{walkInAvailability ? receptionLabel(locale, "refreshAvailability", source.refreshAvailability) : receptionLabel(locale, "searchAvailability", source.searchAvailability)}</button>
                         {loading && <p className="text-sm text-slate-600">{t(source.availabilityLoading)}</p>}
-                        {walkInAvailability && <AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} />}
+                        {walkInAvailability && <div ref={availabilityRegion} tabIndex={-1} className={targetClass(guideStep.key === "slots")}><AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} /></div>}
                     </div>
                 ) : (
                     <>
-                        {pending.length === 0 && <button type="button" onClick={confirmSelection} disabled={!selectedPatient || loading} className="mt-4 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{walkInAvailability ? receptionLabel(locale, "refreshAvailability", source.refreshAvailability) : receptionLabel(locale, "searchAvailability", source.searchAvailability)}</button>}
+                        {pending.length === 0 && <button ref={availabilityButton} type="button" onClick={confirmSelection} disabled={!selectedPatient || loading} className="mt-4 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{walkInAvailability ? receptionLabel(locale, "refreshAvailability", source.refreshAvailability) : selectedPatient?.hasHistoricalScheduledAppointments ? receptionLabel(locale, "newArrival", source.newArrival) : receptionLabel(locale, "searchAvailability", source.searchAvailability)}</button>}
                         {selectedPatient && <p className="mt-3 text-sm text-slate-700">{receptionLabel(locale, "existingPatientDescription", source.existingPatientDescription)}</p>}
                         {loading && selectedPatient && <p className="mt-3 text-sm text-slate-600">{t(source.availabilityLoading)}</p>}
                         {selectedPatient && walkInAvailability && (
-                            <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                            <div ref={availabilityRegion} tabIndex={-1} className={"mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4" + targetClass(guideStep.key === "slots")}>
                                 <AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} introduction={replacementId ? replan.kept : undefined} />
                             </div>
                         )}

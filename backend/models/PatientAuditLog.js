@@ -11,6 +11,8 @@ const PatientAuditLogSchema = new mongoose.Schema(
                 "PATIENT_RESTORE",
                 "PATIENT_DELETE",
                 "RECEPTION_RAMQ_LOOKUP",
+                "RECEPTION_HISTORY_READ",
+                "RECEPTION_ATTENDANCE_UPDATE",
                 "CONSULTATION_READ",
                 "CONSULTATION_NOTE_CREATE",
                 "PATIENT_CARE_ACCEPT",

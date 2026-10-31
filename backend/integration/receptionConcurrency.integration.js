@@ -20,6 +20,9 @@ import { PatientAuditLog } from "../models/PatientAuditLog.js";
 import { WriteOperationAuditLog } from "../models/WriteOperationAuditLog.js";
 import { ReceptionBookingProof } from "../models/ReceptionBookingProof.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
+import { getReplicaSetStatus } from "../services/dbStatus.js";
+import { readConsultation, addConsultationNote } from "../services/consultations.js";
+import { PatientConsultationNote } from "../models/PatientConsultationNote.js";
 
 const day = "2099-01-15";
 const times = Array.from({ length: 24 }, (_, i) => `${String(8 + Math.floor(i / 4)).padStart(2, "0")}:${String(i % 4 * 15).padStart(2, "0")}`);
@@ -58,6 +61,13 @@ async function counts() {
     return { patients: await Patient.countDocuments(), appointments: await Appointment.countDocuments(),
         guards: await AppointmentBookingGuard.countDocuments(), patientAudits: await PatientAuditLog.countDocuments(),
         writeAudits: await WriteOperationAuditLog.countDocuments() };
+}
+function recordedReplicaSummary(snapshot) {
+    // A direct ephemeral-port connection can be reported alongside the
+    // replica's advertised hostname by the existing collector. Test that the
+    // receipt preserves the actual observed summary, never an invented count.
+    return Object.fromEntries(["status", "memberCount", "healthyCount", "primaryCount", "secondaryCount",
+        "majorityAvailable", "maxLagSeconds", "laggingThresholdSeconds"].map(key => [key, snapshot.summary[key]]));
 }
 async function seedKnownPatient(n = 1) {
     const response = await book(payload(n));
@@ -254,9 +264,13 @@ describe("4. Booking, cancellation and rescheduling conflicts", () => {
         expect(await Patient.countDocuments()).toBe(booking.status === 201 ? 2 : 1);
     });
     it("allows only one replacement when both reception accounts replan the original", async () => {
-        expect((await book(payload(1))).status).toBe(201);
+        const originalResponse = await book(payload(1));
+        expect(originalResponse.status).toBe(201);
+        expect(originalResponse.meta.writeVerification.status).toBe("CONFIRMED");
         const original = await Appointment.findOne({});
         const body = { clinic, patientId: String(original.patient), specialist: doctors[0], date: day, replaceAppointmentId: String(original._id), slotType: "walk_in" };
+        const observedSnapshot = await getReplicaSetStatus();
+        expect(observedSnapshot.available).toBe(true);
         const results = await race(gate => book({ ...body, time: times[1] }, 0, gate), gate => book({ ...body, time: times[2] }, 1, gate));
         expect(results.map(result => result.status).sort()).toEqual([201, 409]);
         expect(results.find(result => result.status === 409).error.code).toBe("RECEPTION_REPLAN_REQUIRED");
@@ -268,6 +282,23 @@ describe("4. Booking, cancellation and rescheduling conflicts", () => {
         expect(await Appointment.countDocuments()).toBe(2);
         expect(await Patient.countDocuments()).toBe(1);
         expect((await AppointmentBookingGuard.findOne({ patient: original.patient })).scheduledCount).toBe(1);
+        const winner = results.find(result => result.status === 201);
+        const loser = results.find(result => result.status === 409);
+        expect(loser.meta?.writeVerification).toBeUndefined();
+        expect(winner.meta.writeVerification.status).toBe("CONFIRMED");
+        const wrv = winner.meta.writeVerification.verificationId;
+        expect(wrv).toMatch(/^WRV-[A-Z0-9]+-[A-F0-9]{12}$/);
+        expect(wrv).not.toBe(originalResponse.meta.writeVerification.verificationId);
+        const verified = await WriteOperationAuditLog.find({ verificationId: wrv }).lean();
+        expect(verified).toHaveLength(2);
+        expect(verified.map(event => event.operation).sort()).toEqual(["CREATE", "UPDATE"]);
+        expect(new Set(verified.map(event => event.resourceId))).toEqual(new Set([String(old._id), String(active._id)]));
+        const winnerActor = String(receptionUsers[results.findIndex(result => result.status === 201)]._id);
+        verified.forEach(event => {
+            expect(String(event.actorUserId)).toBe(winnerActor);
+            expect(event.writeConcern).toMatchObject(CLINICAL_WRITE_CONCERN);
+            expect(event.replicaSet).toMatchObject(recordedReplicaSummary(observedSnapshot));
+        });
     });
     it("keeps a consistent history when reception replan races physician cancellation", async () => {
         expect((await book(payload(1))).status).toBe(201);
@@ -361,11 +392,60 @@ describe("6. Atomic failure and minimized clinical audit records", () => {
                 const response = await book(payload(actor + 1), actor);
                 expect(response.status).toBe(500); expect(response.error.code).toBe("PERSISTENCE_FAILED");
                 expect(response.error.stack).toBeUndefined();
+                expect(response.meta?.writeVerification).toBeUndefined();
                 expect(await counts()).toEqual(before);
             }
         } finally { await mongoose.connection.db.command({ collMod: collection, validator: {} }); }
-        expect((await book(payload(1))).status).toBe(201);
+        const observedSnapshot = await getReplicaSetStatus();
+        expect(observedSnapshot.available).toBe(true);
+        const success = await book(payload(1));
+        expect(success.status).toBe(201);
+        expect(success.meta.writeVerification.status).toBe("CONFIRMED");
+        expect(success.data.writeAuditRecorded).toBeUndefined();
         expect(await counts()).toMatchObject({ patients: 1, appointments: 1, guards: 1, patientAudits: 1, writeAudits: 1 });
+        const receipt = await WriteOperationAuditLog.findOne({ verificationId: success.meta.writeVerification.verificationId }).lean();
+        expect(receipt).toMatchObject({ collectionName: "appointments", operation: "CREATE", resourceId: String(success.data.appointment._id), outcome: "SUCCESS" });
+        expect(String(receipt.actorUserId)).toBe(String(receptionUsers[0]._id));
+        expect(receipt.writeConcern).toMatchObject(CLINICAL_WRITE_CONCERN);
+        expect(receipt.replicaSet).toMatchObject(recordedReplicaSummary(observedSnapshot));
+    });
+    it("rolls back replacement links, capacity and booking proof when the CREATE receipt fails after the UPDATE receipt", async () => {
+        const initial = await book(payload(1));
+        expect(initial.status).toBe(201);
+        const original = await Appointment.findOne({});
+        const bookingProof = await lookupProof(String(original.patient));
+        const body = { clinic, patientId: String(original.patient), specialist: doctors[0], date: day,
+            time: times[1], replaceAppointmentId: String(original._id), slotType: "walk_in", bookingProof };
+        const before = await counts();
+        const ownerBefore = String((await Patient.findById(original.patient)).ownerUserId);
+        const collection = WriteOperationAuditLog.collection.collectionName;
+        // The old-appointment UPDATE audit can be inserted, but the later
+        // new-appointment CREATE audit fails inside the same real transaction.
+        await mongoose.connection.db.command({ collMod: collection,
+            validator: { $jsonSchema: { properties: { operation: { enum: ["UPDATE"] } } } }, validationLevel: "strict" });
+        try {
+            const refused = await book(body);
+            expect(refused.status).toBe(500);
+            expect(refused.error.code).toBe("PERSISTENCE_FAILED");
+            expect(refused.meta?.writeVerification).toBeUndefined();
+            expect(await counts()).toEqual(before);
+            const unchanged = await Appointment.findById(original._id);
+            expect(unchanged.status).toBe("scheduled");
+            expect(unchanged.rescheduledTo).toBeUndefined();
+            expect((await AppointmentBookingGuard.findOne({ patient: original.patient })).scheduledCount).toBe(1);
+            expect(String((await Patient.findById(original.patient)).ownerUserId)).toBe(ownerBefore);
+        } finally {
+            await mongoose.connection.db.command({ collMod: collection, validator: {} });
+        }
+        // Reusing this exact one-time proof succeeds only if its failed
+        // transaction consumption was rolled back as well.
+        const success = await book(body);
+        expect(success.status).toBe(201);
+        expect(success.meta.writeVerification.status).toBe("CONFIRMED");
+        const audits = await WriteOperationAuditLog.find({ verificationId: success.meta.writeVerification.verificationId }).lean();
+        expect(audits.map(event => event.operation).sort()).toEqual(["CREATE", "UPDATE"]);
+        expect(await Appointment.countDocuments({ patient: original.patient, status: "scheduled" })).toBe(1);
+        expect(await Patient.countDocuments()).toBe(1);
     });
     it("keeps both reception actors attributable without patient names, insurance numbers, contacts or clinical text in audits", async () => {
         const forbiddenValues = [];
@@ -390,5 +470,246 @@ describe("6. Atomic failure and minimized clinical audit records", () => {
         // Internal patient/resource IDs deliberately remain for traceability;
         // this is minimization, not an assertion of anonymous audit records.
         expect(audits.some(event => event.patientId)).toBe(true);
+    });
+});
+
+
+describe("7. Past scheduled records do not block a new reception arrival", () => {
+    it("keeps two historical scheduled appointments intact, rejects their replacement IDs and books a genuinely receipted new arrival", async () => {
+        const patientId = await seedKnownPatient();
+        const template = await Appointment.findOne({ patient: patientId }).lean();
+        const historical = [];
+        // Explicit synthetic history fixtures, not a migration or status repair.
+        for (const date of ["2099-01-13", "2099-01-14"]) {
+            const { _id, __v, createdAt, updatedAt, ...fields } = template;
+            const record = await Appointment.create({ ...fields, date, status: "scheduled" });
+            historical.push(record.toObject());
+            await AppointmentBookingGuard.create({ patient: patientId, specialist: doctors[0], date, scheduledCount: 1 });
+        }
+        const lookup = await request(`/api/reception/patient-lookup?clinic=${clinic}&ramq=${patient(1).num_assurance_maladie}`, { token: tokens[0] });
+        expect(lookup.status).toBe(200);
+        expect(lookup.data.existingAppointments).toEqual([]);
+        expect(lookup.data.hasHistoricalScheduledAppointments).toBe(true);
+        expect(Object.keys(lookup.data).sort()).toEqual(["_id", "bookingProof", "existingAppointments", "hasHistoricalScheduledAppointments", "nom", "prenom"].sort());
+        const optionsPath = `/api/reception/walk-in-options?clinic=${clinic}&patient=${patientId}`;
+        const options = await request(optionsPath, { token: tokens[0] });
+        expect(options.status).toBe(200);
+        expect(options.data.today.some(item => item.specialist._id === doctors[0] && item.slots.includes(times[1]))).toBe(true);
+        // Exact per-day quota: two scheduled old days cannot inflate today.
+        expect(await Appointment.countDocuments({ specialist: doctors[0], date: day, status: { $in: ["scheduled", "completed"] } })).toBe(1);
+        const body = { clinic, patientId, specialist: doctors[0], date: day, time: times[1], slotType: "walk_in", bookingProof: lookup.data.bookingProof };
+        const before = await counts();
+        for (const original of historical) {
+            const staleOptions = await request(`${optionsPath}&replaceAppointmentId=${original._id}`, { token: tokens[0] });
+            expect(staleOptions.status).toBe(409);
+            expect(staleOptions.error.code).toBe("RECEPTION_REPLAN_REQUIRED");
+            const refused = await book({ ...body, replaceAppointmentId: String(original._id) });
+            expect(refused.status).toBe(409);
+            expect(refused.error.code).toBe("RECEPTION_REPLAN_REQUIRED");
+            expect(refused.meta?.writeVerification).toBeUndefined();
+        }
+        expect(await counts()).toEqual(before);
+        // The exact proof survives both rejected transactions; no new lookup.
+        const booked = await book(body);
+        expect(booked.status).toBe(201);
+        expect(booked.meta.writeVerification.status).toBe("CONFIRMED");
+        const receipts = await WriteOperationAuditLog.find({ verificationId: booked.meta.writeVerification.verificationId }).lean();
+        expect(receipts).toHaveLength(1);
+        expect(receipts[0]).toMatchObject({ operation: "CREATE", resourceId: booked.data.appointment._id });
+        expect(String(receipts[0].actorUserId)).toBe(String(receptionUsers[0]._id));
+        expect(await Patient.countDocuments()).toBe(1);
+        expect(await Appointment.countDocuments({ patient: patientId, status: "scheduled" })).toBe(3);
+        expect(await Appointment.countDocuments({ patient: patientId, status: "scheduled", date: { $gte: day } })).toBe(1);
+        for (const original of historical) {
+            expect(await Appointment.findById(original._id).lean()).toEqual(original);
+            expect((await AppointmentBookingGuard.findOne({ patient: patientId, date: original.date })).scheduledCount).toBe(1);
+            expect(await WriteOperationAuditLog.countDocuments({ resourceId: String(original._id) })).toBe(0);
+        }
+    });
+    it("keeps today's elapsed-hour appointment pending and still rejects multiple current or future appointments", async () => {
+        expect((await book(payload(1))).status).toBe(201);
+        const original = await Appointment.findOne({}).lean();
+        // Keep clock and real authenticated session unchanged. Only this
+        // synthetic fixture's appointment hour is earlier than the test clock.
+        await Appointment.updateOne({ _id: original._id }, { $set: { time: "00:01" } });
+        const lookupPath = `/api/reception/patient-lookup?clinic=${clinic}&ramq=${patient(1).num_assurance_maladie}`;
+        const lookup = await request(lookupPath, { token: tokens[0] });
+        expect(lookup.data.existingAppointments).toEqual([{ _id: String(original._id), date: day, time: "00:01" }]);
+        expect(lookup.data.hasHistoricalScheduledAppointments).toBeUndefined();
+        const body = { clinic, patientId: String(original.patient), specialist: doctors[0], date: day, time: times[1], slotType: "walk_in", bookingProof: lookup.data.bookingProof };
+        const optionsPath = `/api/reception/walk-in-options?clinic=${clinic}&patient=${original.patient}`;
+        expect((await request(optionsPath, { token: tokens[0] })).status).toBe(409);
+        expect((await book(body)).status).toBe(409);
+        expect((await Appointment.findById(original._id)).status).toBe("scheduled");
+        const { _id, __v, createdAt, updatedAt, ...fields } = original;
+        const future = await Appointment.create({ ...fields, date: "2099-01-16", time: "08:00", status: "scheduled" });
+        const ambiguous = await request(lookupPath, { token: tokens[0] });
+        expect(ambiguous.data.existingAppointments.map(item => item._id)).toEqual([String(original._id), String(future._id)]);
+        const before = await counts();
+        const options = await request(`${optionsPath}&replaceAppointmentId=${original._id}`, { token: tokens[0] });
+        expect(options.status).toBe(409);
+        const refused = await book({ ...body, bookingProof: ambiguous.data.bookingProof, replaceAppointmentId: String(original._id) });
+        expect(refused.status).toBe(409);
+        expect(refused.meta?.writeVerification).toBeUndefined();
+        expect(await counts()).toEqual(before);
+        expect(await Appointment.countDocuments({ status: "scheduled" })).toBe(2);
+    });
+});
+
+
+describe("8. Explicit reception administrative attendance", () => {
+    async function seedHistory(count = 1) {
+        const patientId = await seedKnownPatient();
+        const template = await Appointment.findOne({ patient: patientId }).lean();
+        const rows = [];
+        for (let i = 0; i < count; i++) {
+            const { _id, __v, createdAt, updatedAt, ...fields } = template;
+            const row = await Appointment.create({ ...fields, date: `2099-01-${13 + i}`, status: "scheduled",
+                ...(i === 1 ? { attendanceResolution: null } : {}) });
+            rows.push(row);
+            await AppointmentBookingGuard.create({ patient: patientId, specialist: doctors[0], date: row.date, scheduledCount: 1 });
+        }
+        return { patientId, rows, template };
+    }
+    const queryHistory = (patientId, bookingProof, actor = 0, extra = {}) => request("/api/reception/historical-appointments/query", {
+        token: tokens[actor], body: { clinic, patientId, bookingProof, ...extra } });
+    const declareAttendance = (patientId, appointmentId, bookingProof, outcome = "attended", actor = 0, gate, extra = {}) =>
+        request(`/api/reception/historical-appointments/${appointmentId}/attendance`, { token: tokens[actor], method: "PATCH", gate,
+            body: { clinic, patientId, bookingProof, outcome, ...extra } });
+
+    it("resolves absent and null legacy history by explicit patient statement, preserves clinical notes and continues booking with rotated proofs", async () => {
+        const { patientId, rows } = await seedHistory(2);
+        let proof = await lookupProof(patientId);
+        const firstList = await queryHistory(patientId, proof);
+        expect(firstList.status).toBe(200);
+        expect(firstList.data).toEqual({ appointments: rows.map(row => ({ _id: String(row._id), date: row.date, time: row.time })), hasMore: false });
+        const ownerBefore = String((await Patient.findById(patientId)).ownerUserId);
+        const guardsBefore = await AppointmentBookingGuard.find({ patient: patientId }).sort({ date: 1 }).lean();
+        const ids = [];
+        for (const [index, outcome] of ["attended", "not_attended"].entries()) {
+            const row = rows[index];
+            const response = await declareAttendance(patientId, String(row._id), proof, outcome);
+            expect(response.status).toBe(200);
+            expect(response.data).toEqual({ appointment: { _id: String(row._id), date: row.date, time: row.time, attendanceResolution: { outcome } }, bookingProof: expect.stringMatching(/^[a-f0-9]{64}$/) });
+            expect(response.data.bookingProof).not.toBe(proof);
+            expect(response.meta.writeVerification.status).toBe("CONFIRMED");
+            ids.push(response.meta.writeVerification.verificationId);
+            const persisted = await Appointment.findById(row._id).lean();
+            expect(persisted.status).toBe("scheduled");
+            expect(persisted.attendanceResolution).toEqual({ outcome, recordedAt: expect.any(Date), recordedByUserId: receptionUsers[0]._id, source: "patient_statement" });
+            expect(String(persisted.ownerUserId)).toBe(String(row.ownerUserId));
+            const receipt = await WriteOperationAuditLog.findOne({ verificationId: ids[index] }).lean();
+            expect(receipt).toMatchObject({ operation: "UPDATE", resourceId: String(row._id), changedFields: ["attendanceResolution"] });
+            expect(String(receipt.actorUserId)).toBe(String(receptionUsers[0]._id));
+            expect(receipt.writeConcern).toMatchObject(CLINICAL_WRITE_CONCERN);
+            expect((await queryHistory(patientId, proof)).status).toBe(403);
+            proof = response.data.bookingProof;
+            const remaining = await queryHistory(patientId, proof);
+            expect(remaining.data.appointments).toHaveLength(1 - index);
+        }
+        expect(new Set(ids).size).toBe(2);
+        expect(await AppointmentBookingGuard.find({ patient: patientId }).sort({ date: 1 }).lean()).toEqual(guardsBefore);
+        expect(String((await Patient.findById(patientId)).ownerUserId)).toBe(ownerBefore);
+        expect(await PatientConsultationNote.countDocuments()).toBe(0);
+        // Exercise the actual physician service, rather than inferring note
+        // permissions solely from an unchanged status string.
+        const physician = { userId: String(physicianUsers[0]._id), role: "MEDECIN" };
+        for (const row of rows) {
+            expect((await readConsultation(String(row._id), physician, { ip: "127.0.0.1" })).canAddNote).toBe(true);
+            expect((await addConsultationNote(String(row._id), "SYNTHETIC_ATTENDANCE_PERMISSION_NOTE", physician, { ip: "127.0.0.1" }))._id).toBeTruthy();
+        }
+        expect(await PatientConsultationNote.countDocuments()).toBe(2);
+        const lookup = await request(`/api/reception/patient-lookup?clinic=${clinic}&ramq=${patient(1).num_assurance_maladie}`, { token: tokens[0] });
+        expect(lookup.data.hasHistoricalScheduledAppointments).toBeUndefined();
+        const booking = await book({ clinic, patientId, specialist: doctors[0], date: day, time: times[1], slotType: "walk_in", bookingProof: proof });
+        expect(booking.status).toBe(201);
+        expect(booking.meta.writeVerification.verificationId).not.toBe(ids[0]);
+        expect(await Patient.countDocuments()).toBe(1);
+        expect(await Appointment.countDocuments({ patient: patientId, status: "scheduled", date: { $gte: day } })).toBe(1);
+    });
+
+    it("rejects missing or foreign proofs, current/future/foreign records and overwriting an existing resolution", async () => {
+        const { patientId, rows, template } = await seedHistory();
+        const proof = await lookupProof(patientId);
+        for (const body of [{}, { bookingProof: "forged" }, { bookingProof: proof, patientId: String(new mongoose.Types.ObjectId()) }]) {
+            expect((await queryHistory(patientId, body.bookingProof, 0, body)).status).toBe(403);
+        }
+        expect((await queryHistory(patientId, proof, 1)).status).toBe(403);
+        expect((await queryHistory(patientId, proof, 0, { clinic: otherClinic })).status).toBe(403);
+        const { _id, __v, createdAt, updatedAt, ...fields } = template;
+        const excluded = await Appointment.create([
+            { ...fields, date: day, time: times[2], status: "scheduled" },
+            { ...fields, date: "2099-01-16", status: "scheduled" },
+            { ...fields, date: "2099-01-12", clinique: otherClinic, status: "scheduled" },
+            { ...fields, date: "2099-01-11", status: "completed" },
+        ]);
+        const listed = await queryHistory(patientId, proof);
+        expect(listed.data.appointments.map(row => row._id)).toEqual([String(rows[0]._id)]);
+        const before = await counts();
+        for (const row of excluded) {
+            const refused = await declareAttendance(patientId, String(row._id), proof);
+            expect(refused.status).toBe(409);
+            expect(refused.error.code).toBe("RECEPTION_HISTORY_CONFLICT");
+            expect(refused.meta).toBeUndefined();
+        }
+        for (const extra of [{ status: "completed" }, { notes: "FORGED_SYNTHETIC_NOTE" }]) {
+            expect((await declareAttendance(patientId, String(rows[0]._id), proof, "attended", 0, undefined, extra)).status).toBe(400);
+        }
+        expect((await declareAttendance(patientId, String(rows[0]._id), proof, "completed")).status).toBe(400);
+        expect(await counts()).toEqual(before);
+        const success = await declareAttendance(patientId, String(rows[0]._id), proof);
+        expect(success.status).toBe(200);
+        const resolved = await Appointment.findById(rows[0]._id).lean();
+        const overwrite = await declareAttendance(patientId, String(rows[0]._id), success.data.bookingProof, "not_attended");
+        expect(overwrite.status).toBe(409);
+        expect(await Appointment.findById(rows[0]._id).lean()).toEqual(resolved);
+    });
+
+    it("rolls back resolution, both audits and proof rotation on audit or fresh-proof insertion failure", async () => {
+        const { patientId, rows } = await seedHistory();
+        const proof = await lookupProof(patientId);
+        const original = await Appointment.findById(rows[0]._id).lean();
+        const before = await counts();
+        const proofsBefore = await ReceptionBookingProof.find({}).lean();
+        for (const model of [WriteOperationAuditLog, ReceptionBookingProof]) {
+            const collection = model.collection.collectionName;
+            await mongoose.connection.db.command({ collMod: collection, validator: { $jsonSchema: { required: ["__synthetic_required_field"] } }, validationLevel: "strict" });
+            try {
+                const response = await declareAttendance(patientId, String(rows[0]._id), proof);
+                expect(response.status).toBe(500);
+                expect(response.meta).toBeUndefined();
+                expect(response.data).toBeUndefined();
+                expect(await counts()).toEqual(before);
+                expect(await Appointment.findById(rows[0]._id).lean()).toEqual(original);
+                expect(await ReceptionBookingProof.find({}).lean()).toEqual(proofsBefore);
+            } finally { await mongoose.connection.db.command({ collMod: collection, validator: {} }); }
+        }
+        const success = await declareAttendance(patientId, String(rows[0]._id), proof);
+        expect(success.status).toBe(200);
+        expect(success.meta.writeVerification.status).toBe("CONFIRMED");
+        expect((await queryHistory(patientId, success.data.bookingProof)).data.appointments).toEqual([]);
+    });
+
+    it("allows exactly one explicit declaration in a race and preserves the losing actor's proof", async () => {
+        const { patientId, rows } = await seedHistory();
+        const proofs = await Promise.all([lookupProof(patientId, 0), lookupProof(patientId, 1)]);
+        const before = await counts();
+        const results = await race(gate => declareAttendance(patientId, String(rows[0]._id), proofs[0], "attended", 0, gate),
+            gate => declareAttendance(patientId, String(rows[0]._id), proofs[1], "not_attended", 1, gate));
+        expect(results.map(result => result.status).sort()).toEqual([200, 409]);
+        const winner = results.findIndex(result => result.status === 200);
+        const loser = 1 - winner;
+        const row = await Appointment.findById(rows[0]._id).lean();
+        expect(row.status).toBe("scheduled");
+        expect(row.attendanceResolution.outcome).toBe(winner === 0 ? "attended" : "not_attended");
+        expect(String(row.attendanceResolution.recordedByUserId)).toBe(String(receptionUsers[winner]._id));
+        const after = await counts();
+        expect(after.writeAudits).toBe(before.writeAudits + 1);
+        expect(after.patientAudits).toBe(before.patientAudits + 1);
+        expect(after.appointments).toBe(before.appointments);
+        expect(after.guards).toBe(before.guards);
+        expect((await queryHistory(patientId, proofs[loser], loser)).status).toBe(200);
+        expect((await queryHistory(patientId, proofs[winner], winner)).status).toBe(403);
+        expect((await queryHistory(patientId, results[winner].data.bookingProof, winner)).data.appointments).toEqual([]);
     });
 });

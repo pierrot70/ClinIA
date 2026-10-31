@@ -1,9 +1,10 @@
 import mongoose from "mongoose";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const issueReceptionBookingProof = vi.fn();
 const consumeReceptionBookingProof = vi.fn();
-vi.mock("../receptionBookingProof.js", () => ({ issueReceptionBookingProof, consumeReceptionBookingProof }));
+const validateReceptionBookingProof = vi.fn();
+vi.mock("../receptionBookingProof.js", () => ({ issueReceptionBookingProof, consumeReceptionBookingProof, validateReceptionBookingProof }));
 const adminUserFindOne = vi.fn();
 const adminUserFind = vi.fn();
 const specialistFindOne = vi.fn();
@@ -11,7 +12,9 @@ const specialistFind = vi.fn();
 const patientFindOne = vi.fn();
 const patientFindOneAndUpdate = vi.fn();
 const appointmentFind = vi.fn();
+const appointmentExists = vi.fn();
 const appointmentUpdateOne = vi.fn();
+const appointmentFindOneAndUpdate = vi.fn();
 const appointmentCount = vi.fn();
 const releaseDailyAppointmentCapacity = vi.fn();
 const patientExists = vi.fn();
@@ -36,7 +39,7 @@ vi.mock("../../models/Specialist.js", () => ({
 vi.mock("../../models/Patient.js", () => ({
     Patient: { findOne: patientFindOne, findOneAndUpdate: patientFindOneAndUpdate, exists: patientExists },
 }));
-vi.mock("../../models/Appointment.js", () => ({ Appointment: { find: appointmentFind, updateOne: appointmentUpdateOne, countDocuments: appointmentCount } }));
+vi.mock("../../models/Appointment.js", () => ({ Appointment: { find: appointmentFind, exists: appointmentExists, findOneAndUpdate: appointmentFindOneAndUpdate, updateOne: appointmentUpdateOne, countDocuments: appointmentCount } }));
 
 vi.mock("../../audit/patientAudit.js", () => ({ recordPatientAuditEvent }));
 vi.mock("../../audit/writeOperationAudit.js", () => ({
@@ -57,6 +60,8 @@ const {
     listWalkInFamilyMedicineOptions,
     createWalkInPatientAndAppointment,
     createWalkInAppointmentForExistingPatient,
+    listReceptionHistoricalAppointments,
+    recordReceptionHistoricalAttendance,
 } = await import("../reception.js");
 
 const receptionId = "507f1f77bcf86cd799439011";
@@ -79,7 +84,7 @@ describe("reception appointment replacement", () => {
     it("announces an existing appointment immediately at exact patient lookup", async () => {
         const result = await findReceptionPatientByRamq({ clinicId, ramq: "676767", authUser });
         expect(result.existingAppointments).toEqual([{ _id: oldId, date: "2030-01-01", time: "09:00" }]);
-        expect(appointmentFind).toHaveBeenCalledWith({ patient: patientId, clinique: clinicId, status: "scheduled" }, expect.anything());
+        expect(appointmentFind).toHaveBeenCalledWith({ patient: patientId, clinique: clinicId, status: "scheduled", date: { $gte: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) } }, expect.anything());
         expect(appointmentUpdateOne).not.toHaveBeenCalled();
     });
     it("refuses an additional booking without explicit replacement", async () => {
@@ -146,7 +151,9 @@ beforeEach(() => {
     vi.clearAllMocks();
     issueReceptionBookingProof.mockResolvedValue("proof");
     consumeReceptionBookingProof.mockResolvedValue();
+    validateReceptionBookingProof.mockResolvedValue();
     appointmentFind.mockReturnValue(resolvedLean([]));
+    appointmentExists.mockResolvedValue(null);
     appointmentUpdateOne.mockResolvedValue({ modifiedCount: 1 });
     patientFindOneAndUpdate.mockImplementation(query => patientFindOne(query));
     vi.spyOn(mongoose, "startSession").mockResolvedValue(transactionSession);
@@ -563,5 +570,316 @@ describe.each([createWalkInPatientAndAppointment, createWalkInAppointmentForExis
         await expect(book(booking())).rejects.toMatchObject({ code: "RECEIVING_PHYSICIAN_UNAVAILABLE" });
         expect(adminUserFindOne).toHaveBeenCalledWith({ _id: physicianId, role: "MEDECIN", isActive: true }, { _id: 1 });
         expect(createAppointment).not.toHaveBeenCalled();
+    });
+});
+
+
+describe("WalkIn verified receipt transaction", () => {
+    const patientId = "507f1f77bcf86cd799439088";
+    const appointmentId = "507f1f77bcf86cd799439099";
+    const oldId = "507f1f77bcf86cd799439090";
+    const authUser = { userId: receptionId, username: "synthetic-reception", role: "RECEPTION" };
+    const audit = { verificationId: "WRV-SYNTHETIC-REQUEST", clientMutationId: "synthetic-mutation", requestId: "request-test", instanceId: "instance-test",
+        replicaSet: { summary: { status: "OK", memberCount: 3, majorityAvailable: true } } };
+    const args = { clinicId, specialistId, patientId, date: "2030-01-01", time: "09:15", authUser, audit,
+        patientDto: { nom: "Synthetic", prenom: "Fixture", num_assurance_maladie: "TEST12345678" } };
+    beforeEach(() => {
+        patientExists.mockResolvedValue(null);
+        patientFindOne.mockReturnValue(resolvedLean({ _id: patientId, nom: "Synthetic", prenom: "Fixture" }));
+        createPatient.mockResolvedValue({ _id: patientId, nom: "Synthetic", prenom: "Fixture" });
+        createAppointment.mockResolvedValue({ _id: appointmentId });
+    });
+
+    it.each([createWalkInPatientAndAppointment, createWalkInAppointmentForExistingPatient])("returns a verified audit flag after successful commit for %s", async book => {
+        const result = await book(args);
+        expect(result.writeAuditRecorded).toBe(true);
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+            verificationId: audit.verificationId, clientMutationId: audit.clientMutationId, replicaSet: audit.replicaSet,
+            actorUserId: receptionId, actorRole: "RECEPTION", collectionName: "appointments", operation: "CREATE",
+            writeConcern: { w: "majority", j: true, wtimeout: 5000 }, session: transactionSession, throwOnError: true,
+        }));
+    });
+
+    it("uses the same request receipt context for both old UPDATE and new CREATE on replacement", async () => {
+        appointmentFind.mockReturnValue(resolvedLean([{ _id: oldId, date: "2030-01-01", time: "09:00", specialist: specialistId }]));
+        const result = await createWalkInAppointmentForExistingPatient({ ...args, replaceAppointmentId: oldId });
+        expect(result.writeAuditRecorded).toBe(true);
+        const events = recordWriteOperationAuditEvent.mock.calls.map(([event]) => event);
+        expect(events).toHaveLength(2);
+        expect(events.map(event => [event.operation, event.resourceId])).toEqual([["UPDATE", oldId], ["CREATE", appointmentId]]);
+        events.forEach(event => expect(event).toMatchObject({ verificationId: audit.verificationId, clientMutationId: audit.clientMutationId,
+            requestId: audit.requestId, instanceId: audit.instanceId, replicaSet: audit.replicaSet,
+            actorUserId: receptionId, session: transactionSession, throwOnError: true }));
+    });
+
+    it.each([createWalkInPatientAndAppointment, createWalkInAppointmentForExistingPatient])("propagates required audit failure from %s without returning confirmation", async book => {
+        recordWriteOperationAuditEvent.mockRejectedValueOnce(new Error("Synthetic audit insert failure"));
+        await expect(book(args)).rejects.toThrow("Synthetic audit insert failure");
+        expect(transactionSession.withTransaction).toHaveBeenCalledWith(expect.any(Function), { writeConcern: { w: "majority", j: true, wtimeout: 5000 } });
+        expect(transactionSession.endSession).toHaveBeenCalled();
+    });
+
+    it.each([createWalkInPatientAndAppointment, createWalkInAppointmentForExistingPatient])("does not return success if the transaction commit fails in %s", async book => {
+        transactionSession.withTransaction.mockImplementationOnce(async callback => { await callback(); throw new Error("Synthetic commit failure"); });
+        await expect(book(args)).rejects.toThrow("Synthetic commit failure");
+        expect(transactionSession.endSession).toHaveBeenCalled();
+    });
+
+    it("retains one request verification ID when Mongo retries the transaction callback", async () => {
+        transactionSession.withTransaction.mockImplementationOnce(async callback => { await callback(); await callback(); });
+        await createWalkInAppointmentForExistingPatient(args);
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledTimes(2);
+        expect(new Set(recordWriteOperationAuditEvent.mock.calls.map(([event]) => event.verificationId))).toEqual(new Set([audit.verificationId]));
+    });
+});
+
+
+describe("reception pending appointments use the clinic calendar day", () => {
+    const patientId = "507f1f77bcf86cd799439088";
+    const oldId = "507f1f77bcf86cd799439090";
+    const newId = "507f1f77bcf86cd799439091";
+    const authUser = { userId: receptionId, role: "RECEPTION" };
+    const args = { clinicId, patientId, specialistId, date: "2030-01-02", time: "09:15", authUser, bookingProof: "proof" };
+    let records;
+    const record = (date, extra = {}) => ({ _id: oldId, patient: patientId, clinique: clinicId,
+        status: "scheduled", date, time: "08:00", specialist: specialistId, ...extra });
+    function matching(query) {
+        return records.filter(item => item.patient === query.patient && item.clinique === query.clinique && item.status === query.status &&
+            (!query.date?.$gte || item.date >= query.date.$gte) && (!query.date?.$lt || item.date < query.date.$lt) &&
+            (!("attendanceResolution" in query) || item.attendanceResolution == null));
+    }
+    beforeEach(() => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2030-01-02T17:00:00.000Z"));
+        records = [record("2030-01-01")];
+        patientFindOne.mockReturnValue(resolvedLean({ _id: patientId, nom: "Synthetic", prenom: "Only" }));
+        appointmentFind.mockImplementation(query => resolvedLean(matching(query).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 2)));
+        appointmentExists.mockImplementation(async query => matching(query)[0] ? { _id: matching(query)[0]._id } : null);
+        createAppointment.mockResolvedValue({ _id: newId });
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it.each([
+        ["2030-01-02T04:59:59.999Z", "2030-01-01"],
+        ["2030-01-02T05:00:00.000Z", "2030-01-02"],
+        ["2030-07-02T03:59:59.999Z", "2030-07-01"],
+        ["2030-07-02T04:00:00.000Z", "2030-07-02"],
+    ])("uses Toronto day %s -> %s for lookup and options", async (instant, today) => {
+        records = [];
+        const now = new Date(instant);
+        await findReceptionPatientByRamq({ clinicId, ramq: "TEST0001", authUser, now });
+        await listWalkInFamilyMedicineOptions({ clinicId, patientId, authUser, now });
+        expect(appointmentFind).toHaveBeenCalledTimes(2);
+        for (const [query] of appointmentFind.mock.calls) expect(query).toEqual({ patient: patientId, clinique: clinicId, status: "scheduled", date: { $gte: today } });
+        expect(appointmentExists).toHaveBeenCalledWith({ patient: patientId, clinique: clinicId, status: "scheduled", date: { $lt: today }, attendanceResolution: null });
+    });
+    it("returns only a historical boolean and permits a new arrival without rewriting two older scheduled records", async () => {
+        records.push(record("2029-12-31", { _id: "507f1f77bcf86cd799439092" }));
+        const before = structuredClone(records);
+        const lookup = await findReceptionPatientByRamq({ clinicId, ramq: "TEST0001", authUser });
+        expect(lookup).toEqual({ _id: patientId, nom: "Synthetic", prenom: "Only", bookingProof: "proof", existingAppointments: [], hasHistoricalScheduledAppointments: true });
+        const options = await listWalkInFamilyMedicineOptions({ clinicId, patientId, authUser, now: new Date() });
+        expect(options.today).toHaveLength(1);
+        const result = await createWalkInAppointmentForExistingPatient({ ...args, audit: { verificationId: "WRV-genuine-request" } });
+        expect(result.appointment._id).toBe(newId);
+        expect(result.writeAuditRecorded).toBe(true);
+        expect(consumeReceptionBookingProof).toHaveBeenCalledWith(expect.objectContaining({ bookingProof: "proof", session: transactionSession }));
+        expect(records).toEqual(before);
+        expect(appointmentUpdateOne).not.toHaveBeenCalled();
+        expect(releaseDailyAppointmentCapacity).not.toHaveBeenCalled();
+        expect(createPatient).not.toHaveBeenCalled();
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledTimes(1);
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ operation: "CREATE", resourceId: newId, verificationId: "WRV-genuine-request", session: transactionSession, throwOnError: true }));
+    });
+    it("does not signal old records from another clinic or a non-scheduled status", async () => {
+        records = [record("2030-01-01", { clinique: "507f1f77bcf86cd799439099" }), record("2030-01-01", { status: "completed" })];
+        const lookup = await findReceptionPatientByRamq({ clinicId, ramq: "TEST0001", authUser });
+        expect(lookup.existingAppointments).toEqual([]);
+        expect(lookup).not.toHaveProperty("hasHistoricalScheduledAppointments");
+        expect(appointmentUpdateOne).not.toHaveBeenCalled();
+    });
+    it("rejects an old replacement ID both while searching and during the final transaction", async () => {
+        await expect(listWalkInFamilyMedicineOptions({ clinicId, patientId, authUser, replaceAppointmentId: oldId, now: new Date() })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
+        await expect(createWalkInAppointmentForExistingPatient({ ...args, replaceAppointmentId: oldId })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
+        expect(appointmentUpdateOne).not.toHaveBeenCalled();
+        expect(createAppointment).not.toHaveBeenCalled();
+        expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
+        expect(records[0].status).toBe("scheduled");
+    });
+    it.each(["2030-01-02", "2030-01-03"])("retains %s as pending even when today's hour has elapsed", async date => {
+        records.push(record(date, { _id: newId, time: "00:01" }));
+        const lookup = await findReceptionPatientByRamq({ clinicId, ramq: "TEST0001", authUser });
+        expect(lookup.existingAppointments).toEqual([{ _id: newId, date, time: "00:01" }]);
+        expect(lookup.hasHistoricalScheduledAppointments).toBe(true);
+        await expect(listWalkInFamilyMedicineOptions({ clinicId, patientId, authUser, now: new Date() })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
+        await expect(createWalkInAppointmentForExistingPatient(args)).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
+        expect(appointmentUpdateOne).not.toHaveBeenCalled();
+    });
+    it("still refuses ambiguous current and future appointments even when the requested replacement matches one", async () => {
+        records.push(record("2030-01-02", { _id: newId }), record("2030-01-03", { _id: "507f1f77bcf86cd799439093" }));
+        const lookup = await findReceptionPatientByRamq({ clinicId, ramq: "TEST0001", authUser });
+        expect(lookup.existingAppointments).toHaveLength(2);
+        await expect(listWalkInFamilyMedicineOptions({ clinicId, patientId, authUser, replaceAppointmentId: newId, now: new Date() })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
+        await expect(createWalkInAppointmentForExistingPatient({ ...args, replaceAppointmentId: newId })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
+        expect(appointmentUpdateOne).not.toHaveBeenCalled();
+    });
+    it("recomputes the cutoff after the patient lock on each transaction attempt", async () => {
+        records = [];
+        vi.setSystemTime(new Date("2030-01-02T04:59:59.999Z"));
+        transactionSession.withTransaction.mockImplementationOnce(async callback => {
+            await callback();
+            vi.setSystemTime(new Date("2030-01-02T05:00:00.000Z"));
+            await callback();
+        });
+        await createWalkInAppointmentForExistingPatient(args);
+        expect(appointmentFind.mock.calls.map(([query]) => query.date)).toEqual([{ $gte: "2030-01-01" }, { $gte: "2030-01-02" }]);
+        expect(consumeReceptionBookingProof).toHaveBeenCalledTimes(2);
+        expect(patientFindOneAndUpdate).toHaveBeenCalledTimes(2);
+        const proofCalls = consumeReceptionBookingProof.mock.invocationCallOrder;
+        const lockCalls = patientFindOneAndUpdate.mock.invocationCallOrder;
+        const pendingCalls = appointmentFind.mock.invocationCallOrder;
+        for (let i = 0; i < 2; i++) { expect(proofCalls[i]).toBeLessThan(lockCalls[i]); expect(lockCalls[i]).toBeLessThan(pendingCalls[i]); }
+        expect(appointmentFind.mock.results.every(({ value }) => value.session.mock.calls[0][0] === transactionSession)).toBe(true);
+    });
+    it("does not query appointment history when exact lookup finds no patient", async () => {
+        patientFindOne.mockReturnValue(resolvedLean(null));
+        expect(await findReceptionPatientByRamq({ clinicId, ramq: "TEST0001", authUser })).toBeNull();
+        expect(appointmentFind).not.toHaveBeenCalled();
+        expect(appointmentExists).not.toHaveBeenCalled();
+        expect(issueReceptionBookingProof).not.toHaveBeenCalled();
+    });
+});
+
+
+describe("reception historical attendance is an administrative patient statement", () => {
+    const patientId = "507f1f77bcf86cd799439088";
+    const appointmentId = "507f1f77bcf86cd799439090";
+    const authUser = { userId: receptionId, username: "synthetic-reception", role: "RECEPTION", sessionId: "session-test" };
+    const args = { clinicId, patientId, appointmentId, bookingProof: "a".repeat(64), outcome: "attended", authUser,
+        audit: { verificationId: "WRV-ATTENDANCE-REQUEST", clientMutationId: "mutation-test", replicaSet: { summary: { status: "INCIDENT" } }, requestId: "request-test" } };
+    beforeEach(() => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2030-01-02T17:00:00Z"));
+        patientFindOne.mockReturnValue(resolvedLean({ _id: patientId }));
+        appointmentFind.mockReturnValue(resolvedLean([{ _id: appointmentId, date: "2030-01-01", time: "08:00", reason: "SYNTHETIC_PRIVATE", ownerUserId: physicianId }]));
+        appointmentFindOneAndUpdate.mockImplementation((_query, update) => resolvedLean({ _id: appointmentId, date: "2030-01-01", time: "08:00", status: "scheduled", attendanceResolution: update.$set.attendanceResolution }));
+        issueReceptionBookingProof.mockResolvedValue("fresh-proof");
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it("returns only bounded date/time/id details after exact proof validation without consuming", async () => {
+        const result = await listReceptionHistoricalAppointments(args);
+        expect(result).toEqual({ appointments: [{ _id: appointmentId, date: "2030-01-01", time: "08:00" }], hasMore: false });
+        expect(validateReceptionBookingProof).toHaveBeenCalledExactlyOnceWith({ bookingProof: args.bookingProof, authUser, clinicId, patientId });
+        expect(consumeReceptionBookingProof).not.toHaveBeenCalled();
+        expect(appointmentFind).toHaveBeenCalledWith({ patient: patientId, clinique: clinicId, status: "scheduled", date: { $lt: "2030-01-02" }, attendanceResolution: null }, { _id: 1, date: 1, time: 1 });
+        expect(appointmentFind.mock.results[0].value.limit).toHaveBeenCalledWith(51);
+        expect(recordPatientAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: "RECEPTION_HISTORY_READ", actorUserId: receptionId, patientId, throwOnError: true }));
+    });
+    it("bounds a long unresolved history and signals remaining records", async () => {
+        appointmentFind.mockReturnValue(resolvedLean(Array.from({ length: 51 }, (_, i) => ({ _id: String(i), date: "2029-12-01", time: "08:00" }))));
+        const result = await listReceptionHistoricalAppointments(args);
+        expect(result.appointments).toHaveLength(50);
+        expect(result.hasMore).toBe(true);
+    });
+    it("rejects an unproven list before patient or appointment reads", async () => {
+        validateReceptionBookingProof.mockRejectedValueOnce({ code: "RECEPTION_LOOKUP_REQUIRED" });
+        await expect(listReceptionHistoricalAppointments(args)).rejects.toMatchObject({ code: "RECEPTION_LOOKUP_REQUIRED" });
+        expect(patientExists).not.toHaveBeenCalled();
+        expect(appointmentFind).not.toHaveBeenCalled();
+    });
+    it.each(["MEDECIN", "ADMIN", "SUPERADMIN", undefined])("rejects %s at the service boundary before DB access", async role => {
+        const input = { ...args, authUser: { ...authUser, role } };
+        await expect(listReceptionHistoricalAppointments(input)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        await expect(recordReceptionHistoricalAttendance(input)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        expect(adminUserFindOne).not.toHaveBeenCalled();
+        expect(consumeReceptionBookingProof).not.toHaveBeenCalled();
+    });
+    it.each([{}, [], "bad", null])("rejects malformed patient ID %j before DB access", async patientId => {
+        await expect(listReceptionHistoricalAppointments({ ...args, patientId })).rejects.toMatchObject({ code: "INVALID_INPUT" });
+        await expect(recordReceptionHistoricalAttendance({ ...args, patientId })).rejects.toMatchObject({ code: "INVALID_INPUT" });
+        expect(adminUserFindOne).not.toHaveBeenCalled();
+    });
+    it.each([undefined, null, {}, [], "bad"])("rejects a missing or malformed appointment ID %j before DB access", async appointmentId => {
+        await expect(recordReceptionHistoricalAttendance({ ...args, appointmentId })).rejects.toMatchObject({ code: "INVALID_INPUT" });
+        expect(adminUserFindOne).not.toHaveBeenCalled();
+        expect(consumeReceptionBookingProof).not.toHaveBeenCalled();
+    });
+    it("rejects another clinic before proof or historical reads", async () => {
+        const input = { ...args, clinicId: "507f1f77bcf86cd799439099" };
+        await expect(listReceptionHistoricalAppointments(input)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        await expect(recordReceptionHistoricalAttendance(input)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        expect(validateReceptionBookingProof).not.toHaveBeenCalled();
+        expect(consumeReceptionBookingProof).not.toHaveBeenCalled();
+    });
+    it.each(["completed", "no_show", "scheduled", null, {}, []])("rejects unsupported attendance outcome %j without writing", async outcome => {
+        await expect(recordReceptionHistoricalAttendance({ ...args, outcome })).rejects.toMatchObject({ code: "INVALID_INPUT" });
+        expect(adminUserFindOne).not.toHaveBeenCalled();
+        expect(appointmentFindOneAndUpdate).not.toHaveBeenCalled();
+    });
+    it.each(["attended", "not_attended"])("records %s without clinical closure, ownership or capacity mutation and rotates the proof transactionally", async outcome => {
+        const result = await recordReceptionHistoricalAttendance({ ...args, outcome });
+        expect(result).toEqual({ appointment: { _id: appointmentId, date: "2030-01-01", time: "08:00", attendanceResolution: { outcome } }, bookingProof: "fresh-proof", writeAuditRecorded: true });
+        expect(consumeReceptionBookingProof).toHaveBeenCalledWith(expect.objectContaining({ bookingProof: args.bookingProof, authUser, clinicId, patientId, session: transactionSession }));
+        expect(appointmentFindOneAndUpdate).toHaveBeenCalledExactlyOnceWith({ _id: appointmentId, patient: patientId, clinique: clinicId, status: "scheduled", date: { $lt: "2030-01-02" }, attendanceResolution: null },
+            { $set: { attendanceResolution: { outcome, recordedAt: new Date(), recordedByUserId: receptionId, source: "patient_statement" } } }, expect.objectContaining({ session: transactionSession, new: true, runValidators: true }));
+        expect(issueReceptionBookingProof).toHaveBeenCalledExactlyOnceWith({ authUser, clinicId, patientId, session: transactionSession });
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ verificationId: args.audit.verificationId, replicaSet: args.audit.replicaSet, operation: "UPDATE", resourceId: appointmentId, changedFields: ["attendanceResolution"], session: transactionSession, throwOnError: true }));
+        expect(recordPatientAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: "RECEPTION_ATTENDANCE_UPDATE", changedFields: ["attendanceResolution"], session: transactionSession, throwOnError: true }));
+        expect(transactionSession.withTransaction).toHaveBeenCalledWith(expect.any(Function), { writeConcern: { w: "majority", j: true, wtimeout: 5000 } });
+        expect(appointmentUpdateOne).not.toHaveBeenCalled();
+        expect(releaseDailyAppointmentCapacity).not.toHaveBeenCalled();
+        expect(createAppointment).not.toHaveBeenCalled();
+    });
+    it("rejects a stale, already resolved, current, future or foreign appointment through the same CAS without revealing it", async () => {
+        appointmentFindOneAndUpdate.mockReturnValue(resolvedLean(null));
+        await expect(recordReceptionHistoricalAttendance(args)).rejects.toMatchObject({ code: "RECEPTION_HISTORY_CONFLICT" });
+        expect(recordWriteOperationAuditEvent).not.toHaveBeenCalled();
+        expect(issueReceptionBookingProof).not.toHaveBeenCalled();
+        expect(transactionSession.endSession).toHaveBeenCalled();
+    });
+    it("does not mutate after a consumed, expired or wrong-session proof", async () => {
+        consumeReceptionBookingProof.mockRejectedValueOnce({ code: "RECEPTION_LOOKUP_REQUIRED" });
+        await expect(recordReceptionHistoricalAttendance(args)).rejects.toMatchObject({ code: "RECEPTION_LOOKUP_REQUIRED" });
+        expect(patientFindOneAndUpdate).not.toHaveBeenCalled();
+        expect(appointmentFindOneAndUpdate).not.toHaveBeenCalled();
+    });
+    it("rejects an archived or missing patient under the transaction lock", async () => {
+        patientFindOne.mockReturnValue(resolvedLean(null));
+        await expect(recordReceptionHistoricalAttendance(args)).rejects.toMatchObject({ code: "INVALID_INPUT" });
+        expect(appointmentFindOneAndUpdate).not.toHaveBeenCalled();
+        expect(issueReceptionBookingProof).not.toHaveBeenCalled();
+    });
+    it("does not expose a successful result or issue a fresh proof after a required write audit failure", async () => {
+        recordWriteOperationAuditEvent.mockRejectedValueOnce(new Error("synthetic-audit-failure"));
+        await expect(recordReceptionHistoricalAttendance(args)).rejects.toThrow("synthetic-audit-failure");
+        expect(issueReceptionBookingProof).not.toHaveBeenCalled();
+        expect(transactionSession.endSession).toHaveBeenCalled();
+    });
+    it("returns no list when its mandatory read audit fails", async () => {
+        recordPatientAuditEvent.mockRejectedValueOnce(new Error("synthetic-read-audit-failure"));
+        await expect(listReceptionHistoricalAppointments(args)).rejects.toThrow("synthetic-read-audit-failure");
+    });
+    it("recalculates the past-day predicate inside each retry after the proof and patient lock", async () => {
+        vi.setSystemTime(new Date("2030-01-02T04:59:59.999Z"));
+        transactionSession.withTransaction.mockImplementationOnce(async callback => { await callback(); vi.setSystemTime(new Date("2030-01-02T05:00:00Z")); await callback(); });
+        await recordReceptionHistoricalAttendance(args);
+        expect(appointmentFindOneAndUpdate.mock.calls.map(([query]) => query.date)).toEqual([{ $lt: "2030-01-01" }, { $lt: "2030-01-02" }]);
+        expect(issueReceptionBookingProof).toHaveBeenCalledTimes(2);
+        for (let i = 0; i < 2; i++) {
+            expect(consumeReceptionBookingProof.mock.invocationCallOrder[i]).toBeLessThan(patientFindOneAndUpdate.mock.invocationCallOrder[i]);
+            expect(patientFindOneAndUpdate.mock.invocationCallOrder[i]).toBeLessThan(appointmentFindOneAndUpdate.mock.invocationCallOrder[i]);
+        }
+        expect(recordWriteOperationAuditEvent.mock.calls.map(([audit]) => audit.verificationId)).toEqual([args.audit.verificationId, args.audit.verificationId]);
+    });
+    it.each([undefined, null])("omits the historical signal after administrative resolution while including legacy unresolved %j", async attendanceResolution => {
+        appointmentExists.mockImplementation(async query => {
+            expect(query.attendanceResolution).toBeNull();
+            return attendanceResolution == null ? { _id: appointmentId } : null;
+        });
+        const unresolved = await findReceptionPatientByRamq({ clinicId, ramq: "TEST0001", authUser });
+        expect(unresolved.hasHistoricalScheduledAppointments).toBe(true);
+        appointmentExists.mockResolvedValueOnce(null);
+        expect(await findReceptionPatientByRamq({ clinicId, ramq: "TEST0001", authUser })).not.toHaveProperty("hasHistoricalScheduledAppointments");
     });
 });

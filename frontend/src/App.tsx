@@ -325,8 +325,8 @@ const App: React.FC = () => {
                     <Route path="/demo" element={<DemoPage />} />
                     <Route path="/results" element={<Results />} />
                     <Route path="/treatment/:id" element={<TreatmentDetails />} />
-                    <Route path="/quick" element={<QuickMode />} />
-                    <Route path="/patient-summary" element={<PatientSummary />} />
+                    <Route path="/quick" element={<ProtectedRoute allowedRoles={[...CLINICAL_ROLES]}><QuickMode /></ProtectedRoute>} />
+                    <Route path="/patient-summary" element={<ProtectedRoute allowedRoles={[...CLINICAL_ROLES]}><PatientSummary /></ProtectedRoute>} />
                     <Route path="/consultations" element={<ProtectedRoute allowedRoles={["MEDECIN"]}><ConsultationsPage /></ProtectedRoute>} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/security/change-password-required" element={<ChangePasswordRequiredPage />} />
@@ -422,7 +422,7 @@ const App: React.FC = () => {
                     <Route
                         path="/my-write-receipts"
                         element={
-                            <ProtectedRoute allowedRoles={[...CLINICAL_ROLES]}>
+                            <ProtectedRoute allowedRoles={[...CLINICAL_ROLES, "RECEPTION"]}>
                                 <MyWriteReceiptsPage />
                             </ProtectedRoute>
                         }
