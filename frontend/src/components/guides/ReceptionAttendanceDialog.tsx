@@ -96,7 +96,8 @@ export function ReceptionAttendanceDialog(props: ReceptionAttendanceDialogProps)
         setBusy("");
         if ("error" in response) {
             setAppointments([]); setHasMore(false);
-            setError(response.error.code === "RECEPTION_LOOKUP_REQUIRED" ? "lookupRequired" : "loadError");
+            if (response.error.code === "RECEPTION_LOOKUP_REQUIRED") setError("lookupRequired");
+            else setError("loadError");
             return;
         }
         const data = response.data;
@@ -130,7 +131,8 @@ export function ReceptionAttendanceDialog(props: ReceptionAttendanceDialogProps)
         if ("error" in response) {
             // A stale list can never be used for an automatic write retry.
             setAppointments([]); setHasMore(false);
-            setError(response.error.code === "RECEPTION_LOOKUP_REQUIRED" ? "lookupRequired" : "saveError");
+            if (response.error.code === "RECEPTION_LOOKUP_REQUIRED") setError("lookupRequired");
+            else setError("saveError");
             return;
         }
         if (!response.data.bookingProof) {
