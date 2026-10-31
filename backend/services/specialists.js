@@ -8,7 +8,7 @@ import { CLINICAL_QUERY_WRITE_OPTIONS, CLINICAL_WRITE_CONCERN } from "../db/clin
 /* Specialist Service                                                  */
 /* ------------------------------------------------------------------ */
 
-function validateDisponibilites(disponibilites, allowedPastSlots = new Set()) {
+function validateDisponibilites(disponibilites, allowedPastSlots = new Set(), now = Date.now()) {
     if (disponibilites === undefined) return;
     if (disponibilites === "__invalid__") {
         throw {
@@ -52,17 +52,14 @@ function validateDisponibilites(disponibilites, allowedPastSlots = new Set()) {
         (a, b) => a.getTime() - b.getTime()
     );
 
-    const monthKey = sorted.length
-        ? `${sorted[0].getUTCFullYear()}-${sorted[0].getUTCMonth()}`
-        : null;
-    const now = Date.now();
+    // Retained history does not constrain the month being scheduled now.
+    let monthKey = null;
 
     for (let i = 0; i < sorted.length; i += 1) {
         const current = sorted[i];
-        if (
-            current.getTime() < now &&
-            !allowedPastSlots.has(current.toISOString())
-        ) {
+        const isRetainedPastSlot = current.getTime() < now &&
+            allowedPastSlots.has(current.toISOString());
+        if (current.getTime() < now && !isRetainedPastSlot) {
             throw {
                 code: "INVALID_INPUT",
                 message:
@@ -79,20 +76,21 @@ function validateDisponibilites(disponibilites, allowedPastSlots = new Set()) {
                 };
             }
         }
-        if (monthKey) {
+        if (!isRetainedPastSlot) {
             const key = `${current.getUTCFullYear()}-${current.getUTCMonth()}`;
-            if (key !== monthKey) {
+            if (monthKey !== null && key !== monthKey) {
                 throw {
                     code: "INVALID_INPUT",
                     message:
                         "Les disponibilités doivent appartenir au même mois.",
                 };
             }
+            monthKey = key;
         }
     }
 }
 
-function validatePracticeLocations(practiceLocations, existingPastSlotsByClinic = new Map()) {
+function validatePracticeLocations(practiceLocations, existingPastSlotsByClinic = new Map(), now = Date.now()) {
     if (practiceLocations === undefined) return;
     if (practiceLocations === "__invalid__" || !Array.isArray(practiceLocations)) {
         throw {
@@ -124,9 +122,9 @@ function validatePracticeLocations(practiceLocations, existingPastSlotsByClinic 
             };
         }
         clinicIds.add(clinicId);
-        const pastSlots = existingPastSlotsByClinic.get(clinicId) ?? new Set();
-        validateDisponibilites(location.disponibilites, pastSlots);
-        validateDisponibilites(location.walkInDisponibilites, pastSlots);
+        const pastSlots = existingPastSlotsByClinic.get(clinicId);
+        validateDisponibilites(location.disponibilites, pastSlots?.disponibilites, now);
+        validateDisponibilites(location.walkInDisponibilites, pastSlots?.walkInDisponibilites, now);
         for (const slot of [
             ...(location.disponibilites || []),
             ...(location.walkInDisponibilites || []),
@@ -143,7 +141,7 @@ function validatePracticeLocations(practiceLocations, existingPastSlotsByClinic 
     }
 }
 
-function getExistingPastSlotsByClinic(specialist) {
+function getExistingPastSlotsByClinic(specialist, now = Date.now()) {
     const locations = Array.isArray(specialist?.practiceLocations) && specialist.practiceLocations.length
         ? specialist.practiceLocations
         : specialist?.clinique_associer
@@ -154,18 +152,17 @@ function getExistingPastSlotsByClinic(specialist) {
             }]
           : [];
     const slotsByClinic = new Map();
-    const now = Date.now();
 
     for (const location of locations) {
         const clinicId = String(location.clinique);
-        const pastSlots = new Set();
-        for (const slot of [
-            ...(location.disponibilites || []),
-            ...(location.walkInDisponibilites || []),
-        ]) {
-            const date = new Date(slot);
-            if (!Number.isNaN(date.getTime()) && date.getTime() < now) {
-                pastSlots.add(date.toISOString());
+        const pastSlots = {};
+        for (const field of ["disponibilites", "walkInDisponibilites"]) {
+            pastSlots[field] = new Set();
+            for (const slot of location[field] || []) {
+                const date = new Date(slot);
+                if (!Number.isNaN(date.getTime()) && date.getTime() < now) {
+                    pastSlots[field].add(date.toISOString());
+                }
             }
         }
         slotsByClinic.set(clinicId, pastSlots);
@@ -366,9 +363,11 @@ export async function updateSpecialist(id, updates) {
             };
         }
     }
+    const availabilityValidationTime = Date.now();
     validatePracticeLocations(
         updates.practiceLocations,
-        getExistingPastSlotsByClinic(existing)
+        getExistingPastSlotsByClinic(existing, availabilityValidationTime),
+        availabilityValidationTime
     );
 
     const compatibleUpdates = applyPracticeLocationCompatibility(updates);
