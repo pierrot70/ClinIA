@@ -14,6 +14,11 @@ applicatives uniquement si le changement n'est pas purement documentaire.
 Une erreur d'exécution des outils ou de validation documentaire fait échouer
 les contrôles requis ; elle ne produit pas un succès par simple job ignoré.
 
+Une promotion vers `coolify` du même commit déjà validé peut réutiliser les
+tests applicatifs selon [le contrôle de preuve de promotion](ci-promotion-reuse.md).
+Les installations et audits npm restent frais. Les contrôles documentaires et
+les noms des jobs requis sont conservés, même lors de cette réutilisation.
+
 La liste documentaire autorisée comprend :
 
 - Les fichiers `.md` sous `docs/` et `scripts/`.
