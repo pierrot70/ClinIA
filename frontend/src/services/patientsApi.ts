@@ -45,6 +45,7 @@ export interface PatientReactivation {
 }
 
 export interface Patient {
+    ownerUserId?: string | null;
     reactivationHistory?: PatientReactivation[];
     _id: string;
     nom: string;

@@ -68,6 +68,7 @@ export function ConsultationsPage() {
             {detail.canAcceptCare && <button disabled={busy} className={button} onClick={() => void save(true)}>{t.accept}</button>}
             <h3 className="font-semibold">{t.history}</h3>
             {!detail.fullHistory && <p>{t.ownOnly}</p>}
+            {detail.sharedNotesTruncated === true && <p role="status" className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{t.sharedNotesTruncated}</p>}
             {detail.legacyNote && <article className="border p-3">
                 <h4>{t.legacy}</h4>
                 <p className="whitespace-pre-wrap" lang="en" dir="ltr" translate="no">{detail.legacyNote}</p>

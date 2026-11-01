@@ -1,3 +1,5 @@
+import { clinicalCareAccessLabels } from "./clinicalCareAccessLabels";
+import { walkInRoutingLabels } from "./walkInRoutingLabels";
 import { clinicalResultIntegrityLabels } from "./clinicalResultIntegrityLabels";
 import { clinicalProvenanceLabels } from "./clinicalProvenanceLabels";
 import { clinicalResultReturnLabels } from "./clinicalResultReturnLabels";
@@ -78,6 +80,8 @@ function indexedLabels(locale: string) {
         [UI_LABELS_FR.consultations, consultationLabels(locale)],
         [UI_LABELS_FR.urgentologist, urgentologistTranslations[baseUiLocale(locale)]],
         [UI_LABELS_FR.receptionReplan, receptionReplanLabels(locale)],
+        [UI_LABELS_FR.walkInRouting, walkInRoutingLabels(locale)],
+        [UI_LABELS_FR.clinicalCareAccess, clinicalCareAccessLabels(locale)],
         [UI_LABELS_FR.walkInGuide, walkInGuideLabels(locale)],
         [UI_LABELS_FR.receptionAttendance, receptionAttendanceLabels(locale)],
         [UI_LABELS_FR.validationReports, validationReportLabels(locale)],

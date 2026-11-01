@@ -22,6 +22,7 @@ import {
 } from "../services/cliniqueApi";
 import { SPECIALTIES } from "../data/specialties";
 import { displaySpecialty } from "../i18n/specialtyLabels";
+import { walkInRoutingLabels } from "../i18n/walkInRoutingLabels";
 import { urgentologistLabels } from "../i18n/urgentologistLabels";
 
 type DisponibiliteForm = {
@@ -881,7 +882,7 @@ export function SpecialistsPage() {
                         />
                         <input
                             className="border rounded p-2"
-                            placeholder={pageLabels.doctorNumberPlaceholder}
+                            placeholder={form.specialite === "IPS" ? walkInRoutingLabels(i18n.locale).professionalNumber : pageLabels.doctorNumberPlaceholder}
                             value={form.numero_medecin}
                             onChange={(e) =>
                                 setForm((p) => ({
@@ -903,7 +904,7 @@ export function SpecialistsPage() {
                             readOnly
                         />
                         <label className="space-y-1 text-xs text-gray-600">
-                            <span>{pageLabels.clinicianAccount}</span>
+                            <span>{form.specialite === "IPS" ? walkInRoutingLabels(i18n.locale).professionalAccount : pageLabels.clinicianAccount}</span>
                             <select
                                 className="border rounded p-2 w-full text-sm text-gray-900"
                                 value={form.accountUserId}
@@ -915,12 +916,13 @@ export function SpecialistsPage() {
                                 }
                             >
                                 <option value="">{pageLabels.noClinicianAccount}</option>
-                                {clinicianAccounts.map((account) => (
+                                {clinicianAccounts.filter(account => (account.role ?? "MEDECIN") === (form.specialite === "IPS" ? "IPS" : "MEDECIN")).map((account) => (
                                     <option key={account.id} value={account.id}>
                                         {account.username}{account.email ? ` — ${account.email}` : ""}
                                     </option>
                                 ))}
                             </select>
+                            <span className="block text-xs text-slate-600">{walkInRoutingLabels(i18n.locale).accountRoleHint}</span>
                         </label>
                         <label className="space-y-1 text-xs text-gray-600">
                             <span>{pageLabels.primaryClinic}</span>
@@ -975,10 +977,12 @@ export function SpecialistsPage() {
                             value={form.specialite}
                             onChange={(event) => {
                                 if (event.target.value === "Urgentologue") setAvailabilitySlotType("walk_in");
-                                setForm((p) => ({
-                                    ...p,
-                                    specialite: event.target.value,
-                                }));
+                                const specialty = event.target.value;
+                                setForm((p) => {
+                                    const account = clinicianAccounts.find(candidate => candidate.id === p.accountUserId);
+                                    const matches = account && (account.role ?? "MEDECIN") === (specialty === "IPS" ? "IPS" : "MEDECIN");
+                                    return { ...p, specialite: specialty, accountUserId: matches ? p.accountUserId : "" };
+                                });
                             }}
                         >
                             <option value="">{pageLabels.noSpecialty}</option>

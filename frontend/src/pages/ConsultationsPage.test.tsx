@@ -75,4 +75,24 @@ describe("consultation UI", () => {
         await screen.findByRole("alert");
         expect(screen.queryByText("Previous doctor's clinical note.")).not.toBeInTheDocument();
     });
+    it.each(Object.keys(CONSULTATION_LABELS))("explains the 500-note limit only when the server flags truncation in %s", async locale => {
+        api.mockImplementation(async path => !path ? [detail.appointment] : {...detail, sharedNotesTruncated:true});
+        render(<Page locale={locale}/>);
+        const t=consultationLabels(locale);
+        expect(screen.queryByText(t.sharedNotesTruncated)).not.toBeInTheDocument();
+        fireEvent.click(await screen.findByRole("button",{name:t.open}));
+        expect(await screen.findByText(t.sharedNotesTruncated)).toHaveAttribute("role","status");
+        expect(screen.getByText("Previous doctor's clinical note.")).toHaveAttribute("translate","no");
+        expect(screen.getByText("Dr-Leroux")).toBeVisible();
+        expect(api).toHaveBeenCalledTimes(2);
+    });
+    it.each([false,undefined])("does not invent a truncation warning for legacy/complete response %s",async sharedNotesTruncated=>{
+        api.mockImplementation(async path=>!path?[detail.appointment]:{...detail,sharedNotesTruncated});
+        const t=consultationLabels("en-CA");render(<Page locale="en-CA"/>);
+        fireEvent.click(await screen.findByRole("button",{name:t.open}));
+        await screen.findByText("Previous doctor's clinical note.");
+        expect(screen.queryByText(t.sharedNotesTruncated)).not.toBeInTheDocument();
+        expect(api).toHaveBeenCalledTimes(2);
+    });
+
 });

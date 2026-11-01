@@ -2,11 +2,14 @@ export const AUTH_ROLES = {
     USER: "USER",
     RECEPTION: "RECEPTION",
     MEDECIN: "MEDECIN",
+    IPS: "IPS",
     ADMIN: "ADMIN",
     SUPERADMIN: "SUPERADMIN",
 };
 
 export const AUTH_ROLE_VALUES = Object.values(AUTH_ROLES);
+export const CLINICIAN_ROLES = Object.freeze([AUTH_ROLES.MEDECIN, AUTH_ROLES.IPS]);
+export const isClinicianRole = role => CLINICIAN_ROLES.includes(role);
 
 export const ACCESS_TOKEN_EXPIRES_IN = "15m";
 export const REFRESH_TOKEN_TTL_MS = 8 * 60 * 60 * 1000;

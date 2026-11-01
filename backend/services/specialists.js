@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { assertUrgentologistAvailability } from "../domain/specialties.js";
+import { assertUrgentologistAvailability, isIps } from "../domain/specialties.js";
 import { Specialist } from "../models/Specialist.js";
 import { AdminUser } from "../models/AdminUser.js";
 import { CLINICAL_QUERY_WRITE_OPTIONS, CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
@@ -185,7 +185,7 @@ function applyPracticeLocationCompatibility(dto) {
     };
 }
 
-async function validateAccountUserLink(accountUserId) {
+async function validateAccountUserLink(accountUserId, specialty) {
     if (accountUserId === undefined || accountUserId === null) return;
     if (
         accountUserId === "__invalid__" ||
@@ -199,23 +199,23 @@ async function validateAccountUserLink(accountUserId) {
 
     const clinicianAccount = await AdminUser.findOne({
         _id: accountUserId,
-        role: "MEDECIN",
+        role: isIps(specialty) ? "IPS" : "MEDECIN",
         isActive: true,
     }).lean();
     if (!clinicianAccount) {
         throw {
             code: "INVALID_INPUT",
-            message: "Le compte ClinIA associé doit être un médecin actif.",
+            message: "Le compte ClinIA associé doit être actif et correspondre à la profession (IPS ou médecin).",
         };
     }
 }
 
 export async function listEligibleClinicianAccounts() {
     const users = await AdminUser.find({
-        role: "MEDECIN",
+        role: { $in: ["MEDECIN", "IPS"] },
         isActive: true,
     })
-        .select("username email")
+        .select("username email role")
         .sort({ username: 1 })
         .lean();
 
@@ -223,6 +223,7 @@ export async function listEligibleClinicianAccounts() {
         id: String(user._id),
         username: user.username,
         email: user.email || null,
+        role: user.role,
     }));
 }
 
@@ -239,7 +240,7 @@ export async function createSpecialist(dto) {
     validateDisponibilites(dto.walkInDisponibilites);
     validatePracticeLocations(dto.practiceLocations);
     assertUrgentologistAvailability(dto);
-    await validateAccountUserLink(dto.accountUserId);
+    await validateAccountUserLink(dto.accountUserId, dto.specialite);
 
     const specialistPayload = applyPracticeLocationCompatibility(dto);
     if (specialistPayload.accountUserId === null) {
@@ -351,10 +352,9 @@ export async function updateSpecialist(id, updates) {
 
     validateDisponibilites(updates.disponibilites);
     validateDisponibilites(updates.walkInDisponibilites);
-    await validateAccountUserLink(updates.accountUserId);
 
     let existing = null;
-    if (updates.practiceLocations !== undefined || updates.specialite !== undefined || updates.disponibilites !== undefined) {
+    if (updates.practiceLocations !== undefined || updates.specialite !== undefined || updates.disponibilites !== undefined || updates.accountUserId !== undefined) {
         existing = await Specialist.findById(id).lean();
         if (!existing) {
             throw {
@@ -362,6 +362,12 @@ export async function updateSpecialist(id, updates) {
                 message: "Spécialiste introuvable.",
             };
         }
+    }
+    if (updates.accountUserId !== undefined || updates.specialite !== undefined) {
+        await validateAccountUserLink(
+            updates.accountUserId === undefined ? existing?.accountUserId : updates.accountUserId,
+            updates.specialite === undefined ? existing?.specialite : updates.specialite
+        );
     }
     const availabilityValidationTime = Date.now();
     validatePracticeLocations(

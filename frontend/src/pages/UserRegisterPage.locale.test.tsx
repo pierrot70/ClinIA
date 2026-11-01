@@ -88,6 +88,9 @@ describe("user management role display names", () => {
             expect(options).toHaveLength(3);
             for (const option of options) expect(option).toHaveValue(roleCodes[index]);
         }
+        const ipsOptions=screen.getAllByRole("option",{name:getLocalUiTranslation(labels.auth.userManagement.roles.IPS,locale)!});
+        expect(ipsOptions).toHaveLength(3);
+        ipsOptions.forEach(option=>expect(option).toHaveValue("IPS"));
         expect(screen.getByText(`Compte synthétique (${expected[2]})`)).toBeVisible();
         expect(api.authFetch.mock.calls.every(([, options]) => !options?.method || options.method === "GET")).toBe(true);
     });

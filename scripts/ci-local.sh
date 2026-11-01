@@ -48,6 +48,9 @@ run_step() (
             bash "$root/scripts/run-urgentologist-walk-in-integration.sh" --recovery-security
             bash "$root/scripts/run-urgentologist-walk-in-integration.sh" --email-quota
             bash "$root/scripts/run-urgentologist-walk-in-integration.sh" --patient-archive
+            bash "$root/scripts/run-urgentologist-walk-in-integration.sh" --care-access
+            bash "$root/scripts/run-urgentologist-walk-in-integration.sh" --ips-scope
+            bash "$root/scripts/run-urgentologist-walk-in-integration.sh" --ips-consultations
             npm run test:validation-report
             ;;
         typecheck) npm run typecheck ;;

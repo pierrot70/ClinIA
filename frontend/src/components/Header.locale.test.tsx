@@ -1,3 +1,4 @@
+import { clinicalCareAccessLabels } from "../i18n/clinicalCareAccessLabels";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
@@ -98,5 +99,33 @@ describe("primary navigation follows the authenticated role", () => {
     expect(screen.queryByRole("link", { name: UI_LABELS_FR.header.nav.walkInArrival })).not.toBeInTheDocument();
     fireEvent.click(links[0]);
     expect(screen.getByTestId("current-path")).toHaveTextContent("/clinical");
+  });
+});
+
+describe("bounded IPS clinical navigation", () => {
+  afterEach(() => { cleanup(); localStorage.clear(); state.fetch.mockReset(); state.authenticated=false; state.role="SUPERADMIN"; });
+  it.each(UI_LOCALES)("shows IPS collaboration and own clinical workflows without administrative or physician support links in %s", async locale => {
+    state.authenticated=true; state.role="IPS";
+    state.fetch.mockResolvedValue({ok:true,json:async()=>({data:[]})});
+    await act(async()=>{render(<Page locale={locale}/>);});
+    const title=clinicalCareAccessLabels(locale).title;
+    expect(screen.getByRole("link",{name:title})).toHaveAttribute("href","/clinical-care-access");
+    expect(screen.getAllByRole("link").some(link=>link.getAttribute("href")==="/consultations")).toBe(true);
+    expect(screen.queryAllByRole("link").some(link=>["/cliniques","/specialists","/clinical-support-access/inbox","/clinical-support-access/request","/clinical-support-access/patients","/admin/users/manage","/quick","/patient-summary"].includes(link.getAttribute("href")||""))).toBe(false);
+    fireEvent.click(screen.getByRole("button",{name:localizeHeaderUiLabel(UI_LABELS_FR.header.controls.openMenu,locale)!}));
+    expect(screen.getAllByRole("link",{name:title})).toHaveLength(2);
+    expect(screen.getAllByRole("link").filter(link=>link.getAttribute("href")==="/patients").length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole("link").some(link=>["/cliniques","/specialists","/clinical-support-access/inbox","/clinical-support-access/request","/clinical-support-access/patients","/admin/users/manage"].includes(link.getAttribute("href")||""))).toBe(false);
+  });
+  it.each(["USER","RECEPTION","ADMIN","SUPERADMIN"] as const)("hides the clinical collaboration link from %s",async role=>{
+    state.authenticated=true;state.role=role;state.fetch.mockResolvedValue({ok:true,json:async()=>({data:[]})});
+    await act(async()=>{render(<Page locale="fr-CA"/>);});
+    expect(screen.queryByRole("link",{name:clinicalCareAccessLabels("fr-CA").title})).not.toBeInTheDocument();
+  });
+  it("keeps physician support distinct from the new collaboration link",async()=>{
+    state.authenticated=true;state.role="MEDECIN";state.fetch.mockResolvedValue({ok:true,json:async()=>({data:[]})});
+    await act(async()=>{render(<Page locale="fr-CA"/>);});
+    expect(screen.getByRole("link",{name:clinicalCareAccessLabels("fr-CA").title})).toHaveAttribute("href","/clinical-care-access");
+    expect(screen.getAllByRole("link").some(link=>link.getAttribute("href")==="/clinical-support-access/inbox")).toBe(true);
   });
 });

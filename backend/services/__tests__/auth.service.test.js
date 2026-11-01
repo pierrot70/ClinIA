@@ -968,7 +968,7 @@ describe("auth service", () => {
         expect(user.mfaSecretEncrypted).toBeNull();
     });
 
-    it("self-registers only a USER with email/password", async () => {
+    it.each(["IPS", "SUPERADMIN"])("self-registers only USER despite requested role %s", async requestedRole => {
         mockFindOne.mockResolvedValue(null);
         hash.mockResolvedValue("hashed-password");
         mockCreate.mockResolvedValue({
@@ -981,7 +981,7 @@ describe("auth service", () => {
         const result = await registerSelf({
             email: "drsmith@clinia.local",
             password: "cobalt meadow lantern river",
-            role: "SUPERADMIN",
+            role: requestedRole,
             req: { headers: {}, ip: "127.0.0.1" },
         });
 

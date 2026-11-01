@@ -8,6 +8,8 @@ export type ApiErrorCode =
     | "AI_UNAVAILABLE"        // OpenAI down / timeout / modèle cassé
     | "AI_DEGRADED"           // IA OK mais fallback/mock utilisé
     | "PERSISTENCE_FAILED"    // Mongo indisponible
+    | "FORBIDDEN"
+    | "CARE_ACCESS_ALREADY_ACTIVE"
     | "INVALID_INPUT"         // Payload invalide
     | "POTENTIAL_DUPLICATE"   // Homonyme detecte avant creation patient
     | "PATIENT_ARCHIVED"      // Dossier retiré des opérations actives

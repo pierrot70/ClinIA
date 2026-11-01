@@ -24,6 +24,11 @@ const transactionSession = {
     endSession: vi.fn(),
 };
 
+function queryWithSession(query) {
+    if (query && typeof query === "object" && !query.session) query.session = vi.fn().mockReturnValue(query);
+    return query;
+}
+
 vi.mock("../../models/Appointment.js", () => {
     function Appointment(payload) {
         Object.assign(this, payload);
@@ -32,7 +37,7 @@ vi.mock("../../models/Appointment.js", () => {
     }
 
     Appointment.findOne = findOne;
-    Appointment.find = find;
+    Appointment.find = (...args) => queryWithSession(find(...args));
     Appointment.countDocuments = countDocuments;
 
     return { Appointment };
@@ -50,7 +55,7 @@ vi.mock("../../models/Patient.js", () => ({
 }));
 
 vi.mock("../../models/Specialist.js", () => ({
-    Specialist: { findById: specialistFindById, find: specialistFind, findOne: specialistFindOne, updateOne: specialistUpdateOne },
+    Specialist: { findById: (...args) => queryWithSession(specialistFindById(...args)), find: specialistFind, findOne: specialistFindOne, updateOne: specialistUpdateOne },
 }));
 
 vi.mock("../../models/Clinique.js", () => ({
@@ -134,6 +139,13 @@ describe("appointments service", () => {
             specialistUpdateOne.mockResolvedValue({ modifiedCount: 1 });
             countDocuments.mockReturnValue({ session: vi.fn().mockResolvedValue(19) });
         });
+        it("does not accept an origin binding forged in appointment DTO data", async () => {
+            const reception = { userId: authUser.userId, role: "RECEPTION" };
+            await expect(createAppointment({ ...dto, receptionOriginClinicId: clinique }, reception, {
+                session: transactionSession, patientFromTransaction: { _id: patient }, receivingPhysicianUserId: authUser.userId,
+            })).rejects.toMatchObject({ code: "FORBIDDEN" });
+            expect(appointmentSave).not.toHaveBeenCalled();
+        });
         it("automatically uses a transaction for the twentieth booking", async () => {
             expect((await createAppointment(dto, authUser)).time).toBe("12:00");
             expect(transactionSession.withTransaction).toHaveBeenCalledOnce();
@@ -202,7 +214,7 @@ describe("appointments service", () => {
         it.each(["MEDECIN", "RECEPTION"])("rejects a direct %s booking on a completed slot before saving", async role => {
             const actor = { ...authUser, role };
             const options = role === "RECEPTION" ? { session: transactionSession,
-                receivingPhysicianUserId: authUser.userId, patientFromTransaction: { _id: patientId } } : {};
+                receivingPhysicianUserId: authUser.userId, receptionOriginClinicId: clinicId, patientFromTransaction: { _id: patientId } } : {};
             await expect(createAppointment({ patient: patientId, specialist: specialistId, clinique: clinicId,
                 date: "2099-01-01", time: "12:00", priority: "normal", slotType: "walk_in" }, actor, options))
                 .rejects.toMatchObject({ code: "NO_AVAILABILITY" });

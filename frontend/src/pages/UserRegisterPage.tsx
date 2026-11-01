@@ -17,7 +17,7 @@ import {
     type Clinique,
 } from "../services/cliniqueApi";
 
-const ROLE_OPTIONS = ["USER", "RECEPTION", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
+const ROLE_OPTIONS = ["USER", "RECEPTION", "MEDECIN", "IPS", "ADMIN", "SUPERADMIN"] as const;
 const USER_ROLE_FILTER_OPTIONS = ["ALL", ...ROLE_OPTIONS] as const;
 const PASSWORD_MIN_LENGTH = 12;
 

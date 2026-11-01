@@ -15,9 +15,9 @@ beforeEach(() => {
 });
 
 describe("real receipt route and service with database model mocked", () => {
-    it("ignores forged query author/role/outcome and uses only the server-authenticated reception account", async () => {
+    it.each(["RECEPTION", "IPS"])("ignores forged query author/role/outcome and uses only the server-authenticated %s account", async role => {
         const res = response();
-        await ownHandler({ auth: { userId: actorId, role: "RECEPTION" }, query: {
+        await ownHandler({ auth: { userId: actorId, role }, query: {
             actorUserId: "507f1f77bcf86cd799439032", actorRole: "SUPERADMIN", outcome: "FAILED",
         } }, res);
         expect(res.status).toHaveBeenCalledWith(200);
@@ -39,9 +39,9 @@ describe("real receipt route and service with database model mocked", () => {
         expect(model.countDocuments).not.toHaveBeenCalled();
     });
 
-    it("keeps the administrative route forbidden to reception", async () => {
+    it.each(["RECEPTION", "IPS"])("keeps the administrative route forbidden to %s", async role => {
         const res = response();
-        await adminHandler({ auth: { userId: actorId, role: "RECEPTION" }, query: {} }, res);
+        await adminHandler({ auth: { userId: actorId, role }, query: {} }, res);
         expect(res.status).toHaveBeenCalledWith(403);
         expect(model.find).not.toHaveBeenCalled();
         expect(model.countDocuments).not.toHaveBeenCalled();

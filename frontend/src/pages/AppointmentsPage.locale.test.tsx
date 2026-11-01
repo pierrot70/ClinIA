@@ -37,25 +37,30 @@ beforeEach(() => {
 afterEach(cleanup);
 
 const expectedLabels: Record<string, string[]> = {
-    "fr-CA": ["Médecin de famille", "Urgentologue", "Ophtalmologue", "Cardiologue", "Pneumologue", "Neurologue", "Endocrinologue", "Néphrologue", "Rhumatologue"],
-    "en-CA": ["Family Physician", "Emergency Physician", "Ophthalmologist", "Cardiologist", "Pulmonologist", "Neurologist", "Endocrinologist", "Nephrologist", "Rheumatologist"],
-    es: ["Médico de familia", "Médico de urgencias", "Oftalmólogo", "Cardiólogo", "Neumólogo", "Neurólogo", "Endocrinólogo", "Nefrólogo", "Reumatólogo"],
-    "ko-KR": ["가정의학과 의사", "응급의학과 의사", "안과 의사", "심장내과 의사", "호흡기내과 의사", "신경과 의사", "내분비내과 의사", "신장내과 의사", "류마티스내과 의사"],
-    vi: ["Bác sĩ gia đình", "Bác sĩ cấp cứu", "Bác sĩ nhãn khoa", "Bác sĩ tim mạch", "Bác sĩ hô hấp", "Bác sĩ thần kinh", "Bác sĩ nội tiết", "Bác sĩ thận học", "Bác sĩ cơ xương khớp"],
-    "no-NO": ["Allmennlege", "Akuttlege", "Øyelege", "Kardiolog", "Lungelege", "Nevrolog", "Endokrinolog", "Nyrelege", "Revmatolog"],
-    ja: ["家庭医", "救急医", "眼科医", "循環器内科医", "呼吸器内科医", "神経内科医", "内分泌内科医", "腎臓内科医", "リウマチ科医"],
-    zh: ["家庭医生", "急诊医生", "眼科医生", "心脏科医生", "呼吸科医生", "神经内科医生", "内分泌科医生", "肾内科医生", "风湿科医生"],
-    he: ["רופא משפחה", "רופא לרפואה דחופה", "רופא עיניים", "קרדיולוג", "רופא ריאות", "נוירולוג", "אנדוקרינולוג", "נפרולוג", "ראומטולוג"],
+    "fr-CA": ["Médecin de famille", "Urgentologue", "Infirmière ou infirmier praticien spécialisé (IPS)", "Ophtalmologue", "Cardiologue", "Pneumologue", "Neurologue", "Endocrinologue", "Néphrologue", "Rhumatologue"],
+    "en-CA": ["Family Physician", "Emergency Physician", "Specialized nurse practitioner (IPS)", "Ophthalmologist", "Cardiologist", "Pulmonologist", "Neurologist", "Endocrinologist", "Nephrologist", "Rheumatologist"],
+    "es": ["Médico de familia", "Médico de urgencias", "Enfermería de práctica especializada (IPS)", "Oftalmólogo", "Cardiólogo", "Neumólogo", "Neurólogo", "Endocrinólogo", "Nefrólogo", "Reumatólogo"],
+    "ko-KR": ["가정의학과 의사", "응급의학과 의사", "전문 간호사 (IPS)", "안과 의사", "심장내과 의사", "호흡기내과 의사", "신경과 의사", "내분비내과 의사", "신장내과 의사", "류마티스내과 의사"],
+    "vi": ["Bác sĩ gia đình", "Bác sĩ cấp cứu", "Điều dưỡng thực hành chuyên sâu (IPS)", "Bác sĩ nhãn khoa", "Bác sĩ tim mạch", "Bác sĩ hô hấp", "Bác sĩ thần kinh", "Bác sĩ nội tiết", "Bác sĩ thận học", "Bác sĩ cơ xương khớp"],
+    "no-NO": ["Allmennlege", "Akuttlege", "Spesialisert avansert klinisk sykepleier (IPS)", "Øyelege", "Kardiolog", "Lungelege", "Nevrolog", "Endokrinolog", "Nyrelege", "Revmatolog"],
+    "ja": ["家庭医", "救急医", "専門ナースプラクティショナー（IPS）", "眼科医", "循環器内科医", "呼吸器内科医", "神経内科医", "内分泌内科医", "腎臓内科医", "リウマチ科医"],
+    "zh": ["家庭医生", "急诊医生", "专科执业护士（IPS）", "眼科医生", "心脏科医生", "呼吸科医生", "神经内科医生", "内分泌科医生", "肾内科医生", "风湿科医生"],
+    "he": ["רופא משפחה", "רופא לרפואה דחופה", "אח או אחות מומחים (IPS)", "רופא עיניים", "קרדיולוג", "רופא ריאות", "נוירולוג", "אנדוקרינולוג", "נפרולוג", "ראומטולוג"],
 };
 
+const expectedCanonicalSpecialties = ["Medecin de famille", "Urgentologue", "IPS", "Ophtalmologue", "Cardiologue", "Pneumologue", "Neurologue", "Endocrinologue", "Néphrologue", "Rhumatologue"] as const;
+
 describe("appointment specialty display names", () => {
-    it.each(Object.entries(expectedLabels))("renders all nine specialties in %s while preserving API values", async (locale, expected) => {
+    it.each(Object.entries(expectedLabels))("renders all ten specialties including IPS in %s while preserving API values", async (locale, expected) => {
         render(<Page locale={locale} />);
         const name = getLocalUiTranslation(UI_LABELS_FR.appointmentsPage.specialist.specialtyChoose, locale)!;
         const select = screen.getByRole("combobox", { name });
-        for (const [index, label] of expected.entries()) {
-            expect(within(select).getByRole("option", { name: label })).toHaveValue(SPECIALTIES[index]);
-            expect(getLocalUiTranslation(UI_LABELS_FR.appointmentSpecialties[SPECIALTIES[index]], locale)).toBe(label);
+        expect(SPECIALTIES).toEqual(expectedCanonicalSpecialties);
+        expect(expected).toHaveLength(expectedCanonicalSpecialties.length);
+        const expectedBySpecialty = Object.fromEntries(expectedCanonicalSpecialties.map((specialty, index) => [specialty, expected[index]]));
+        for (const [specialty, label] of Object.entries(expectedBySpecialty)) {
+            expect(within(select).getByRole("option", { name: label })).toHaveValue(specialty);
+            expect(getLocalUiTranslation(UI_LABELS_FR.appointmentSpecialties[specialty as keyof typeof UI_LABELS_FR.appointmentSpecialties], locale)).toBe(label);
         }
         await waitFor(() => expect(api.clinics).toHaveBeenCalledOnce());
     });

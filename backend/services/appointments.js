@@ -17,6 +17,8 @@ import {
     toSchedulingTime,
 } from "../utils/schedulingTime.js";
 
+const readWithSession = (query, session) => session ? query.session(session) : query;
+
 function getClinicalWriteOptions(session) {
     return session
         ? { ...CLINICAL_WRITE_CONCERN, session }
@@ -146,14 +148,15 @@ export async function releaseDailyAppointmentCapacity({ patient, specialist, dat
 export async function createAppointment(
     dto,
     authUser,
-    { session = null, patientFromTransaction = null, receivingPhysicianUserId = null, excludeAppointmentId = null } = {}
+    { session = null, patientFromTransaction = null, receivingPhysicianUserId = null, excludeAppointmentId = null, receptionOriginClinicId = null } = {}
 ) {
     if (excludeAppointmentId && (!session || !patientFromTransaction)) {
         throw { code: "FORBIDDEN", message: "Transactional replacement required." };
     }
     if (authUser?.role === "RECEPTION" || receivingPhysicianUserId !== null) {
         if (authUser?.role !== "RECEPTION" || !session || !patientFromTransaction ||
-            !receivingPhysicianUserId || !mongoose.Types.ObjectId.isValid(receivingPhysicianUserId)) {
+            !receivingPhysicianUserId || !mongoose.Types.ObjectId.isValid(receivingPhysicianUserId) ||
+            !mongoose.Types.ObjectId.isValid(receptionOriginClinicId)) {
             throw { code: "FORBIDDEN", message: "Validated reception booking required." };
         }
     }
@@ -255,7 +258,7 @@ export async function createAppointment(
     if (isUrgentologist(specialist.specialite)) {
         if (slotType !== "walk_in") throw { code: "INVALID_INPUT", message: "Un urgentologue accepte uniquement des rendez-vous walk-in." };
         if (!session) return runAppointmentWriteTransaction(transactionSession => createAppointment(dto, authUser, {
-            session: transactionSession, patientFromTransaction, receivingPhysicianUserId, excludeAppointmentId,
+            session: transactionSession, patientFromTransaction, receivingPhysicianUserId, excludeAppointmentId, receptionOriginClinicId,
         }));
         await reserveUrgentologistCapacity(dto.specialist, dto.date, { session, excludeAppointmentId });
     }
@@ -289,7 +292,7 @@ export async function createAppointment(
     const availableSlots = await getAvailableSlots(
         dto.specialist,
         dto.date,
-        { patient: dto.patient, clinique: dto.clinique, slotType, ...(excludeAppointmentId ? { excludeAppointmentId } : {}) }
+        { patient: dto.patient, clinique: dto.clinique, slotType, session, ...(excludeAppointmentId ? { excludeAppointmentId } : {}) }
     );
     if (!availableSlots.includes(dto.time)) {
         throw {
@@ -1296,7 +1299,8 @@ async function getSpecialistAvailableTimes(
     date,
     clinique = null,
     slotType = "regular",
-    excludeAppointmentId = null
+    excludeAppointmentId = null,
+    session = null
 ) {
     if (!["regular", "walk_in"].includes(slotType)) {
         throw { code: "INVALID_INPUT", message: "Type de créneau invalide." };
@@ -1305,7 +1309,7 @@ async function getSpecialistAvailableTimes(
         return new Set();
     }
 
-    const specialistDoc = await Specialist.findById(
+    const specialistDoc = await readWithSession(Specialist.findById(
         specialist,
         {
             specialite: 1,
@@ -1314,7 +1318,7 @@ async function getSpecialistAvailableTimes(
             clinique_associer: 1,
             practiceLocations: 1,
         }
-    ).lean();
+    ), session).lean();
 
     const availableTimes = new Set();
 
@@ -1323,7 +1327,7 @@ async function getSpecialistAvailableTimes(
     }
     if (isUrgentologist(specialistDoc.specialite)) {
         if (slotType !== "walk_in") return availableTimes;
-        if (await countUrgentologistConsultations(specialist, date, { excludeAppointmentId }) >= URGENTOLOGIST_DAILY_LIMIT) return availableTimes;
+        if (await countUrgentologistConsultations(specialist, date, { session, excludeAppointmentId }) >= URGENTOLOGIST_DAILY_LIMIT) return availableTimes;
     }
 
     const locations = getPracticeLocations(specialistDoc).filter(
@@ -1357,6 +1361,8 @@ export async function getAvailableSlots(
         authUser = null,
         clinique = null,
         slotType = "regular",
+        session = null,
+        now = new Date(),
     } = {}
 ) {
     const schedule = await getAvailableSlotSchedule(specialist, date, {
@@ -1365,6 +1371,8 @@ export async function getAvailableSlots(
         authUser,
         clinique,
         slotType,
+        session,
+        now,
     });
 
     return schedule.slots;
@@ -1379,6 +1387,8 @@ export async function getAvailableSlotSchedule(
         authUser = null,
         clinique = null,
         slotType = "regular",
+        session = null,
+        now = new Date(),
     } = {}
 ) {
     if (!specialist || !date) {
@@ -1396,7 +1406,7 @@ export async function getAvailableSlotSchedule(
         };
     }
 
-    if (isSchedulingDatePast(date)) {
+    if (isSchedulingDatePast(date, now)) {
         return {
             slots: [],
             existingAppointmentTimes: [],
@@ -1404,7 +1414,6 @@ export async function getAvailableSlotSchedule(
         };
     }
 
-    const now = new Date();
 
     let latestPatientTime = null;
     let existingAppointmentTimes = [];
@@ -1441,10 +1450,10 @@ export async function getAvailableSlotSchedule(
                 patientAppointmentsQuery._id = { $ne: excludeAppointmentId };
             }
 
-            const patientAppointments = await Appointment.find(
+            const patientAppointments = await readWithSession(Appointment.find(
                 patientAppointmentsQuery,
                 { time: 1, _id: 0 }
-            ).lean();
+            ), session).lean();
 
             existingAppointmentTimes = patientAppointments
                 .map((appointment) => appointment.time)
@@ -1474,7 +1483,8 @@ export async function getAvailableSlotSchedule(
         date,
         clinique,
         slotType,
-        excludeAppointmentId
+        excludeAppointmentId,
+        session
     );
     if (specialistTimes.size === 0) {
         return {
@@ -1492,10 +1502,10 @@ export async function getAvailableSlotSchedule(
         bookedQuery._id = { $ne: excludeAppointmentId };
     }
 
-    const booked = await Appointment.find(
+    const booked = await readWithSession(Appointment.find(
         bookedQuery,
         { time: 1, _id: 0 }
-    ).lean();
+    ), session).lean();
 
     const bookedTimes = new Set(booked.map((a) => a.time));
 

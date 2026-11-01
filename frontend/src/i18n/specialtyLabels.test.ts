@@ -16,7 +16,13 @@ const expected = [
 
 describe("specialty display names", () => {
     it.each(expected)("displays all nine specialties in %s", (locale, names) => {
-        expect(SPECIALTIES.map(value => displaySpecialty(value, locale))).toEqual(names);
+        expect(SPECIALTIES.filter(value => value !== "IPS").map(value => displaySpecialty(value, locale))).toEqual(names);
+    });
+    it.each(["fr-CA", "en-CA", "es", "ko-KR", "vi", "no-NO", "ja", "zh", "he"])("shows the IPS professional name locally in %s", locale => {
+        expect(SPECIALTIES).toContain("IPS");
+        const label = displaySpecialty(" ips ", locale);
+        expect(label).not.toBe("IPS");
+        expect(label).toContain("IPS");
     });
     it("accepts legacy accent and case variants and preserves unknown specialty names", () => {
         expect(displaySpecialty(" MÉDECIN DE FAMILLE ", "ja-JP")).toBe("家庭医");

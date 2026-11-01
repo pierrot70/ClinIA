@@ -1,3 +1,4 @@
+import { isClinicianRole } from "../../auth/roles";
 import { useClinicalFormDraftState, useClearClinicalFormDraft, useHasClinicalFormDraft } from "../../contexts/ClinicalFormDraftContext";
 import { ClinicalContentNotice } from "./ClinicalContentNotice";
 import { useUiLabelTree } from "../../hooks/useUiLabels";
@@ -1897,7 +1898,7 @@ export function ClinicalForm({
                         <label htmlFor="clinical-symptoms" className="text-sm font-medium text-gray-700">
                             {symptomsLabel}
                         </label>
-                        {user?.role === "MEDECIN" && listInputs.symptoms.trim() && (
+                        {isClinicianRole(user?.role) && listInputs.symptoms.trim() && (
                             <button type="button" onClick={() => void requestSymptomTerm()} disabled={submittingTermRequest} className="rounded border border-blue-600 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-60">
                                 {submittingTermRequest ? termRequestSendingLabel : termRequestActionLabel}
                             </button>
@@ -1924,7 +1925,7 @@ export function ClinicalForm({
                             {symptomSuggestionsError ? <p role="alert" className="text-xs text-red-700"><UiMessage message={symptomSuggestionsError} /></p> : symptomSuggestions.length === 0 ? <p className="text-xs text-gray-600">{termRequestLabels.suggestionsLoading}</p> : visibleSymptomSuggestions.length === 0 ? <p className="text-xs text-gray-600">{termRequestLabels.suggestionsEmpty}</p> : <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">{visibleSymptomSuggestions.map((suggestion) => { const displayLabel = displaySymptomLabel(suggestion.canonicalValue, targetLang); return <button key={suggestion.canonicalValue} type="button" onClick={() => addSymptomSuggestion(displayLabel)} className="rounded border border-blue-300 bg-white px-2 py-1 text-xs text-blue-800 hover:bg-blue-100">{displayLabel}</button>; })}</div>}
                         </div>
                     )}
-                    {user?.role === "MEDECIN" && listInputs.symptoms.trim() && <p className="text-xs text-gray-500">{termRequestPrivacyLabel}</p>}
+                    {isClinicianRole(user?.role) && listInputs.symptoms.trim() && <p className="text-xs text-gray-500">{termRequestPrivacyLabel}</p>}
                     {termRequestFeedback && <p role={termRequestFeedback.type === "error" ? "alert" : "status"} className={termRequestFeedback.type === "error" ? "text-xs text-red-700" : "text-xs text-emerald-700"}><UiMessage message={termRequestFeedback.message} /></p>}
                 </div>
             </Field>

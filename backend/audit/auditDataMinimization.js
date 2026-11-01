@@ -96,7 +96,7 @@ export function minimizeSecurityIncidentContext(type, context) {
             if (value !== undefined) result[key] = value;
         }
         const role = nonEmptyString(context.role, 32);
-        if (["MEDECIN", "ADMIN", "SUPERADMIN"].includes(role)) result.role = role;
+        if (["MEDECIN", "IPS", "ADMIN", "SUPERADMIN"].includes(role)) result.role = role;
         return result;
     }
     const result = {};

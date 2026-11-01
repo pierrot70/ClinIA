@@ -15,14 +15,14 @@ function sendError(res, err) {
     return res.status(status).json({ error: { code: err.code || "INVALID_INPUT", message: err.message, retryable: false } });
 }
 
-router.get("/approved", requireRole(AUTH_ROLES.MEDECIN, AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN), async (_req, res) => {
+router.get("/approved", requireRole(AUTH_ROLES.MEDECIN, AUTH_ROLES.IPS, AUTH_ROLES.ADMIN, AUTH_ROLES.SUPERADMIN), async (_req, res) => {
     try {
         const data = await listApprovedClinicalTerms();
         return res.status(200).json({ data, meta: { source: "real", model: "mongo" } });
     } catch (err) { return sendError(res, err); }
 });
 
-router.post("/requests", requireRole(AUTH_ROLES.MEDECIN), async (req, res) => {
+router.post("/requests", requireRole(AUTH_ROLES.MEDECIN, AUTH_ROLES.IPS), async (req, res) => {
     try {
         const request = await createClinicalTermRequest({ term: req.body?.term, authUser: req.auth });
         return res.status(201).json({ data: { id: String(request._id), status: request.status }, meta: { source: "real", model: "mongo" } });

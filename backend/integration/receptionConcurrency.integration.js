@@ -31,10 +31,10 @@ let ownsDatabase = false;
 let gates;
 let mongoWriteErrorCodes;
 
-async function request(path, { token, body, method = body ? "POST" : "GET", gate } = {}) {
+async function request(path, { token, body, method = body ? "POST" : "GET", gate, bookingProof } = {}) {
     const response = await fetch(`${base}${path}`, {
         method, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            ...(body ? { "Content-Type": "application/json" } : {}), ...(gate ? { "x-test-race": gate } : {}) },
+            ...(body ? { "Content-Type": "application/json" } : {}), ...(gate ? { "x-test-race": gate } : {}), ...(bookingProof ? { "X-Reception-Booking-Proof": bookingProof } : {}) },
         ...(body ? { body: JSON.stringify(body) } : {}),
     });
     return { status: response.status, ...await response.json() };
@@ -242,7 +242,12 @@ describe("3. Last daily consultation", () => {
             gate => book(payload(21, doctors[0], times[20]), 1, gate),
         );
         expect(results.map(result => result.status).sort()).toEqual([201, 409]);
-        expect(results.find(result => result.status === 409).error.code).toBe("MAXIMUM_APPOINTMENTS_REACHED");
+        // Transaction retry reruns priority/capacity selection before the
+        // older quota guard; the losing choice is now explicitly stale.
+        const loser = results.find(result => result.status === 409);
+        expect(loser.error.code).toBe("NO_AVAILABILITY");
+        expect(loser.data).toBeUndefined();
+        expect(loser.meta?.writeVerification).toBeUndefined();
         expect(await Appointment.countDocuments({ specialist: doctors[0], date: day, status: { $in: ["scheduled", "completed"] } })).toBe(20);
         expect(await counts()).toMatchObject({ patients: 20, appointments: 20, guards: 20, patientAudits: 20, writeAudits: 20 });
     });
@@ -372,7 +377,12 @@ describe("5. API authorization", () => {
         else await AdminUser.updateOne({ _id: physicianUsers[0]._id }, { $set: state === "inactive" ? { isActive: false } : { role: "USER" } });
         for (let actor = 0; actor < 2; actor++) {
             const refused = await book(payload(actor + 1), actor);
-            expect(refused.status).toBe(409); expect(refused.error.code).toBe("RECEIVING_PHYSICIAN_UNAVAILABLE");
+            // The inactive/mismatched/unlinked directory entry is excluded
+            // by transactional routing before any identity is created.
+            expect(refused.status).toBe(409); expect(refused.error.code).toBe("NO_AVAILABILITY");
+            expect(refused.data).toBeUndefined();
+            expect(refused.meta?.writeVerification).toBeUndefined();
+            expect(await counts()).toMatchObject({ patients: 0, appointments: 0, guards: 0, patientAudits: 0, writeAudits: 0 });
             const refreshed = await request(`/api/reception/walk-in-options?clinic=${clinic}`, { token: tokens[actor] });
             expect(refreshed.data.today.some(item => item.specialist._id === doctors[0])).toBe(false);
         }
@@ -492,7 +502,7 @@ describe("7. Past scheduled records do not block a new reception arrival", () =>
         expect(lookup.data.hasHistoricalScheduledAppointments).toBe(true);
         expect(Object.keys(lookup.data).sort()).toEqual(["_id", "bookingProof", "existingAppointments", "hasHistoricalScheduledAppointments", "nom", "prenom"].sort());
         const optionsPath = `/api/reception/walk-in-options?clinic=${clinic}&patient=${patientId}`;
-        const options = await request(optionsPath, { token: tokens[0] });
+        const options = await request(optionsPath, { token: tokens[0], bookingProof: lookup.data.bookingProof });
         expect(options.status).toBe(200);
         expect(options.data.today.some(item => item.specialist._id === doctors[0] && item.slots.includes(times[1]))).toBe(true);
         // Exact per-day quota: two scheduled old days cannot inflate today.
@@ -500,7 +510,7 @@ describe("7. Past scheduled records do not block a new reception arrival", () =>
         const body = { clinic, patientId, specialist: doctors[0], date: day, time: times[1], slotType: "walk_in", bookingProof: lookup.data.bookingProof };
         const before = await counts();
         for (const original of historical) {
-            const staleOptions = await request(`${optionsPath}&replaceAppointmentId=${original._id}`, { token: tokens[0] });
+            const staleOptions = await request(`${optionsPath}&replaceAppointmentId=${original._id}`, { token: tokens[0], bookingProof: lookup.data.bookingProof });
             expect(staleOptions.status).toBe(409);
             expect(staleOptions.error.code).toBe("RECEPTION_REPLAN_REQUIRED");
             const refused = await book({ ...body, replaceAppointmentId: String(original._id) });
@@ -538,7 +548,7 @@ describe("7. Past scheduled records do not block a new reception arrival", () =>
         expect(lookup.data.hasHistoricalScheduledAppointments).toBeUndefined();
         const body = { clinic, patientId: String(original.patient), specialist: doctors[0], date: day, time: times[1], slotType: "walk_in", bookingProof: lookup.data.bookingProof };
         const optionsPath = `/api/reception/walk-in-options?clinic=${clinic}&patient=${original.patient}`;
-        expect((await request(optionsPath, { token: tokens[0] })).status).toBe(409);
+        expect((await request(optionsPath, { token: tokens[0], bookingProof: lookup.data.bookingProof })).status).toBe(409);
         expect((await book(body)).status).toBe(409);
         expect((await Appointment.findById(original._id)).status).toBe("scheduled");
         const { _id, __v, createdAt, updatedAt, ...fields } = original;
@@ -546,7 +556,7 @@ describe("7. Past scheduled records do not block a new reception arrival", () =>
         const ambiguous = await request(lookupPath, { token: tokens[0] });
         expect(ambiguous.data.existingAppointments.map(item => item._id)).toEqual([String(original._id), String(future._id)]);
         const before = await counts();
-        const options = await request(`${optionsPath}&replaceAppointmentId=${original._id}`, { token: tokens[0] });
+        const options = await request(`${optionsPath}&replaceAppointmentId=${original._id}`, { token: tokens[0], bookingProof: lookup.data.bookingProof });
         expect(options.status).toBe(409);
         const refused = await book({ ...body, bookingProof: ambiguous.data.bookingProof, replaceAppointmentId: String(original._id) });
         expect(refused.status).toBe(409);
@@ -711,5 +721,150 @@ describe("8. Explicit reception administrative attendance", () => {
         expect((await queryHistory(patientId, proofs[loser], loser)).status).toBe(200);
         expect((await queryHistory(patientId, proofs[winner], winner)).status).toBe(403);
         expect((await queryHistory(patientId, results[winner].data.bookingProof, winner)).data.appointments).toEqual([]);
+    });
+});
+
+
+describe("12. Ordered nearby IPS routing and cross-clinic transaction", () => {
+    async function nearbyIps() {
+        await Clinique.updateOne({ _id: clinic }, { $set: { lat: 45, long: -73 } });
+        await Clinique.updateOne({ _id: otherClinic }, { $set: { lat: 45.05, long: -73 } });
+        await Specialist.updateMany({ _id: { $in: doctors } }, { $set: { disponibilites: [], walkInDisponibilites: [],
+            practiceLocations: [{ clinique: clinic, disponibilites: [], walkInDisponibilites: [] }] } });
+        const user = await AdminUser.create({ username: "synthetic_routing_ips", email: "synthetic_routing_ips@example.invalid", passwordHash: physicianUsers[0].passwordHash, role: "IPS", isActive: true });
+        const specialist = await Specialist.create({ nom: "SyntheticIPS", prenom: "Routing", numero_medecin: "SYNTHETIC_IPS_ROUTING", specialite: "IPS", accountUserId: user._id,
+            clinique_associer: otherClinic, practiceLocations: [{ clinique: otherClinic, disponibilites: [], walkInDisponibilites: times.slice(0, 3).map(time => new Date(`${day}T${time}:00-05:00`)) }] });
+        return { user, specialist };
+    }
+    it("offers and books nearby IPS capacity from the assigned origin without granting destination directory access", async () => {
+        const { user, specialist } = await nearbyIps();
+        const before = await counts();
+        const options = await request(`/api/reception/walk-in-options?clinic=${clinic}`, { token: tokens[0] });
+        expect(options.status).toBe(200);
+        expect(options.data).toMatchObject({ presentation: "priority", selectedClinic: { _id: otherClinic }, prioritySpecialty: "IPS", search: { status: "found", radiusKm: 100, examinedClinics: 2 } });
+        expect(options.data.selectedClinic.distanceKm).toBeGreaterThan(0);
+        expect(options.data.selectedClinic.distanceKm).toBeLessThan(100);
+        expect(await counts()).toEqual(before);
+        const forbidden = await request(`/api/reception/walk-in-options?clinic=${otherClinic}`, { token: tokens[0] });
+        expect(forbidden.status).toBe(403);
+        const result = await book({ ...payload(90, String(specialist._id)), clinic: otherClinic, originClinic: clinic });
+        expect(result.status).toBe(201);
+        expect(result.meta.writeVerification.status).toBe("CONFIRMED");
+        const appointment = await Appointment.findById(result.data.appointment._id).lean();
+        expect(String(appointment.clinique)).toBe(otherClinic);
+        expect(String(appointment.ownerUserId)).toBe(String(user._id));
+        expect((await Patient.findById(appointment.patient)).ownerUserId).toBeNull();
+        const receipt = await WriteOperationAuditLog.findOne({ verificationId: result.meta.writeVerification.verificationId });
+        expect(String(receipt.actorUserId)).toBe(String(receptionUsers[0]._id));
+        expect(receipt.actorRole).toBe("RECEPTION");
+        expect(receipt.operation).toBe("CREATE");
+        expect((await request(`/api/reception/patient-lookup?clinic=${otherClinic}&ramq=${patient(90).num_assurance_maladie}`, { token: tokens[0] })).status).toBe(403);
+    });
+    it("rolls back a cross-clinic replacement and origin proof when the final receipt fails, then commits both links once", async () => {
+        const initial = await book(payload(91));
+        expect(initial.status).toBe(201);
+        const original = await Appointment.findById(initial.data.appointment._id).lean();
+        const { user, specialist } = await nearbyIps();
+        const bookingProof = await lookupProof(String(original.patient));
+        const path = `/api/reception/walk-in-options?clinic=${clinic}&patient=${original.patient}&replaceAppointmentId=${original._id}`;
+        expect((await request(path, { token: tokens[0] })).status).toBe(403);
+        const options = await request(path, { token: tokens[0], bookingProof });
+        expect(options.status).toBe(200);
+        expect(options.data.selectedClinic._id).toBe(otherClinic);
+        const body = { clinic: otherClinic, originClinic: clinic, specialist: String(specialist._id), date: day, time: times[1], slotType: "walk_in",
+            patientId: String(original.patient), replaceAppointmentId: String(original._id), bookingProof };
+        const before = await counts();
+        const collection = WriteOperationAuditLog.collection.collectionName;
+        await mongoose.connection.db.command({ collMod: collection, validator: { $jsonSchema: { properties: { operation: { enum: ["UPDATE"] } } } }, validationLevel: "strict" });
+        try {
+            const failed = await book(body);
+            expect(failed.status).toBe(500);
+            expect(failed.meta?.writeVerification).toBeUndefined();
+            expect(await counts()).toEqual(before);
+            expect(await Appointment.findById(original._id).lean()).toEqual(original);
+            expect((await AppointmentBookingGuard.findOne({ patient: original.patient, specialist: original.specialist, date: day })).scheduledCount).toBe(1);
+        } finally { await mongoose.connection.db.command({ collMod: collection, validator: {} }); }
+        const success = await book(body);
+        expect(success.status).toBe(201);
+        expect(success.meta.writeVerification.status).toBe("CONFIRMED");
+        const old = await Appointment.findById(original._id).lean();
+        const replacement = await Appointment.findById(success.data.appointment._id).lean();
+        expect(old.status).toBe("rescheduled");
+        expect(String(old.clinique)).toBe(clinic);
+        expect(String(old.rescheduledTo)).toBe(String(replacement._id));
+        expect(String(replacement.clinique)).toBe(otherClinic);
+        expect(String(replacement.rescheduledFrom)).toBe(String(original._id));
+        expect(String(replacement.ownerUserId)).toBe(String(user._id));
+        expect(await Appointment.countDocuments({ patient: original.patient, status: "scheduled" })).toBe(1);
+        const receipts = await WriteOperationAuditLog.find({ verificationId: success.meta.writeVerification.verificationId }).lean();
+        expect(receipts.map(event => event.operation).sort()).toEqual(["CREATE", "UPDATE"]);
+        expect(receipts.every(event => String(event.actorUserId) === String(receptionUsers[0]._id) && event.actorRole === "RECEPTION")).toBe(true);
+        expect(await ReceptionBookingProof.exists({ tokenHash: (await import("node:crypto")).createHash("sha256").update(bookingProof).digest("hex") })).toBeNull();
+    });
+});
+
+
+describe("13. Explicit earlier neighboring appointment comparison", () => {
+    const primaryDay = "2099-02-14", earlierDay = "2099-01-16";
+    async function prepareEarlierOffers() {
+        await Clinique.updateOne({ _id: clinic }, { $set: { lat: 45, long: -73 } });
+        await Clinique.updateOne({ _id: otherClinic }, { $set: { lat: 45.05, long: -73 } });
+        await Specialist.updateMany({ _id: { $in: doctors } }, { $set: { disponibilites: [], walkInDisponibilites: [],
+            practiceLocations: [{ clinique: clinic, disponibilites: [], walkInDisponibilites: [new Date(`${primaryDay}T09:00:00-05:00`)] }] } });
+        const user = await AdminUser.create({ username: "synthetic_earlier_ips", email: "synthetic_earlier_ips@example.invalid", passwordHash: physicianUsers[0].passwordHash, role: "IPS", isActive: true });
+        const specialist = await Specialist.create({ nom: "SyntheticEarlierIPS", prenom: "Comparison", numero_medecin: "SYNTHETIC_IPS_EARLIER", specialite: "IPS", accountUserId: user._id,
+            clinique_associer: otherClinic, practiceLocations: [{ clinique: otherClinic, disponibilites: [], walkInDisponibilites: [new Date(`${earlierDay}T09:00:00-05:00`)] }] });
+        return { user, specialist };
+    }
+    it("retains the local offer and books a neighboring earlier alternative only after explicit choice", async () => {
+        const { user, specialist } = await prepareEarlierOffers();
+        const before = await counts();
+        const normal = await request(`/api/reception/walk-in-options?clinic=${clinic}`, { token: tokens[0] });
+        const compared = await request(`/api/reception/walk-in-options?clinic=${clinic}&compareEarlier=true`, { token: tokens[0] });
+        expect(normal.status).toBe(200); expect(compared.status).toBe(200);
+        const { earlierAlternatives, ...primary } = compared.data;
+        expect(primary).toEqual(normal.data);
+        expect(primary).toMatchObject({ selectedClinic: { _id: clinic }, prioritySpecialty: "Urgentologue", today: [] });
+        expect(primary.future.every(option => option.date === primaryDay)).toBe(true);
+        expect(earlierAlternatives).toEqual([expect.objectContaining({ clinic: expect.objectContaining({ _id: otherClinic }), specialist: expect.objectContaining({ _id: String(specialist._id) }), prioritySpecialty: "IPS", date: earlierDay, slots: ["09:00"] })]);
+        expect(await counts()).toEqual(before);
+        const body = { ...payload(92, String(specialist._id), "09:00"), clinic: otherClinic, originClinic: clinic, date: earlierDay };
+        const refused = await book(body);
+        expect(refused.status).toBe(409); expect(refused.error.code).toBe("NO_AVAILABILITY");
+        expect(await counts()).toEqual(before);
+        const chosen = await book({ ...body, selectionMode: "earlier" });
+        expect(chosen.status).toBe(201);
+        expect(chosen.meta.writeVerification.status).toBe("CONFIRMED");
+        const persisted = await Appointment.findById(chosen.data.appointment._id).lean();
+        expect(persisted).toMatchObject({ date: earlierDay, time: "09:00", status: "scheduled" });
+        expect(String(persisted.clinique)).toBe(otherClinic);
+        expect(String(persisted.ownerUserId)).toBe(String(user._id));
+        const receipt = await WriteOperationAuditLog.findOne({ verificationId: chosen.meta.writeVerification.verificationId }).lean();
+        expect(String(receipt.actorUserId)).toBe(String(receptionUsers[0]._id));
+        expect(receipt.actorRole).toBe("RECEPTION");
+        expect(await Patient.countDocuments()).toBe(1);
+    });
+    it("revalidates comparison after a changed local offer without consuming an existing patient's proof", async () => {
+        const patientId = await seedKnownPatient(93);
+        const { specialist } = await prepareEarlierOffers();
+        const proof = await lookupProof(patientId);
+        const path = `/api/reception/walk-in-options?clinic=${clinic}&patient=${patientId}&compareEarlier=true`;
+        expect((await request(path, { token: tokens[0] })).status).toBe(403);
+        const compared = await request(path, { token: tokens[0], bookingProof: proof });
+        expect(compared.data.earlierAlternatives).toHaveLength(1);
+        const body = { clinic: otherClinic, originClinic: clinic, patientId, specialist: String(specialist._id), date: earlierDay, time: "09:00", slotType: "walk_in", selectionMode: "earlier", bookingProof: proof };
+        await Specialist.updateOne({ _id: doctors[0] }, { $set: { practiceLocations: [{ clinique: clinic, disponibilites: [], walkInDisponibilites: [new Date(`${day}T10:00:00-05:00`)] }] } });
+        const before = await counts();
+        const refused = await book(body);
+        expect(refused.status).toBe(409); expect(refused.error.code).toBe("NO_AVAILABILITY");
+        expect(refused.meta).toBeUndefined();
+        expect(await counts()).toEqual(before);
+        expect((await request(path, { token: tokens[0], bookingProof: proof })).status).toBe(200);
+        await Specialist.updateOne({ _id: doctors[0] }, { $set: { practiceLocations: [{ clinique: clinic, disponibilites: [], walkInDisponibilites: [new Date(`${primaryDay}T09:00:00-05:00`)] }] } });
+        const chosen = await book(body);
+        expect(chosen.status).toBe(201);
+        expect(await Patient.countDocuments()).toBe(1);
+        expect(await Appointment.countDocuments({ patient: patientId, status: "scheduled" })).toBe(1);
+        expect((await request(path, { token: tokens[0], bookingProof: proof })).status).toBe(403);
     });
 });

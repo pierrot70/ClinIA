@@ -28,6 +28,14 @@ type LoginPageProps = {
 
 type RecoveryStep = "request" | "verify" | "complete";
 
+function authenticatedDestination(user: { role: UserRole; passwordResetRequired?: boolean; mustChangePasswordOnNextLogin?: boolean }, from?: unknown) {
+    if (user.passwordResetRequired) return "/security/password-reset-required";
+    if (user.mustChangePasswordOnNextLogin) return "/security/change-password-required";
+    if (typeof from === "string" && from.trim().length > 0) return from;
+    return getDefaultRouteForRole(user.role);
+}
+
+
 function useLoginLabel(text: string, translationKey: string) {
     const { locale } = useHomeI18n();
     return useTranslation({
@@ -59,6 +67,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
     const [mfaCode, setMfaCode] = useState("");
     const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
     const enrollmentCompletionPendingRef = useRef(false);
+    const mfaDestinationRef = useRef("/");
 
     const location = useLocation();
     const navigate = useNavigate();
@@ -138,11 +147,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
 
     const redirectTarget = useMemo(() => {
         const from = (location.state as { from?: string } | null)?.from;
-        if (typeof from === "string" && from.trim().length > 0) {
-            return from;
-        }
         if (user) {
-            return adminOnly ? getDefaultRouteForRole(user.role) : "/";
+            return authenticatedDestination(user, from);
         }
         return adminOnly ? "/mock-studio" : "/";
     }, [adminOnly, location.state, user]);
@@ -203,16 +209,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
             }
 
             const from = (location.state as { from?: string } | null)?.from;
-            const destination =
-                session.user.passwordResetRequired
-                    ? "/security/password-reset-required"
-                    : session.user.mustChangePasswordOnNextLogin
-                    ? "/security/change-password-required"
-                    : typeof from === "string" && from.trim().length > 0
-                    ? from
-                    : adminOnly || session.user.role === "RECEPTION"
-                        ? getDefaultRouteForRole(session.user.role)
-                        : "/";
+            const destination = authenticatedDestination(session.user, from);
 
             navigate(destination, { replace: true });
         } catch (err: unknown) {
@@ -243,10 +240,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
         enrollmentCompletionPendingRef.current = mfaChallenge.enrollmentRequired;
         try {
             const result = await completeMfaLogin(mfaChallenge, mfaCode);
+            const from = (location.state as { from?: string } | null)?.from;
+            const destination = authenticatedDestination(result.session.user, from);
+            mfaDestinationRef.current = destination;
             setRecoveryCodes(result.recoveryCodes);
             if (result.recoveryCodes.length === 0) {
                 enrollmentCompletionPendingRef.current = false;
-                navigate(adminOnly ? getDefaultRouteForRole(result.session.user.role) : "/", { replace: true });
+                navigate(destination, { replace: true });
             }
         } catch (err) {
             enrollmentCompletionPendingRef.current = false;
@@ -418,7 +418,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ adminOnly = false }) => {
                     <h2 className="text-lg font-semibold text-gray-900">{mfaLabels.recoveryCodesTitle}</h2>
                     <p className="text-sm text-gray-600">{mfaLabels.recoveryCodesDescription}</p>
                     <pre className="rounded border bg-gray-50 p-3 text-sm whitespace-pre-wrap">{recoveryCodes.join("\n")}</pre>
-                    <button type="button" onClick={() => navigate(adminOnly ? "/mock-studio" : "/", { replace: true })} className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white">{mfaLabels.continue}</button>
+                    <button type="button" onClick={() => navigate(mfaDestinationRef.current, { replace: true })} className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white">{mfaLabels.continue}</button>
                 </div>
             ) : mfaChallenge ? (
                 <form onSubmit={handleMfaSubmit} className="space-y-4">

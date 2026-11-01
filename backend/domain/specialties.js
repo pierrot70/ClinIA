@@ -1,4 +1,6 @@
 export const URGENTOLOGIST_SPECIALTY = "Urgentologue";
+export const IPS_SPECIALTY = "IPS";
+export const isIps = value => typeof value === "string" && value.trim().toUpperCase() === IPS_SPECIALTY;
 // Temporary UI-test switch. Production and the normal automated scenarios
 // keep the business limit of 20, even if this variable leaks into deployment.
 export function resolveUrgentologistDailyLimit(env = process.env) {

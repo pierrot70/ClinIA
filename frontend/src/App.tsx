@@ -26,6 +26,7 @@ import { AppointmentsListPage } from "./pages/AppointmentsList";
 import { WalkInArrivalPage } from "./pages/WalkInArrivalPage";
 import { PatientsPage } from "./pages/PatientsPage";
 import { ConsultationsPage } from "./pages/ConsultationsPage";
+import { ClinicalCareAccessPage } from "./pages/ClinicalCareAccessPage";
 import { PatientAuditLogsPage } from "./pages/PatientAuditLogsPage";
 import { OpenAILogsPage } from "./pages/OpenAILogsPage";
 import { DbStatusPage } from "./pages/DbStatusPage";
@@ -50,6 +51,7 @@ import { useHomeI18n } from "./contexts/HomeI18nContext";
 import { receptionLabel } from "./i18n/receptionLabels";
 
 const CLINICAL_ROLES = ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"] as const;
+const OWN_CLINICAL_ROLES = [...CLINICAL_ROLES, "IPS"] as const;
 const ADMIN_ROLES = ["ADMIN", "SUPERADMIN"] as const;
 const SUPERADMIN_ROLES = ["SUPERADMIN"] as const;
 const APP_STATUS_REFRESH_MS = 10_000;
@@ -327,7 +329,8 @@ const App: React.FC = () => {
                     <Route path="/treatment/:id" element={<TreatmentDetails />} />
                     <Route path="/quick" element={<ProtectedRoute allowedRoles={[...CLINICAL_ROLES]}><QuickMode /></ProtectedRoute>} />
                     <Route path="/patient-summary" element={<ProtectedRoute allowedRoles={[...CLINICAL_ROLES]}><PatientSummary /></ProtectedRoute>} />
-                    <Route path="/consultations" element={<ProtectedRoute allowedRoles={["MEDECIN"]}><ConsultationsPage /></ProtectedRoute>} />
+                    <Route path="/consultations" element={<ProtectedRoute allowedRoles={["MEDECIN", "IPS"]}><ConsultationsPage /></ProtectedRoute>} />
+                    <Route path="/clinical-care-access" element={<ProtectedRoute allowedRoles={["IPS", "MEDECIN"]}><ClinicalCareAccessPage /></ProtectedRoute>} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/security/change-password-required" element={<ChangePasswordRequiredPage />} />
                     <Route path="/security/password-reset-required" element={<PasswordResetRequiredPage />} />
@@ -336,7 +339,7 @@ const App: React.FC = () => {
                     <Route
                         path="/clinical"
                         element={
-                            <ProtectedRoute allowedRoles={[...CLINICAL_ROLES]}>
+                            <ProtectedRoute allowedRoles={[...OWN_CLINICAL_ROLES]}>
                                 <ClinicalAnalyzePage />
                             </ProtectedRoute>
                         }
@@ -346,7 +349,7 @@ const App: React.FC = () => {
                     <Route
                         path="/appointments"
                         element={
-                            <ProtectedRoute allowedRoles={[...CLINICAL_ROLES]}>
+                            <ProtectedRoute allowedRoles={[...OWN_CLINICAL_ROLES]}>
                                 <AppointmentsPage />
                             </ProtectedRoute>
                         }
@@ -354,7 +357,7 @@ const App: React.FC = () => {
                     <Route
                         path="/appointments/list"
                         element={
-                            <ProtectedRoute allowedRoles={[...CLINICAL_ROLES]}>
+                            <ProtectedRoute allowedRoles={[...OWN_CLINICAL_ROLES]}>
                                 <AppointmentsListPage />
                             </ProtectedRoute>
                         }
@@ -370,7 +373,7 @@ const App: React.FC = () => {
                     <Route
                         path="/patients"
                         element={
-                            <ProtectedRoute allowedRoles={[...CLINICAL_ROLES]}>
+                            <ProtectedRoute allowedRoles={[...OWN_CLINICAL_ROLES]}>
                                 <PatientsPage />
                             </ProtectedRoute>
                         }
@@ -422,7 +425,7 @@ const App: React.FC = () => {
                     <Route
                         path="/my-write-receipts"
                         element={
-                            <ProtectedRoute allowedRoles={[...CLINICAL_ROLES, "RECEPTION"]}>
+                            <ProtectedRoute allowedRoles={[...OWN_CLINICAL_ROLES, "RECEPTION"]}>
                                 <MyWriteReceiptsPage />
                             </ProtectedRoute>
                         }

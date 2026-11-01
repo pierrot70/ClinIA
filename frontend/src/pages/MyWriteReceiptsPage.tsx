@@ -51,7 +51,7 @@ function formatWriteConcern(receipt: MyWriteReceipt) {
 export function MyWriteReceiptsPage() {
     const { locale } = useHomeI18n();
     const { user } = useAuth();
-    const canSearchPatients = ["USER", "MEDECIN", "ADMIN", "SUPERADMIN"].includes(user?.role ?? "");
+    const canSearchPatients = ["USER", "MEDECIN", "IPS", "ADMIN", "SUPERADMIN"].includes(user?.role ?? "");
     const pageLabels = getMyWriteReceiptsLabels(locale);
     const collectionLabel = (value: string) => pageLabels.collections[value as keyof typeof pageLabels.collections] ?? value;
     const operationLabel = (value: string) => pageLabels.operations[value as keyof typeof pageLabels.operations] ?? value;

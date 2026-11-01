@@ -4,17 +4,20 @@ import { Specialist } from "../models/Specialist.js";
 import { Appointment } from "../models/Appointment.js";
 import { Patient } from "../models/Patient.js";
 import { PatientConsultationNote } from "../models/PatientConsultationNote.js";
+import { PatientSharedConsultationNote } from "../models/PatientSharedConsultationNote.js";
 import { recordPatientAuditEvent } from "../audit/patientAudit.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
 
+const MAX_SHARED_NOTES = 500;
 const fail = (code) => { throw { code }; };
 const id = (value) => typeof value === "string" && /^[a-f\d]{24}$/i.test(value);
 
 async function physicianSpecialists(auth, session = null) {
-    if (auth?.role !== "MEDECIN" || !id(auth?.userId)) fail("FORBIDDEN");
-    const active = await AdminUser.findOne({ _id: auth.userId, role: "MEDECIN", isActive: true }, { _id: 1 }).session(session).lean();
+    if (!["MEDECIN", "IPS"].includes(auth?.role) || !id(auth?.userId)) fail("FORBIDDEN");
+    const active = await AdminUser.findOne({ _id: auth.userId, role: auth.role, isActive: true }, { _id: 1 }).session(session).lean();
     if (!active) fail("FORBIDDEN");
-    const specialists = await Specialist.find({ accountUserId: auth.userId }, { _id: 1 }).session(session).lean();
+    const specialists = await Specialist.find({ accountUserId: auth.userId, ...(auth.role === "IPS" ? { specialite: "IPS" } : {}) }, { _id: 1 }).session(session).lean();
+    if (auth.role === "IPS" && !specialists.length) fail("FORBIDDEN");
     return specialists.map((entry) => entry._id);
 }
 
@@ -23,10 +26,13 @@ async function access(appointmentId, auth, session = null) {
     const specialists = await physicianSpecialists(auth, session);
     const appointment = await Appointment.findOne({
         _id: appointmentId, specialist: { $in: specialists },
+        ...(auth.role === "IPS" ? { ownerUserId: auth.userId } : {}),
         status: { $in: ["scheduled", "completed"] },
-    }, { patient: 1, status: 1, date: 1, time: 1 }).session(session).lean();
+    }, { patient: 1, status: 1, date: 1, time: 1, ...(auth.role === "IPS" ? { specialist: 1, ownerUserId: 1 } : {}) }).session(session).lean();
     // Deliberately indistinguishable missing/unrelated/cancelled appointment.
     if (!appointment) fail("FORBIDDEN");
+    // This exact assigned encounter authorizes consultation access without
+    // changing the professional responsible for the patient's dossier.
     const patient = await Patient.findOne({ _id: appointment.patient, archivedAt: null }, {
         nom: 1, prenom: 1, ownerUserId: 1, "secure_request_profile.clinicalNotes": 1,
     }).session(session).lean();
@@ -38,12 +44,15 @@ async function access(appointmentId, auth, session = null) {
 async function lockAuthorization(appointment, patient, auth, session) {
     // Serialize writes against account deactivation, specialist relinking,
     // appointment changes and patient archival. Transactions retry conflicts.
-    const specialists = await Specialist.find({ accountUserId: auth.userId }, { _id: 1 }).session(session).lean();
+    const specialists = await Specialist.find({ accountUserId: auth.userId, ...(auth.role === "IPS" ? { specialite: "IPS" } : {}) }, { _id: 1 }).session(session).lean();
     const checks = [
-        [AdminUser, { _id: auth.userId, role: "MEDECIN", isActive: true }],
-        [Specialist, { _id: { $in: specialists.map(s => s._id) }, accountUserId: auth.userId }],
-        [Appointment, { _id: appointment._id, status: appointment.status }],
-        [Patient, { _id: patient._id, archivedAt: null }],
+        [AdminUser, { _id: auth.userId, role: auth.role, isActive: true }],
+        [Specialist, { _id: auth.role === "IPS" ? appointment.specialist : { $in: specialists.map(s => s._id) }, accountUserId: auth.userId,
+            ...(auth.role === "IPS" ? { specialite: "IPS" } : {}) }],
+        [Appointment, { _id: appointment._id, status: appointment.status,
+            ...(auth.role === "IPS" ? { ownerUserId: auth.userId, specialist: { $in: specialists.map(s => s._id) } } : {}) }],
+        [Patient, { _id: patient._id, archivedAt: null,
+            ...(auth.role === "IPS" ? { ownerUserId: patient.ownerUserId ?? null } : {}) }],
     ];
     for (const [model, filter] of checks) {
         const result = await model.updateOne(filter, { $inc: { __v: 1 } }, { session });
@@ -63,7 +72,7 @@ async function audit(action, patient, auth, metadata, session = null) {
 
 export async function listConsultations(auth, metadata = {}) {
     const specialists = await physicianSpecialists(auth);
-    const appointments = await Appointment.find({ specialist: { $in: specialists }, status: { $in: ["scheduled", "completed"] } }, {
+    const appointments = await Appointment.find({ specialist: { $in: specialists }, ...(auth.role === "IPS" ? { ownerUserId: auth.userId } : {}), status: { $in: ["scheduled", "completed"] } }, {
         patient: 1, date: 1, time: 1, status: 1,
     }).sort({ date: -1, time: -1, _id: -1 }).limit(100).lean();
     const patients = await Patient.find({ _id: { $in: appointments.map(a => a.patient) }, archivedAt: null }, { nom: 1, prenom: 1 }).lean();
@@ -78,8 +87,20 @@ export async function listConsultations(auth, metadata = {}) {
 export async function readConsultation(appointmentId, auth, metadata = {}) {
     const { appointment, patient, inCare, fullHistory } = await access(appointmentId, auth);
     const filter = { patientId: patient._id, ...(!fullHistory ? { authorUserId: auth.userId, appointmentId } : {}) };
-    const notes = await PatientConsultationNote.find(filter, { note: 1, authorUserId: 1, appointmentId: 1, createdAt: 1 })
+    const encounterNotes = await PatientConsultationNote.find(filter, { note: 1, authorUserId: 1, appointmentId: 1, createdAt: 1 })
         .sort({ createdAt: 1, _id: 1 }).lean();
+    // Shared consultation entries remain part of the dossier after the access
+    // invitation expires or is revoked. Only the existing full-history policy
+    // authorizes them here; completed foreign encounters never query this set.
+    const sharedNotes = fullHistory ? await PatientSharedConsultationNote.find({ patientId: patient._id }, {
+        note: 1, authorUserId: 1, authorRole: 1, authorSpecialty: 1, createdAt: 1,
+    }).sort({ createdAt: -1, _id: -1 }).limit(MAX_SHARED_NOTES + 1).lean() : [];
+    const sharedNotesTruncated = fullHistory && sharedNotes.length > MAX_SHARED_NOTES;
+    const notes = [
+        ...encounterNotes.map(note => ({ ...note, source: "CONSULTATION", authorRole: null, authorSpecialty: null })),
+        ...sharedNotes.slice(0, MAX_SHARED_NOTES).map(note => ({ ...note, source: "SHARED", appointmentId: null })),
+    ].sort((a, b) => (new Date(a.createdAt).getTime() || 0) - (new Date(b.createdAt).getTime() || 0)
+        || String(a._id).localeCompare(String(b._id)));
     const authors = await AdminUser.find({ _id: { $in: notes.map(n => n.authorUserId) } }, { username: 1 }).lean();
     const authorNames = new Map(authors.map(a => [String(a._id), a.username]));
     await audit("CONSULTATION_READ", patient, auth, metadata);
@@ -87,7 +108,7 @@ export async function readConsultation(appointmentId, auth, metadata = {}) {
         patient: { _id: patient._id, nom: patient.nom, prenom: patient.prenom },
         appointment, notes: notes.map(n => ({ ...n, author: authorNames.get(String(n.authorUserId)) || String(n.authorUserId) })),
         legacyNote: fullHistory ? patient.secure_request_profile?.clinicalNotes || "" : "",
-        fullHistory,
+        fullHistory, sharedNotesTruncated,
         canAddNote: appointment.status === "scheduled",
         canAcceptCare: !patient.ownerUserId,
         inCare,

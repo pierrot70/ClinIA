@@ -9,12 +9,16 @@ import {
     findReceptionPatientByRamq,
     type ReceptionPatient,
     type WalkInAvailability,
+    type WalkInDestinationClinic,
 } from "../services/receptionApi";
 import { useReceptionClinic } from "../contexts/ReceptionClinicContext";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { isReceptionLabel, receptionLabel } from "../i18n/receptionLabels";
 import { receptionReplanLabels } from "../i18n/receptionReplanLabels";
 import { urgentologistLabels, walkInEmergencyReminder } from "../i18n/urgentologistLabels";
+
+import { walkInRoutingLabels } from "../i18n/walkInRoutingLabels";
+import { displaySpecialty } from "../i18n/specialtyLabels";
 
 import { GuidedWorkflow } from "../components/guides/GuidedWorkflow";
 import { resolveWalkInGuide, WALK_IN_GUIDE } from "../components/guides/walkInGuide";
@@ -38,27 +42,104 @@ function patientName(patient: Pick<ReceptionPatient, "prenom" | "nom">) {
 }
 
 type SelectedWalkInSlot = {
+    selectionMode?: "priority" | "earlier";
+    destinationClinic?: WalkInDestinationClinic;
+    prioritySpecialty?: WalkInAvailability["prioritySpecialty"];
     specialist: WalkInAvailability["today"][number]["specialist"];
     date: string;
     time: string;
     slotType: "regular" | "walk_in";
 };
 
+// New routing metadata must agree as a whole. A legacy response remains
+// limited to 100 km; a partial/forged tolerance never expands that bound.
+function effectiveSearchDistance(search: NonNullable<WalkInAvailability["search"]>): 100 | 110 | null {
+    if (search.radiusKm !== 100) return null;
+    if (search.toleranceKm === undefined && search.maxDistanceKm === undefined) return 100;
+    return search.toleranceKm === 10 && search.maxDistanceKm === 110 ? 110 : null;
+}
+
 function AvailabilityOptions({
     availability,
     onChooseSlot,
     locale,
     introduction,
+    onCompareEarlier,
+    patientKind = "new",
+    genericProfessionals = false,
 }: {
     availability: WalkInAvailability;
     onChooseSlot?: (slot: SelectedWalkInSlot) => void;
     locale: string;
     introduction?: string;
+    onCompareEarlier?: () => void;
+    patientKind?: "new" | "existing" | "replacement";
+    genericProfessionals?: boolean;
 }) {
     const { t } = useUiLabels(locale);
     const urgent = urgentologistLabels(locale, availability.urgentologists?.limit);
     const [choice, setChoice] = useState<"family" | "tomorrow" | null>(null);
     useEffect(() => { setChoice(null); }, [availability]);
+    const routing = walkInRoutingLabels(locale);
+    const contextIntroduction = introduction ?? (patientKind === "replacement" ? receptionReplanLabels(locale).kept : patientKind === "existing" ? routing.existingAvailabilityIntro : receptionLabel(locale, "availabilityIntro", source.availabilityIntro));
+    const [gapNoticeOpen, setGapNoticeOpen] = useState(false);
+    useEffect(() => { setGapNoticeOpen(availability.search?.status === "exhausted" && !availability.search.hasUnlocatedClinics); }, [availability]);
+    if (availability.search) {
+        const distanceLimit = effectiveSearchDistance(availability.search);
+        const exhaustedTitle = routing.exhaustedTitle.replace("{maxDistance}", String(distanceLimit ?? 100));
+        const searchLimit = routing.searchLimit.replace("{radius}", "100").replace("{tolerance}", distanceLimit === 110 ? "10" : "0").replace("{maxDistance}", String(distanceLimit ?? 100));
+        const reminder = <p role="alert" lang="en" translate="no" data-content-kind={walkInEmergencyReminder.kind}
+            className="rounded border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-700">{walkInEmergencyReminder.text}</p>;
+        const searchContext = <div className="space-y-1 text-sm text-slate-700"><p>{routing.priorityOrder}</p><p>{routing.dateScope}</p><p>{searchLimit}</p></div>;
+        const invalidDestination = availability.search.status === "found" && (!availability.selectedClinic?._id
+            || !Number.isFinite(availability.selectedClinic.distanceKm) || availability.selectedClinic.distanceKm < 0 || availability.selectedClinic.distanceKm > (distanceLimit ?? 100));
+        if (distanceLimit === null || availability.search.status === "location_missing" || (availability.search.status === "exhausted" && availability.search.hasUnlocatedClinics) || invalidDestination) return <div className="space-y-3">
+            {searchContext}
+            <p role="status" className="font-semibold">{routing.locationMissingTitle}</p>
+            <p>{routing.locationMissingHelp}</p>
+            {reminder}
+        </div>;
+        if (availability.search.status === "exhausted") return <div className="space-y-3">
+            {searchContext}
+            <p role="status" className="font-semibold">{exhaustedTitle}</p>
+            {reminder}
+            {gapNoticeOpen && <div role="dialog" aria-modal="true" aria-labelledby="walkin-gap-notice-title"
+                className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4">
+                <div className="max-w-lg space-y-4 rounded-lg bg-white p-5 shadow-lg">
+                    <h3 id="walkin-gap-notice-title" className="font-semibold">{exhaustedTitle}</h3>
+                    <p>{routing.gapNotice}</p>
+                    <button type="button" autoFocus className="rounded bg-blue-600 px-3 py-2 text-white" onClick={() => setGapNoticeOpen(false)}>{routing.gapAcknowledge}</button>
+                </div>
+            </div>}
+        </div>;
+        const destination = availability.selectedClinic;
+        return <div className="space-y-3">
+            {searchContext}
+            {availability.search.hasUnlocatedClinics && <p role="status" className="rounded border border-amber-200 bg-amber-50 p-3">{routing.unlocatedWarning}</p>}
+            <h3 className="font-semibold">{routing.primaryOffer}</h3>
+            {destination && <div className="space-y-1 rounded border border-blue-200 bg-blue-50 p-3">
+                <p className="font-semibold">{routing.destination.replace("{name}", destination.nom)}</p>
+                <p>{routing.distance.replace("{distance}", new Intl.NumberFormat(locale).format(destination.distanceKm))}</p>
+                {availability.prioritySpecialty && <p>{routing.professional.replace("{specialty}", displaySpecialty(availability.prioritySpecialty, locale))}</p>}
+            </div>}
+            {reminder}
+            <AvailabilityOptions availability={{ today: availability.today, future: availability.future }}
+                onChooseSlot={onChooseSlot ? slot => onChooseSlot({ ...slot, destinationClinic: destination, prioritySpecialty: availability.prioritySpecialty, selectionMode: "priority" }) : undefined}
+                locale={locale} introduction={introduction} patientKind={patientKind} genericProfessionals={true} />
+            {onCompareEarlier && <button type="button" className="rounded border border-blue-500 px-3 py-2 text-blue-800" onClick={onCompareEarlier}>{routing.compareEarlier}</button>}
+            {availability.earlierAlternatives && <section className="space-y-3 border-t pt-3">
+                <h3 className="font-semibold">{routing.earlierOffers.replace("{maxDistance}", String(distanceLimit))}</h3><p>{routing.earlierHelp}</p>
+                {!availability.earlierAlternatives.length && <p role="status">{routing.noEarlier}</p>}
+                {availability.earlierAlternatives.filter(option => option.clinic?._id && Number.isFinite(option.clinic.distanceKm) && option.clinic.distanceKm >= 0 && option.clinic.distanceKm <= distanceLimit).map((option, index) => <article key={`${option.clinic._id}:${option.specialist._id}:${option.date}:${index}`} className="space-y-2 rounded border bg-white p-3">
+                    <p className="font-semibold">{routing.destination.replace("{name}", option.clinic.nom)}</p>
+                    <p>{routing.distance.replace("{distance}", new Intl.NumberFormat(locale).format(option.clinic.distanceKm))}</p>
+                    <p>{routing.professional.replace("{specialty}", displaySpecialty(option.prioritySpecialty, locale))}</p>
+                    <AvailabilityOptions availability={{ today: [], future: [option] }} locale={locale} introduction={introduction} patientKind={patientKind} genericProfessionals={true}
+                        onChooseSlot={onChooseSlot ? slot => onChooseSlot({ ...slot, destinationClinic: option.clinic, prioritySpecialty: option.prioritySpecialty, selectionMode: "earlier" }) : undefined} />
+                </article>)}
+            </section>}
+        </div>;
+    }
     if (availability.presentation === "alternatives" || availability.urgentologists?.allAtCapacity) {
         const familyAvailability = {
             today: availability.today.filter(option => option.specialist.specialty !== "Urgentologue"),
@@ -75,16 +156,16 @@ function AvailabilityOptions({
                 <button type="button" className="rounded border px-3 py-2" onClick={() => setChoice("family")}>{urgent.family}</button>
             </div>
             {choice === "tomorrow" && <p role="status">{urgent.tomorrowNotice}</p>}
-            {choice === "family" && <AvailabilityOptions availability={familyAvailability} onChooseSlot={onChooseSlot} locale={locale} introduction={introduction} />}
+            {choice === "family" && <AvailabilityOptions availability={familyAvailability} onChooseSlot={onChooseSlot} locale={locale} introduction={introduction} patientKind={patientKind} genericProfessionals={genericProfessionals} />}
         </div>;
     }
     return (
         <div className="space-y-4">
-            <p className="text-sm text-slate-700">{introduction || receptionLabel(locale, "availabilityIntro", source.availabilityIntro)}</p>
+            <p className="text-sm text-slate-700">{contextIntroduction}</p>
             <div>
-                <h3 className="text-sm font-semibold text-slate-900">{receptionLabel(locale, "availabilityToday", source.availabilityToday)}</h3>
+                <h3 className="text-sm font-semibold text-slate-900">{genericProfessionals ? routing.routedToday : receptionLabel(locale, "availabilityToday", source.availabilityToday)}</h3>
                 {availability.today.length === 0 ? (
-                    <p className="mt-1 text-sm text-slate-700">{receptionLabel(locale, "noSameDayAvailability", source.noSameDayAvailability)}</p>
+                    <p className="mt-1 text-sm text-slate-700">{genericProfessionals ? routing.routedNoToday : receptionLabel(locale, "noSameDayAvailability", source.noSameDayAvailability)}</p>
                 ) : (
                     <ul className="mt-2 space-y-2">
                         {availability.today.map((option) => (
@@ -116,9 +197,9 @@ function AvailabilityOptions({
                 )}
             </div>
             {availability.presentation !== "urgent_today" && <div>
-                <h3 className="text-sm font-semibold text-slate-900">{receptionLabel(locale, "availabilityFuture", source.availabilityFuture)}</h3>
+                <h3 className="text-sm font-semibold text-slate-900">{genericProfessionals ? routing.routedFuture : receptionLabel(locale, "availabilityFuture", source.availabilityFuture)}</h3>
                 {availability.future.length === 0 ? (
-                    <p className="mt-1 text-sm text-slate-700">{receptionLabel(locale, "noFutureAvailability", source.noFutureAvailability)}</p>
+                    <p className="mt-1 text-sm text-slate-700">{genericProfessionals ? routing.routedNoFuture : receptionLabel(locale, "noFutureAvailability", source.noFutureAvailability)}</p>
                 ) : (
                     <ul className="mt-2 space-y-2">
                         {availability.future.map((option) => (
@@ -157,6 +238,7 @@ export function WalkInArrivalPage() {
     const { locale } = useHomeI18n();
     const { t } = useUiLabels(locale);
     const replan = receptionReplanLabels(locale);
+    const routing = walkInRoutingLabels(locale);
     const requestEpoch = useRef(0);
     const lastLookupKey = useRef("");
     const automaticLookup = useRef<(automatic?: boolean) => Promise<void>>(async () => {});
@@ -227,7 +309,8 @@ export function WalkInArrivalPage() {
     async function loadWalkInAvailability(
         selectedClinicId = clinicId,
         patientId: string | null | undefined = selectedPatient?._id,
-        replaceId: string | null | undefined = replacementId
+        replaceId: string | null | undefined = replacementId,
+        compareEarlier = false
     ) {
         if (!selectedClinicId) {
             setError(source.availabilityRequiredClinic);
@@ -240,7 +323,10 @@ export function WalkInArrivalPage() {
         setWalkInAvailability(null);
         const epoch = ++requestEpoch.current;
         setLoading(true);
-        const response = await fetchWalkInAvailability(selectedClinicId, patientId || undefined, replaceId || undefined);
+        const proof = patientId ? (selectedPatient?._id === patientId ? selectedPatient.bookingProof : patients.find(patient => patient._id === patientId)?.bookingProof) : undefined;
+        const response = compareEarlier
+            ? await fetchWalkInAvailability(selectedClinicId, patientId || undefined, replaceId || undefined, proof, true)
+            : await fetchWalkInAvailability(selectedClinicId, patientId || undefined, replaceId || undefined, proof);
         if (epoch !== requestEpoch.current) return;
         setLoading(false);
 
@@ -361,7 +447,8 @@ export function WalkInArrivalPage() {
         const epoch = ++requestEpoch.current;
         finalWritePending.current = true;
         const response = await createWalkInBooking({
-            clinic: clinicId,
+            clinic: selectedSlot.destinationClinic?._id || clinicId,
+            ...(selectedSlot.destinationClinic ? { originClinic: clinicId, selectionMode: selectedSlot.selectionMode ?? "priority" } : {}),
             specialist: selectedSlot.specialist._id,
             date: selectedSlot.date,
             time: selectedSlot.time,
@@ -393,6 +480,12 @@ export function WalkInArrivalPage() {
                 setReplacementId(undefined);
                 setWalkInAvailability(null);
                 setError(receptionLabel(locale, "searchPatient", source.searchPatient));
+                return;
+            }
+            if (selectedSlot.destinationClinic && ["NO_AVAILABILITY", "MAXIMUM_APPOINTMENTS_REACHED", "RECEIVING_PHYSICIAN_UNAVAILABLE"].includes(response.error.code)) {
+                // No write retry: discard the stale route and require a fresh search.
+                setSelectedSlot(null); setWalkInAvailability(null); setDetailsReviewed(false);
+                setError(routing.availabilityChanged);
                 return;
             }
             setError(response.error.code === "PATIENT_ALREADY_EXISTS" ? replan.patientExists : response.error.code === "MAXIMUM_APPOINTMENTS_REACHED" ? urgentologistLabels(locale).dailyLimitReached : response.error.code === "RECEPTION_REPLAN_REQUIRED" ? replan.conflict : response.error.code === "RECEIVING_PHYSICIAN_UNAVAILABLE"
@@ -477,12 +570,14 @@ export function WalkInArrivalPage() {
     }
 
     const stepKey = guideStep.key;
-    const guideActionLabel = guideText[`${stepKey}Action` as keyof typeof guideText];
+    const routedUnavailable = stepKey === "slots" && walkInAvailability?.search?.status === "exhausted";
+    const routedIncomplete = stepKey === "slots" && walkInAvailability?.search?.status === "location_missing";
+    const guideActionLabel = routedUnavailable ? routing.guideUnavailableAction : routedIncomplete ? routing.guideIncompleteAction : guideText[`${stepKey}Action` as keyof typeof guideText];
     const guide = <GuidedWorkflow active={guideActive} text={guideText}
         onStart={() => setGuideActive(true)} onStop={() => setGuideActive(false)}
         step={{
-            title: guideText[`${stepKey}Title`],
-            description: guideText[`${stepKey}Description`],
+            title: routedUnavailable ? routing.guideUnavailableTitle : routedIncomplete ? routing.guideIncompleteTitle : guideText[`${stepKey}Title`],
+            description: routedUnavailable ? routing.guideUnavailableDescription : routedIncomplete ? routing.locationMissingHelp : guideText[`${stepKey}Description`],
             current: guideStep.current,
             total: WALK_IN_GUIDE.total,
             ...(guideActionLabel ? { action: { label: guideActionLabel, disabled: guideStep.disabled, run: runGuideAction } } : {}),
@@ -496,7 +591,7 @@ export function WalkInArrivalPage() {
     ) : null;
 
     if (selectedSlot) {
-        const clinicName = activeClinic?.nom ?? clinicId;
+        const clinicName = selectedSlot.destinationClinic?.nom ?? activeClinic?.nom ?? clinicId;
         return (
             <section className="mx-auto max-w-3xl space-y-5 px-4 py-6">
                 <header>
@@ -523,7 +618,11 @@ export function WalkInArrivalPage() {
                             .replace("{specialist}", `${selectedSlot.specialist.prenom} ${selectedSlot.specialist.nom}`)
                             .replace("{date}", selectedSlot.date)
                             .replace("{time}", selectedSlot.time)}
-                        <span className="block text-slate-600">{receptionLabel(locale, "assignedClinic", source.assignedClinic).replace("{name}", clinicName)}</span>
+                        <span className="block text-slate-600">{selectedSlot.destinationClinic
+                            ? routing.destination.replace("{name}", clinicName)
+                            : receptionLabel(locale, "assignedClinic", source.assignedClinic).replace("{name}", clinicName)}</span>
+                        {selectedSlot.destinationClinic && <span className="block text-slate-600">{routing.distance.replace("{distance}", new Intl.NumberFormat(locale).format(selectedSlot.destinationClinic.distanceKm))}</span>}
+                        {selectedSlot.prioritySpecialty && <span className="block text-slate-600">{routing.professional.replace("{specialty}", displaySpecialty(selectedSlot.prioritySpecialty, locale))}</span>}
                     </p>
 
                     {selectedPatient ? (
@@ -640,7 +739,7 @@ export function WalkInArrivalPage() {
                         </div>
                         <button ref={availabilityButton} type="button" onClick={() => void loadWalkInAvailability()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{walkInAvailability ? receptionLabel(locale, "refreshAvailability", source.refreshAvailability) : receptionLabel(locale, "searchAvailability", source.searchAvailability)}</button>
                         {loading && <p className="text-sm text-slate-600">{t(source.availabilityLoading)}</p>}
-                        {walkInAvailability && <div ref={availabilityRegion} tabIndex={-1} className={targetClass(guideStep.key === "slots")}><AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} /></div>}
+                        {walkInAvailability && <div ref={availabilityRegion} tabIndex={-1} className={targetClass(guideStep.key === "slots")}><AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} onCompareEarlier={() => void loadWalkInAvailability(clinicId, selectedPatient?._id, replacementId, true)} /></div>}
                     </div>
                 ) : (
                     <>
@@ -649,7 +748,7 @@ export function WalkInArrivalPage() {
                         {loading && selectedPatient && <p className="mt-3 text-sm text-slate-600">{t(source.availabilityLoading)}</p>}
                         {selectedPatient && walkInAvailability && (
                             <div ref={availabilityRegion} tabIndex={-1} className={"mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4" + targetClass(guideStep.key === "slots")}>
-                                <AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} introduction={replacementId ? replan.kept : undefined} />
+                                <AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} onCompareEarlier={() => void loadWalkInAvailability(clinicId, selectedPatient?._id, replacementId, true)} patientKind={replacementId ? "replacement" : "existing"} />
                             </div>
                         )}
                     </>

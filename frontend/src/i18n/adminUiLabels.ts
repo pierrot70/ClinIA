@@ -14,6 +14,7 @@ export const adminUiRows: readonly (readonly string[])[] = [
     [u.roles.USER, "User", "Usuario", "사용자", "Người dùng", "Bruker", "ユーザー", "用户", "משתמש"],
     [u.roles.RECEPTION, "Receptionist", "Recepcionista", "접수 담당자", "Nhân viên lễ tân", "Resepsjonist", "受付担当者", "接待员", "פקיד קבלה"],
     [u.roles.MEDECIN, "Physician", "Médico", "의사", "Bác sĩ", "Lege", "医師", "医生", "רופא"],
+    [u.roles.IPS, "Specialized nurse practitioner (IPS)", "Enfermería de práctica especializada (IPS)", "전문 간호사 (IPS)", "Điều dưỡng thực hành chuyên sâu (IPS)", "Spesialisert avansert klinisk sykepleier (IPS)", "専門ナースプラクティショナー（IPS）", "专科执业护士（IPS）", "אח או אחות מומחים (IPS)"],
     [u.roles.ADMIN, "Administrator", "Administrador", "관리자", "Quản trị viên", "Administrator", "管理者", "管理员", "מנהל"],
     [u.roles.SUPERADMIN, "Super administrator", "Superadministrador", "최고 관리자", "Quản trị viên cấp cao", "Superadministrator", "上級管理者", "超级管理员", "מנהל על"],
 

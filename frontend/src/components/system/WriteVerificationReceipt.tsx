@@ -1,3 +1,4 @@
+import { UI_LABELS_FR } from "../../i18n/uiLabels.fr";
 import type { WriteVerificationMeta } from "../../types/api";
 
 type WriteVerificationReceiptProps = {
@@ -12,7 +13,7 @@ type WriteVerificationReceiptProps = {
 export function formatWriteVerificationMessage(
     baseMessage: string,
     verification?: WriteVerificationMeta | null,
-    verificationTitle = "No verification"
+    verificationTitle: string = UI_LABELS_FR.writeVerification.title
 ) {
     if (verification?.status !== "CONFIRMED" || !verification.verificationId) {
         return baseMessage;

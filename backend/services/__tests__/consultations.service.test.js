@@ -5,6 +5,7 @@ import { Specialist } from "../../models/Specialist.js";
 import { Appointment } from "../../models/Appointment.js";
 import { Patient } from "../../models/Patient.js";
 import { PatientConsultationNote } from "../../models/PatientConsultationNote.js";
+import { PatientSharedConsultationNote } from "../../models/PatientSharedConsultationNote.js";
 import { PatientAuditLog } from "../../models/PatientAuditLog.js";
 import { listConsultations, readConsultation, addConsultationNote, acceptPatientCare } from "../consultations.js";
 
@@ -19,6 +20,7 @@ const query = data => ({ session: vi.fn().mockReturnThis(), sort: vi.fn().mockRe
 let patient;
 let appointment;
 beforeEach(() => {
+    vi.spyOn(PatientSharedConsultationNote, "find").mockImplementation(() => query([]));
     patient = { _id: patientId, nom: "Synthetic", prenom: "Patient", ownerUserId: null, secure_request_profile: { clinicalNotes: "Previous history" } };
     appointment = { _id: appointmentId, patient: patientId, status: "scheduled" };
     vi.spyOn(AdminUser, "findOne").mockImplementation(() => query({ _id: doctor }));

@@ -20,8 +20,24 @@ export interface WalkInAppointmentOption {
     slotTypes?: Record<string, "regular" | "walk_in">;
 }
 
+export interface WalkInDestinationClinic extends ReceptionClinic {
+    distanceKm: number;
+}
+
 export interface WalkInAvailability {
-    presentation?: "urgent_today" | "alternatives";
+    presentation?: "urgent_today" | "alternatives" | "priority";
+    selectedClinic?: WalkInDestinationClinic;
+    prioritySpecialty?: "Urgentologue" | "IPS" | "Medecin de famille";
+    search?: {
+        radiusKm: 100;
+        toleranceKm?: 10;
+        maxDistanceKm?: 110;
+        status: "found" | "exhausted" | "location_missing";
+        distanceMode: "straight_line";
+        examinedClinics: number;
+        hasUnlocatedClinics?: boolean;
+    };
+    earlierAlternatives?: (WalkInAppointmentOption & { clinic: WalkInDestinationClinic; prioritySpecialty: "Urgentologue" | "IPS" | "Medecin de famille" })[];
     urgentologists?: { limit: number; day: string; allAtCapacity: boolean };
     today: WalkInAppointmentOption[];
     future: WalkInAppointmentOption[];
@@ -38,6 +54,8 @@ export interface ReceptionPatient {
 
 export interface CreateWalkInBookingPayload {
     clinic: string;
+    originClinic?: string;
+    selectionMode?: "priority" | "earlier";
     specialist: string;
     date: string;
     time: string;
@@ -84,15 +102,19 @@ export async function fetchReceptionClinics(): Promise<ApiResponse<ReceptionClin
 export async function fetchWalkInAvailability(
     clinicId: string,
     patientId?: string,
-    replaceAppointmentId?: string
+    replaceAppointmentId?: string,
+    bookingProof?: string,
+    compareEarlier = false
 ): Promise<ApiResponse<WalkInAvailability>> {
     return withSecurityIncidentGuard((async () => {
         try {
             const query = new URLSearchParams({ clinic: clinicId });
+            if (compareEarlier) query.set("compareEarlier", "true");
             if (patientId) query.set("patient", patientId);
             if (replaceAppointmentId) query.set("replaceAppointmentId", replaceAppointmentId);
             const response = await authFetch(
-                `/api/reception/walk-in-options?${query.toString()}`
+                `/api/reception/walk-in-options?${query.toString()}`,
+                patientId && bookingProof ? { headers: { "X-Reception-Booking-Proof": bookingProof } } : undefined
             );
             return (await response.json()) as ApiResponse<WalkInAvailability>;
         } catch {

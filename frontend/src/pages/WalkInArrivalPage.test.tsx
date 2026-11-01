@@ -166,7 +166,7 @@ describe("reception rescheduling", () => {
         expect(screen.queryByRole("button", { name: "View available appointments" })).not.toBeInTheDocument();
         expect(api.slots).not.toHaveBeenCalled(); expect(api.book).not.toHaveBeenCalled();
         await choose();
-        expect(api.slots).toHaveBeenCalledWith("clinic", "patient", "original");
+        expect(api.slots).toHaveBeenCalledWith("clinic", "patient", "original", "lookup-proof");
         expect(screen.getByText(receptionReplanLabels("en").kept)).toBeInTheDocument();
         expect(api.book).not.toHaveBeenCalled();
         fireEvent.click(screen.getByRole("button", { name: "Confirm appointment replacement" }));

@@ -18,7 +18,7 @@ function assertWriteAuditAccess(authUser) {
 }
 
 function assertReceiptAccess(authUser) {
-    if (!authUser?.userId || !authUser?.role || !["USER", "RECEPTION", "MEDECIN", "ADMIN", "SUPERADMIN"].includes(authUser.role)) {
+    if (!authUser?.userId || !authUser?.role || !["USER", "RECEPTION", "MEDECIN", "IPS", "ADMIN", "SUPERADMIN"].includes(authUser.role)) {
         throw createWriteAuditError("FORBIDDEN", "Authentification requise.");
     }
 }

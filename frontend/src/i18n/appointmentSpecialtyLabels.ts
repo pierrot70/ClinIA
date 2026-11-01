@@ -8,6 +8,7 @@ const source = UI_LABELS_FR.appointmentSpecialties;
 const translations: Record<Specialty, readonly string[]> = {
     "Medecin de famille": [source["Medecin de famille"], "Family Physician", "Médico de familia", "가정의학과 의사", "Bác sĩ gia đình", "Allmennlege", "家庭医", "家庭医生", "רופא משפחה"],
     "Urgentologue": [source["Urgentologue"], "Emergency Physician", "Médico de urgencias", "응급의학과 의사", "Bác sĩ cấp cứu", "Akuttlege", "救急医", "急诊医生", "רופא לרפואה דחופה"],
+    "IPS": [source["IPS"], "Specialized nurse practitioner (IPS)", "Enfermería de práctica especializada (IPS)", "전문 간호사 (IPS)", "Điều dưỡng thực hành chuyên sâu (IPS)", "Spesialisert avansert klinisk sykepleier (IPS)", "専門ナースプラクティショナー（IPS）", "专科执业护士（IPS）", "אח או אחות מומחים (IPS)"],
     "Ophtalmologue": [source["Ophtalmologue"], "Ophthalmologist", "Oftalmólogo", "안과 의사", "Bác sĩ nhãn khoa", "Øyelege", "眼科医", "眼科医生", "רופא עיניים"],
     "Cardiologue": [source["Cardiologue"], "Cardiologist", "Cardiólogo", "심장내과 의사", "Bác sĩ tim mạch", "Kardiolog", "循環器内科医", "心脏科医生", "קרדיולוג"],
     "Pneumologue": [source["Pneumologue"], "Pulmonologist", "Neumólogo", "호흡기내과 의사", "Bác sĩ hô hấp", "Lungelege", "呼吸器内科医", "呼吸科医生", "רופא ריאות"],

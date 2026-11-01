@@ -24,6 +24,15 @@ describe("validation report contract", () => {
         expect((await readImageRevision(file)).commit).toBeNull();
         expect(() => buildRevision("44507d0")).toThrow();
     });
+    it("requires all four additional routing/comparison cases and never reuses a legacy nine-case point-zero success", () => {
+        expect(EXPECTED).toEqual([13, 1, 2, 1, 4, 8, 3]);
+        const current = fixture();
+        expect(current.cases).toHaveLength(32);
+        const legacy = { ...current, cases: current.cases.filter(c => c.point !== 0 || c.index <= 9) };
+        expect(summary(legacy, legacy.commit)).toMatchObject({ passed: false, correspondence: "match" });
+        expect(summary(current, current.commit)).toMatchObject({ passed: true, correspondence: "match" });
+        expect(summary({ ...current, dirty: true }, current.commit).correspondence).toBe("dirty");
+    });
     it("separates successful tests from correspondence, dirty worktrees and unknown versions", () => {
         const r = fixture();
         expect(summary(r, r.commit)).toMatchObject({ passed: true, correspondence: "match" });
@@ -59,7 +68,7 @@ describe("validation report contract", () => {
         const bundle = JSON.parse(evidenceBundle(r));
         for (const entry of Object.values(bundle.files)) expect(sha256(Buffer.from(entry.content, "base64"))).toBe(entry.sha256);
         expect(Buffer.from(bundle.files["report.json"].content, "base64")).toEqual(reportBytes(r));
-        expect(Buffer.from(bundle.files["results.junit.xml"].content, "base64").toString()).toContain('tests="28"');
+        expect(Buffer.from(bundle.files["results.junit.xml"].content, "base64").toString()).toContain('tests="32"');
     });
     it("reads only schema-valid regular archives, excluding symlinks and mismatched identifiers", async () => {
         dir = await mkdtemp(path.join(tmpdir(), "clinia-report-test-")); vi.stubEnv("CLINIA_VALIDATION_REPORT_DIR", dir);

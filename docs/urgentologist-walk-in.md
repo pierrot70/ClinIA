@@ -41,18 +41,16 @@ Spécialité enregistrée : `Urgentologue`. Le libellé médical affiché reste
   d'urgentologue écrivent le même document Specialist avant le décompte dans
   une transaction MongoDB, afin de provoquer un conflit et une reprise si deux
   écritures se disputent la dernière place. Aucun compteur à initialiser.
-- Dès qu'un urgentologue a un créneau admissible aujourd'hui, la recherche
-  RECEPTION renvoie uniquement les urgentologues d'aujourd'hui
-  (`presentation: urgent_today`). Les médecins de famille et la section des
-  rendez-vous futurs ne sont pas affichés à cette étape.
-- S'il n'y a aucun créneau d'urgentologue aujourd'hui (quota atteint, horaires
-  absents/épuisés, ou aucun urgentologue admissible), la recherche renvoie
-  `presentation: alternatives`. RECEPTION choisit « Revenir demain » ou « Voir
-  les créneaux des médecins de famille ». Les créneaux admissibles des médecins
-  de famille d'aujourd'hui et des jours suivants ne sont affichés qu'après ce
-  second choix. Un message distinct évite de confondre quota atteint et absence
-  de disponibilité. Les dates restent visibles. Le retour demain ne réserve rien,
-  ne garantit aucune disponibilité et ne constitue pas un triage médical.
+- La recherche RECEPTION examine aujourd’hui et les dates futures configurées.
+  Dans la clinique actuelle, l’ordre de priorité est Urgentologue, IPS, puis
+  Médecin de famille. Si aucune disponibilité admissible n’existe, elle examine
+  les autres cliniques de la plus proche à la plus éloignée, dans un rayon de
+  100 km avec une tolérance de 10 km (110 km maximum). Les règles détaillées et la comparaison de rendez-vous plus
+  proches dans le temps sont décrites dans [le parcours IPS/WalkIn](walkin-ips-nearby-care-sharing.md).
+- La réception peut demander explicitement des propositions plus rapides dans
+  les autres cliniques. La proposition initiale reste visible et aucun choix
+  n’est confirmé automatiquement. À épuisement de la recherche, une fenêtre
+  indique de recourir au GAP ; aucune intégration ni réservation GAP n’est faite.
 - La prise en charge permanente reste une action distincte et explicite.
 
 ## Vérification locale / staging avec données fictives uniquement
@@ -67,8 +65,8 @@ Spécialité enregistrée : `Urgentologue`. Le libellé médical affiché reste
    créer une 21e consultation active. Un échec conserve la réservation initiale.
 5. Vérifier qu'une nouvelle visite du même patient, après sa consultation
    terminée et dans un autre créneau libre, compte comme une nouvelle consultation.
-6. Saturer les urgentologues de la clinique et vérifier les deux choix de
-   RECEPTION, puis changer de langue pour vérifier les nouveaux libellés.
+6. Saturer les urgentologues et vérifier le passage aux IPS puis aux médecins
+   de famille, la comparaison intercliniques et les libellés dans les neuf langues.
 7. Preuve de concurrence automatisée sur un vrai replica set MongoDB : avec 19
    consultations, envoyer deux réservations parallèles pour deux patients
    fictifs et deux créneaux différents. Une seule doit réussir ; vérifier le
@@ -99,8 +97,8 @@ refuse la réservation suivante. Le médecin de famille a un créneau walk-in
 le lendemain : un nouveau patient reste soumis à cette règle d'admissibilité.
 
 Les 40 arrivées sont réservées via le vrai routeur HTTP RECEPTION et ses
-transactions. La 41e reçoit le signal `allAtCapacity` et l'option du médecin
-le lendemain. Une tentative directe chez chaque urgentologue doit renvoyer
+transactions. La 41e reçoit le signal `allAtCapacity` et la proposition du médecin
+le lendemain, selon la nouvelle présentation `priority`. Une tentative directe chez chaque urgentologue doit renvoyer
 HTTP 409 ; aucun dossier, rendez-vous, audit ou verrou de réservation ne doit
 subsister de ces transactions refusées. L'acceptation du créneau de demain est
 ensuite vérifiée. Après libération d'une place, deux demandes parallèles pour
@@ -117,9 +115,9 @@ vérifie le plafond de 20 en comptant également les consultations terminées.
 
 Seules l'horloge (date fictive fixe) et l'identité HTTP authentifiée sont
 contrôlées par le test ; il ne teste pas le formulaire de connexion/JWT.
-L'affichage des deux boutons, le changement de langue et l'absence de réservation
-en choisissant « revenir demain » sont couverts séparément par
-`WalkInArrivalPage.test.tsx` dans les neuf langues, sans navigateur réel.
+L’affichage des propositions, la comparaison explicite, le changement de langue
+et l’absence de réservation automatique sont couverts séparément par les suites
+`WalkInArrivalPage*.test.tsx`, sans navigateur réel.
 
 Une transaction globale annulée ne conviendrait pas : les réservations doivent
 voir les fixtures validées et utiliser leurs propres sessions concurrentes.

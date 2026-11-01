@@ -1,3 +1,4 @@
+import { clinicalCareAccessLabels } from "../i18n/clinicalCareAccessLabels";
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import VoiceNavButton from "./VoiceNavButton";
@@ -12,7 +13,7 @@ import { ValidationReportsMenu } from "./admin/ValidationReportsMenu";
 import { consultationLabels } from "../i18n/consultationLabels";
 import { useAuth } from "../hooks/useAuth";
 import { useSensitiveReauthDialog } from "../hooks/useSensitiveReauthDialog";
-import { isAdminRole } from "../auth/roles";
+import { isAdminRole, isClinicianRole } from "../auth/roles";
 import { SessionExpiredError } from "../services/authService";
 import { useTranslation } from "../hooks/useTranslation";
 import { labels } from "../i18n/uiLabels";
@@ -320,7 +321,7 @@ const Header: React.FC = () => {
         ? headerLabels.nav.walkInArrival : headerLabels.nav.clinicalAnalysis;
     const showAdminHeaderNav = canAccessAdmin;
     const showSuperAdminHeaderNav = user?.role === "SUPERADMIN";
-    const isPhysicianMobileNav = isAuthenticated && user?.role === "MEDECIN";
+    const isClinicianMobileNav = isAuthenticated && isClinicianRole(user?.role);
     const hasMobileBottomNav = isAuthenticated;
     const hostname = window.location.hostname;
     const isLocalRuntime =
@@ -1444,11 +1445,12 @@ const Header: React.FC = () => {
                                 <HeaderLabel text={headerLabels.nav.myWriteReceipts} />
                             </Link>
 
-                            {user?.role === "MEDECIN" && (
+                            {isClinicianRole(user?.role) && (
                                 <Link to="/consultations" className={linkClass("/consultations")}>
                                     {consultationLabels(locale).title}
                                 </Link>
                             )}
+                            {isClinicianRole(user?.role) && <Link to="/clinical-care-access" className={linkClass("/clinical-care-access")}>{clinicalCareAccessLabels(locale).title}</Link>}
                             {user?.role === "MEDECIN" && (
                                 <Link to="/clinical-support-access/inbox" className={linkClass("/clinical-support-access/inbox")}>
                                     <HeaderLabel text={headerLabels.nav.supportAccessInbox} />
@@ -1509,7 +1511,7 @@ const Header: React.FC = () => {
                                         },
                                         ]),
                                     ].map((item) => (
-                                        user?.role === "MEDECIN" &&
+                                        isClinicianRole(user?.role) &&
                                         ["/cliniques", "/specialists"].includes(item.path) ? (
                                             <span
                                                 key={item.path}
@@ -1849,7 +1851,7 @@ const Header: React.FC = () => {
                         </div>
 
                         <div className="space-y-1 border-t border-gray-100 pt-2">
-                            {isPhysicianMobileNav && (
+                            {isClinicianMobileNav && (
                                 <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     <HeaderLabel text={headerLabels.nav.collaboration} />
                                 </div>
@@ -1858,13 +1860,14 @@ const Header: React.FC = () => {
                             <Link to={primaryWorkflowPath} onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={primaryWorkflowLabel} /></Link>
                             <Link to="/comments" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.comments} /></Link>
                             <Link to="/my-write-receipts" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.myWriteReceipts} /></Link>
-                            {user?.role === "MEDECIN" && <Link to="/consultations" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">{consultationLabels(locale).title}</Link>}
+                            {isClinicianRole(user?.role) && <Link to="/consultations" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">{consultationLabels(locale).title}</Link>}
+                            {isClinicianRole(user?.role) && <Link to="/clinical-care-access" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">{clinicalCareAccessLabels(locale).title}</Link>}
                             {user?.role === "MEDECIN" && <Link to="/clinical-support-access/inbox" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.supportAccessInbox} /></Link>}
                             {user?.role === "SUPERADMIN" && <Link to="/clinical-support-access/patients" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.delegatedPatients} /></Link>}
                             {user?.role === "SUPERADMIN" && <Link to="/clinical-support-access/request" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.requestSupportAccess} /></Link>}
                             {user?.role === "SUPERADMIN" && <Link to="/admin/clinical-terms" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.clinicalTermCatalog} /></Link>}
                             {user?.role === "SUPERADMIN" && <ValidationReportsMenu mobile onNavigate={() => setIsMobileMenuOpen(false)} />}
-                            {isPhysicianMobileNav && (
+                            {isClinicianMobileNav && (
                                 <div className="mt-3 border-t border-gray-100 px-2 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     <HeaderLabel text={headerLabels.nav.clinicManagement} />
                                 </div>
@@ -1872,12 +1875,12 @@ const Header: React.FC = () => {
                             {user?.role === "RECEPTION" ? <Link to="/walk-in-arrival" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.walkInArrival} /></Link> : <>
                             <Link to="/appointments" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.appointments} /></Link>
                             <Link to="/patients" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.patients} /></Link>
-                            {user?.role === "MEDECIN" ? (
+                            {isClinicianRole(user?.role) ? (
                                 <span aria-disabled="true" className="block cursor-not-allowed rounded px-2 py-2 text-sm text-gray-400"><HeaderLabel text={headerLabels.nav.cliniques} /></span>
                             ) : (
                                 <Link to="/cliniques" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.cliniques} /></Link>
                             )}
-                            {user?.role === "MEDECIN" ? (
+                            {isClinicianRole(user?.role) ? (
                                 <span aria-disabled="true" className="block cursor-not-allowed rounded px-2 py-2 text-sm text-gray-400"><HeaderLabel text={headerLabels.nav.specialists} /></span>
                             ) : (
                                 <Link to="/specialists" onClick={() => setIsMobileMenuOpen(false)} className="block rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50"><HeaderLabel text={headerLabels.nav.specialists} /></Link>
@@ -1895,7 +1898,7 @@ const Header: React.FC = () => {
                                     <HeaderLabel text={headerLabels.nav.openaiLogs} />
                                 </button>
                             )}
-                            {isPhysicianMobileNav && (
+                            {isClinicianMobileNav && (
                                 <div className="mt-3 border-t border-gray-100 px-2 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     <HeaderLabel text={headerLabels.nav.tools} />
                                 </div>
@@ -1987,7 +1990,7 @@ const Header: React.FC = () => {
                         <span className="text-base" aria-hidden="true">✦</span>
                         <HeaderLabel text={primaryWorkflowLabel} />
                     </Link>
-                    {isPhysicianMobileNav ? (
+                    {isClinicianMobileNav ? (
                         <Link to="/patients" onClick={() => setIsMobileMenuOpen(false)} className={`flex min-h-14 flex-col items-center justify-center rounded-lg text-xs ${location.pathname === "/patients" ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-600"}`}>
                             <span className="text-base" aria-hidden="true">◉</span>
                             <HeaderLabel text={headerLabels.nav.patients} />

@@ -56,6 +56,7 @@ export interface SpecialistPayload {
 
 export interface ClinicianAccount {
     id: string;
+    role?: "MEDECIN" | "IPS";
     username: string;
     email: string | null;
 }

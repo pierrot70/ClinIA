@@ -40,6 +40,7 @@ describe("registration role display names", () => {
             expect(screen.getByRole("option", { name })).toHaveValue(["MEDECIN", "USER", "ADMIN", "SUPERADMIN"][index]);
         }
         expect(screen.getAllByRole("option")).toHaveLength(4);
+        expect(screen.getAllByRole("option").some(option=>option.getAttribute("value")==="IPS")).toBe(false);
         expect(auth.registerSelf).not.toHaveBeenCalled();
     });
 

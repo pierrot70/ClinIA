@@ -14,7 +14,7 @@ describe("reception booking response", () => {
         const handler = router.stack.find(layer => layer.route?.path === "/walk-in-bookings").route.stack.at(-1).handle;
         services.createWalkInAppointmentForExistingPatient.mockRejectedValue({ code: "RECEPTION_REPLAN_REQUIRED", message: "Refresh selection." });
         const req = { body: { patientId: "patient", replaceAppointmentId: "old", specialist: "doctor", clinic: "clinic", date: "2030-01-01", time: "08:15" }, auth: { userId: "reception" }, headers: {} };
-        const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+        const res = { set: vi.fn().mockReturnThis(), status: vi.fn().mockReturnThis(), json: vi.fn() };
         await handler(req, res);
         expect(services.createWalkInAppointmentForExistingPatient).toHaveBeenCalledWith(expect.objectContaining({ patientId: "patient", replaceAppointmentId: "old" }));
         expect(res.status).toHaveBeenCalledWith(409);
@@ -23,7 +23,7 @@ describe("reception booking response", () => {
         const handler = router.stack.find(layer => layer.route?.path === "/walk-in-bookings").route.stack.at(-1).handle;
         services.createWalkInAppointmentForExistingPatient.mockRejectedValue({ code: "RECEIVING_PHYSICIAN_UNAVAILABLE", message: "Choose another active physician." });
         const req = { body: { patientId: "patient-test", specialist: "specialist-test", clinic: "clinic-test", date: "2030-01-01", time: "09:00" }, auth: { userId: "reception-test" }, headers: {}, originalUrl: "/api/reception/walk-in-bookings" };
-        const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+        const res = { set: vi.fn().mockReturnThis(), status: vi.fn().mockReturnThis(), json: vi.fn() };
         await handler(req, res);
         expect(res.status).toHaveBeenCalledWith(409);
         expect(res.json).toHaveBeenCalledWith({ error: { code: "RECEIVING_PHYSICIAN_UNAVAILABLE", message: "Choose another active physician.", retryable: false } });
@@ -44,7 +44,7 @@ describe("genuine WalkIn write verification response", () => {
         requestContext: { requestId: "request-test", instanceId: "instance-test" },
         originalUrl: "/api/reception/walk-in-bookings",
     });
-    const response = () => ({ status: vi.fn().mockReturnThis(), json: vi.fn() });
+    const response = () => ({ set: vi.fn().mockReturnThis(), status: vi.fn().mockReturnThis(), json: vi.fn() });
     beforeEach(() => {
         vi.clearAllMocks();
         replica.getStatus.mockResolvedValue(snapshot);
@@ -95,7 +95,7 @@ describe("reception scheduling day is selected by the server", () => {
         services.findReceptionPatientByRamq.mockResolvedValueOnce(result);
         const handler = router.stack.find(layer => layer.route?.path === "/patient-lookup").route.stack.at(-1).handle;
         const req = { query: { clinic: "clinic-test", ramq: "TEST0001", now: "2099-01-01", today: "2099-01-01" }, auth: { userId: "reception-test", role: "RECEPTION" }, headers: {}, originalUrl: "/api/reception/patient-lookup?ramq=TEST0001" };
-        const res = { status: vi.fn().mockReturnThis(), json: vi.fn(), set: vi.fn().mockReturnThis() };
+        const res = { set: vi.fn().mockReturnThis(), status: vi.fn().mockReturnThis(), json: vi.fn() };
         await handler(req, res);
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.set).toHaveBeenCalledWith("Cache-Control", "no-store");
@@ -108,9 +108,9 @@ describe("reception scheduling day is selected by the server", () => {
         services.listWalkInFamilyMedicineOptions.mockResolvedValueOnce({ today: [], future: [] });
         const handler = router.stack.find(layer => layer.route?.path === "/walk-in-options").route.stack.at(-1).handle;
         const auth = { userId: "reception-test", role: "RECEPTION" };
-        const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+        const res = { set: vi.fn().mockReturnThis(), status: vi.fn().mockReturnThis(), json: vi.fn() };
         await handler({ query: { clinic: "clinic-test", patient: "patient-test", replaceAppointmentId: "old-test", now: "2099-01-01" }, auth }, res);
-        expect(services.listWalkInFamilyMedicineOptions).toHaveBeenCalledExactlyOnceWith({ clinicId: "clinic-test", patientId: "patient-test", replaceAppointmentId: "old-test", authUser: auth });
+        expect(services.listWalkInFamilyMedicineOptions).toHaveBeenCalledExactlyOnceWith({ clinicId: "clinic-test", patientId: "patient-test", replaceAppointmentId: "old-test", compareEarlier: false, authUser: auth });
     });
 });
 
@@ -121,7 +121,7 @@ describe("proof-scoped administrative attendance API", () => {
     const auth = { userId: "reception-test", role: "RECEPTION", sessionId: "session-test" };
     const request = outcome => ({ body: { clinic: "clinic-test", patientId: "patient-test", bookingProof: "proof-test", outcome },
         params: { id: "appointment-test" }, auth, ip: "127.0.0.1", headers: {}, requestContext: { requestId: "request-test", instanceId: "instance-test" } });
-    const response = () => ({ status: vi.fn().mockReturnThis(), json: vi.fn(), set: vi.fn().mockReturnThis() });
+    const response = () => ({ set: vi.fn().mockReturnThis(), status: vi.fn().mockReturnThis(), json: vi.fn() });
     beforeEach(() => { vi.clearAllMocks(); replica.getStatus.mockResolvedValue({ summary: { status: "INCIDENT" } }); });
 
     it("uses a body-only proof and ignores forged clocks or actor IDs for the minimal historical list", async () => {
@@ -167,4 +167,62 @@ describe("proof-scoped administrative attendance API", () => {
         expect(res.json.mock.calls[0][0]).not.toHaveProperty("meta");
         if (status === 500) expect(res.json.mock.calls[0][0].error.code).toBe("PERSISTENCE_FAILED");
     });
+});
+
+
+describe("WalkIn routing proof and origin boundary", () => {
+    beforeEach(() => { vi.clearAllMocks(); replica.getStatus.mockResolvedValue({ summary: { status: "OK" } }); });
+    const response = () => ({ set: vi.fn().mockReturnThis(), status: vi.fn().mockReturnThis(), json: vi.fn() });
+    const options = router.stack.find(layer => layer.route?.path === "/walk-in-options").route.stack.at(-1).handle;
+    const booking = router.stack.find(layer => layer.route?.path === "/walk-in-bookings").route.stack.at(-1).handle;
+    it("accepts the booking proof only through its dedicated header, not through URL input", async () => {
+        services.listWalkInFamilyMedicineOptions.mockResolvedValueOnce({ search: { status: "found" } });
+        const req = { query: { clinic: "origin", patient: "synthetic-patient", bookingProof: "forged-url-proof", now: "2099-01-01", radiusKm: "99999" },
+            auth: { userId: "reception", role: "RECEPTION" }, headers: { "x-reception-booking-proof": "actual-origin-proof" } };
+        const res = response(); await options(req, res);
+        expect(services.listWalkInFamilyMedicineOptions).toHaveBeenCalledExactlyOnceWith({ clinicId: "origin", patientId: "synthetic-patient", replaceAppointmentId: undefined,
+            bookingProof: "actual-origin-proof", compareEarlier: false, authUser: req.auth });
+        expect(res.set).toHaveBeenCalledWith("Cache-Control", "no-store");
+        expect(res.status).toHaveBeenCalledWith(200);
+    });
+    it("returns 403 without availability when an origin lookup proof is invalid", async () => {
+        services.listWalkInFamilyMedicineOptions.mockRejectedValueOnce({ code: "RECEPTION_LOOKUP_REQUIRED", message: "Repeat exact lookup" });
+        const res = response(); await options({ query: { clinic: "origin", patient: "synthetic-patient" }, headers: {}, auth: { userId: "reception" } }, res);
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(res.json.mock.calls[0][0]).not.toHaveProperty("data");
+    });
+    it("forwards separate origin and destination while ignoring forged receiving ownership context", async () => {
+        services.createWalkInAppointmentForExistingPatient.mockResolvedValueOnce({ appointment: { _id: "synthetic-appointment" }, writeAuditRecorded: true });
+        const req = { body: { clinic: "destination", originClinic: "assigned-origin", specialist: "ips-specialist", patientId: "synthetic-patient", bookingProof: "origin-proof",
+            receivingPhysicianUserId: "forged-owner", receptionOriginClinicId: "forged-origin", date: "2030-01-01", time: "09:00" }, headers: {}, auth: { userId: "reception", role: "RECEPTION" } };
+        const res = response(); await booking(req, res);
+        const args = services.createWalkInAppointmentForExistingPatient.mock.calls[0][0];
+        expect(args).toMatchObject({ clinicId: "destination", originClinicId: "assigned-origin", specialistId: "ips-specialist", patientId: "synthetic-patient", bookingProof: "origin-proof", authUser: req.auth });
+        expect(args).not.toHaveProperty("receivingPhysicianUserId");
+        expect(args).not.toHaveProperty("receptionOriginClinicId");
+        expect(res.status).toHaveBeenCalledWith(201);
+    });
+    it.each([["true", true], ["false", false], ["TRUE", false], [undefined, false]])("compares earlier offers only for explicit query %s", async (value, expected) => {
+        services.listWalkInFamilyMedicineOptions.mockResolvedValueOnce({ today: [], future: [] });
+        await options({ query: { clinic: "origin", compareEarlier: value }, auth: { role: "RECEPTION" } }, response());
+        expect(services.listWalkInFamilyMedicineOptions).toHaveBeenCalledWith(expect.objectContaining({ compareEarlier: expected }));
+    });
+    it("forwards explicit patient choice mode and defaults legacy requests to priority", async () => {
+        services.createWalkInAppointmentForExistingPatient.mockResolvedValue({ appointment: {}, writeAuditRecorded: true });
+        const req = { body: { patientId: "patient", clinic: "target", originClinic: "origin", specialist: "ips", date: "2030-01-02", time: "09:00", selectionMode: "earlier" }, auth: { role: "RECEPTION" }, headers: {} };
+        await booking(req, response());
+        expect(services.createWalkInAppointmentForExistingPatient).toHaveBeenCalledWith(expect.objectContaining({ selectionMode: "earlier" }));
+        delete req.body.selectionMode;
+        await booking(req, response());
+        expect(services.createWalkInAppointmentForExistingPatient.mock.calls[1][0].selectionMode).toBe("priority");
+    });
+    it("rejects an unsupported selection mode before a service call or receipt", async () => {
+        const res = response();
+        await booking({ body: { selectionMode: "bypass" }, auth: { role: "RECEPTION" }, headers: {} }, res);
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(services.createWalkInPatientAndAppointment).not.toHaveBeenCalled();
+        expect(services.createWalkInAppointmentForExistingPatient).not.toHaveBeenCalled();
+        expect(replica.getStatus).not.toHaveBeenCalled();
+    });
+
 });

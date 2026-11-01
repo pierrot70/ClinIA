@@ -5,6 +5,7 @@ type Labels = { [K in keyof typeof UI_LABELS_FR.consultations]: string };
 export const CONSULTATION_LABELS: Record<string, Labels> = {
     "fr-CA": UI_LABELS_FR.consultations,
     "en-CA": {
+        sharedNotesTruncated: "Only the 500 most recent collaboration notes are displayed. The history may be incomplete.",
         title: "Consultations", description: "Open an appointment to review the history. An appointment does not establish ongoing care.",
         refresh: "Refresh", open: "Open", empty: "No consultations available (100 most recent appointments).", history: "Note history", legacy: "Previous record note",
         ownOnly: "Completed consultation: only your notes for this appointment are available without ongoing care.",
@@ -13,6 +14,7 @@ export const CONSULTATION_LABELS: Record<string, Labels> = {
         accepted: "This patient is under your ongoing care.", saved: "Saved.", error: "Action unavailable. Refresh the page and check your access permissions.", loading: "Loading…", author: "Author",
     },
     es: {
+        sharedNotesTruncated: "Solo se muestran las 500 notas de colaboración más recientes. El historial puede estar incompleto.",
         title: "Consultas", description: "Abra una cita para consultar el historial. Una cita no establece una atención permanente.",
         refresh: "Actualizar", open: "Abrir", empty: "No hay consultas disponibles (las 100 citas más recientes).", history: "Historial de notas", legacy: "Nota anterior del expediente",
         ownOnly: "Consulta finalizada: sin atención permanente, solo puede acceder a sus notas de esta cita.",
@@ -21,6 +23,7 @@ export const CONSULTATION_LABELS: Record<string, Labels> = {
         accepted: "Este paciente está bajo su atención permanente.", saved: "Guardado.", error: "Acción no disponible. Actualice la página y compruebe sus permisos.", loading: "Cargando…", author: "Autor",
     },
     "ko-KR": {
+        sharedNotesTruncated: "최근 협업 메모 500개만 표시됩니다. 기록이 완전하지 않을 수 있습니다.",
         title: "진료", description: "예약을 열어 기록을 확인하세요. 예약만으로 지속적인 담당 관계가 설정되지는 않습니다.",
         refresh: "새로 고침", open: "열기", empty: "이용 가능한 진료가 없습니다 (최근 예약 100건).", history: "진료 기록", legacy: "기존 환자 기록",
         ownOnly: "진료가 완료되었습니다. 지속적인 담당 관계가 없으면 이 예약에서 본인이 작성한 기록만 볼 수 있습니다.",
@@ -29,6 +32,7 @@ export const CONSULTATION_LABELS: Record<string, Labels> = {
         accepted: "지속적으로 담당하는 환자입니다.", saved: "저장되었습니다.", error: "작업을 수행할 수 없습니다. 페이지를 새로 고치고 접근 권한을 확인하세요.", loading: "불러오는 중…", author: "작성자",
     },
     vi: {
+        sharedNotesTruncated: "Chỉ hiển thị 500 ghi chú hợp tác mới nhất. Lịch sử có thể chưa đầy đủ.",
         title: "Lượt khám", description: "Mở lịch hẹn để xem lịch sử. Lịch hẹn không có nghĩa là nhận chăm sóc lâu dài.",
         refresh: "Làm mới", open: "Mở", empty: "Không có lượt khám (100 lịch hẹn gần nhất).", history: "Lịch sử ghi chú", legacy: "Ghi chú trước đó trong hồ sơ",
         ownOnly: "Lượt khám đã hoàn tất: nếu chưa nhận chăm sóc lâu dài, bạn chỉ có thể xem ghi chú của mình cho lịch hẹn này.",
@@ -37,6 +41,7 @@ export const CONSULTATION_LABELS: Record<string, Labels> = {
         accepted: "Bệnh nhân này được bạn chăm sóc lâu dài.", saved: "Đã lưu.", error: "Không thể thực hiện. Hãy làm mới trang và kiểm tra quyền truy cập.", loading: "Đang tải…", author: "Tác giả",
     },
     "no-NO": {
+        sharedNotesTruncated: "Bare de 500 nyeste samarbeidsnotatene vises. Historikken kan være ufullstendig.",
         title: "Konsultasjoner", description: "Åpne en time for å se historikken. En time innebærer ikke et fast behandlingsansvar.",
         refresh: "Oppdater", open: "Åpne", empty: "Ingen konsultasjoner tilgjengelig (de 100 siste timene).", history: "Notathistorikk", legacy: "Tidligere journalnotat",
         ownOnly: "Avsluttet konsultasjon: uten fast behandlingsansvar kan du bare lese dine egne notater fra denne timen.",
@@ -45,6 +50,7 @@ export const CONSULTATION_LABELS: Record<string, Labels> = {
         accepted: "Du har fast behandlingsansvar for denne pasienten.", saved: "Lagret.", error: "Handlingen er ikke tilgjengelig. Oppdater siden og kontroller tilgangsrettighetene.", loading: "Laster…", author: "Forfatter",
     },
     ja: {
+        sharedNotesTruncated: "最新の連携メモ500件のみ表示しています。履歴は不完全な場合があります。",
         title: "診察", description: "予約を開いて履歴を確認できます。予約だけでは継続的な担当関係は成立しません。",
         refresh: "更新", open: "開く", empty: "利用可能な診察はありません（直近100件の予約）。", history: "記録の履歴", legacy: "既存の診療記録",
         ownOnly: "診察は終了しています。継続的な担当関係がない場合、この予約で自分が作成した記録のみ閲覧できます。",
@@ -53,6 +59,7 @@ export const CONSULTATION_LABELS: Record<string, Labels> = {
         accepted: "この患者は継続的に担当する患者です。", saved: "保存しました。", error: "操作できません。ページを更新してアクセス権限を確認してください。", loading: "読み込み中…", author: "作成者",
     },
     zh: {
+        sharedNotesTruncated: "仅显示最近的500条协作记录。历史记录可能不完整。",
         title: "诊疗", description: "打开预约以查看历史记录。预约并不代表建立长期诊疗关系。",
         refresh: "刷新", open: "打开", empty: "暂无可用诊疗（最近100次预约）。", history: "记录历史", legacy: "原有病历记录",
         ownOnly: "诊疗已结束：若未建立长期诊疗关系，您只能查看本次预约中自己撰写的记录。",
@@ -61,6 +68,7 @@ export const CONSULTATION_LABELS: Record<string, Labels> = {
         accepted: "此患者由您长期负责诊疗。", saved: "已保存。", error: "无法执行操作。请刷新页面并检查访问权限。", loading: "正在加载…", author: "作者",
     },
     he: {
+        sharedNotesTruncated: "מוצגות רק 500 הערות שיתוף הפעולה האחרונות. ייתכן שההיסטוריה אינה מלאה.",
         title: "מפגשים", description: "פתחו תור לצפייה בהיסטוריה. קביעת תור אינה יוצרת אחריות קבועה לטיפול.",
         refresh: "רענון", open: "פתיחה", empty: "אין מפגשים זמינים (100 התורים האחרונים).", history: "היסטוריית רשומות", legacy: "רשומה קודמת בתיק",
         ownOnly: "המפגש הסתיים: ללא אחריות קבועה לטיפול, ניתן לצפות רק ברשומות שכתבתם לתור זה.",

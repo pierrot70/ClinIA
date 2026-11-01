@@ -70,3 +70,12 @@ describe("audit data minimization", () => {
         })).toEqual({ route: "/clinical" });
     });
 });
+
+describe("IPS security audit attribution", () => {
+    it.each(["MASS_DOWNLOAD_ATTEMPT", "REFRESH_TOKEN_REPLAY", "MFA_CHALLENGE_EXHAUSTED", "CONCURRENT_SESSION_REPLACED", "SESSION_LIMIT_REACHED", "LOGIN_FAILURE_THROTTLED"])("retains the actual IPS role without retaining identifying context for %s", type => {
+        expect(minimizeSecurityIncidentContext(type, { userId: "507f1f77bcf86cd799439011", role: "IPS", username: "SYNTHETIC_NOT_RETAINED", note: "SYNTHETIC_NOTE_NOT_RETAINED" })).toEqual({ userId: "507f1f77bcf86cd799439011", role: "IPS" });
+    });
+    it("still drops arbitrary role claims", () => {
+        expect(minimizeSecurityIncidentContext("LOGIN_FAILURE_THROTTLED", { role: "IPS_ADMIN" })).toEqual({});
+    });
+});

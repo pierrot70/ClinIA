@@ -23,6 +23,18 @@ if [[ "${1:-}" == --patient-archive ]]; then
     test_config=vitest.patientArchive.config.js
     shift
 fi
+if [[ "${1:-}" == --care-access ]]; then
+    test_config=vitest.careAccess.config.js
+    shift
+fi
+if [[ "${1:-}" == --ips-scope ]]; then
+    test_config=vitest.ipsScope.config.js
+    shift
+fi
+if [[ "${1:-}" == --ips-consultations ]]; then
+    test_config=vitest.ipsConsultations.config.js
+    shift
+fi
 [[ "${NODE_ENV:-}" != production ]] || { echo 'Refusing production mode.' >&2; exit 1; }
 endpoint="${DOCKER_HOST:-$(docker context inspect --format '{{.Endpoints.docker.Host}}')}"
 [[ "$endpoint" == unix://* ]] || { echo 'A local Docker Unix socket is required.' >&2; exit 1; }

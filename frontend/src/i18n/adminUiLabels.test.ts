@@ -1,3 +1,4 @@
+import { appointmentSpecialtyLabel } from "./appointmentSpecialtyLabels";
 import { describe, expect, it } from "vitest";
 import { adminUiRows, localizeAdminUiLabel } from "./adminUiLabels";
 import { UI_LABELS_FR } from "./uiLabels.fr";
@@ -33,6 +34,10 @@ describe("administration translation catalogue", () => {
             if (seen.has(row[0])) expect(row).toEqual(seen.get(row[0]));
             seen.set(row[0], row);
         }
+    });
+
+    it.each(UI_LOCALES)("keeps the IPS account profession consistent with the appointment catalogue in %s", locale => {
+        expect(localizeAdminUiLabel(UI_LABELS_FR.auth.userManagement.roles.IPS, locale)).toBe(appointmentSpecialtyLabel("IPS", locale));
     });
 
     it("normalizes locale variants and does not translate unknown input", () => {

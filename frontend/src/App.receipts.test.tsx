@@ -32,7 +32,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("personal receipt route", () => {
-    it.each(["RECEPTION", "USER", "MEDECIN", "ADMIN", "SUPERADMIN"])("renders receipts rather than a default redirect for %s", async role => {
+    it.each(["RECEPTION", "USER", "MEDECIN", "IPS", "ADMIN", "SUPERADMIN"])("renders receipts rather than a default redirect for %s", async role => {
         state.role = role;
         render(<Page />);
         await screen.findByRole("heading", { name: getMyWriteReceiptsLabels("fr-CA").title });

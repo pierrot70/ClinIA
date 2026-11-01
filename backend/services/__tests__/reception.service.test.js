@@ -7,6 +7,8 @@ const validateReceptionBookingProof = vi.fn();
 vi.mock("../receptionBookingProof.js", () => ({ issueReceptionBookingProof, consumeReceptionBookingProof, validateReceptionBookingProof }));
 const adminUserFindOne = vi.fn();
 const adminUserFind = vi.fn();
+const clinicFindOne = vi.fn();
+const clinicFind = vi.fn();
 const specialistFindOne = vi.fn();
 const specialistFind = vi.fn();
 const patientFindOne = vi.fn();
@@ -31,6 +33,8 @@ const transactionSession = {
 vi.mock("../../models/AdminUser.js", () => ({
     AdminUser: { findOne: adminUserFindOne, find: adminUserFind },
 }));
+
+vi.mock("../../models/Clinique.js", () => ({ Clinique: { findOne: clinicFindOne, find: clinicFind } }));
 
 vi.mock("../../models/Specialist.js", () => ({
     Specialist: { find: specialistFind, findOne: specialistFindOne },
@@ -93,11 +97,11 @@ describe("reception appointment replacement", () => {
         expect(appointmentUpdateOne).not.toHaveBeenCalled();
     });
     it("refuses availability without choosing to replan", async () => {
-        await expect(listWalkInFamilyMedicineOptions({ clinicId, patientId, authUser })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
+        await expect(listWalkInFamilyMedicineOptions({ clinicId, patientId, bookingProof: "proof", authUser })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
         expect(getAvailableSlotSchedule).not.toHaveBeenCalled();
     });
     it("keeps the original while searching and excludes its occupied slot from choices", async () => {
-        const result = await listWalkInFamilyMedicineOptions({ clinicId, patientId, authUser, replaceAppointmentId: oldId, now: new Date("2030-01-01T13:00:00Z") });
+        const result = await listWalkInFamilyMedicineOptions({ clinicId, patientId, bookingProof: "proof", authUser, replaceAppointmentId: oldId, now: new Date("2030-01-01T13:00:00Z") });
         expect(result.today[0].slots).toEqual(["09:15"]);
         expect(getAvailableSlotSchedule).toHaveBeenCalledWith(specialistId, "2030-01-01", expect.objectContaining({ excludeAppointmentId: oldId }));
         expect(appointmentUpdateOne).not.toHaveBeenCalled();
@@ -161,15 +165,18 @@ beforeEach(() => {
     transactionSession.endSession.mockResolvedValue();
     adminUserFindOne.mockImplementation(query => resolvedLean(query.role === "RECEPTION"
         ? { assignedClinics: [clinicId] } : { _id: physicianId }));
-    adminUserFind.mockReturnValue(resolvedLean([{ _id: physicianId }]));
+    adminUserFind.mockReturnValue(resolvedLean([{ _id: physicianId, role: "MEDECIN" }]));
+    clinicFindOne.mockReturnValue(resolvedLean({ _id: clinicId, nom: "Origin synthetic clinic", lat: 45.5, long: -73.6 }));
+    clinicFind.mockReturnValue(resolvedLean([{ _id: clinicId, nom: "Origin synthetic clinic", lat: 45.5, long: -73.6 }]));
     specialistFindOne.mockReturnValue(resolvedLean({
-        _id: specialistId, accountUserId: physicianId,
+        _id: specialistId, accountUserId: physicianId, specialite: "Medecin de famille",
         practiceLocations: [{ clinique: clinicId }],
     }));
     specialistFind.mockReturnValue(resolvedLean([
         {
             _id: "507f1f77bcf86cd799439013",
             accountUserId: physicianId,
+            specialite: "Medecin de famille",
             prenom: "Marie",
             nom: "Leroux",
             practiceLocations: [{
@@ -194,7 +201,7 @@ beforeEach(() => {
 });
 
 describe("listWalkInFamilyMedicineOptions", () => {
-    it.each([true, false])("prioritizes urgentologists today, otherwise returns family alternatives (urgent slot: %s)", async urgentAvailable => {
+    it.each([true, false])("prioritizes future urgentologists over same-day family slots (urgent today: %s)", async urgentAvailable => {
         const familyId = "507f1f77bcf86cd799439099";
         const location = { clinique: clinicId, walkInDisponibilites: [new Date("2030-01-01T14:00:00Z"), new Date("2030-01-02T14:00:00Z")] };
         specialistFind.mockReturnValue(resolvedLean([
@@ -204,9 +211,10 @@ describe("listWalkInFamilyMedicineOptions", () => {
         appointmentCount.mockReturnValue({ session: vi.fn().mockResolvedValue(0) });
         getAvailableSlotSchedule.mockImplementation(async (id, date) => ({ slots: id === specialistId && date === "2030-01-01" && !urgentAvailable ? [] : ["09:00"] }));
         const result = await listWalkInFamilyMedicineOptions({ clinicId, authUser: { userId: receptionId, role: "RECEPTION" }, now: new Date("2030-01-01T13:00:00Z") });
-        expect(result.presentation).toBe(urgentAvailable ? "urgent_today" : "alternatives");
-        expect(result.today.map(option => option.specialist._id)).toEqual([urgentAvailable ? specialistId : familyId]);
-        expect(result.future.map(option => option.specialist._id)).toEqual(urgentAvailable ? [] : [familyId]);
+        expect(result.presentation).toBe("priority");
+        expect(result.prioritySpecialty).toBe("Urgentologue");
+        expect(result.today.map(option => option.specialist._id)).toEqual(urgentAvailable ? [specialistId] : []);
+        expect(result.future.map(option => option.specialist._id)).toEqual([specialistId]);
         expect(result.urgentologists.allAtCapacity).toBe(false);
     });
     it.each([19, 20])("includes active urgentologists with walk-in-only slots and reports daily quota %s", async count => {
@@ -223,19 +231,19 @@ describe("listWalkInFamilyMedicineOptions", () => {
     it("excludes unlinked specialists and accounts that are not active physicians before looking up slots", async () => {
         const location = { clinique: clinicId, walkInDisponibilites: [new Date("2030-01-01T14:00:00Z")] };
         specialistFind.mockReturnValue(resolvedLean([
-            { _id: specialistId, accountUserId: physicianId, practiceLocations: [location] },
+            { _id: specialistId, accountUserId: physicianId, specialite: "Medecin de famille", practiceLocations: [location] },
             { _id: "507f1f77bcf86cd799439015", practiceLocations: [location] },
-            { _id: "507f1f77bcf86cd799439016", accountUserId: "507f1f77bcf86cd799439017", practiceLocations: [location] },
+            { _id: "507f1f77bcf86cd799439016", accountUserId: "507f1f77bcf86cd799439017", specialite: "Medecin de famille", practiceLocations: [location] },
         ]));
         const result = await listWalkInFamilyMedicineOptions({ clinicId, authUser: { userId: receptionId, role: "RECEPTION" }, now: new Date("2030-01-01T13:00:00Z") });
         expect(result.today.map(option => option.specialist._id)).toEqual([specialistId]);
-        expect(adminUserFind).toHaveBeenCalledWith({ _id: { $in: [physicianId, "507f1f77bcf86cd799439017"] }, role: "MEDECIN", isActive: true }, { _id: 1 });
+        expect(adminUserFind).toHaveBeenCalledWith({ _id: { $in: [physicianId, "507f1f77bcf86cd799439017"] }, role: { $in: ["MEDECIN", "IPS"] }, isActive: true }, { _id: 1, role: 1 });
         expect(getAvailableSlotSchedule.mock.calls.every(([id]) => id === specialistId)).toBe(true);
     });
 
     it("returns no slots when no linked physician account is active", async () => {
         adminUserFind.mockReturnValue(resolvedLean([]));
-        await expect(listWalkInFamilyMedicineOptions({ clinicId, authUser: { userId: receptionId, role: "RECEPTION" }, now: new Date("2030-01-01T13:00:00Z") })).resolves.toEqual({ presentation: "alternatives", today: [], future: [] });
+        await expect(listWalkInFamilyMedicineOptions({ clinicId, authUser: { userId: receptionId, role: "RECEPTION" }, now: new Date("2030-01-01T13:00:00Z") })).resolves.toMatchObject({ presentation: "priority", today: [], future: [], search: { status: "exhausted", radiusKm: 100 } });
         expect(getAvailableSlotSchedule).not.toHaveBeenCalled();
     });
     it("returns same-day and future family-medicine slots without a patient identifier", async () => {
@@ -258,7 +266,7 @@ describe("listWalkInFamilyMedicineOptions", () => {
         expect(getAvailableSlotSchedule).toHaveBeenCalledWith(
             "507f1f77bcf86cd799439013",
             "2030-01-01",
-            { clinique: clinicId, slotType: "walk_in" }
+            expect.objectContaining({ clinique: clinicId, slotType: "walk_in" })
         );
     });
 
@@ -276,6 +284,7 @@ describe("listWalkInFamilyMedicineOptions", () => {
             {
                 _id: "507f1f77bcf86cd799439013",
                 accountUserId: physicianId,
+                specialite: "Medecin de famille",
                 prenom: "Marie",
                 nom: "Leroux",
                 practiceLocations: [{
@@ -290,7 +299,7 @@ describe("listWalkInFamilyMedicineOptions", () => {
             clinicId,
             authUser: { userId: receptionId, role: "RECEPTION" },
             now: new Date("2030-01-01T13:00:00.000Z"),
-        })).resolves.toEqual({ presentation: "alternatives", today: [], future: [] });
+        })).resolves.toMatchObject({ presentation: "priority", today: [], future: [], search: { status: "exhausted", radiusKm: 100 } });
         expect(getAvailableSlotSchedule).not.toHaveBeenCalled();
     });
 
@@ -309,20 +318,20 @@ describe("listWalkInFamilyMedicineOptions", () => {
         expect(getAvailableSlotSchedule).toHaveBeenCalledWith(
             "507f1f77bcf86cd799439013",
             "2030-01-01",
-            {
+            expect.objectContaining({
                 clinique: clinicId,
                 patient: "507f1f77bcf86cd799439088",
                 slotType: "regular",
-            }
+            })
         );
         expect(getAvailableSlotSchedule).toHaveBeenCalledWith(
             "507f1f77bcf86cd799439013",
             "2030-01-01",
-            {
+            expect.objectContaining({
                 clinique: clinicId,
                 patient: "507f1f77bcf86cd799439088",
                 slotType: "walk_in",
-            }
+            })
         );
     });
 
@@ -331,6 +340,7 @@ describe("listWalkInFamilyMedicineOptions", () => {
             {
                 _id: "507f1f77bcf86cd799439013",
                 accountUserId: physicianId,
+                specialite: "Medecin de famille",
                 prenom: "Marie",
                 nom: "Leroux",
                 practiceLocations: [{
@@ -651,6 +661,7 @@ describe("reception pending appointments use the clinic calendar day", () => {
     beforeEach(() => {
         vi.useFakeTimers({ toFake: ["Date"] });
         vi.setSystemTime(new Date("2030-01-02T17:00:00.000Z"));
+        getAvailableSlotSchedule.mockResolvedValue({ slots: ["09:15"] });
         records = [record("2030-01-01")];
         patientFindOne.mockReturnValue(resolvedLean({ _id: patientId, nom: "Synthetic", prenom: "Only" }));
         appointmentFind.mockImplementation(query => resolvedLean(matching(query).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 2)));
@@ -668,7 +679,7 @@ describe("reception pending appointments use the clinic calendar day", () => {
         records = [];
         const now = new Date(instant);
         await findReceptionPatientByRamq({ clinicId, ramq: "TEST0001", authUser, now });
-        await listWalkInFamilyMedicineOptions({ clinicId, patientId, authUser, now });
+        await listWalkInFamilyMedicineOptions({ clinicId, patientId, bookingProof: "proof", authUser, now });
         expect(appointmentFind).toHaveBeenCalledTimes(2);
         for (const [query] of appointmentFind.mock.calls) expect(query).toEqual({ patient: patientId, clinique: clinicId, status: "scheduled", date: { $gte: today } });
         expect(appointmentExists).toHaveBeenCalledWith({ patient: patientId, clinique: clinicId, status: "scheduled", date: { $lt: today }, attendanceResolution: null });
@@ -678,7 +689,7 @@ describe("reception pending appointments use the clinic calendar day", () => {
         const before = structuredClone(records);
         const lookup = await findReceptionPatientByRamq({ clinicId, ramq: "TEST0001", authUser });
         expect(lookup).toEqual({ _id: patientId, nom: "Synthetic", prenom: "Only", bookingProof: "proof", existingAppointments: [], hasHistoricalScheduledAppointments: true });
-        const options = await listWalkInFamilyMedicineOptions({ clinicId, patientId, authUser, now: new Date() });
+        const options = await listWalkInFamilyMedicineOptions({ clinicId, patientId, bookingProof: "proof", authUser, now: new Date() });
         expect(options.today).toHaveLength(1);
         const result = await createWalkInAppointmentForExistingPatient({ ...args, audit: { verificationId: "WRV-genuine-request" } });
         expect(result.appointment._id).toBe(newId);
@@ -699,7 +710,7 @@ describe("reception pending appointments use the clinic calendar day", () => {
         expect(appointmentUpdateOne).not.toHaveBeenCalled();
     });
     it("rejects an old replacement ID both while searching and during the final transaction", async () => {
-        await expect(listWalkInFamilyMedicineOptions({ clinicId, patientId, authUser, replaceAppointmentId: oldId, now: new Date() })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
+        await expect(listWalkInFamilyMedicineOptions({ clinicId, patientId, bookingProof: "proof", authUser, replaceAppointmentId: oldId, now: new Date() })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
         await expect(createWalkInAppointmentForExistingPatient({ ...args, replaceAppointmentId: oldId })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
         expect(appointmentUpdateOne).not.toHaveBeenCalled();
         expect(createAppointment).not.toHaveBeenCalled();
@@ -711,7 +722,7 @@ describe("reception pending appointments use the clinic calendar day", () => {
         const lookup = await findReceptionPatientByRamq({ clinicId, ramq: "TEST0001", authUser });
         expect(lookup.existingAppointments).toEqual([{ _id: newId, date, time: "00:01" }]);
         expect(lookup.hasHistoricalScheduledAppointments).toBe(true);
-        await expect(listWalkInFamilyMedicineOptions({ clinicId, patientId, authUser, now: new Date() })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
+        await expect(listWalkInFamilyMedicineOptions({ clinicId, patientId, bookingProof: "proof", authUser, now: new Date() })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
         await expect(createWalkInAppointmentForExistingPatient(args)).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
         expect(appointmentUpdateOne).not.toHaveBeenCalled();
     });
@@ -719,7 +730,7 @@ describe("reception pending appointments use the clinic calendar day", () => {
         records.push(record("2030-01-02", { _id: newId }), record("2030-01-03", { _id: "507f1f77bcf86cd799439093" }));
         const lookup = await findReceptionPatientByRamq({ clinicId, ramq: "TEST0001", authUser });
         expect(lookup.existingAppointments).toHaveLength(2);
-        await expect(listWalkInFamilyMedicineOptions({ clinicId, patientId, authUser, replaceAppointmentId: newId, now: new Date() })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
+        await expect(listWalkInFamilyMedicineOptions({ clinicId, patientId, bookingProof: "proof", authUser, replaceAppointmentId: newId, now: new Date() })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
         await expect(createWalkInAppointmentForExistingPatient({ ...args, replaceAppointmentId: newId })).rejects.toMatchObject({ code: "RECEPTION_REPLAN_REQUIRED" });
         expect(appointmentUpdateOne).not.toHaveBeenCalled();
     });
@@ -882,4 +893,312 @@ describe("reception historical attendance is an administrative patient statement
         appointmentExists.mockResolvedValueOnce(null);
         expect(await findReceptionPatientByRamq({ clinicId, ramq: "TEST0001", authUser })).not.toHaveProperty("hasHistoricalScheduledAppointments");
     });
+});
+
+
+describe("ordered WalkIn clinic and IPS routing", () => {
+    const nearId = "507f1f77bcf86cd799439041", farId = "507f1f77bcf86cd799439042", outsideId = "507f1f77bcf86cd799439043", missingId = "507f1f77bcf86cd799439044";
+    const ipsId = "507f1f77bcf86cd799439051", urgentId = "507f1f77bcf86cd799439052", familyId = "507f1f77bcf86cd799439053";
+    const ipsAccount = "507f1f77bcf86cd799439061", patientId = "507f1f77bcf86cd799439071", appointmentId = "507f1f77bcf86cd799439072";
+    const origin = { _id: clinicId, nom: "Origin", lat: 45, long: -73 };
+    const near = { _id: nearId, nom: "Near", lat: 45.1, long: -73 };
+    const far = { _id: farId, nom: "Far", lat: 45.2, long: -73 };
+    const outside = { _id: outsideId, nom: "Outside", lat: 47, long: -73 };
+    const missing = { _id: missingId, nom: "Missing" };
+    const now = new Date("2030-01-01T13:00:00Z");
+    const authUser = { userId: receptionId, sessionId: "synthetic-session", username: "synthetic-reception", role: "RECEPTION" };
+    const location = (id, day = "2030-01-01") => ({ clinique: id, disponibilites: [], walkInDisponibilites: [new Date(day + "T14:00:00Z")] });
+    const professional = (id, specialty, clinic, day) => ({ _id: id, specialite: specialty, accountUserId: specialty === "IPS" ? ipsAccount : physicianId,
+        prenom: "Synthetic", nom: specialty, practiceLocations: [location(clinic, day)] });
+    function directory(professionals, clinics = [origin, near, far, outside, missing]) {
+        specialistFind.mockReturnValue(resolvedLean(professionals));
+        clinicFindOne.mockReturnValue(resolvedLean(origin));
+        const ids = new Set(professionals.flatMap(s => s.practiceLocations.map(l => l.clinique)));
+        clinicFind.mockReturnValue(resolvedLean(clinics.filter(c => ids.has(c._id))));
+        adminUserFind.mockReturnValue(resolvedLean([{ _id: physicianId, role: "MEDECIN" }, { _id: ipsAccount, role: "IPS" }]));
+        adminUserFindOne.mockImplementation(query => resolvedLean(query.role === "RECEPTION" ? { assignedClinics: [clinicId] } : { _id: query._id }));
+        appointmentCount.mockReturnValue({ session: vi.fn().mockResolvedValue(0) });
+        getAvailableSlotSchedule.mockResolvedValue({ slots: ["09:00"] });
+    }
+    const list = extra => listWalkInFamilyMedicineOptions({ clinicId, authUser, now, ...extra });
+
+    it("prefers a future urgentologist to today's IPS and family medicine in the same clinic", async () => {
+        directory([professional(familyId, "Medecin de famille", clinicId), professional(ipsId, "IPS", clinicId), professional(urgentId, "Urgentologue", clinicId, "2030-01-02")]);
+        const result = await list();
+        expect(result).toMatchObject({ prioritySpecialty: "Urgentologue", selectedClinic: { _id: clinicId, distanceKm: 0 }, search: { status: "found" }, today: [] });
+        expect(result.future).toHaveLength(1);
+        expect(result.future[0].specialist._id).toBe(urgentId);
+        expect(getAvailableSlotSchedule.mock.calls.every(([id]) => id === urgentId)).toBe(true);
+    });
+    it("offers IPS before family medicine when urgentology has no remaining configured slots", async () => {
+        directory([professional(urgentId, "Urgentologue", clinicId), professional(familyId, "Medecin de famille", clinicId), professional(ipsId, "IPS", clinicId)]);
+        getAvailableSlotSchedule.mockImplementation(async id => ({ slots: id === urgentId ? [] : ["09:00"] }));
+        const result = await list();
+        expect(result.prioritySpecialty).toBe("IPS");
+        expect(result.today[0].specialist).toMatchObject({ _id: ipsId, specialty: "IPS" });
+        expect(getAvailableSlotSchedule.mock.calls.some(([id]) => id === familyId)).toBe(false);
+    });
+    it("keeps a future family slot at origin before an urgentologist in a neighboring clinic", async () => {
+        directory([professional(familyId, "Medecin de famille", clinicId, "2030-01-02"), professional(urgentId, "Urgentologue", nearId)]);
+        const result = await list();
+        expect(result.selectedClinic._id).toBe(clinicId);
+        expect(result.prioritySpecialty).toBe("Medecin de famille");
+        expect(getAvailableSlotSchedule.mock.calls.every(([, , options]) => options.clinique === clinicId)).toBe(true);
+    });
+    it("uses the closest clinic before a farther clinic's higher-priority professional", async () => {
+        directory([professional(urgentId, "Urgentologue", farId), professional(familyId, "Medecin de famille", nearId, "2030-01-02")]);
+        const result = await list();
+        expect(result.selectedClinic._id).toBe(nearId);
+        expect(result.prioritySpecialty).toBe("Medecin de famille");
+        expect(result.search.examinedClinics).toBe(2);
+        expect(getAvailableSlotSchedule.mock.calls.every(([, , options]) => options.clinique === nearId)).toBe(true);
+    });
+    it("skips an empty nearby clinic and stops at the first actual capacity", async () => {
+        directory([professional(familyId, "Medecin de famille", nearId), professional(ipsId, "IPS", farId)]);
+        getAvailableSlotSchedule.mockImplementation(async (_id, _date, options) => ({ slots: options.clinique === nearId ? [] : ["09:00"] }));
+        expect((await list()).selectedClinic._id).toBe(farId);
+    });
+    it("never searches beyond 100km or in an unlocated clinic and cannot falsely declare exhaustion", async () => {
+        directory([professional(urgentId, "Urgentologue", outsideId), professional(ipsId, "IPS", missingId)]);
+        const result = await list();
+        expect(result).toMatchObject({ today: [], future: [], search: { status: "location_missing", hasUnlocatedClinics: true, examinedClinics: 1 } });
+        expect(getAvailableSlotSchedule).not.toHaveBeenCalled();
+    });
+    it("returns true exhaustion only when all eligible located clinics within the radius are empty", async () => {
+        directory([professional(ipsId, "IPS", nearId), professional(urgentId, "Urgentologue", outsideId)]);
+        getAvailableSlotSchedule.mockResolvedValue({ slots: [] });
+        expect(await list()).toMatchObject({ today: [], future: [], search: { status: "exhausted", examinedClinics: 2 } });
+    });
+    it("warns about unknown clinic positions while offering capacity from a located neighbor", async () => {
+        directory([professional(ipsId, "IPS", nearId), professional(urgentId, "Urgentologue", missingId)]);
+        expect(await list()).toMatchObject({ selectedClinic: { _id: nearId }, search: { status: "found", hasUnlocatedClinics: true } });
+    });
+    it.each([true, false])("handles missing origin coordinates without guessing distances (local capacity %s)", async available => {
+        directory([professional(ipsId, "IPS", clinicId), professional(urgentId, "Urgentologue", nearId)]);
+        clinicFindOne.mockReturnValue(resolvedLean({ ...origin, lat: null }));
+        getAvailableSlotSchedule.mockResolvedValue({ slots: available ? ["09:00"] : [] });
+        const result = await list();
+        expect(result.search.status).toBe(available ? "found" : "location_missing");
+        expect(getAvailableSlotSchedule.mock.calls.every(([, , options]) => options.clinique === clinicId)).toBe(true);
+    });
+    it("excludes active account and directory profession mismatches before reading schedules", async () => {
+        directory([{ ...professional(ipsId, "IPS", clinicId), accountUserId: physicianId }, { ...professional(urgentId, "Urgentologue", clinicId), accountUserId: ipsAccount }]);
+        const result = await list();
+        expect(result.search.status).toBe("exhausted");
+        expect(getAvailableSlotSchedule).not.toHaveBeenCalled();
+    });
+    it("validates an existing patient's origin proof before searching any clinic", async () => {
+        directory([professional(ipsId, "IPS", nearId)]);
+        validateReceptionBookingProof.mockRejectedValueOnce({ code: "RECEPTION_LOOKUP_REQUIRED" });
+        await expect(list({ patientId, bookingProof: "foreign-proof" })).rejects.toMatchObject({ code: "RECEPTION_LOOKUP_REQUIRED" });
+        expect(validateReceptionBookingProof).toHaveBeenCalledWith({ authUser, clinicId, patientId, bookingProof: "foreign-proof" });
+        expect(specialistFind).not.toHaveBeenCalled();
+    });
+
+    function prepareBooking(professionals = [professional(ipsId, "IPS", nearId)]) {
+        directory(professionals);
+        specialistFindOne.mockReturnValue(resolvedLean(professionals[0]));
+        patientExists.mockResolvedValue(null);
+        createPatient.mockResolvedValue({ _id: patientId, nom: "Synthetic", prenom: "Only" });
+        patientFindOne.mockReturnValue(resolvedLean({ _id: patientId, nom: "Synthetic", prenom: "Only", ownerUserId: null }));
+        createAppointment.mockResolvedValue({ _id: appointmentId });
+        return { clinicId: nearId, originClinicId: clinicId, specialistId: ipsId, date: "2030-01-01", time: "09:00", authUser,
+            patientId, bookingProof: "origin-proof", patientDto: { nom: "Synthetic", prenom: "Only", num_assurance_maladie: "TEST-ROUTING" } };
+    }
+    it("creates a new arrival at the selected unassigned nearby clinic with the real origin actor", async () => {
+        const args = prepareBooking();
+        const result = await createWalkInPatientAndAppointment(args);
+        expect(result.writeAuditRecorded).toBe(true);
+        expect(createAppointment).toHaveBeenCalledWith(expect.objectContaining({ clinique: nearId, specialist: ipsId }), authUser,
+            expect.objectContaining({ receptionOriginClinicId: clinicId, receivingPhysicianUserId: ipsAccount, session: transactionSession }));
+        expect(recordWriteOperationAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ actorUserId: receptionId, actorRole: "RECEPTION", resourceId: appointmentId, session: transactionSession }));
+        expect(adminUserFindOne).toHaveBeenCalledWith({ _id: ipsAccount, role: "IPS", isActive: true }, { _id: 1 });
+    });
+    it("keeps existing-patient lookup proof bound to the origin and checks destination pending state", async () => {
+        const args = prepareBooking();
+        await createWalkInAppointmentForExistingPatient(args);
+        expect(consumeReceptionBookingProof).toHaveBeenCalledWith(expect.objectContaining({ clinicId, patientId, bookingProof: "origin-proof", session: transactionSession }));
+        expect(appointmentFind).toHaveBeenCalledWith(expect.objectContaining({ clinique: clinicId }), expect.anything());
+        expect(appointmentFind).toHaveBeenCalledWith(expect.objectContaining({ clinique: nearId }), expect.anything());
+        expect(createPatient).not.toHaveBeenCalled();
+        expect(createAppointment.mock.calls[0][2].patientFromTransaction.ownerUserId).toBeNull();
+    });
+    it("refuses a pending destination appointment without exposing its details or creating another", async () => {
+        const args = prepareBooking();
+        appointmentFind.mockImplementation(query => resolvedLean(query.clinique === nearId ? [{ _id: appointmentId, date: "2030-01-01", time: "08:00", specialist: ipsId }] : []));
+        let caught;
+        try { await createWalkInAppointmentForExistingPatient(args); } catch (error) { caught = error; }
+        expect(caught.code).toBe("RECEPTION_REPLAN_REQUIRED");
+        expect(JSON.stringify(caught)).not.toContain(appointmentId);
+        expect(createAppointment).not.toHaveBeenCalled();
+    });
+    it("rejects a forged origin or destination and rechecks routing before patient creation", async () => {
+        const args = prepareBooking();
+        await expect(createWalkInPatientAndAppointment({ ...args, originClinicId: farId })).rejects.toMatchObject({ code: "FORBIDDEN" });
+        await expect(createWalkInPatientAndAppointment({ ...args, clinicId: outsideId })).rejects.toMatchObject({ code: "NO_AVAILABILITY" });
+        expect(createPatient).not.toHaveBeenCalled();
+    });
+    it("requires a new selection if the origin regains higher-priority capacity before confirmation", async () => {
+        const args = prepareBooking([professional(ipsId, "IPS", nearId), professional(urgentId, "Urgentologue", clinicId)]);
+        await expect(createWalkInPatientAndAppointment(args)).rejects.toMatchObject({ code: "NO_AVAILABILITY" });
+        expect(createPatient).not.toHaveBeenCalled();
+        expect(createAppointment).not.toHaveBeenCalled();
+    });
+    it("moves only the origin reservation and links both records in the destination booking transaction", async () => {
+        const args = prepareBooking();
+        const oldId = "507f1f77bcf86cd799439081";
+        const previous = { _id: oldId, specialist: specialistId, date: "2030-01-01", time: "08:00" };
+        appointmentFind.mockImplementation(query => resolvedLean(query.clinique === clinicId ? [previous] : []));
+        await createWalkInAppointmentForExistingPatient({ ...args, replaceAppointmentId: oldId });
+        expect(appointmentUpdateOne).toHaveBeenCalledWith({ _id: oldId, patient: patientId, clinique: clinicId, status: "scheduled" }, { $set: { status: "rescheduled" } }, { session: transactionSession });
+        expect(appointmentUpdateOne).toHaveBeenCalledWith({ _id: appointmentId }, { $set: { rescheduledFrom: oldId } }, { session: transactionSession });
+        expect(appointmentUpdateOne).toHaveBeenCalledWith({ _id: oldId }, { $set: { rescheduledTo: appointmentId } }, { session: transactionSession });
+        expect(releaseDailyAppointmentCapacity).toHaveBeenCalledWith(expect.objectContaining({ specialist: specialistId, session: transactionSession }));
+        expect(recordWriteOperationAuditEvent.mock.calls.map(([event]) => event.operation)).toEqual(["UPDATE", "CREATE"]);
+    });
+    it("reruns origin access and destination selection on each transaction retry", async () => {
+        const args = prepareBooking();
+        transactionSession.withTransaction.mockImplementationOnce(async callback => { await callback(); await callback(); });
+        await createWalkInAppointmentForExistingPatient(args);
+        expect(clinicFindOne).toHaveBeenCalledTimes(2);
+        expect(consumeReceptionBookingProof).toHaveBeenCalledTimes(2);
+        expect(patientFindOneAndUpdate).toHaveBeenCalledTimes(2);
+        expect(specialistFind.mock.results.every(({ value }) => value.session.mock.calls[0][0] === transactionSession)).toBe(true);
+    });
+    it("compares neighboring appointments explicitly without replacing the primary local offer", async () => {
+        const pros = [professional(urgentId, "Urgentologue", clinicId, "2030-01-31"), professional(ipsId, "IPS", nearId, "2030-01-02")];
+        directory(pros);
+        const normal = await list();
+        expect(normal).not.toHaveProperty("earlierAlternatives");
+        expect(getAvailableSlotSchedule.mock.calls.every(([, , opts]) => opts.clinique === clinicId)).toBe(true);
+        const compared = await list({ compareEarlier: true });
+        const { earlierAlternatives, ...unchanged } = compared;
+        expect(unchanged).toEqual(normal);
+        expect(earlierAlternatives).toEqual([expect.objectContaining({ date: "2030-01-02", slots: ["09:00"], prioritySpecialty: "IPS", clinic: expect.objectContaining({ _id: nearId }), specialist: expect.objectContaining({ _id: ipsId }) })]);
+        expect(createAppointment).not.toHaveBeenCalled();
+        expect(createPatient).not.toHaveBeenCalled();
+    });
+    it("filters individual times strictly before the earliest primary and never compares another origin specialty", async () => {
+        directory([professional(urgentId, "Urgentologue", clinicId, "2030-01-02"), professional(ipsId, "IPS", nearId, "2030-01-02"), professional(familyId, "Medecin de famille", clinicId)]);
+        getAvailableSlotSchedule.mockImplementation(async id => ({ slots: id === urgentId ? ["10:00", "11:00"] : ["09:00", "10:00", "12:00"] }));
+        const result = await list({ compareEarlier: true });
+        expect(result.earlierAlternatives).toHaveLength(1);
+        expect(result.earlierAlternatives[0]).toMatchObject({ slots: ["09:00"], slotTypes: { "09:00": "walk_in" } });
+        expect(getAvailableSlotSchedule.mock.calls.some(([id]) => id === familyId)).toBe(false);
+    });
+    it("orders all neighboring professions chronologically then by distance then specialty", async () => {
+        const familyNear = "507f1f77bcf86cd799439090", urgentNear = "507f1f77bcf86cd799439091";
+        directory([professional(urgentId, "Urgentologue", clinicId, "2030-01-31"), professional(familyId, "Medecin de famille", farId, "2030-01-02"), professional(ipsId, "IPS", nearId, "2030-01-03"), professional(familyNear, "Medecin de famille", nearId, "2030-01-03"), professional(urgentNear, "Urgentologue", nearId, "2030-01-03")]);
+        const alternatives = (await list({ compareEarlier: true })).earlierAlternatives;
+        expect(alternatives.map(o => o.specialist._id)).toEqual([familyId, urgentNear, ipsId, familyNear]);
+        expect(alternatives.map(o => o.clinic._id)).toContain(farId);
+    });
+    it("bounds chronological alternatives to eight groups while retaining all available times within each", async () => {
+        const neighbor = professional(ipsId, "IPS", nearId);
+        neighbor.practiceLocations[0].walkInDisponibilites = Array.from({ length: 12 }, (_, index) => new Date(`2030-01-${String(index + 2).padStart(2, "0")}T14:00:00Z`));
+        directory([professional(urgentId, "Urgentologue", clinicId, "2030-01-31"), neighbor]);
+        getAvailableSlotSchedule.mockResolvedValue({ slots: ["09:00", "09:15"] });
+        const alternatives = (await list({ compareEarlier: true })).earlierAlternatives;
+        expect(alternatives).toHaveLength(8);
+        expect(alternatives.map(o => o.date)).toEqual(Array.from({ length: 8 }, (_, index) => `2030-01-${String(index + 2).padStart(2, "0")}`));
+        expect(alternatives.every(o => o.slots.length === 2)).toBe(true);
+    });
+    it("includes earlier lower-priority offers in the selected neighboring clinic", async () => {
+        directory([professional(urgentId, "Urgentologue", nearId, "2030-01-31"), professional(ipsId, "IPS", nearId, "2030-01-02")]);
+        const result = await list({ compareEarlier: true });
+        expect(result.selectedClinic._id).toBe(nearId);
+        expect(result.prioritySpecialty).toBe("Urgentologue");
+        expect(result.earlierAlternatives[0]).toMatchObject({ clinic: { _id: nearId }, prioritySpecialty: "IPS", date: "2030-01-02" });
+    });
+    it("excludes distant or unlocated alternatives and preserves the incomplete geography warning", async () => {
+        directory([professional(urgentId, "Urgentologue", clinicId, "2030-01-31"), professional(ipsId, "IPS", outsideId), professional(familyId, "Medecin de famille", missingId)]);
+        const result = await list({ compareEarlier: true });
+        expect(result.earlierAlternatives).toEqual([]);
+        expect(result.search.hasUnlocatedClinics).toBe(true);
+        expect(getAvailableSlotSchedule.mock.calls.every(([, , opts]) => opts.clinique === clinicId)).toBe(true);
+    });
+    it.each([true, false])("returns no comparison when primary is unavailable or origin is unlocated (%s)", async missingCoords => {
+        directory([professional(urgentId, "Urgentologue", clinicId), professional(ipsId, "IPS", nearId)]);
+        if (missingCoords) clinicFindOne.mockReturnValue(resolvedLean({ ...origin, lat: null }));
+        else getAvailableSlotSchedule.mockResolvedValue({ slots: [] });
+        expect((await list({ compareEarlier: true })).earlierAlternatives).toEqual([]);
+    });
+    it("requires the exact patient proof before an explicit temporal comparison", async () => {
+        directory([professional(ipsId, "IPS", nearId)]);
+        validateReceptionBookingProof.mockRejectedValueOnce({ code: "RECEPTION_LOOKUP_REQUIRED" });
+        await expect(list({ patientId, bookingProof: "wrong", compareEarlier: true })).rejects.toMatchObject({ code: "RECEPTION_LOOKUP_REQUIRED" });
+        expect(specialistFind).not.toHaveBeenCalled();
+    });
+    function earlierBooking(primaryDay = "2030-01-31", targetDay = "2030-01-02") {
+        const args = prepareBooking([professional(ipsId, "IPS", nearId, targetDay), professional(urgentId, "Urgentologue", clinicId, primaryDay)]);
+        return { ...args, date: targetDay, selectionMode: "earlier" };
+    }
+    it("books a real earlier neighboring choice only with the explicit selection mode", async () => {
+        const args = earlierBooking();
+        await expect(createWalkInPatientAndAppointment({ ...args, selectionMode: "priority" })).rejects.toMatchObject({ code: "NO_AVAILABILITY" });
+        expect(createPatient).not.toHaveBeenCalled();
+        await createWalkInPatientAndAppointment(args);
+        expect(createAppointment).toHaveBeenCalledWith(expect.objectContaining({ clinique: nearId, date: "2030-01-02" }), authUser, expect.objectContaining({ receptionOriginClinicId: clinicId, session: transactionSession }));
+    });
+    it.each(["2030-01-02", "2030-01-03"])("rejects a target at or after the primary (%s)", async targetDay => {
+        await expect(createWalkInPatientAndAppointment(earlierBooking("2030-01-02", targetDay))).rejects.toMatchObject({ code: "NO_AVAILABILITY" });
+        expect(createPatient).not.toHaveBeenCalled();
+    });
+    it("rejects forged origin choices, unsupported modes and options outside the radius", async () => {
+        const args = earlierBooking();
+        await expect(createWalkInPatientAndAppointment({ ...args, clinicId, specialistId: urgentId, date: "2030-01-31" })).rejects.toMatchObject({ code: "NO_AVAILABILITY" });
+        await expect(createWalkInPatientAndAppointment({ ...args, selectionMode: "bypass" })).rejects.toMatchObject({ code: "INVALID_INPUT" });
+        directory([professional(ipsId, "IPS", outsideId, "2030-01-02"), professional(urgentId, "Urgentologue", clinicId, "2030-01-31")]);
+        await expect(createWalkInPatientAndAppointment({ ...args, clinicId: outsideId })).rejects.toMatchObject({ code: "NO_AVAILABILITY" });
+        expect(createPatient).not.toHaveBeenCalled();
+    });
+    it("recomputes earlier eligibility on transaction retry and refuses a newly earlier primary", async () => {
+        const args = earlierBooking();
+        transactionSession.withTransaction.mockImplementationOnce(async callback => {
+            await callback();
+            directory([professional(ipsId, "IPS", nearId, "2030-01-02"), professional(urgentId, "Urgentologue", clinicId, "2030-01-01")]);
+            await callback();
+        });
+        await expect(createWalkInPatientAndAppointment(args)).rejects.toMatchObject({ code: "NO_AVAILABILITY" });
+        expect(createAppointment).toHaveBeenCalledTimes(1);
+        expect(clinicFindOne).toHaveBeenCalledTimes(2);
+    });
+
+    function toleranceDirectory(professionals, distance) {
+        directory(professionals);
+        clinicFindOne.mockReturnValue(resolvedLean({ ...origin, lat: 0, long: 0 }));
+        clinicFind.mockReturnValue(resolvedLean([{ ...near, lat: 0, long: distance / 6371 * 180 / Math.PI }]));
+    }
+    it.each([[100, true], [105, true], [109.9999, true], [110.001, false]])("uses the effective radius for default routing (%s km)", async (distance, admitted) => {
+        toleranceDirectory([professional(ipsId, "IPS", nearId)], distance);
+        const result = await list();
+        expect(result.search).toMatchObject({ radiusKm: 100, toleranceKm: 10, maxDistanceKm: 110, status: admitted ? "found" : "exhausted" });
+        expect(result.selectedClinic?._id).toBe(admitted ? nearId : undefined);
+        if (!admitted) expect(getAvailableSlotSchedule).not.toHaveBeenCalled();
+    });
+    it.each([[105, true], [110.001, false]])("uses the same limit for comparison and transactional booking (%s km)", async (distance, admitted) => {
+        const professionals = [professional(ipsId, "IPS", nearId, "2030-01-02"), professional(urgentId, "Urgentologue", clinicId, "2030-01-31")];
+        const args = prepareBooking(professionals);
+        toleranceDirectory(professionals, distance);
+        const compared = await list({ compareEarlier: true });
+        expect(compared.selectedClinic._id).toBe(clinicId);
+        expect(compared.earlierAlternatives).toHaveLength(admitted ? 1 : 0);
+        const booking = { ...args, date: "2030-01-02", selectionMode: "earlier" };
+        if (admitted) await expect(createWalkInPatientAndAppointment(booking)).resolves.toMatchObject({ writeAuditRecorded: true });
+        else {
+            await expect(createWalkInPatientAndAppointment(booking)).rejects.toMatchObject({ code: "NO_AVAILABILITY" });
+            expect(createPatient).not.toHaveBeenCalled();
+            expect(createAppointment).not.toHaveBeenCalled();
+        }
+    });
+    it("rejects a stale choice after a clinic moves beyond the effective limit", async () => {
+        const professionals = [professional(ipsId, "IPS", nearId, "2030-01-02"), professional(urgentId, "Urgentologue", clinicId, "2030-01-31")];
+        const args = prepareBooking(professionals);
+        toleranceDirectory(professionals, 105);
+        expect((await list({ compareEarlier: true })).earlierAlternatives).toHaveLength(1);
+        toleranceDirectory(professionals, 110.001);
+        await expect(createWalkInPatientAndAppointment({ ...args, date: "2030-01-02", selectionMode: "earlier" })).rejects.toMatchObject({ code: "NO_AVAILABILITY" });
+        expect(createAppointment).not.toHaveBeenCalled();
+    });
+
 });

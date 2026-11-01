@@ -1,0 +1,26 @@
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { UserRole } from "../auth/roles";
+import { MfaRequiredError } from "../services/authService";
+import LoginPage from "./LoginPage";
+import { HomeI18nContext } from "../contexts/HomeI18nContext";
+import { HOME_STRINGS_FR } from "../i18n/homeStrings";
+import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
+const auth=vi.hoisted(()=>({isAuthenticated:false,user:null as {id:string;email:string;role:UserRole;passwordResetRequired?:boolean;mustChangePasswordOnNextLogin?:boolean}|null,login:vi.fn(),completeMfaLogin:vi.fn(),logout:vi.fn(),registerSelf:vi.fn(),passwordResetRequired:false,mustChangePasswordOnNextLogin:false}));
+vi.mock("../hooks/useAuth",()=>({useAuth:()=>auth}));
+vi.mock("../services/translationApi",()=>({translateText:vi.fn().mockResolvedValue("")}));
+function CurrentPath(){return <output data-testid="destination">{useLocation().pathname}</output>;}
+function Page({from,adminOnly=false}:{from?:string;adminOnly?:boolean}){const path=adminOnly?"/admin/login":"/login";return <MemoryRouter initialEntries={[{pathname:path,state:from?{from}:null}]}><HomeI18nContext.Provider value={{locale:"fr-CA",strings:HOME_STRINGS_FR,isTranslating:false,setLocaleFromDropdown:vi.fn(),setLocaleFromVoice:vi.fn()}}><Routes><Route path={path} element={<LoginPage adminOnly={adminOnly}/>}/><Route path="*" element={<CurrentPath/>}/></Routes></HomeI18nContext.Provider></MemoryRouter>;}
+function session(role:UserRole){return {accessToken:"synthetic-access-token",user:{id:"synthetic-user",email:"synthetic@example.test",role}};}
+beforeEach(()=>{vi.clearAllMocks();window.sessionStorage.clear();auth.isAuthenticated=false;auth.user=null;auth.passwordResetRequired=false;auth.mustChangePasswordOnNextLogin=false;auth.login.mockResolvedValue(session("RECEPTION"));});
+afterEach(cleanup);
+const destinations:[[UserRole,string],...[UserRole,string][]]=[["RECEPTION","/walk-in-arrival"],["IPS","/clinical"],["MEDECIN","/clinical"],["USER","/clinical"],["ADMIN","/mock-studio"],["SUPERADMIN","/mock-studio"]];
+describe("role-consistent login destinations",()=>{
+ it.each(destinations)("routes an already authenticated %s to %s",async(role,path)=>{auth.isAuthenticated=true;auth.user=session(role).user;render(<Page/>);expect(await screen.findByTestId("destination")).toHaveTextContent(path);});
+ it.each(destinations)("routes a newly authenticated %s to %s",async(role,path)=>{auth.login.mockResolvedValue(session(role));render(<Page/>);fireEvent.submit(document.querySelector("form")!);expect(await screen.findByTestId("destination")).toHaveTextContent(path);});
+ it.each(destinations)("routes a completed MFA %s to %s",async(role,path)=>{auth.login.mockRejectedValue(new MfaRequiredError({mfaChallenge:"synthetic-challenge",enrollmentRequired:false}));auth.completeMfaLogin.mockResolvedValue({session:session(role),recoveryCodes:[]});render(<Page/>);fireEvent.submit(document.querySelector("form")!);await screen.findByLabelText(UI_LABELS_FR.loginPage.mfa.codeLabel);fireEvent.submit(document.querySelector("form")!);expect(await screen.findByTestId("destination")).toHaveTextContent(path);});
+ it("preserves an administrative return path through MFA",async()=>{auth.login.mockRejectedValue(new MfaRequiredError({mfaChallenge:"synthetic-challenge",enrollmentRequired:false}));auth.completeMfaLogin.mockResolvedValue({session:session("SUPERADMIN"),recoveryCodes:[]});render(<Page adminOnly from="/admin/users/manage"/>);fireEvent.submit(document.querySelector("form")!);await screen.findByLabelText(UI_LABELS_FR.loginPage.mfa.codeLabel);fireEvent.submit(document.querySelector("form")!);expect(await screen.findByTestId("destination")).toHaveTextContent("/admin/users/manage");});
+ it("waits for acknowledgement of recovery codes, then opens WalkIn for reception",async()=>{auth.login.mockRejectedValue(new MfaRequiredError({mfaChallenge:"synthetic-enrollment",enrollmentRequired:true}));auth.completeMfaLogin.mockImplementation(async()=>{auth.user=session("RECEPTION").user;auth.isAuthenticated=true;return {session:session("RECEPTION"),recoveryCodes:["SYNTHETIC-RECOVERY-CODE"]};});render(<Page/>);fireEvent.submit(document.querySelector("form")!);await screen.findByLabelText(UI_LABELS_FR.loginPage.mfa.codeLabel);fireEvent.submit(document.querySelector("form")!);expect(await screen.findByText("SYNTHETIC-RECOVERY-CODE")).toBeVisible();expect(screen.queryByTestId("destination")).not.toBeInTheDocument();fireEvent.click(screen.getByRole("button",{name:UI_LABELS_FR.loginPage.mfa.continue}));expect(await screen.findByTestId("destination")).toHaveTextContent("/walk-in-arrival");});
+ it.each(["passwordResetRequired","mustChangePasswordOnNextLogin"] as const)("preserves the mandatory %s gate before a saved destination",async field=>{auth.login.mockResolvedValue({...session("RECEPTION"),user:{...session("RECEPTION").user,[field]:true}});render(<Page from="/walk-in-arrival"/>);fireEvent.submit(document.querySelector("form")!);expect(await screen.findByTestId("destination")).toHaveTextContent(field==="passwordResetRequired"?"/security/password-reset-required":"/security/change-password-required");});
+});

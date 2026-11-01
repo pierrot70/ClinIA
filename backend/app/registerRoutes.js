@@ -1,3 +1,5 @@
+import { requireIpsClinicalScope } from "../middleware/ipsClinicalScope.js";
+import clinicalCareAccessRouter from "../routes/clinicalCareAccess.js";
 import appointmentsRouter from "../routes/appointments.js";
 import patientsRouter from "../routes/patients.js";
 import cliniquesRouter from "../routes/cliniques.js";
@@ -30,6 +32,7 @@ function requireDirectoryAccess(req, res, next) {
     const readRoles = [
         AUTH_ROLES.USER,
         AUTH_ROLES.MEDECIN,
+        AUTH_ROLES.IPS,
         AUTH_ROLES.ADMIN,
         AUTH_ROLES.SUPERADMIN,
     ];
@@ -59,15 +62,17 @@ export function registerRoutes(app, deps) {
     app.use("/api/ai", aiAnalyzeRouter || createAiAnalyzeRouter({}));
 
     app.use("/api/auth", authRouter);
-    app.use("/api/consultations", verifyJWT, requireRole(AUTH_ROLES.MEDECIN),
+    app.use("/api/consultations", verifyJWT, requireIpsClinicalScope("consultations"), requireRole(AUTH_ROLES.MEDECIN, AUTH_ROLES.IPS),
         massDownloadRestrictionGuard, loi25DataLeakGuard, consultationsRouter);
 
     app.use(
         "/api/appointments",
         verifyJWT,
+        requireIpsClinicalScope("appointments"),
         requireRole(
             AUTH_ROLES.USER,
             AUTH_ROLES.MEDECIN,
+            AUTH_ROLES.IPS,
             AUTH_ROLES.ADMIN,
             AUTH_ROLES.SUPERADMIN
         ),
@@ -77,11 +82,13 @@ export function registerRoutes(app, deps) {
     app.use(
         "/api/patients",
         verifyJWT,
+        requireIpsClinicalScope("patients"),
         // Reception uses only clinic-scoped /api/reception workflows, never
         // the generic patient record, clinical profile or note endpoints.
         requireRole(
             AUTH_ROLES.USER,
             AUTH_ROLES.MEDECIN,
+            AUTH_ROLES.IPS,
             AUTH_ROLES.ADMIN,
             AUTH_ROLES.SUPERADMIN
         ),
@@ -100,6 +107,7 @@ export function registerRoutes(app, deps) {
     app.use(
         "/api/cliniques",
         verifyJWT,
+        requireIpsClinicalScope("directory"),
         requireDirectoryAccess,
         loi25DataLeakGuard,
         cliniquesRouter
@@ -107,6 +115,7 @@ export function registerRoutes(app, deps) {
     app.use(
         "/api/specialists",
         verifyJWT,
+        requireIpsClinicalScope("directory"),
         requireDirectoryAccess,
         loi25DataLeakGuard,
         specialistsRouter
@@ -150,9 +159,14 @@ export function registerRoutes(app, deps) {
     app.use(
         "/api/clinical-terms",
         verifyJWT,
+        requireIpsClinicalScope("clinicalTerms"),
         loi25DataLeakGuard,
         clinicalTermsRouter
     );
+    // Dedicated owner/recipient access with finite expiry and append-only notes.
+    app.use("/api/clinical-care-access", verifyJWT,
+        requireRole(AUTH_ROLES.IPS, AUTH_ROLES.MEDECIN),
+        massDownloadRestrictionGuard, loi25DataLeakGuard, clinicalCareAccessRouter);
     app.use("/api/validation-reports", validationReportsRouter);
     app.use(
         "/api/write-operation-audits",

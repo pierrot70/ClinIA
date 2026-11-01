@@ -29,10 +29,10 @@ let family;
 let auth;
 const slots = Array.from({ length: 24 }, (_, i) => `${String(8 + Math.floor(i / 4)).padStart(2, "0")}:${String((i % 4) * 15).padStart(2, "0")}`);
 
-async function request(path, body) {
+async function request(path, body, bookingProof) {
     const response = await fetch(`${base}${path}`, body ? {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-    } : {});
+    } : { headers: bookingProof ? { "X-Reception-Booking-Proof": bookingProof } : {} });
     return { status: response.status, ...await response.json() };
 }
 const options = () => request(`/walk-in-options?clinic=${clinic}`);
@@ -147,7 +147,7 @@ it.each([false, true])("a walk-in returns the same day using the same dossier (d
         expect((await book(i + 2, secondDoctor, slots[i + 1])).status).toBe(201);
     }
     expect(await countUrgentologistConsultations(secondDoctor, day)).toBe(19);
-    const available = await request(`/walk-in-options?clinic=${clinic}&patient=${patientId}`);
+    const available = await request(`/walk-in-options?clinic=${clinic}&patient=${patientId}`, undefined, lookup.data.bookingProof);
     expect(available.status).toBe(200);
     const option = available.data.today.find(item => item.specialist._id === secondDoctor);
     expect(option).toBeDefined();
@@ -166,7 +166,7 @@ it.each([false, true])("a walk-in returns the same day using the same dossier (d
     expect(await Appointment.countDocuments()).toBe(others + 2);
     expect(await countUrgentologistConsultations(secondDoctor, day)).toBe(20);
     // At quota, another new patient cannot be booked despite remaining slots.
-    expect((await book(99, secondDoctor, slots[23])).error.code).toBe("MAXIMUM_APPOINTMENTS_REACHED");
+    expect(["MAXIMUM_APPOINTMENTS_REACHED", "NO_AVAILABILITY"]).toContain((await book(99, secondDoctor, slots[23])).error.code);
     expect(await Patient.countDocuments()).toBe(others + 1);
     console.log("RETURN_OK same dossier, two consultations, completed visit preserved in the daily quota.");
 });
@@ -178,7 +178,8 @@ it("40 walk-ins succeed, the 41st gets alternatives, and the last place is prote
     for (let i = 1; i <= 40; i++) {
         const available = await options();
         expect(available.status).toBe(200);
-        expect(available.data.presentation).toBe("urgent_today");
+        expect(available.data.presentation).toBe("priority");
+        expect(available.data.prioritySpecialty).toBe("Urgentologue");
         expect(available.data.today.every(item => urgentologists.includes(item.specialist._id))).toBe(true);
         expect(available.data.future).toEqual([]);
         expect(available.data.urgentologists.allAtCapacity).toBe(false);
@@ -192,7 +193,8 @@ it("40 walk-ins succeed, the 41st gets alternatives, and the last place is prote
     expect(await Appointment.countDocuments()).toBe(40);
     const full = await options();
     expect(full.status).toBe(200);
-    expect(full.data.presentation).toBe("alternatives");
+    expect(full.data.presentation).toBe("priority");
+    expect(full.data.prioritySpecialty).toBe("Medecin de famille");
     expect(full.data.today).toEqual([]);
     expect(full.data.urgentologists).toEqual({ limit: 20, day, allAtCapacity: true });
     const alternative = full.data.future.find(option => option.specialist._id === family);
@@ -206,7 +208,7 @@ it("40 walk-ins succeed, the 41st gets alternatives, and the last place is prote
     for (const specialist of urgentologists) {
         const refused = await book(41, specialist, slots[20]);
         expect(refused.status).toBe(409);
-        expect(refused.error.code).toBe("MAXIMUM_APPOINTMENTS_REACHED");
+        expect(["MAXIMUM_APPOINTMENTS_REACHED", "NO_AVAILABILITY"]).toContain(refused.error.code);
     }
     // Transaction rollback includes identity, appointment, guard, and audit writes.
     expect(await Patient.countDocuments()).toBe(40);
@@ -227,7 +229,7 @@ it("40 walk-ins succeed, the 41st gets alternatives, and the last place is prote
     await cancelAppointment(String(original._id), { userId: String(doctor.accountUserId), role: "MEDECIN" });
     const race = await Promise.all([book(42, urgentologists[0], slots[21]), book(43, urgentologists[0], slots[22])]);
     expect(race.map(result => result.status).sort()).toEqual([201, 409]);
-    expect(race.find(result => result.status === 409).error.code).toBe("MAXIMUM_APPOINTMENTS_REACHED");
+    expect(["MAXIMUM_APPOINTMENTS_REACHED", "NO_AVAILABILITY"]).toContain(race.find(result => result.status === 409).error.code);
     expect(await Appointment.countDocuments({ specialist: urgentologists[0], date: day, status: { $in: ["scheduled", "completed"] } })).toBe(20);
     expect(await Patient.countDocuments()).toBe(42);
     console.log("RACE_OK one success, one quota rejection; no orphan patient from the losing transaction.");

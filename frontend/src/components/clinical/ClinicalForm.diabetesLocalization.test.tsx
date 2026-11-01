@@ -55,7 +55,8 @@ describe("deterministic diabetes panel labels", () => {
         expect(panel.getByLabelText(text(f.cardiovascularRisk, locale))).toHaveValue("Moderate to high");
         expect(panel.getByLabelText(text(f.renalFunction, locale))).toHaveValue("Preserved or mildly reduced");
         expect(onSubmit).not.toHaveBeenCalled();
-    });
+    // Initial clinical form + full panel render reached 6.4 s under CI load.
+    }, 10_000);
     it("changes labels through all nine languages while preserving authored values and save/cancel behavior", async () => {
         const { container, rerender } = render(<Form locale="en-CA" />); selectExample(container, "en-CA");
         const initial = within(screen.getByRole("dialog"));
@@ -92,5 +93,7 @@ describe("deterministic diabetes panel labels", () => {
             cardiovascular_risk: authoredValues[0], renal_function: authoredValues[1], fragility: authoredValues[2],
             tolerance: authoredValues[3], glycemic_goals: authoredValues[4],
         } });
-    });
+    // This single case deliberately renders and edits all nine locales before
+    // verifying save/cancel and submission; CI observed 9.4 s under concurrent load.
+    }, 15_000);
 });

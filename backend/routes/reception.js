@@ -65,11 +65,14 @@ router.get("/clinics", async (req, res) => {
 });
 
 router.get("/walk-in-options", async (req, res) => {
+    res.set("Cache-Control", "no-store");
     try {
         const data = await listWalkInFamilyMedicineOptions({
             clinicId: req.query.clinic,
             patientId: req.query.patient,
             replaceAppointmentId: req.query.replaceAppointmentId,
+            compareEarlier: req.query.compareEarlier === "true",
+            bookingProof: req.get?.("X-Reception-Booking-Proof") ?? req.headers?.["x-reception-booking-proof"],
             authUser: req.auth,
         });
         return res.status(200).json({
@@ -80,6 +83,7 @@ router.get("/walk-in-options", async (req, res) => {
         if (err.code === "RECEPTION_REPLAN_REQUIRED") {
             return res.status(409).json({ error: { code: err.code, message: err.message, retryable: false } });
         }
+        if (err.code === "RECEPTION_LOOKUP_REQUIRED") return res.status(403).json({ error: { code: err.code, message: err.message, retryable: false } });
         if (err.code === "INVALID_INPUT" || err.code === "FORBIDDEN") {
             return res.status(err.code === "FORBIDDEN" ? 403 : 400).json({
                 error: { code: err.code, message: err.message, retryable: false },
@@ -169,6 +173,9 @@ router.post("/walk-in-bookings", async (req, res) => {
     const existingPatientId = req.body?.patientId;
     const commonFieldsAreMissing = !req.body?.specialist || !req.body?.clinic ||
         !req.body?.date || !req.body?.time;
+    if (req.body?.selectionMode !== undefined && !["priority", "earlier"].includes(req.body.selectionMode)) {
+        return res.status(400).json({ error: { code: "INVALID_INPUT", message: "Mode de sélection invalide.", retryable: false } });
+    }
     if (commonFieldsAreMissing || (existingPatientId && req.body?.patient) || (req.body?.replaceAppointmentId && !existingPatientId)) {
         return res.status(400).json({
             error: {
@@ -210,6 +217,8 @@ router.post("/walk-in-bookings", async (req, res) => {
         const replicaSet = await getReplicaSetStatus();
         const booking = {
             clinicId: req.body.clinic,
+            originClinicId: req.body.originClinic,
+            selectionMode: req.body.selectionMode ?? "priority",
             specialistId: req.body.specialist,
             date: req.body.date,
             time: req.body.time,

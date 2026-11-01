@@ -1,4 +1,4 @@
-export type UserRole = "USER" | "RECEPTION" | "MEDECIN" | "ADMIN" | "SUPERADMIN";
+export type UserRole = "USER" | "RECEPTION" | "MEDECIN" | "IPS" | "ADMIN" | "SUPERADMIN";
 
 export function isAdminRole(role: UserRole | null | undefined): boolean {
     return role === "ADMIN" || role === "SUPERADMIN";
@@ -13,4 +13,8 @@ export function getDefaultRouteForRole(role: UserRole): string {
     }
 
     return "/clinical";
+}
+
+export function isClinicianRole(role: string | null | undefined): role is "MEDECIN" | "IPS" {
+    return role === "MEDECIN" || role === "IPS";
 }

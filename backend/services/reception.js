@@ -5,7 +5,9 @@ import { AdminUser } from "../models/AdminUser.js";
 import { Patient } from "../models/Patient.js";
 import { Specialist } from "../models/Specialist.js";
 import { Appointment } from "../models/Appointment.js";
-import { URGENTOLOGIST_SPECIALTY, URGENTOLOGIST_DAILY_LIMIT, isUrgentologist } from "../domain/specialties.js";
+import { Clinique } from "../models/Clinique.js";
+import { orderedWalkInClinics, WALK_IN_RADIUS_KM, WALK_IN_TOLERANCE_KM, WALK_IN_MAX_DISTANCE_KM, WALK_IN_SPECIALTY_PRIORITY } from "./receptionWalkInRouting.js";
+import { IPS_SPECIALTY, URGENTOLOGIST_SPECIALTY, URGENTOLOGIST_DAILY_LIMIT, isUrgentologist } from "../domain/specialties.js";
 import { countUrgentologistConsultations } from "./urgentologistCapacity.js";
 import { recordPatientAuditEvent } from "../audit/patientAudit.js";
 import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
@@ -20,7 +22,6 @@ import { createPatient } from "./patients.js";
 import { isSchedulingDatePast, toSchedulingDateKey } from "../utils/schedulingTime.js";
 import { normalizePatientIdentifierSearch } from "../utils/patientSearchKeys.js";
 
-const FAMILY_MEDICINE_SPECIALTY = "Medecin de famille";
 const MAX_FUTURE_OPTIONS = 8;
 
 function replacementConflict() {
@@ -50,7 +51,7 @@ function invalidInput(message) {
     return { code: "INVALID_INPUT", message };
 }
 
-async function assertReceptionClinicAccess(clinicId, authUser) {
+async function assertReceptionClinicAccess(clinicId, authUser, session = null) {
     if (!mongoose.Types.ObjectId.isValid(clinicId)) {
         throw invalidInput("Clinique invalide.");
     }
@@ -59,7 +60,7 @@ async function assertReceptionClinicAccess(clinicId, authUser) {
         _id: authUser?.userId,
         isActive: true,
         role: "RECEPTION",
-    }, { assignedClinics: 1 }).lean();
+    }, { assignedClinics: 1 }).session(session).lean();
 
     if (!reception) {
         throw { code: "FORBIDDEN", message: "Compte réception invalide ou inactif." };
@@ -81,14 +82,14 @@ function getLocationForClinic(specialist, clinicId) {
 async function requireActiveReceivingPhysician(specialistId, clinicId, session) {
     if (!mongoose.Types.ObjectId.isValid(specialistId)) throw invalidInput("Médecin invalide.");
     const specialist = await Specialist.findOne({
-        _id: specialistId, specialite: { $in: [FAMILY_MEDICINE_SPECIALTY, URGENTOLOGIST_SPECIALTY] },
+        _id: specialistId, specialite: { $in: WALK_IN_SPECIALTY_PRIORITY },
     }).session(session).lean();
     if (!specialist || !getLocationForClinic(specialist, clinicId)) {
         throw { code: "FORBIDDEN", message: "Ce médecin n'exerce pas dans la clinique sélectionnée." };
     }
     const account = specialist.accountUserId
         ? await AdminUser.findOne({
-            _id: specialist.accountUserId, role: "MEDECIN", isActive: true,
+            _id: specialist.accountUserId, role: specialist.specialite === IPS_SPECIALTY ? "IPS" : "MEDECIN", isActive: true,
         }, { _id: 1 }).session(session).lean()
         : null;
     if (!account) {
@@ -103,7 +104,7 @@ function toOption(specialist, date, schedule, slotTypes = {}) {
             _id: String(specialist._id),
             nom: specialist.nom,
             prenom: specialist.prenom,
-            ...(isUrgentologist(specialist.specialite) ? { specialty: URGENTOLOGIST_SPECIALTY } : {}),
+            specialty: specialist.specialite,
         },
         date,
         slots: schedule.slots,
@@ -111,134 +112,156 @@ function toOption(specialist, date, schedule, slotTypes = {}) {
     };
 }
 
-// This read-only search deliberately receives no patient identifier. It is
-// used before a new patient agrees to a visit, so no patient record or
-// appointment can be created by merely looking for capacity.
+// Search only scheduling data. It never creates an identity or appointment.
+// Existing-patient filtering requires the exact origin-clinic lookup proof.
 export async function listWalkInFamilyMedicineOptions({
-    clinicId,
-    patientId = null,
-    replaceAppointmentId = null,
-    authUser,
-    now = new Date(),
+    clinicId, patientId = null, replaceAppointmentId = null, bookingProof,
+    authUser, now = new Date(), compareEarlier = false,
 }) {
     await assertReceptionClinicAccess(clinicId, authUser);
-
-    if (patientId && !mongoose.Types.ObjectId.isValid(patientId)) {
-        throw invalidInput("Patient invalide.");
-    }
+    if (patientId && !mongoose.Types.ObjectId.isValid(patientId)) throw invalidInput("Patient invalide.");
     if (patientId) {
-        const patientExists = await Patient.exists({ _id: patientId, archivedAt: null });
-        if (!patientExists) {
-            throw invalidInput("Patient introuvable.");
-        }
+        await validateReceptionBookingProof({ bookingProof, authUser, clinicId, patientId });
+        if (!await Patient.exists({ _id: patientId, archivedAt: null })) throw invalidInput("Patient introuvable.");
     }
     const today = currentSchedulingDay(now);
     const previous = patientId
         ? validateReplacement(await pendingAppointments(patientId, clinicId, today), replaceAppointmentId)
         : null;
     if (!patientId && replaceAppointmentId) throw invalidInput("Patient requis pour replanifier.");
+    return searchWalkInOptions({ clinicId, patientId, previous, now, compareEarlier: compareEarlier === true });
+}
 
-    const specialists = await Specialist.find({
-        specialite: { $in: [FAMILY_MEDICINE_SPECIALTY, URGENTOLOGIST_SPECIALTY] },
-    }).lean();
-
-    const accountIds = specialists.filter(s => getLocationForClinic(s, clinicId) && s.accountUserId)
-        .map(s => s.accountUserId);
-    const activeAccounts = accountIds.length ? await AdminUser.find({
-        _id: { $in: accountIds }, role: "MEDECIN", isActive: true,
-    }, { _id: 1 }).lean() : [];
-    const activeAccountIds = new Set(activeAccounts.map(account => String(account._id)));
-
-    const todayOptions = [];
-    const futureCandidates = [];
-    let urgentologistCount = 0;
-    let urgentologistsAtCapacity = 0;
-
-    for (const specialist of specialists) {
-        if (!specialist.accountUserId || !activeAccountIds.has(String(specialist.accountUserId))) continue;
-        const location = getLocationForClinic(specialist, clinicId);
+async function clinicSpecialtyOptions({ candidate, specialty, active, patientId, previous, now, session, before = null }) {
+    const destinationId = String(candidate.clinic._id);
+    const today = currentSchedulingDay(now);
+    const options = [];
+    let urgentologistCount = 0, urgentologistsAtCapacity = 0;
+    for (const specialist of active.filter(s => s.specialite === specialty)) {
+        const location = getLocationForClinic(specialist, destinationId);
         if (!location) continue;
-        const urgentologist = isUrgentologist(specialist.specialite);
+        const urgentologist = isUrgentologist(specialty);
         if (urgentologist) {
             urgentologistCount++;
-            if (await countUrgentologistConsultations(specialist._id, today, { excludeAppointmentId: previous?._id }) >= URGENTOLOGIST_DAILY_LIMIT) urgentologistsAtCapacity++;
+            if (await countUrgentologistConsultations(specialist._id, today, { session, excludeAppointmentId: previous?._id }) >= URGENTOLOGIST_DAILY_LIMIT) urgentologistsAtCapacity++;
         }
-
-        // A person already known to the clinic may still arrive without an
-        // appointment. They can therefore use either their regular slots or
-        // the capacity the physician explicitly reserved for walk-ins. A new
-        // patient remains restricted to walk-in capacity.
-        const slotTypes = patientId && !urgentologist
-            ? ["regular", "walk_in"]
-            : ["walk_in"];
-        const configuredSlots = slotTypes.flatMap((slotType) =>
-            slotType === "walk_in"
-                ? location.walkInDisponibilites || []
-                : location.disponibilites || []
-        );
-        const dates = [...new Set(
-            configuredSlots
-                .map(toSchedulingDateKey)
-                .filter((date) => date && !isSchedulingDatePast(date, now))
-        )].sort();
-
+        const slotTypes = patientId && !urgentologist ? ["regular", "walk_in"] : ["walk_in"];
+        const configuredSlots = slotTypes.flatMap(type => type === "walk_in" ? location.walkInDisponibilites || [] : location.disponibilites || []);
+        const dates = [...new Set(configuredSlots.map(toSchedulingDateKey).filter(date => date && !isSchedulingDatePast(date, now) && (!before || date <= before.slice(0, 10))))].sort();
         for (const date of dates) {
-            const schedules = await Promise.all(
-                slotTypes.map((slotType) =>
-                    getAvailableSlotSchedule(
-                        String(specialist._id),
-                        date,
-                        {
-                            clinique: String(clinicId),
-                            ...(patientId ? { patient: String(patientId) } : {}),
-                            ...(previous ? { excludeAppointmentId: String(previous._id) } : {}),
-                            slotType,
-                        }
-                    )
-                )
-            );
+            // A MongoDB transaction must not run simultaneous queries
+            // on the same session, including regular/walk-in merging.
+            const schedules = [];
+            for (const slotType of slotTypes) {
+                schedules.push(await getAvailableSlotSchedule(String(specialist._id), date, {
+                    clinique: destinationId, ...(patientId ? { patient: String(patientId) } : {}),
+                    ...(previous ? { excludeAppointmentId: String(previous._id) } : {}), slotType, session, now,
+                }));
+            }
             const slotTypesByTime = {};
-            const slots = [];
-            schedules.forEach((schedule, index) => {
-                schedule.slots.forEach((time) => {
-                    if (previous && String(previous.specialist) === String(specialist._id) && previous.date === date && previous.time === time) return;
-                    if (slotTypesByTime[time]) return;
-                    slotTypesByTime[time] = slotTypes[index];
-                    slots.push(time);
-                });
-            });
-            slots.sort();
-            if (slots.length === 0) continue;
+            for (let index = 0; index < schedules.length; index++) {
+                for (const time of schedules[index].slots) {
+                    if (previous && String(previous.specialist) === String(specialist._id) && previous.date === date && previous.time === time) continue;
+                    if (!slotTypesByTime[time]) slotTypesByTime[time] = slotTypes[index];
+                }
+            }
+            const slots = Object.keys(slotTypesByTime).sort();
+            if (slots.length) options.push(toOption(specialist, date, { slots }, slotTypesByTime));
+        }
+    }
+    const urgentologists = urgentologistCount ? { limit: URGENTOLOGIST_DAILY_LIMIT, day: today, allAtCapacity: urgentologistsAtCapacity === urgentologistCount } : undefined;
+    return { options, urgentologists };
+}
 
-            const option = toOption(specialist, date, { slots }, slotTypesByTime);
-            if (date === today) {
-                todayOptions.push(option);
-            } else {
-                futureCandidates.push(option);
+async function earlierWalkInAlternatives({ primary, geography, active, clinicId, patientId, previous, now, session }) {
+    const primaryTimes = [...primary.today, ...primary.future].flatMap(option => option.slots.map(time => `${option.date}T${time}`)).sort();
+    if (!primary.selectedClinic || !primaryTimes.length || !geography.originLocated) return [];
+    const before = primaryTimes[0];
+    const alternatives = [];
+    // This secondary, explicitly requested comparison never changes the
+    // priority result or automatically selects another appointment.
+    for (const candidate of geography.candidates) {
+        if (String(candidate.clinic._id) === String(clinicId)) continue;
+        for (const specialty of WALK_IN_SPECIALTY_PRIORITY) {
+            const { options } = await clinicSpecialtyOptions({ candidate, specialty, active, patientId, previous, now, session, before });
+            for (const option of options) {
+                const slots = option.slots.filter(time => `${option.date}T${time}` < before);
+                if (!slots.length) continue;
+                alternatives.push({ ...option, slots, slotTypes: Object.fromEntries(slots.map(time => [time, option.slotTypes[time]])),
+                    clinic: { _id: String(candidate.clinic._id), nom: candidate.clinic.nom, distanceKm: candidate.distanceKm }, prioritySpecialty: specialty });
             }
         }
     }
+    alternatives.sort((left, right) => `${left.date}T${left.slots[0]}`.localeCompare(`${right.date}T${right.slots[0]}`)
+        || left.clinic.distanceKm - right.clinic.distanceKm
+        || WALK_IN_SPECIALTY_PRIORITY.indexOf(left.prioritySpecialty) - WALK_IN_SPECIALTY_PRIORITY.indexOf(right.prioritySpecialty)
+        || left.clinic._id.localeCompare(right.clinic._id)
+        || left.specialist._id.localeCompare(right.specialist._id));
+    return alternatives.slice(0, MAX_FUTURE_OPTIONS);
+}
 
-    const sortOptions = (left, right) =>
-        `${left.date}T${left.slots[0]}`.localeCompare(`${right.date}T${right.slots[0]}`) ||
-        `${left.specialist.prenom} ${left.specialist.nom}`.localeCompare(
-            `${right.specialist.prenom} ${right.specialist.nom}`,
-            "fr"
-        );
-
-    // Reception offers today's urgentologist slots first. Family medicine is
-    // the alternative when none remain, not a competing initial choice.
-    const urgentToday = todayOptions.filter(option => option.specialist.specialty === URGENTOLOGIST_SPECIALTY);
-    const hasUrgentToday = urgentToday.length > 0;
+async function searchWalkInOptions({ clinicId, patientId, previous, now = new Date(), session = null, compareEarlier = false }) {
+    const today = currentSchedulingDay(now);
+    const origin = await Clinique.findOne({ _id: clinicId }, { nom: 1, lat: 1, long: 1 }).session(session).lean();
+    if (!origin) throw invalidInput("Clinique introuvable.");
+    const specialists = await Specialist.find({ specialite: { $in: WALK_IN_SPECIALTY_PRIORITY } }).session(session).lean();
+    const accountIds = [...new Set(specialists.filter(s => s.accountUserId).map(s => String(s.accountUserId)))];
+    const accounts = accountIds.length ? await AdminUser.find({ _id: { $in: accountIds }, role: { $in: ["MEDECIN", "IPS"] }, isActive: true }, { _id: 1, role: 1 }).session(session).lean() : [];
+    const activeAccounts = new Map(accounts.map(account => [String(account._id), account.role]));
+    const active = specialists.filter(s => WALK_IN_SPECIALTY_PRIORITY.includes(s.specialite)
+        && activeAccounts.get(String(s.accountUserId)) === (s.specialite === IPS_SPECIALTY ? "IPS" : "MEDECIN"));
+    const clinicIds = [...new Set(active.flatMap(s => getPracticeLocations(s).map(location => location.clinique)))];
+    const clinics = clinicIds.length ? await Clinique.find({ _id: { $in: clinicIds } }, { nom: 1, lat: 1, long: 1 }).session(session).lean() : [];
+    const geography = orderedWalkInClinics(origin, clinics);
+    let examinedClinics = 0;
+    let originUrgentologists;
+    for (const candidate of geography.candidates) {
+        examinedClinics++;
+        const destinationId = String(candidate.clinic._id);
+        for (const specialty of WALK_IN_SPECIALTY_PRIORITY) {
+            const { options, urgentologists } = await clinicSpecialtyOptions({ candidate, specialty, active, patientId, previous, now, session });
+            if (destinationId === String(clinicId) && specialty === URGENTOLOGIST_SPECIALTY) originUrgentologists = urgentologists;
+            if (!options.length) continue;
+            options.sort((left, right) => `${left.date}T${left.slots[0]}`.localeCompare(`${right.date}T${right.slots[0]}`)
+                || `${left.specialist.prenom || ""} ${left.specialist.nom || ""}`.localeCompare(`${right.specialist.prenom || ""} ${right.specialist.nom || ""}`, "fr")
+                || left.specialist._id.localeCompare(right.specialist._id));
+            const result = {
+                presentation: "priority", selectedClinic: { _id: destinationId, nom: candidate.clinic.nom, distanceKm: candidate.distanceKm }, prioritySpecialty: specialty,
+                search: { radiusKm: WALK_IN_RADIUS_KM, toleranceKm: WALK_IN_TOLERANCE_KM, maxDistanceKm: WALK_IN_MAX_DISTANCE_KM, status: "found", distanceMode: "straight_line", examinedClinics,
+                    ...(geography.hasUnlocatedClinics ? { hasUnlocatedClinics: true } : {}) },
+                today: options.filter(option => option.date === today), future: options.filter(option => option.date > today).slice(0, MAX_FUTURE_OPTIONS),
+                ...(urgentologists || originUrgentologists ? { urgentologists: urgentologists || originUrgentologists } : {}),
+            };
+            if (compareEarlier) result.earlierAlternatives = await earlierWalkInAlternatives({ primary: result, geography, active, clinicId, patientId, previous, now, session });
+            return result;
+        }
+    }
     return {
-        presentation: hasUrgentToday ? "urgent_today" : "alternatives",
-        today: (hasUrgentToday ? urgentToday : todayOptions).sort(sortOptions),
-        future: hasUrgentToday ? [] : futureCandidates
-            .filter(option => option.specialist.specialty !== URGENTOLOGIST_SPECIALTY)
-            .sort(sortOptions).slice(0, MAX_FUTURE_OPTIONS),
-        ...(urgentologistCount ? { urgentologists: { limit: URGENTOLOGIST_DAILY_LIMIT, day: today,
-            allAtCapacity: urgentologistsAtCapacity === urgentologistCount } } : {}),
+        presentation: "priority", today: [], future: [],
+        ...(compareEarlier ? { earlierAlternatives: [] } : {}),
+        search: { radiusKm: WALK_IN_RADIUS_KM, toleranceKm: WALK_IN_TOLERANCE_KM, maxDistanceKm: WALK_IN_MAX_DISTANCE_KM, status: !geography.originLocated || geography.hasUnlocatedClinics ? "location_missing" : "exhausted", distanceMode: "straight_line", examinedClinics,
+            ...(geography.hasUnlocatedClinics ? { hasUnlocatedClinics: true } : {}) },
+        ...(originUrgentologists ? { urgentologists: originUrgentologists } : {}),
     };
+}
+
+async function assertWalkInDestination({ originClinicId, clinicId, specialistId, patientId = null, previous = null, date, time, slotType = "walk_in", selectionMode = "priority", session, authUser }) {
+    await assertReceptionClinicAccess(originClinicId, authUser, session);
+    if (!mongoose.Types.ObjectId.isValid(clinicId)) throw invalidInput("Clinique invalide.");
+    if (!["priority", "earlier"].includes(selectionMode)) throw invalidInput("Mode de sélection invalide.");
+    const options = await searchWalkInOptions({ clinicId: originClinicId, patientId, previous, session, compareEarlier: selectionMode === "earlier" });
+    const selected = selectionMode === "earlier"
+        ? options.earlierAlternatives?.find(option => option.clinic._id === String(clinicId) && option.specialist._id === String(specialistId) && option.date === date && option.slots.includes(time))
+        : options.selectedClinic?._id === String(clinicId)
+            && [...options.today, ...options.future].find(option => option.specialist._id === String(specialistId) && option.date === date && option.slots.includes(time));
+    if (!selected) throw { code: "NO_AVAILABILITY", message: "Le créneau ou la clinique prioritaire a changé. Recherchez les disponibilités à nouveau." };
+    // The merged display has one preferred slot type per time. A legacy
+    // client may choose its other genuinely configured type at that time.
+    const schedule = await getAvailableSlotSchedule(String(specialistId), date, {
+        clinique: String(clinicId), ...(patientId ? { patient: String(patientId) } : {}),
+        ...(previous ? { excludeAppointmentId: String(previous._id) } : {}), slotType, session,
+    });
+    if (!schedule.slots.includes(time)) throw { code: "NO_AVAILABILITY", message: "Ce créneau n'est plus disponible. Recherchez les disponibilités à nouveau." };
 }
 
 // A reception lookup is intentionally exact, limited to an assigned clinic,
@@ -358,6 +381,8 @@ export async function recordReceptionHistoricalAttendance({ clinicId, patientId,
 // appointment is retained.
 export async function createWalkInPatientAndAppointment({
     clinicId,
+    originClinicId = clinicId,
+    selectionMode = "priority",
     specialistId,
     date,
     time,
@@ -365,7 +390,7 @@ export async function createWalkInPatientAndAppointment({
     authUser,
     audit = {},
 }) {
-    await assertReceptionClinicAccess(clinicId, authUser);
+    await assertReceptionClinicAccess(originClinicId, authUser);
 
     const ramq = normalizePatientIdentifierSearch(
         patientDto?.num_assurance_maladie
@@ -389,6 +414,7 @@ export async function createWalkInPatientAndAppointment({
     try {
         let result;
         await session.withTransaction(async () => {
+            await assertWalkInDestination({ originClinicId, clinicId, specialistId, date, time, selectionMode, session, authUser });
             const receivingPhysicianUserId = await requireActiveReceivingPhysician(specialistId, clinicId, session);
             // Reception creates identity data only, never a clinical profile or
             // notes, even if such fields are forged in the HTTP payload.
@@ -414,7 +440,7 @@ export async function createWalkInPatientAndAppointment({
                     slotType: "walk_in",
                 },
                 authUser,
-                { session, patientFromTransaction: patient, receivingPhysicianUserId }
+                { session, patientFromTransaction: patient, receivingPhysicianUserId, receptionOriginClinicId: originClinicId }
             );
 
             await recordPatientAuditEvent({
@@ -487,6 +513,8 @@ export async function createWalkInPatientAndAppointment({
 // and the exact RAMQ lookup.
 export async function createWalkInAppointmentForExistingPatient({
     clinicId,
+    originClinicId = clinicId,
+    selectionMode = "priority",
     specialistId,
     patientId,
     date,
@@ -497,7 +525,7 @@ export async function createWalkInAppointmentForExistingPatient({
     authUser,
     audit = {},
 }) {
-    await assertReceptionClinicAccess(clinicId, authUser);
+    await assertReceptionClinicAccess(originClinicId, authUser);
 
     if (!mongoose.Types.ObjectId.isValid(patientId)) {
         throw invalidInput("Patient invalide.");
@@ -508,7 +536,7 @@ export async function createWalkInAppointmentForExistingPatient({
         let result;
         await session.withTransaction(async () => {
             const receivingPhysicianUserId = await requireActiveReceivingPhysician(specialistId, clinicId, session);
-            await consumeReceptionBookingProof({ bookingProof, authUser, clinicId, patientId, session });
+            await consumeReceptionBookingProof({ bookingProof, authUser, clinicId: originClinicId, patientId, session });
             // All reception bookings for this patient serialize on this document.
             // A transaction retried after a concurrent booking rechecks pending appointments.
             const patient = await Patient.findOneAndUpdate(
@@ -522,10 +550,12 @@ export async function createWalkInAppointmentForExistingPatient({
 
             // Recompute inside every retry, after the patient lock and proof.
             const today = currentSchedulingDay();
-            const previous = validateReplacement(await pendingAppointments(patientId, clinicId, today, session), replaceAppointmentId);
+            const previous = validateReplacement(await pendingAppointments(patientId, originClinicId, today, session), replaceAppointmentId);
+            if (String(originClinicId) !== String(clinicId) && (await pendingAppointments(patientId, clinicId, today, session)).length) throw replacementConflict();
+            if (previous && String(previous.specialist) === String(specialistId) && previous.date === date && previous.time === time) throw invalidInput("Choisissez un autre créneau.");
+            await assertWalkInDestination({ originClinicId, clinicId, specialistId, patientId, previous, date, time, slotType, selectionMode, session, authUser });
             if (previous) {
-                if (String(previous.specialist) === String(specialistId) && previous.date === date && previous.time === time) throw invalidInput("Choisissez un autre créneau.");
-                const changed = await Appointment.updateOne({ _id: previous._id, patient: patientId, clinique: clinicId, status: "scheduled" },
+                const changed = await Appointment.updateOne({ _id: previous._id, patient: patientId, clinique: originClinicId, status: "scheduled" },
                     { $set: { status: "rescheduled" } }, { session });
                 if (changed.modifiedCount !== 1) throw replacementConflict();
                 await releaseDailyAppointmentCapacity({ patient: patientId, specialist: previous.specialist, date: previous.date, session });
@@ -542,7 +572,7 @@ export async function createWalkInAppointmentForExistingPatient({
                     slotType,
                 },
                 authUser,
-                { session, patientFromTransaction: patient, receivingPhysicianUserId, ...(previous ? { excludeAppointmentId: String(previous._id) } : {}) }
+                { session, patientFromTransaction: patient, receivingPhysicianUserId, receptionOriginClinicId: originClinicId, ...(previous ? { excludeAppointmentId: String(previous._id) } : {}) }
             );
 
             if (previous) {

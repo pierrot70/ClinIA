@@ -1,3 +1,5 @@
+import { OwnerCareSharing, type CareSharingPatient } from "../components/clinical/OwnerCareSharing";
+import { clinicalCareAccessLabels } from "../i18n/clinicalCareAccessLabels";
 import { useUiLabels } from "../hooks/useUiLabels";
 import { UiMessage } from "../components/i18n/UiMessage";
 import { useContext, useEffect, useMemo, useState } from "react";
@@ -211,11 +213,13 @@ function usePatientsPageLabels(targetLang: string) {
 export function PatientsPage() {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const canManageArchive = user?.role !== "IPS";
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
     const ui = usePatientsPageLabels(targetLang);
     const { t } = useUiLabels();
     const [patients, setPatients] = useState<Patient[]>([]);
+    const [careSharingPatient, setCareSharingPatient] = useState<CareSharingPatient | null>(null);
     const [supportRequestPatientIds, setSupportRequestPatientIds] = useState<Set<string>>(() => new Set());
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
@@ -325,9 +329,12 @@ export function PatientsPage() {
     });
     const [viewMode, setViewMode] = useState<"create" | "list" | "archived">("list");
     useEffect(() => {
+        if (!canManageArchive && viewMode === "archived") setViewMode("list");
+    }, [canManageArchive, viewMode]);
+    useEffect(() => {
         loadPatients();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filters, limit, page, viewMode]);
+    }, [filters, limit, page, viewMode, canManageArchive]);
 
     async function loadPatients() {
         setLoading(true);
@@ -348,7 +355,7 @@ export function PatientsPage() {
             sortBy: filters.sortBy,
             sortDir: filters.sortDir,
             archiveStatus:
-                viewMode === "archived" ? ("archived" as const) : ("active" as const),
+                viewMode === "archived" && canManageArchive ? ("archived" as const) : ("active" as const),
         };
 
         const shouldUsePhoneOnly =
@@ -647,6 +654,7 @@ export function PatientsPage() {
     }
 
     async function handleArchive(id: string) {
+        if (!canManageArchive) return;
         const confirmed = window.confirm(
             ui.archiveConfirm
         );
@@ -691,6 +699,7 @@ export function PatientsPage() {
     }
 
     async function handleRestore(id: string) {
+        if (!canManageArchive) return;
         if (!window.confirm(ui.restoreConfirm)) return;
 
         const reason = window.prompt(ui.restoreReasonPrompt)?.trim();
@@ -786,6 +795,7 @@ export function PatientsPage() {
                 >
                     {ui.searchTab}
                 </button>
+                {canManageArchive && (
                 <button
                     type="button"
                     className={`px-4 py-2 rounded border font-semibold transition ${
@@ -800,6 +810,7 @@ export function PatientsPage() {
                 >
                     {ui.archivedTab}
                 </button>
+                )}
             </div>
 
             {visibleErrorMessage && (
@@ -1153,13 +1164,14 @@ export function PatientsPage() {
                                 </dl>
                                 <div className="mt-3 grid grid-cols-2 gap-2">
                                     {viewMode === "archived" ? (
-                                        <button className="col-span-2 min-h-11 rounded border border-emerald-600 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 shadow-xs" disabled={busyIds[p._id]} onClick={() => handleRestore(p._id)}>{ui.restoreLabel}</button>
+                                        canManageArchive && (<button className="col-span-2 min-h-11 rounded border border-emerald-600 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 shadow-xs" disabled={busyIds[p._id]} onClick={() => handleRestore(p._id)}>{ui.restoreLabel}</button>)
                                     ) : (<>
                                         <button type="button" className="col-span-2 min-h-11 rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-blue-700" onClick={() => navigate("/appointments", { state: { patientId: p._id } })}>{ui.createAppointment}</button>
                                         <button className="min-h-11 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-xs hover:bg-slate-50" onClick={() => handleEdit(p)}>{ui.edit}</button>
                                         <button className="min-h-11 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-xs hover:bg-slate-50" onClick={() => handleOpenClinicalNotes(p._id)}>{ui.clinicalNotesOpen}</button>
+                                        {user?.role === "IPS" && p.ownerUserId === user.id && !p.archivedAt && <button type="button" className="col-span-2 rounded border border-blue-300 px-3 py-2 text-blue-800" onClick={() => setCareSharingPatient(p)}>{clinicalCareAccessLabels(targetLang).manage}</button>}
                                         {user?.role === "MEDECIN" && <button type="button" className="col-span-2 min-h-11 rounded border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 shadow-xs disabled:opacity-60" disabled={supportRequestPatientIds.has(p._id)} onClick={() => void handleRequestSupport(p)}>{supportRequestPatientIds.has(p._id) ? ui.supportRequestPending : ui.requestSupport}</button>}
-                                        <button className="col-span-2 min-h-11 rounded border border-amber-400 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 shadow-xs" disabled={busyIds[p._id]} onClick={() => handleArchive(p._id)}>{ui.archiveLabel}</button>
+                                        {canManageArchive && <button className="col-span-2 min-h-11 rounded border border-amber-400 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 shadow-xs" disabled={busyIds[p._id]} onClick={() => handleArchive(p._id)}>{ui.archiveLabel}</button>}
                                     </>)}
                                 </div>
                                 </>}
@@ -1283,6 +1295,7 @@ export function PatientsPage() {
                                                                 ? ` - ${ui.archivedAt} ${new Date(p.archivedAt).toLocaleString()}`
                                                                 : ""}
                                                         </span>
+                                                        {canManageArchive && (
                                                         <button
                                                             className="px-2 py-1 border rounded text-emerald-700"
                                                             disabled={busyIds[p._id]}
@@ -1290,6 +1303,7 @@ export function PatientsPage() {
                                                         >
                                                             {ui.restoreLabel}
                                                         </button>
+                                                        )}
                                                     </>
                                                 ) : (
                                                     <>
@@ -1320,6 +1334,7 @@ export function PatientsPage() {
                                                 >
                                                     {ui.clinicalNotesOpen}
                                                 </button>
+                                                {user?.role === "IPS" && p.ownerUserId === user.id && !p.archivedAt && <button type="button" className="rounded border px-3 py-1 text-blue-700" onClick={() => setCareSharingPatient(p)}>{clinicalCareAccessLabels(targetLang).manage}</button>}
                                                 {user?.role === "MEDECIN" && (
                                                     <button
                                                         type="button"
@@ -1332,6 +1347,7 @@ export function PatientsPage() {
                                                             : ui.requestSupport}
                                                     </button>
                                                 )}
+                                                {canManageArchive && (
                                                 <button
                                                     className="px-2 py-1 border rounded text-amber-700"
                                                     disabled={
@@ -1343,6 +1359,7 @@ export function PatientsPage() {
                                                 >
                                                     {ui.archiveLabel}
                                                 </button>
+                                                )}
                                                     </>
                                                 )}
                                             </td>
@@ -1351,6 +1368,8 @@ export function PatientsPage() {
                             </tbody>
                         </table>
                     </div>
+                    <OwnerCareSharing patient={careSharingPatient} onClose={() => setCareSharingPatient(null)} />
+
                     <PatientClinicalNotesModal
                         patient={notesPatient}
                         onClose={() => setNotesPatient(null)}
