@@ -1,0 +1,80 @@
+[
+  {
+    "id": "DT2-55",
+    "therapeutic_options": {
+      "current_strategy": {
+        "description": "Continuation of metformin monotherapy given good tolerance and preserved renal function.",
+        "rationale": "Metformin is first-line therapy for type 2 diabetes, effective for glycemic control and weight neutrality, with cardiovascular safety."
+      },
+      "additional_options": [
+        {
+          "class": "GLP-1 receptor agonists",
+          "considerations": "May provide additional glycemic control, weight reduction, and cardiovascular risk reduction benefits, especially in moderate to high cardiovascular risk patients.",
+          "suitability": "Appropriate for patients with preserved or mildly reduced renal function and low fragility.",
+          "notes": "Requires evaluation of patient preference, injection route, cost, and potential gastrointestinal side effects."
+        },
+        {
+          "class": "SGLT2 inhibitors",
+          "considerations": "Offer glycemic control, cardiovascular and renal protection benefits, and weight loss.",
+          "suitability": "Suitable for patients with preserved or mildly reduced renal function; monitor renal function regularly.",
+          "notes": "Assess for risk of genitourinary infections and volume depletion."
+        },
+        {
+          "class": "Other agents (DPP-4 inhibitors, sulfonylureas, insulin)",
+          "considerations": "May be considered based on individual patient factors, but less preferred due to weight gain risk or hypoglycemia potential."
+        }
+      ]
+    }
+  },
+  {
+    "id": "DT2-78-LOW-FRAILTY",
+    "therapeutic_options": {
+      "current_strategy": {
+        "description": "Continuation of metformin monotherapy given good tolerance and preserved renal function.",
+        "rationale": "Metformin remains first-line therapy for type 2 diabetes, especially with preserved renal function and good tolerance.",
+        "considerations": "Monitor glycemic control and side effects; assess if HbA1c target <7% is achieved safely."
+      },
+      "additional_or_alternative_options": {
+        "GLP-1_receptor_agonists": {
+          "description": "Consider GLP-1 receptor agonists as add-on therapy if glycemic targets are not met or for additional cardiovascular benefit.",
+          "rationale": "GLP-1 RAs have demonstrated cardiovascular risk reduction in moderate to high risk patients and promote weight loss, which may benefit patients in the 80-99kg weight band.",
+          "considerations": "Evaluate renal function, gastrointestinal tolerance, and patient preference before initiation."
+        },
+        "SGLT2_inhibitors": {
+          "description": "Consider SGLT2 inhibitors for cardiovascular and renal protection, especially in moderate to high cardiovascular risk patients.",
+          "rationale": "SGLT2 inhibitors reduce cardiovascular events and have renal benefits; suitable if renal function is preserved or mildly reduced.",
+          "considerations": "Monitor for volume depletion, genital infections, and renal function."
+        },
+        "Other agents": {
+          "description": "DPP-4 inhibitors, sulfonylureas, or insulin may be considered based on glycemic control, hypoglycemia risk, and patient factors.",
+          "rationale": "Tailor therapy to individual needs, comorbidities, and risk profiles."
+        }
+      }
+    }
+  },
+  {
+    "id": "DT2-CV-58",
+    "therapeutic_options": {
+      "current_strategy": {
+        "description": "Continuation of metformin monotherapy given good tolerance and preserved renal function.",
+        "considerations": "Metformin remains first-line therapy for type 2 diabetes with benefits on glycemic control and weight neutrality."
+      },
+      "additional_agents": [
+        {
+          "class": "GLP-1 receptor agonists",
+          "rationale": "Recommended for patients with type 2 diabetes and high cardiovascular risk to reduce major adverse cardiovascular events and support weight loss.",
+          "benefits": "Improves glycemic control, promotes weight loss, and has cardiovascular benefits.",
+          "considerations": "Appropriate for patients with preserved or mildly reduced renal function and low fragility.",
+          "contraindications": "Personal or family history of medullary thyroid carcinoma or multiple endocrine neoplasia syndrome type 2."
+        },
+        {
+          "class": "SGLT2 inhibitors",
+          "rationale": "Also beneficial for cardiovascular risk reduction and renal protection in patients with type 2 diabetes and high cardiovascular risk.",
+          "benefits": "Improves glycemic control, reduces heart failure hospitalization, and slows progression of kidney disease.",
+          "considerations": "Use cautiously if renal function declines; monitor volume status.",
+          "contraindications": "History of recurrent genital infections or diabetic ketoacidosis."
+        }
+      ]
+    }
+  }
+]

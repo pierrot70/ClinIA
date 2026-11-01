@@ -83,6 +83,49 @@ function buildTreatmentFromString(name, extras = {}) {
     };
 }
 
+// Historical provider responses use these three explicit option containers.
+// Read only those boundaries: a named reference, global caution or prose
+// mentioning a medication must never become a therapeutic option.
+function historicalTherapeuticOptions(therapeuticOptions) {
+    const ownList = value => typeof value === "string" && value.trim()
+        ? [value]
+        : Array.isArray(value)
+            ? value.filter(item => typeof item === "string" && item.trim())
+            : [];
+    const mapOption = (option, sourceKey) => {
+        if (!option || typeof option !== "object" || Array.isArray(option)) return [];
+        const name = firstAuthoredText(option.name, option.class,
+            sourceKey === undefined ? "" : sourceKey.replaceAll("_", " "));
+        if (!name.trim()) return [];
+        return [{
+            ...buildTreatmentFromString(name, {
+                ...option,
+                justification: firstAuthoredText(option.justification, option.rationale, option.explanation),
+                details: firstAuthoredText(option.details, option.description),
+                // A dictionary's key is its authored option label. Retain
+                // that exact key, including underscores, with its own data.
+                source_fields: sourceKey === undefined ? option : { [sourceKey]: option },
+            }),
+            contraindications: ownList(option.contraindications),
+            monitoring: ownList(option.monitoring),
+        }];
+    };
+    const options = [];
+    for (const key of ["additional_options", "additional_agents"]) {
+        if (Array.isArray(therapeuticOptions[key])) {
+            for (const option of therapeuticOptions[key]) options.push(...mapOption(option));
+        }
+    }
+    const keyed = therapeuticOptions.additional_or_alternative_options;
+    if (keyed && typeof keyed === "object" && !Array.isArray(keyed)) {
+        const metadataKeys = new Set(["references", "sources", "monitoring", "monitoring_considerations", "contraindications", "contraindications_and_cautions", "current_strategy"]);
+        for (const [key, option] of Object.entries(keyed)) {
+            if (!metadataKeys.has(key)) options.push(...mapOption(option, key));
+        }
+    }
+    return options;
+}
+
 function flattenTherapeuticOptions(therapeuticOptions) {
     if (!therapeuticOptions || typeof therapeuticOptions !== "object") {
         return [];
@@ -124,7 +167,7 @@ function flattenTherapeuticOptions(therapeuticOptions) {
         }
     }
 
-    return treatments;
+    return [...treatments, ...historicalTherapeuticOptions(therapeuticOptions)];
 }
 
 function namedStructuredOptions(value) {
@@ -200,6 +243,9 @@ export function normalizeClinicalAnalysis(
         raw?.other_ai_fields && typeof raw.other_ai_fields === "object"
             ? raw.other_ai_fields
             : {};
+    // The fields are lifted above; carrying their wrapper into merged would
+    // nest other_ai_fields inside itself on every historical replay.
+    delete root.other_ai_fields;
 
     const merged = { ...liftedOtherAIFields, ...root, ...pa };
 

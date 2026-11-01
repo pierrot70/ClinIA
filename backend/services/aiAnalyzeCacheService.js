@@ -54,6 +54,10 @@ export function resolveCachedDiagnosisState({
     });
     const summaryWithheld = normalizedCachedOutput?.summary_safety?.status === "withheld";
     const repairedLegacyReplay = JSON.stringify(normalizedStoredOutput) !== JSON.stringify(normalizedCachedSource);
+    // Recovering or repairing option cards is a response-only projection.
+    // Preserve the original historical output even outside diabetes cases.
+    const changedTreatmentReplay = JSON.stringify(cachedDiagnosis?.output?.treatments)
+        !== JSON.stringify(normalizedCachedSource?.treatments);
 
     const cachedDiagnosisIsPlaceholderReal =
         cachedDiagnosis?.mode === "real" &&
@@ -68,6 +72,7 @@ export function resolveCachedDiagnosisState({
         canReuseCachedDiagnosis &&
         // Replay repairs must not rewrite the historical stored analysis.
         !repairedLegacyReplay &&
+        !changedTreatmentReplay &&
         !summaryWithheld &&
         JSON.stringify(cachedDiagnosis.output) !==
             JSON.stringify(normalizedCachedOutput);
