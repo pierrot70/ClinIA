@@ -1,7 +1,7 @@
 import { UiMessage } from "../components/i18n/UiMessage";
 import { useUiLabels } from "../hooks/useUiLabels";
 import { formatUiDate, formatUiTime, translateUiLabelTree } from "../i18n/pageUiLabels";
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
     fetchAppointmentsPaginated,
@@ -58,6 +58,12 @@ function useDebounce<T>(value: T, delay = 300): T {
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 
+type PendingCancellation = {
+    appointment: Appointment;
+    reason: "patient" | "clinic_emergency";
+    trigger: HTMLButtonElement;
+};
+
 export function AppointmentsListPage() {
     const { locale: uiLocale, t } = useUiLabels();
     const { user } = useAuth();
@@ -66,6 +72,21 @@ export function AppointmentsListPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const [busyIds, setBusyIds] = useState<Record<string, boolean>>({});
+    const [pendingCancellation, setPendingCancellation] = useState<PendingCancellation | null>(null);
+    const cancellationDialog = useRef<HTMLDialogElement>(null);
+    const cancellationTitleId = useId();
+    const cancellationDetailsId = useId();
+
+    useEffect(() => {
+        const dialog = cancellationDialog.current;
+        if (!pendingCancellation || !dialog) return;
+
+        dialog.showModal();
+        return () => {
+            if (dialog.open) dialog.close();
+            if (pendingCancellation.trigger.isConnected) pendingCancellation.trigger.focus();
+        };
+    }, [pendingCancellation]);
     const [specialists, setSpecialists] = useState<Specialist[]>([]);
     const [cliniques, setCliniques] = useState<Clinique[]>([]);
     const [availabilityRequests, setAvailabilityRequests] = useState<SpecialistAvailabilityRequest[]>([]);
@@ -492,6 +513,20 @@ export function AppointmentsListPage() {
         return true;
     }
 
+    function confirmCancellation() {
+        const dialog = cancellationDialog.current;
+        if (!pendingCancellation || !dialog?.open) return;
+
+        const { appointment, reason } = pendingCancellation;
+        dialog.close();
+        setPendingCancellation(null);
+        void handleAction(appointment._id, () => updateAppointmentStatus(appointment._id, "cancelled", reason), {
+            successMessage: reason === "patient"
+                ? labels.appointmentsList.feedback.cancelledPatient
+                : labels.appointmentsList.feedback.cancelledClinicEmergency,
+        });
+    }
+
     function startEditing(appointment: Appointment) {
         setEditingPurpose("update");
         setEditingId(appointment._id);
@@ -640,6 +675,40 @@ export function AppointmentsListPage() {
 
     return (
         <div className="max-w-6xl mx-auto p-6 space-y-6">
+            {pendingCancellation && (
+                <dialog
+                    ref={cancellationDialog}
+                    aria-labelledby={cancellationTitleId}
+                    aria-describedby={cancellationDetailsId}
+                    dir={uiLocale.toLowerCase().startsWith("he") ? "rtl" : "ltr"}
+                    className="m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border border-slate-200 bg-white p-5 text-slate-900 shadow-xl backdrop:bg-slate-950/40"
+                    onCancel={(event) => {
+                        event.preventDefault();
+                        setPendingCancellation(null);
+                    }}
+                >
+                    <h2 id={cancellationTitleId} className="text-lg font-semibold">
+                        {pendingCancellation.reason === "patient"
+                            ? appointmentLabels.feedback.confirmCancelledPatient
+                            : appointmentLabels.feedback.confirmCancelledClinicEmergency}
+                    </h2>
+                    <p id={cancellationDetailsId} className="mt-2 text-sm text-slate-600">
+                        {formatUiDate(pendingCancellation.appointment.date, uiLocale)}
+                        {" · "}{formatUiTime(pendingCancellation.appointment.time, uiLocale)}
+                        {" · "}{formatCliniqueName(pendingCancellation.appointment)}
+                    </p>
+                    <div className="mt-5 flex flex-wrap justify-end gap-2">
+                        <button type="button" onClick={() => setPendingCancellation(null)}
+                            className="rounded border border-slate-300 px-3 py-2 text-sm font-medium">
+                            {t(labels.pageUi.annuler)}
+                        </button>
+                        <button type="button" onClick={confirmCancellation}
+                            className="rounded bg-red-700 px-3 py-2 text-sm font-medium text-white hover:bg-red-800">
+                            {t(labels.auth.sensitiveAction.confirm)}
+                        </button>
+                    </div>
+                </dialog>
+            )}
             {toast && (
                 <div
                     className={`fixed top-4 right-4 z-50 max-w-xl rounded shadow text-sm ${
@@ -1080,9 +1149,8 @@ export function AppointmentsListPage() {
                                             <button
                                                 disabled={busyIds[a._id] || !canResolve}
                                                 className="rounded border border-red-400 bg-red-50 px-2 py-1 text-xs font-semibold text-red-800 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-45"
-                                                onClick={() => handleAction(a._id, () => updateAppointmentStatus(a._id, "cancelled", "patient"), {
-                                                    confirmMessage: appointmentLabels.feedback.confirmCancelledPatient,
-                                                    successMessage: labels.appointmentsList.feedback.cancelledPatient,
+                                                onClick={(event) => setPendingCancellation({
+                                                    appointment: a, reason: "patient", trigger: event.currentTarget,
                                                 })}
                                             >
                                                 {localize("cancelPatient", appointmentLabels.actions.cancelPatient)}
@@ -1091,9 +1159,8 @@ export function AppointmentsListPage() {
                                             <button
                                                 disabled={busyIds[a._id] || !canResolve}
                                                 className="rounded bg-red-700 px-2 py-1 text-xs font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-45"
-                                                onClick={() => handleAction(a._id, () => updateAppointmentStatus(a._id, "cancelled", "clinic_emergency"), {
-                                                    confirmMessage: appointmentLabels.feedback.confirmCancelledClinicEmergency,
-                                                    successMessage: labels.appointmentsList.feedback.cancelledClinicEmergency,
+                                                onClick={(event) => setPendingCancellation({
+                                                    appointment: a, reason: "clinic_emergency", trigger: event.currentTarget,
                                                 })}
                                             >
                                                 {localize("cancelClinicEmergency", appointmentLabels.actions.cancelClinicEmergency)}

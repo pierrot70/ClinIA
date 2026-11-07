@@ -9,6 +9,7 @@ import { HOME_STRINGS_FR } from "../i18n/homeStrings";
 import { UI_LABELS_FR as labels } from "../i18n/uiLabels.fr";
 import { getLocalUiTranslation } from "../i18n/localUiTranslations";
 import { AppointmentsListPage } from "./AppointmentsList";
+import { installNativeDialogTestSupport } from "../testUtils/nativeDialog";
 
 const api = vi.hoisted(() => ({ list: vi.fn(), update: vi.fn(), clinics: vi.fn(), specialists: vi.fn() }));
 vi.mock("../hooks/useAuth", () => ({ useAuth: () => ({ user: { role: "MEDECIN" } }) }));
@@ -65,6 +66,46 @@ describe("appointment feedback follows the selected language", () => {
         const toast = await screen.findByRole("status");
         expect(toast).toHaveTextContent(getLocalUiTranslation(labels.generalUi.error, "en-CA")!);
         expect(screen.queryByText("Erreur serveur synthétique non répertoriée")).not.toBeInTheDocument();
+    });
+});
+
+describe("in-app appointment cancellation", () => {
+    it.each([
+        ["patient", labels.appointmentsList.actions.cancelPatient, labels.appointmentsList.feedback.confirmCancelledPatient],
+        ["clinic_emergency", labels.appointmentsList.actions.cancelClinicEmergency, labels.appointmentsList.feedback.confirmCancelledClinicEmergency],
+    ] as const)("waits for explicit confirmation of a %s cancellation", async (reason, action, question) => {
+        const restoreDialog = installNativeDialogTestSupport();
+        try {
+            render(<Page locale="fr-CA" />);
+            const row = await screen.findByRole("row", { name: /Patient synth/ });
+            const trigger = within(row).getByRole("button", { name: action });
+
+            fireEvent.click(trigger);
+            const dialog = screen.getByRole("dialog", { name: question });
+            expect(dialog).toHaveTextContent("Clinique synthétique");
+            expect(api.update).not.toHaveBeenCalled();
+
+            fireEvent.click(within(dialog).getByRole("button", { name: labels.pageUi.annuler }));
+            expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+            expect(trigger).toHaveFocus();
+            expect(api.update).not.toHaveBeenCalled();
+
+            fireEvent.click(trigger);
+            fireEvent(screen.getByRole("dialog", { name: question }), new Event("cancel", { cancelable: true }));
+            expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+            expect(api.update).not.toHaveBeenCalled();
+
+            fireEvent.click(trigger);
+            fireEvent.click(within(screen.getByRole("dialog", { name: question }))
+                .getByRole("button", { name: labels.auth.sensitiveAction.confirm }));
+            const toast = await screen.findByRole("status");
+            expect(toast).toHaveTextContent("SYNTHETIC-RECEIPT-123");
+            expect(api.update).toHaveBeenCalledExactlyOnceWith("synthetic-appointment", "cancelled", reason);
+            expect(window.confirm).not.toHaveBeenCalled();
+        } finally {
+            cleanup();
+            restoreDialog();
+        }
     });
 });
 
