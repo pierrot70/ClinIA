@@ -60,6 +60,21 @@ process.stdout.write(String(status));
 }
 main().catch(()=>process.exit(9));
 `, { mode: 0o700 });
+    if (target.includes("--concurrent")) {
+        // Measure simulated request overlap with a monotonic clock. Real date
+        // parsing still handles the HTTP Date headers in the fixture.
+        writeFileSync(path.join(directory, "date"), `#!${process.execPath}
+const args = process.argv.slice(2);
+if (args.length === 1 && args[0] === '+%s%3N') {
+    console.log(String(process.hrtime.bigint() / 1000000n));
+} else {
+    const { execFileSync } = require('node:child_process');
+    process.stdout.write(execFileSync('date', args, {
+        env: { ...process.env, PATH: ${JSON.stringify(process.env.PATH)} },
+    }));
+}
+`, { mode: 0o700 });
+    }
     const result = spawnSync("bash", [path.join(root, "scripts/test-mfa-replay.sh"), ...target], {
         input, encoding: "utf8", timeout: 15000,
         env: { ...process.env, PATH: `${directory}:${process.env.PATH}`, FIXTURE_TRACE: trace, FIXTURE_SCENARIO: scenario, FIXTURE_CONCURRENT: String(target.includes("--concurrent")), CLINIA_EXPECTED_INSTANCE_A: "", CLINIA_EXPECTED_INSTANCE_B: "", ...expected },
