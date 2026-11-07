@@ -39,7 +39,7 @@ vi.mock("../../services/appShutdown.js", () => ({
 }));
 
 import router from "../auth.js";
-import { reauthenticate, resetUserPassword, completeForcedPasswordChange } from "../../services/auth.js";
+import { logout, reauthenticate, resetUserPassword, completeForcedPasswordChange } from "../../services/auth.js";
 import { verifyJWT } from "../../middleware/verifyJWT.js";
 import { reauthRateLimiter } from "../../middleware/reauthRateLimiter.js";
 
@@ -53,6 +53,8 @@ it("limits reauthentication after JWT verification and before checking the passw
 function makeRes() {
     return {
         cookie: vi.fn().mockReturnThis(),
+        clearCookie: vi.fn().mockReturnThis(),
+        set: vi.fn().mockReturnThis(),
         status: vi.fn().mockReturnThis(),
         json: vi.fn().mockReturnThis(),
     };
@@ -71,6 +73,21 @@ function getLastRouteHandler(method, path) {
 
     return layer.route.stack.at(-1).handle;
 }
+
+describe("logout browser cache", () => {
+    it.each([true, false])("clears only the HTTP cache on successful logout (%s)", async success => {
+        logout.mockReset();
+        if (success) logout.mockResolvedValueOnce(undefined);
+        else logout.mockRejectedValueOnce(new Error("Synthetic logout failure"));
+
+        const res = makeRes();
+        await getLastRouteHandler("post", "/logout")({ headers: {}, auth: { userId: "test" } }, res);
+
+        expect(res.status).toHaveBeenCalledWith(success ? 200 : 500);
+        if (success) expect(res.set).toHaveBeenCalledExactlyOnceWith("Clear-Site-Data", '"cache"');
+        else expect(res.set).not.toHaveBeenCalled();
+    });
+});
 
 describe("password delays are wired to both endpoints", () => {
     it.each([

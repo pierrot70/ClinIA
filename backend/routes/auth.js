@@ -458,6 +458,8 @@ router.post("/logout", enforceSensitiveAuthOrigin, verifyJWT, async (req, res) =
             getSensitiveReauthCookieOptions(req)
         );
 
+        // Retire cached HTML from earlier releases before returning to /login.
+        res.set("Clear-Site-Data", '"cache"');
         return res.status(200).json({
             data: { success: true },
             meta: {
