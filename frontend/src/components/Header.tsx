@@ -408,7 +408,14 @@ const Header: React.FC = () => {
 
     const logout = () => {
         logoutSession().finally(() => {
-            window.location.href = isRemoteProd ? "/login" : "/";
+            if (isRemoteProd) {
+                // Reload the canonical login page so Chrome revalidates cached HTML
+                // and discards this authenticated document and its in-memory state.
+                window.history.replaceState(null, "", "/login");
+                window.location.reload();
+                return;
+            }
+            window.location.href = "/";
         });
     };
 
