@@ -2,6 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const countDocuments = vi.fn();
 const find = vi.fn();
+const findReception = vi.fn();
+const findAppointments = vi.fn();
+const findPatients = vi.fn();
+
+vi.mock("../../models/AdminUser.js", () => ({ AdminUser: { findOne: findReception } }));
+vi.mock("../../models/Appointment.js", () => ({ Appointment: { find: findAppointments } }));
+vi.mock("../../models/Patient.js", () => ({ Patient: { find: findPatients } }));
 
 vi.mock("../../models/WriteOperationAuditLog.js", () => ({
     WriteOperationAuditLog: {
@@ -233,6 +240,54 @@ describe("personal receipts for reception", () => {
             "verificationId", "collectionName", "operation", "resourceId", "patientId",
             "changedFields", "writeConcern", "replicaSet", "timestamp",
         ].sort());
+    });
+
+    it("shows names only for matching appointments in the reception account's current scope", async () => {
+        const clinic = "507f1f77bcf86cd799439030";
+        const nearbyClinic = "507f1f77bcf86cd799439031";
+        const patient = "507f1f77bcf86cd799439023";
+        const otherPatient = "507f1f77bcf86cd799439024";
+        const ids = ["040", "041", "042", "043", "044"].map(suffix => "507f1f77bcf86cd799439" + suffix);
+        const receipt = {
+            collectionName: "appointments", operation: "CREATE", outcome: "SUCCESS",
+            actorUserId: actorId, actorRole: "RECEPTION", patientId: patient, verificationId: "WRV-TEST",
+        };
+        const logs = [
+            { ...receipt, resourceId: ids[0] }, // Older same-clinic booking.
+            { ...receipt, resourceId: ids[1], receptionClinicId: clinic }, // Authorized nearby booking.
+            { ...receipt, resourceId: ids[2] }, // Unassigned clinic for the same patient.
+            { ...receipt, resourceId: ids[3] }, // Appointment for someone else.
+            { ...receipt, resourceId: ids[4], receptionClinicId: nearbyClinic }, // Origin no longer assigned.
+            { ...receipt, resourceId: ids[0], collectionName: "patients" },
+        ];
+        find.mockReturnValue(makeFindChain(logs));
+        countDocuments.mockResolvedValue(logs.length);
+        findReception.mockReturnValue({ lean: vi.fn().mockResolvedValue({ assignedClinics: [clinic] }) });
+        findAppointments.mockReturnValue({ lean: vi.fn().mockResolvedValue([
+            { _id: ids[0], patient, clinique: clinic },
+            { _id: ids[1], patient, clinique: nearbyClinic },
+            { _id: ids[2], patient, clinique: nearbyClinic },
+            { _id: ids[3], patient: otherPatient, clinique: clinic },
+            { _id: ids[4], patient, clinique: clinic },
+        ]) });
+        findPatients.mockReturnValue({ lean: vi.fn().mockResolvedValue([
+            { _id: patient, prenom: "Camille", nom: "Fictif" },
+        ]) });
+        const authUser = { role: "RECEPTION", userId: actorId };
+        const result = await listMyWriteReceipts({ authUser });
+
+        expect(result.logs.map(log => log.patientName)).toEqual([
+            "Camille Fictif", "Camille Fictif", undefined, undefined, undefined, undefined,
+        ]);
+        expect(result.logs.every(log => !Object.hasOwn(log, "receptionClinicId"))).toBe(true);
+        expect(findReception).toHaveBeenCalledWith({ _id: actorId, role: "RECEPTION", isActive: true }, { assignedClinics: 1 });
+        expect(findPatients).toHaveBeenCalledExactlyOnceWith(
+            { _id: { $in: [patient] }, archivedAt: null }, { _id: 1, prenom: 1, nom: 1 }
+        );
+        findReception.mockReturnValue({ lean: vi.fn().mockResolvedValue({ assignedClinics: [] }) });
+        const revoked = await listMyWriteReceipts({ authUser });
+        expect(revoked.logs.every(log => !Object.hasOwn(log, "patientName"))).toBe(true);
+        expect(findPatients).toHaveBeenCalledTimes(1);
     });
 
     it("continues to deny reception access to administrative audit listings before reading the database", async () => {

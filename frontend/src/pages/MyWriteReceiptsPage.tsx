@@ -254,7 +254,7 @@ export function MyWriteReceiptsPage() {
                     <div className="divide-y divide-gray-100">
                         {receipts.map((receipt, index) => {
                             const status = receiptStatus(receipt);
-                            const patientName = receipt.patientId ? patientNames.get(receipt.patientId) : null;
+                            const patientName = receipt.patientName ?? (receipt.patientId ? patientNames.get(receipt.patientId) : null);
                             const receiptKey = `${receipt.verificationId || "receipt"}-${receipt.timestamp}-${index}`;
                             const expanded = selectedReceiptId === receiptKey;
                             return <article key={receiptKey} className="space-y-2 p-4 text-sm">
@@ -290,7 +290,7 @@ export function MyWriteReceiptsPage() {
                         <tbody className="divide-y divide-gray-100">
                             {receipts.map((receipt, index) => {
                                 const status = receiptStatus(receipt);
-                                const patientName = receipt.patientId ? patientNames.get(receipt.patientId) : null;
+                                const patientName = receipt.patientName ?? (receipt.patientId ? patientNames.get(receipt.patientId) : null);
                                 const receiptKey = `${receipt.verificationId || "receipt"}-${receipt.timestamp}-${index}`;
                                 const expanded = selectedReceiptId === receiptKey;
                                 const replica = receipt.replicaSet;

@@ -467,6 +467,7 @@ router.get("/", async (req, res) => {
             page,
             limit,
             authUser: req.auth,
+            ipsSpecialistIds: req.ipsAppointmentSpecialistIds,
         });
 
         return res.status(200).json({

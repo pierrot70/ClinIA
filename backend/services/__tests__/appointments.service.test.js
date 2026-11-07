@@ -254,6 +254,38 @@ describe("appointments service", () => {
         expect(patientFindOne).toHaveBeenCalledTimes(1);
     });
 
+    it("shows a patient name to the assigned IPS without giving the name to other appointment rows", async () => {
+        const ips = { role: "IPS", userId: "507f1f77bcf86cd799439088" };
+        const linkedSpecialist = "507f1f77bcf86cd799439021";
+        const patient = "507f1f77bcf86cd799439012";
+        const linked = { ...buildAppointment(), patient, specialist: linkedSpecialist, ownerUserId: ips.userId };
+        const appointments = [
+            linked,
+            { ...linked, status: "cancelled" },
+            { ...linked, specialist: "507f1f77bcf86cd799439022" },
+        ];
+        find.mockReturnValue({
+            sort: vi.fn().mockReturnThis(),
+            skip: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockReturnThis(),
+            lean: vi.fn().mockResolvedValue(appointments),
+        });
+        countDocuments.mockResolvedValue(appointments.length);
+        const select = vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue([
+            { _id: patient, prenom: "Camille", nom: "Fictif" },
+        ]) });
+        patientFind.mockReturnValue({ select });
+        const result = await listAppointmentsPaginated({
+            authUser: ips,
+            ipsSpecialistIds: new Set([linkedSpecialist]),
+        });
+
+        expect(find).toHaveBeenCalledWith({ ownerUserId: ips.userId });
+        expect(patientFind).toHaveBeenCalledExactlyOnceWith({ _id: { $in: [patient] }, archivedAt: null });
+        expect(select).toHaveBeenCalledWith("_id nom prenom");
+        expect(result.data.map(row => row.patientName)).toEqual(["Camille Fictif", "Camille Fictif", null]);
+    });
+
     it("returns only the current page's patient display names", async () => {
         const appointment = {
             _id: "appointment-1",

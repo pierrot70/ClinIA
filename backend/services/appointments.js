@@ -1537,6 +1537,7 @@ export async function listAppointmentsPaginated({
                                                     patientInsuranceNumber,
                                                     sortDirection = "asc",
                                                     authUser,
+                                                    ipsSpecialistIds,
 }) {
     const query = buildAppointmentListReadScope(authUser);
 
@@ -1570,9 +1571,16 @@ export async function listAppointmentsPaginated({
         Appointment.countDocuments(query),
     ]);
 
+    // For IPS, the display name follows the same ownership and professional
+    // assignment as access to the individual appointment, including its history.
+    const canShowPatientName = appointment => authUser?.role !== "IPS" || (
+        String(appointment.ownerUserId) === String(authUser.userId) &&
+        ipsSpecialistIds?.has(String(appointment.specialist))
+    );
     const patientIds = Array.from(
         new Set(
             data
+                .filter(canShowPatientName)
                 .map((appointment) => appointment.patient)
                 .filter(Boolean)
                 .map((patientId) => String(patientId))
@@ -1584,7 +1592,8 @@ export async function listAppointmentsPaginated({
             // These IDs come exclusively from the already-authorized page of
             // appointments. A doctor's booking may concern an unassigned patient
             // or another doctor's patient. Expose display names, never a profile.
-            ...(authUser?.role === "MEDECIN" ? {} : buildAppointmentListReadScope(authUser)),
+            ...(authUser?.role === "IPS" ? { archivedAt: null }
+                : authUser?.role === "MEDECIN" ? {} : buildAppointmentListReadScope(authUser)),
         })
             .select("_id nom prenom")
             .lean()
@@ -1605,7 +1614,9 @@ export async function listAppointmentsPaginated({
                 ...appointment,
                 status: requiresConfirmation ? "awaiting_confirmation" : appointment.status,
                 requiresConfirmation,
-                patientName: patientNames.get(String(appointment.patient)) || null,
+                patientName: canShowPatientName(appointment)
+                    ? patientNames.get(String(appointment.patient)) || null
+                    : null,
             };
         }),
         meta: {

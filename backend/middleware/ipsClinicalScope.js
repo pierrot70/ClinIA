@@ -38,7 +38,10 @@ export function requireIpsClinicalScope(resource) {
                 return next();
             }
             if (resource === "appointments") {
-                if (method === "GET" && (path === "/" || path === "")) return next();
+                if (method === "GET" && (path === "/" || path === "")) {
+                    req.ipsAppointmentSpecialistIds = ownSpecialists;
+                    return next();
+                }
                 if (method === "GET" && ["/manual-options", "/slots"].includes(path)) {
                     const patientId = req.query?.patient ?? req.query?.patientId;
                     if (patientId && !await ownPatient(patientId)) return denied(res);

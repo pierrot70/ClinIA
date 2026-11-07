@@ -106,7 +106,7 @@ export type MyWriteReceipt = Pick<
     | "writeConcern"
     | "replicaSet"
     | "timestamp"
->;
+> & { patientName?: string };
 
 export type PaginatedMyWriteReceipts = {
     logs: MyWriteReceipt[];

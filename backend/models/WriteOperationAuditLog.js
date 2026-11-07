@@ -114,6 +114,12 @@ const WriteOperationAuditLogSchema = new mongoose.Schema(
             index: true,
             maxlength: 120,
         },
+        // Clinic whose reception assignment authorized the write; not exposed in receipts.
+        receptionClinicId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Clinique",
+            default: null,
+        },
         changedFields: {
             type: [String],
             default: [],

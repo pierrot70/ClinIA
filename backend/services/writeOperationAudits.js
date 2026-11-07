@@ -1,5 +1,8 @@
 import mongoose from "mongoose";
 import { WriteOperationAuditLog } from "../models/WriteOperationAuditLog.js";
+import { AdminUser } from "../models/AdminUser.js";
+import { Appointment } from "../models/Appointment.js";
+import { Patient } from "../models/Patient.js";
 
 const DEFAULT_PAGE_LIMIT = 20;
 const MAX_PAGE_LIMIT = 100;
@@ -333,6 +336,46 @@ export async function listWriteOperationAudits({
     };
 }
 
+async function listReceptionReceiptPatientNames(logs, userId) {
+    const receipts = logs.filter(log =>
+        log.actorRole === "RECEPTION" && log.collectionName === "appointments" &&
+        ["CREATE", "UPDATE"].includes(log.operation) &&
+        mongoose.isObjectIdOrHexString(log.resourceId) && mongoose.isObjectIdOrHexString(log.patientId)
+    );
+    if (!receipts.length) return new Map();
+
+    const reception = await AdminUser.findOne(
+        { _id: userId, role: "RECEPTION", isActive: true }, { assignedClinics: 1 }
+    ).lean();
+    const assignedClinics = new Set((reception?.assignedClinics || []).map(String));
+    if (!assignedClinics.size) return new Map();
+
+    const appointments = await Appointment.find(
+        { _id: { $in: [...new Set(receipts.map(log => log.resourceId))] } },
+        { _id: 1, patient: 1, clinique: 1 }
+    ).lean();
+    const appointmentById = new Map(appointments.map(row => [String(row._id), row]));
+    const authorized = receipts.filter(log => {
+        const appointment = appointmentById.get(String(log.resourceId));
+        // Older same-clinic receipts can use the booking clinic. New receipts
+        // carry the actual origin, including when a nearer slot is found elsewhere.
+        return appointment && String(appointment.patient) === String(log.patientId) &&
+            assignedClinics.has(String(log.receptionClinicId ?? appointment.clinique));
+    });
+    if (!authorized.length) return new Map();
+
+    const patients = await Patient.find(
+        { _id: { $in: [...new Set(authorized.map(log => log.patientId))] }, archivedAt: null },
+        { _id: 1, prenom: 1, nom: 1 }
+    ).lean();
+    const names = new Map(patients.map(patient => [
+        String(patient._id), `${patient.prenom || ""} ${patient.nom || ""}`.trim(),
+    ]));
+    // Index by the actual receipt row, so another row for this patient does
+    // not inherit the name without passing its own clinic and booking checks.
+    return new Map(authorized.map(log => [log, names.get(String(log.patientId))]));
+}
+
 export async function listMyWriteReceipts({
     authUser,
     page,
@@ -378,15 +421,21 @@ export async function listMyWriteReceipts({
             .lean(),
     ]);
 
+    const receiptPatientNames = authUser.role === "RECEPTION"
+        ? await listReceptionReceiptPatientNames(logs, authUser.userId)
+        : new Map();
+
     return {
         logs: logs.map((log) => {
             const row = normalizeAuditRow(log);
+            const patientName = receiptPatientNames.get(log);
             return {
                 verificationId: row.verificationId,
                 collectionName: row.collectionName,
                 operation: row.operation,
                 resourceId: row.resourceId,
                 patientId: row.patientId,
+                ...(patientName ? { patientName } : {}),
                 changedFields: row.changedFields,
                 writeConcern: row.writeConcern,
                 replicaSet: row.replicaSet,

@@ -361,7 +361,7 @@ export async function recordReceptionHistoricalAttendance({ clinicId, patientId,
             await recordWriteOperationAuditEvent({ verificationId: audit.verificationId ?? null, clientMutationId: audit.clientMutationId ?? null,
                 replicaSet: audit.replicaSet ?? null, collectionName: "appointments", operation: "UPDATE", outcome: "SUCCESS",
                 actorUserId: authUser.userId, actorUsername: authUser.username, actorRole: "RECEPTION", ip: audit.ip ?? null,
-                patientId, resourceId: String(appointment._id), changedFields: ["attendanceResolution"],
+                patientId, resourceId: String(appointment._id), receptionClinicId: clinicId, changedFields: ["attendanceResolution"],
                 requestPath: "/api/reception/historical-appointments/:id/attendance", requestId: audit.requestId ?? null, instanceId: audit.instanceId ?? null,
                 writeConcern: CLINICAL_WRITE_CONCERN, session, throwOnError: true });
             // Rotate the consumed proof atomically so the user can resolve the
@@ -471,6 +471,7 @@ export async function createWalkInPatientAndAppointment({
                 instanceId: audit.instanceId ?? null,
                 resourceId: String(appointment._id),
                 patientId: String(patient._id),
+                receptionClinicId: originClinicId,
                 changedFields: ["patient", "specialist", "clinique", "date", "time", "status"],
                 requestPath: audit.requestPath ?? "/api/reception/walk-in-bookings",
                 writeConcern: CLINICAL_WRITE_CONCERN,
@@ -587,6 +588,7 @@ export async function createWalkInAppointmentForExistingPatient({
                     actorUserId: authUser.userId, actorUsername: authUser.username, actorRole: "RECEPTION",
                     ip: audit.ip ?? null, resourceId: String(previous._id), patientId: String(patientId),
                     requestId: audit.requestId ?? null, instanceId: audit.instanceId ?? null,
+                    receptionClinicId: originClinicId,
                     changedFields: ["status", "rescheduledTo"], requestPath: "/api/reception/walk-in-bookings",
                     writeConcern: CLINICAL_WRITE_CONCERN, session, throwOnError: true,
                 });
@@ -607,6 +609,7 @@ export async function createWalkInAppointmentForExistingPatient({
                 instanceId: audit.instanceId ?? null,
                 resourceId: String(appointment._id),
                 patientId: String(patient._id),
+                receptionClinicId: originClinicId,
                 changedFields: ["patient", "specialist", "clinique", "date", "time", "status"],
                 requestPath: audit.requestPath ?? "/api/reception/walk-in-bookings",
                 writeConcern: CLINICAL_WRITE_CONCERN,

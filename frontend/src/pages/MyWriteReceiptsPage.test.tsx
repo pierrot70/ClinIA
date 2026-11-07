@@ -88,6 +88,17 @@ describe("reception personal receipts", () => {
     beforeEach(() => { vi.clearAllMocks(); mocks.locale = "fr-CA"; mocks.role = "RECEPTION"; mocks.fetch.mockResolvedValue(response([receipt])); });
     afterEach(cleanup);
 
+    it("shows the authorized name in the receipt table and mobile card without a patient lookup", async () => {
+        mocks.fetch.mockResolvedValue(response([
+            { ...receipt, collectionName: "appointments", patientId: "fictitious-id", patientName: "Camille Fictif" },
+            { ...receipt, collectionName: "appointments", patientId: "fictitious-id", verificationId: "TEST-RECEIPT-456" },
+        ]));
+        render(<MyWriteReceiptsPage />);
+        expect(await screen.findAllByText("Camille Fictif")).toHaveLength(2);
+        expect(screen.getAllByText(results.unavailablePatient)).toHaveLength(2);
+        expect(mocks.patients).not.toHaveBeenCalled();
+    });
+
     it.each(["fr-CA", "en-CA", "es", "ko-KR", "vi", "no-NO", "ja", "zh", "he"])("shows own receipts without generic patient directory access in %s", async locale => {
         mocks.locale = locale;
         render(<MyWriteReceiptsPage />);
