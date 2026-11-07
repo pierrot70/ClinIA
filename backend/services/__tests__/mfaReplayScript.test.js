@@ -74,7 +74,7 @@ main().catch(()=>process.exit(9));
 describe("manual MFA replay script (simulated HTTP only)", () => {
     it("reuses the first code on a new challenge, then uses a different code on B", () => {
         const result = run();
-        expect(result.status).toBe(0);
+        expect(result.status, result.text).toBe(0);
         expect(result.text).toContain("PROTECTION CONFIRMEE");
         const mfa = result.calls.filter(c => c.url.endsWith('/login/mfa'));
         expect(mfa.map(c => [c.session, c.firstCode, c.nextCode, c.challenge])).toEqual([
@@ -103,7 +103,7 @@ describe("manual MFA replay script (simulated HTTP only)", () => {
     });
     it("uses verified HTTPS without redirects for Coolify", () => {
         const result = run('protected', ['coolify'], 'TESTER COOLIFY\ntest-user\nfixture-password\n123456\n654321\n');
-        expect(result.status).toBe(0);
+        expect(result.status, result.text).toBe(0);
         for (const call of result.calls) {
             expect(call.url.startsWith('https://clinique-ai.ca/')).toBe(true);
             expect(call.args[0]).toBe('-q');
@@ -114,7 +114,7 @@ describe("manual MFA replay script (simulated HTTP only)", () => {
     });
     it("rejects replay on the other staging instance and cleans up both sessions", () => {
         const result = run('protected', ['staging-pair']);
-        expect(result.status).toBe(0);
+        expect(result.status, result.text).toBe(0);
         expect(result.text).toContain('STAGING_MFA_PAIR_PASSED');
         expect(result.calls.filter(c => c.url.endsWith('/login/mfa')).map(c => c.url)).toEqual([
             'http://localhost:4002/api/auth/login/mfa',
@@ -134,7 +134,7 @@ describe("manual MFA replay script (simulated HTTP only)", () => {
     });
     it.each(['protected', 'b-wins', 'invalid-code'])("runs overlapping MFA requests and validates a fresh challenge afterwards (%s)", scenario => {
         const result = run(scenario, ['coolify', '--concurrent'], 'TESTER COOLIFY\ntest-user\nfixture-password\n123456\n654321\n');
-        expect(result.status).toBe(0);
+        expect(result.status, result.text).toBe(0);
         expect(result.text).toContain('MFA_CONCURRENT_PASSED');
         const calls = result.calls.filter(c => c.url.endsWith('/login/mfa'));
         expect(calls).toHaveLength(3);
@@ -163,7 +163,7 @@ describe("manual MFA replay script (simulated HTTP only)", () => {
     const pairInput = 'TESTER COOLIFY\ntest-user\nfixture-password\n123456\n654321\n';
     it("targets distinct pinned tunnel instances and checks their identities again afterwards", () => {
         const result = run('protected', ['coolify-pair', '--concurrent'], pairInput, pairIds);
-        expect(result.status).toBe(0);
+        expect(result.status, result.text).toBe(0);
         expect(result.text).toContain('COOLIFY_MFA_PAIR_PASSED');
         const mfa = result.calls.filter(c => c.url.endsWith('/login/mfa'));
         expect(new Set(mfa.slice(0, 2).map(c => c.url))).toEqual(new Set([
