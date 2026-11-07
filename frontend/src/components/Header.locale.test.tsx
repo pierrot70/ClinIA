@@ -18,6 +18,15 @@ vi.mock("../hooks/useAuth", () => ({ useAuth: () => ({
 }) }));
 vi.mock("../hooks/useSensitiveReauthDialog", () => ({ useSensitiveReauthDialog: () => ({ requestSensitiveReauth: vi.fn(async () => false), sensitiveReauthModal: null }) }));
 vi.mock("./VoiceNavButton", () => ({ default: () => null }));
+vi.mock("../services/clinicianCommentsApi", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../services/clinicianCommentsApi")>(),
+  listClinicianCommentsInbox: vi.fn(async () => ({ ok: true, data: { items: [] } })),
+}));
+vi.mock("../services/securityIncidentApi", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../services/securityIncidentApi")>(),
+  listSecurityIncidents: vi.fn(async () => ({ data: { incidents: [], pagination: { total: 0 } } })),
+}));
+
 
 function CurrentPath() {
   return <output data-testid="current-path">{useLocation().pathname}</output>;
