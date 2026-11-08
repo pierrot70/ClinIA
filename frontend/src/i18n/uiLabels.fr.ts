@@ -1665,6 +1665,7 @@ export const UI_LABELS_FR = {
         save: "Enregistrer l’inscription",
         saving: "Enregistrement de l’inscription…",
         saved: "Le patient a été inscrit sur la liste d’attente.",
+        clinicLimit: "Ce patient est déjà sur la liste d’attente de deux cliniques.",
         duplicate: "Ce patient est déjà sur la liste d’attente de cette clinique.",
         searchChanged: "Reprenez la recherche du patient et des créneaux avant de l’inscrire.",
         invalid: "Vérifiez la coordonnée et le mode de contact choisis.",

@@ -40,6 +40,7 @@ export function WalkInWaitlistForm({ locale, context }: {
             if ("error" in response) {
                 setState("editing");
                 setError(response.error.code === "WAITLIST_ALREADY_ENROLLED" ? text.duplicate
+                    : response.error.code === "WAITLIST_CLINIC_LIMIT" ? text.clinicLimit
                     : ["WAITLIST_SEARCH_CHANGED", "RECEPTION_LOOKUP_REQUIRED", "RECEPTION_REPLAN_REQUIRED"].includes(response.error.code) ? text.searchChanged
                     : ["INVALID_INPUT", "WAITLIST_CONTACT_IN_USE"].includes(response.error.code) ? text.invalid : text.unavailable);
                 return;

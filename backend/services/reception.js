@@ -25,6 +25,7 @@ import { toUpdatePatientDTO } from "../dto/patient.dto.js";
 import { buildPatientSearchKeys, normalizePatientIdentifierSearch } from "../utils/patientSearchKeys.js";
 
 const MAX_FUTURE_OPTIONS = 8;
+const MAX_WAITLIST_CLINICS = 2;
 
 function replacementConflict() {
     return { code: "RECEPTION_REPLAN_REQUIRED", message: "Le rendez-vous existant a changé ou plusieurs rendez-vous sont planifiés. Recherchez à nouveau le patient avant de replanifier." };
@@ -178,6 +179,23 @@ export async function enrollWalkInWaitlist({
                 nom: fields.nom, prenom: fields.prenom, num_assurance_maladie: insurance,
                 country: "CA", healthInsuranceJurisdiction: "QC", ...contactFields,
             }, authUser, { session, walkInWaitlist: true });
+            if (patient) {
+                // Every enrollment writes the same patient inside this transaction.
+                // A concurrent enrollment in another clinic must retry the count.
+                const updated = await Patient.updateOne({ _id: patient._id, archivedAt: null }, {
+                    $inc: { __v: 1 },
+                }, { session, timestamps: false });
+                if (updated.matchedCount !== 1) {
+                    throw { code: "RECEPTION_LOOKUP_REQUIRED", message: "Recherchez à nouveau le patient." };
+                }
+                if (await WalkInWaitlistEntry.exists({ patient: patient._id, clinic: clinicId }).session(session)) {
+                    throw { code: "WAITLIST_ALREADY_ENROLLED", message: "Ce patient est déjà sur la liste d’attente de cette clinique." };
+                }
+                const enrolledClinics = await WalkInWaitlistEntry.countDocuments({ patient: patient._id }).session(session);
+                if (enrolledClinics >= MAX_WAITLIST_CLINICS) {
+                    throw { code: "WAITLIST_CLINIC_LIMIT", message: "Ce patient est déjà sur la liste d’attente de deux cliniques." };
+                }
+            }
             const [entry] = await WalkInWaitlistEntry.create([{
                 clinic: clinicId, patient: record._id, channel, consentedAt: now, enrolledBy: authUser.userId,
             }], { session });

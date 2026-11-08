@@ -17,6 +17,7 @@ import { isAdminRole, isClinicianRole } from "../auth/roles";
 import { SessionExpiredError } from "../services/authService";
 import { useTranslation } from "../hooks/useTranslation";
 import { labels } from "../i18n/uiLabels";
+import { receptionLabel } from "../i18n/receptionLabels";
 import { useUiLabels } from "../hooks/useUiLabels";
 import {
     listClinicianCommentsInbox,
@@ -289,7 +290,11 @@ const AUTH_GRAPH_TYPE_LABELS: Record<AuthGraphType, string> = {
     histogram: "Histogramme graph",
 };
 
-const Header: React.FC = () => {
+type HeaderProps = {
+    receptionClinic?: { name: string; onChange?: () => void };
+};
+
+const Header: React.FC<HeaderProps> = ({ receptionClinic }) => {
             // Log debug pour la langue (après initialisation)
             // Log debug pour la langue (évite l'accès prématuré)
             // Tous les hooks doivent être appelés avant ce useEffect !
@@ -1293,7 +1298,7 @@ const Header: React.FC = () => {
     ]);
 
     return (
-        <header className="sticky top-0 z-50 border-b border-gray-200 bg-white lg:fixed lg:inset-x-0 lg:h-16">
+        <header className={`sticky top-0 z-50 border-b border-gray-200 bg-white lg:fixed lg:inset-x-0 ${receptionClinic ? "lg:h-24" : "lg:h-16"}`}>
             <div className="mx-auto max-w-6xl px-4 py-3 lg:ml-64 lg:max-w-none lg:py-2">
                 <div className="space-y-2 lg:hidden">
                     <div className="relative flex h-9 items-center justify-between">
@@ -1429,6 +1434,19 @@ const Header: React.FC = () => {
                         )}
                     </div>
                 </div>
+
+                {receptionClinic && (
+                    <div className="mt-2 flex min-h-8 items-center justify-between gap-3 rounded border border-blue-200 bg-blue-50 px-3 py-1 text-sm text-blue-950">
+                        <span className="min-w-0 break-words font-medium lg:truncate" title={receptionClinic.name}>
+                            {receptionLabel(locale, "active", labels.receptionClinic.active).replace("{name}", receptionClinic.name)}
+                        </span>
+                        {receptionClinic.onChange && (
+                            <button type="button" onClick={receptionClinic.onChange} className="shrink-0 rounded border border-blue-600 px-2 py-0.5 text-xs font-medium text-blue-800 hover:bg-blue-100">
+                                {receptionLabel(locale, "change", labels.receptionClinic.change)}
+                            </button>
+                        )}
+                    </div>
+                )}
 
                 <nav className={"mt-3 hidden items-center gap-4 text-sm lg:fixed lg:inset-y-0 lg:left-0 lg:mt-0 lg:flex lg:w-64 lg:flex-col lg:items-stretch lg:gap-1 lg:overflow-y-auto lg:border-r lg:border-slate-200 lg:bg-slate-50 lg:px-3 lg:py-5 lg:shadow-xs" + (showAdminHeaderNav ? " lg:pb-32" : "")}>
                     {showFullHeaderNav && canAccessAdmin && <VoiceNavButton />}
