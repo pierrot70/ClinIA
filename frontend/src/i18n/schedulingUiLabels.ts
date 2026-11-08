@@ -2,6 +2,9 @@ import { UI_LABELS_FR } from "./uiLabels.fr";
 
 // Autonyms remain in their native language so users can recognize their preferred language.
 export const SCHEDULING_UI_SOURCES_FR = {
+    availabilityReminder_title: UI_LABELS_FR.availabilityReminder.title,
+    availabilityReminder_body: UI_LABELS_FR.availabilityReminder.body,
+    availabilityReminder_dismiss: UI_LABELS_FR.availabilityReminder.dismiss,
     clinicalSymptomLabels_Fatigue: UI_LABELS_FR.clinicalSymptomLabels.Fatigue,
     appointmentsPage_patientSearch_empty: UI_LABELS_FR.appointmentsPage.patientSearch.empty,
     appointmentsPage_specialist_referenceClinicLoading: UI_LABELS_FR.appointmentsPage.specialist.referenceClinicLoading,
@@ -303,6 +306,9 @@ export const SCHEDULING_UI_SOURCES_FR = {
 } as const;
 export const SCHEDULING_UI_TRANSLATIONS: Record<string, Record<keyof typeof SCHEDULING_UI_SOURCES_FR, string>> = {
     en: {
+        availabilityReminder_title: "Availability reminder",
+        availabilityReminder_body: "Available slots: {count}. Ask clinic management to add more.",
+        availabilityReminder_dismiss: "Dismiss reminder",
         clinicalSymptomLabels_Fatigue: "Fatigue",
         appointmentsPage_patientSearch_empty: "None of your patients match this search.",
         appointmentsPage_specialist_referenceClinicLoading: "Loading your practice clinics…",
@@ -603,6 +609,9 @@ export const SCHEDULING_UI_TRANSLATIONS: Record<string, Record<keyof typeof SCHE
         openAiLogs_table_upstream: "Upstream",
     },
     es: {
+        availabilityReminder_title: "Recordatorio de disponibilidad",
+        availabilityReminder_body: "Horarios disponibles: {count}. Pida a la administración de la clínica que añada más.",
+        availabilityReminder_dismiss: "Cerrar recordatorio",
         clinicalSymptomLabels_Fatigue: "Fatiga",
         appointmentsPage_patientSearch_empty: "Ninguno de sus pacientes coincide con esta búsqueda.",
         appointmentsPage_specialist_referenceClinicLoading: "Cargando sus clínicas de práctica…",
@@ -903,6 +912,9 @@ export const SCHEDULING_UI_TRANSLATIONS: Record<string, Record<keyof typeof SCHE
         openAiLogs_table_upstream: "Ascendente",
     },
     ko: {
+        availabilityReminder_title: "예약 가능 시간 알림",
+        availabilityReminder_body: "예약 가능 시간: {count}개. 병원 관리팀에 추가를 요청하세요.",
+        availabilityReminder_dismiss: "알림 닫기",
         clinicalSymptomLabels_Fatigue: "피로",
         appointmentsPage_patientSearch_empty: "검색에 일치하는 담당 환자가 없습니다.",
         appointmentsPage_specialist_referenceClinicLoading: "진료 클리닉 로딩 중…",
@@ -1203,6 +1215,9 @@ export const SCHEDULING_UI_TRANSLATIONS: Record<string, Record<keyof typeof SCHE
         openAiLogs_table_upstream: "업스트림",
     },
     vi: {
+        availabilityReminder_title: "Nhắc về lịch hẹn",
+        availabilityReminder_body: "Số khung giờ còn trống: {count}. Hãy yêu cầu bộ phận quản lý phòng khám bổ sung.",
+        availabilityReminder_dismiss: "Đóng lời nhắc",
         clinicalSymptomLabels_Fatigue: "Mệt mỏi",
         appointmentsPage_patientSearch_empty: "Không có bệnh nhân của bạn khớp tìm kiếm này.",
         appointmentsPage_specialist_referenceClinicLoading: "Đang tải phòng khám nơi bạn làm việc…",
@@ -1503,6 +1518,9 @@ export const SCHEDULING_UI_TRANSLATIONS: Record<string, Record<keyof typeof SCHE
         openAiLogs_table_upstream: "Thượng nguồn",
     },
     no: {
+        availabilityReminder_title: "Påminnelse om ledige timer",
+        availabilityReminder_body: "Ledige timer: {count}. Be klinikkadministrasjonen legge til flere.",
+        availabilityReminder_dismiss: "Lukk påminnelsen",
         clinicalSymptomLabels_Fatigue: "Tretthet",
         appointmentsPage_patientSearch_empty: "Ingen av pasientene dine samsvarer med søket.",
         appointmentsPage_specialist_referenceClinicLoading: "Laster dine praksisklinikker…",
@@ -1803,6 +1821,9 @@ export const SCHEDULING_UI_TRANSLATIONS: Record<string, Record<keyof typeof SCHE
         openAiLogs_table_upstream: "Oppstrøms",
     },
     ja: {
+        availabilityReminder_title: "予約枠のお知らせ",
+        availabilityReminder_body: "空き枠は{count}件です。クリニックの管理担当者に追加を依頼してください。",
+        availabilityReminder_dismiss: "お知らせを閉じる",
         clinicalSymptomLabels_Fatigue: "疲労",
         appointmentsPage_patientSearch_empty: "担当患者に検索結果がありません。",
         appointmentsPage_specialist_referenceClinicLoading: "勤務先のクリニックを読み込み中…",
@@ -2103,6 +2124,9 @@ export const SCHEDULING_UI_TRANSLATIONS: Record<string, Record<keyof typeof SCHE
         openAiLogs_table_upstream: "上流",
     },
     zh: {
+        availabilityReminder_title: "预约时段提醒",
+        availabilityReminder_body: "可预约时段：{count} 个。请联系诊所管理人员增加时段。",
+        availabilityReminder_dismiss: "关闭提醒",
         clinicalSymptomLabels_Fatigue: "疲劳",
         appointmentsPage_patientSearch_empty: "您的患者中没有符合搜索条件者。",
         appointmentsPage_specialist_referenceClinicLoading: "正在加载您的执业诊所…",
@@ -2403,6 +2427,9 @@ export const SCHEDULING_UI_TRANSLATIONS: Record<string, Record<keyof typeof SCHE
         openAiLogs_table_upstream: "上游",
     },
     he: {
+        availabilityReminder_title: "תזכורת לגבי תורים פנויים",
+        availabilityReminder_body: "תורים פנויים: {count}. יש לבקש מהנהלת המרפאה להוסיף תורים.",
+        availabilityReminder_dismiss: "סגירת התזכורת",
         clinicalSymptomLabels_Fatigue: "עייפות",
         appointmentsPage_patientSearch_empty: "אף אחד מהמטופלים שלך אינו תואם לחיפוש.",
         appointmentsPage_specialist_referenceClinicLoading: "טוען את מרפאות העבודה שלך…",

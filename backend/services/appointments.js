@@ -5,7 +5,7 @@ import { Specialist } from "../models/Specialist.js";
 import { Patient } from "../models/Patient.js";
 import { Clinique } from "../models/Clinique.js";
 import mongoose from "mongoose";
-import { isUrgentologist, URGENTOLOGIST_DAILY_LIMIT } from "../domain/specialties.js";
+import { IPS_SPECIALTY, isUrgentologist, URGENTOLOGIST_DAILY_LIMIT } from "../domain/specialties.js";
 import { countUrgentologistConsultations, reserveUrgentologistCapacity } from "./urgentologistCapacity.js";
 import { buildOwnerScope } from "../auth/resourceAccess.js";
 import { CLINICAL_WRITE_CONCERN } from "../db/clinicalWriteConcern.js";
@@ -1350,6 +1350,61 @@ async function getSpecialistAvailableTimes(
     });
 
     return availableTimes;
+}
+
+export async function countOwnAvailableSlots(authUser, now = new Date()) {
+    const specialist = await Specialist.findOne(
+        {
+            accountUserId: authUser.userId,
+            ...(authUser.role === "IPS" ? { specialite: IPS_SPECIALTY } : {}),
+        },
+        { specialite: 1, practiceLocations: 1, clinique_associer: 1, disponibilites: 1, walkInDisponibilites: 1 }
+    ).lean();
+    if (!specialist) return 0;
+
+    const urgentologist = isUrgentologist(specialist.specialite);
+    const practiceLocations = getPracticeLocations(specialist);
+    const locations = practiceLocations.length ? practiceLocations : [specialist];
+    const today = toSchedulingDateKey(now);
+    const currentTime = toSchedulingTime(now);
+    const timesByDate = new Map();
+
+    for (const location of locations) {
+        const slots = [
+            ...(urgentologist ? [] : location.disponibilites || []),
+            ...(location.walkInDisponibilites || []),
+        ];
+        for (const slot of slots) {
+            const date = toSchedulingDateKey(slot);
+            if (!date || date < today) continue;
+            const time = formatTime(slot);
+            if (date === today && time <= currentTime) continue;
+
+            if (!timesByDate.has(date)) timesByDate.set(date, new Set());
+            timesByDate.get(date).add(time);
+        }
+    }
+    if (!timesByDate.size) return 0;
+
+    // A booking blocks this professional's time across all locations.
+    const booked = await Appointment.find(
+        { specialist: specialist._id, date: { $in: [...timesByDate.keys()] }, status: { $in: ["scheduled", "completed"] } },
+        { date: 1, time: 1, _id: 0 }
+    ).lean();
+    const consultationsByDate = new Map();
+    for (const { date, time } of booked) {
+        timesByDate.get(date)?.delete(time);
+        consultationsByDate.set(date, (consultationsByDate.get(date) ?? 0) + 1);
+    }
+
+    let count = 0;
+    for (const [date, times] of timesByDate) {
+        const capacity = urgentologist
+            ? Math.max(0, URGENTOLOGIST_DAILY_LIMIT - (consultationsByDate.get(date) ?? 0))
+            : times.size;
+        count += Math.min(times.size, capacity);
+    }
+    return count;
 }
 
 export async function getAvailableSlots(

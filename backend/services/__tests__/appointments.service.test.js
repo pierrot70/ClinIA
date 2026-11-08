@@ -86,6 +86,7 @@ const {
     createAppointmentCoordinationRequest,
     findNearestAvailableAppointment,
     getAvailableSlotSchedule,
+    countOwnAvailableSlots,
     getAvailableSlots,
     listManualAppointmentOptions,
     listAppointmentsPaginated,
@@ -124,6 +125,52 @@ describe("appointments service", () => {
         userId: "507f1f77bcf86cd799439099",
         role: "MEDECIN",
     };
+
+    describe("own available slots", () => {
+        const now = new Date("2099-01-01T15:00:00Z");
+        const specialist = "507f1f77bcf86cd799439021";
+        const slot = (time) => new Date(`2099-01-01T${time}:00Z`);
+
+        it("counts future free times once across slot types and clinics, scoped to the signed-in IPS", async () => {
+            specialistFindOne.mockReturnValue({ lean: async () => ({
+                _id: specialist,
+                specialite: "IPS",
+                disponibilites: [slot("22:00")], // Superseded by practiceLocations.
+                practiceLocations: [
+                    { clinique: "a", disponibilites: [slot("14:00"), slot("15:00"), slot("15:30"), slot("16:00"), slot("16:30")] },
+                    { clinique: "b", walkInDisponibilites: [slot("16:30"), slot("17:00")] },
+                ],
+            }) });
+            find.mockReturnValue({ lean: async () => [
+                { date: "2099-01-01", time: "10:30" }, // scheduled
+                { date: "2099-01-01", time: "11:00" }, // completed
+            ] });
+
+            await expect(countOwnAvailableSlots({ ...authUser, role: "IPS" }, now)).resolves.toBe(2);
+            expect(specialistFindOne).toHaveBeenCalledWith(
+                { accountUserId: authUser.userId, specialite: "IPS" }, expect.any(Object)
+            );
+            expect(find).toHaveBeenCalledWith(
+                { specialist, date: { $in: ["2099-01-01"] }, status: { $in: ["scheduled", "completed"] } },
+                { date: 1, time: 1, _id: 0 }
+            );
+        });
+
+        it("counts legacy urgentologist WalkIn slots up to the remaining daily capacity", async () => {
+            specialistFindOne.mockReturnValue({ lean: async () => ({
+                _id: specialist,
+                specialite: "Urgentologue",
+                clinique_associer: "a",
+                disponibilites: [new Date("2099-01-02T19:00:00Z")],
+                walkInDisponibilites: [slot("16:00"), slot("16:30"), slot("17:00")],
+            }) });
+            find.mockReturnValue({ lean: async () => Array.from({ length: 19 }, (_, index) => ({
+                date: "2099-01-01", time: `09:${String(index).padStart(2, "0")}`,
+            })) });
+
+            await expect(countOwnAvailableSlots(authUser, now)).resolves.toBe(1);
+        });
+    });
 
     describe("urgentologist booking", () => {
         const specialist = "507f1f77bcf86cd799439021";

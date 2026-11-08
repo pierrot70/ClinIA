@@ -31,6 +31,7 @@ interface AuthContextValue {
     status: AuthStatus;
     user: AuthSession["user"] | null;
     isAuthenticated: boolean;
+    loginVersion: number;
     login: (credentials: LoginCredentials) => Promise<AuthSession>;
     completeMfaLogin: (challenge: MfaChallenge, code: string) => Promise<{
         session: AuthSession;
@@ -52,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const sessionCopy = useUiLabelTree(labels.auth.session);
     const [status, setStatus] = useState<AuthStatus>("loading");
     const [user, setUser] = useState<AuthSession["user"] | null>(null);
+    const [loginVersion, setLoginVersion] = useState(0);
     const [warningSecondsLeft, setWarningSecondsLeft] = useState<number | null>(null);
     const lastInteractionAtRef = useRef(Date.now());
     const lastServerTouchAtRef = useRef(0);
@@ -186,6 +188,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const login = useCallback(async (credentials: LoginCredentials) => {
         const session = await loginService(credentials);
+        setLoginVersion((version) => version + 1);
         setUser(session.user);
         setStatus("authenticated");
         lastInteractionAtRef.current = Date.now();
@@ -198,6 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         code: string
     ) => {
         const result = await completeMfaLoginService(challenge, code);
+        setLoginVersion((version) => version + 1);
         setUser(result.session.user);
         setStatus("authenticated");
         lastInteractionAtRef.current = Date.now();
@@ -248,6 +252,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             status,
             user,
             isAuthenticated: status === "authenticated",
+            loginVersion,
             login,
             completeMfaLogin,
             registerSelf,
@@ -262,6 +267,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }),
         [
             status,
+            loginVersion,
             user,
             login,
             completeMfaLogin,

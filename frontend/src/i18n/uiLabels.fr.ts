@@ -1,4 +1,9 @@
 export const UI_LABELS_FR = {
+    availabilityReminder: {
+        title: "Rappel de disponibilités",
+        body: "Créneaux disponibles : {count}. Demandez à la gestion clinique d’en ajouter.",
+        dismiss: "Fermer le rappel",
+    },
     clinicalResultIntegrity: {
         summaryWithheld: "Résumé non affiché : les informations fournies ne permettent pas d'établir le contrôle glycémique. Consultez les paramètres soumis et complétez l'évaluation clinique.",
         noOptions: "Aucune option thérapeutique structurée fournie dans cette réponse. Aucun exemple simulé n'a été substitué.",

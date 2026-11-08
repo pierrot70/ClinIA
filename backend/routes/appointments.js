@@ -6,6 +6,7 @@ import {
     findNextAvailableRescheduleSlot,
     listRequestingPhysicianPracticeClinics,
     getAvailableSlotSchedule,
+    countOwnAvailableSlots,
     listManualAppointmentOptions,
     getAppointmentById,
     cancelAppointmentWithWriteVerification,
@@ -27,6 +28,8 @@ import { getSafeRequestPath, logSafeError } from "../utils/requestLogSafety.js";
 import { getTrustedRequestIp } from "../utils/requestIp.js";
 import { recordWriteOperationAuditEvent } from "../audit/writeOperationAudit.js";
 import { SpecialistAvailabilityRequest } from "../models/SpecialistAvailabilityRequest.js";
+import { CLINICIAN_ROLES } from "../auth/constants.js";
+import { requireRole } from "../middleware/requireRole.js";
 
 const router = express.Router();
 
@@ -645,6 +648,22 @@ router.patch("/availability-requests/:id/resolve", async (req, res) => {
             error: {
                 code: "PERSISTENCE_FAILED",
                 message: "Impossible de traiter la demande de disponibilités.",
+                retryable: true,
+            },
+        });
+    }
+});
+
+router.get("/my-availability-summary", requireRole(...CLINICIAN_ROLES), async (req, res) => {
+    try {
+        const availableCount = await countOwnAvailableSlots(req.auth);
+        return res.set("Cache-Control", "no-store").json({ data: { availableCount } });
+    } catch (err) {
+        logSafeError("OWN_APPOINTMENT_AVAILABILITY_SUMMARY_FAILED", err);
+        return res.status(500).json({
+            error: {
+                code: "PERSISTENCE_FAILED",
+                message: "Impossible de compter les créneaux disponibles.",
                 retryable: true,
             },
         });

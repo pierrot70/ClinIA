@@ -17,6 +17,9 @@ export function requireIpsClinicalScope(resource) {
             if (!objectId(userId)) return denied(res);
             const active = await AdminUser.findOne({ _id: userId, role: "IPS", isActive: true }, { _id: 1 }).lean();
             if (!active) return denied(res);
+            if (resource === "appointments" && req.method === "GET" && req.path === "/my-availability-summary") {
+                return next();
+            }
             const professionals = await Specialist.find({ accountUserId: userId, specialite: "IPS" }, { _id: 1 }).lean();
             if (!professionals.length) return denied(res);
             const ownSpecialists = new Set(professionals.map(p => String(p._id)));

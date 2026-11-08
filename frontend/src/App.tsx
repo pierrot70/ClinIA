@@ -7,6 +7,8 @@ import TreatmentDetails from "./pages/TreatmentDetails";
 import QuickMode from "./pages/QuickMode";
 import PatientSummary from "./pages/PatientSummary";
 import Header from "./components/Header";
+import { AvailabilityReminder } from "./components/AvailabilityReminder";
+import { isClinicianRole } from "./auth/roles";
 import Footer from "./components/Footer";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { SecurityBlockingAlert } from "./components/system/SecurityBlockingAlert";
@@ -238,6 +240,7 @@ function CoolifyLandingPage() {
 const App: React.FC = () => {
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
+    const { user, isAuthenticated, loginVersion, passwordResetRequired, mustChangePasswordOnNextLogin } = useAuth();
     const { blockingIncident, setBlockingIncident } = useSecurityIncident();
     const [acknowledging, setAcknowledging] = useState(false);
     const showCoolifyLanding = !!import.meta.env.PROD;
@@ -298,6 +301,10 @@ const App: React.FC = () => {
         <div className="min-h-screen bg-background lg:pl-64 lg:pt-16">
             <Header />
             <ReceptionClinicStatus />
+            {isAuthenticated && loginVersion > 0 && isClinicianRole(user?.role)
+                && !passwordResetRequired && !mustChangePasswordOnNextLogin && (
+                    <AvailabilityReminder key={loginVersion} />
+                )}
             {blockingIncident && (
                 <SecurityBlockingAlert
                     blocking={blockingIncident}
