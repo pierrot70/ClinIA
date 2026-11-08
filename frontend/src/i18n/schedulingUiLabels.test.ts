@@ -13,7 +13,7 @@ describe("local scheduling UI translations", () => {
     it("derives every source from the existing French registry", () => {
         const versionedSources = new Set(leafStrings(UI_LABELS_FR));
         expect(Object.values(SCHEDULING_UI_SOURCES_FR).every(source => versionedSources.has(source))).toBe(true);
-        expect(Object.keys(SCHEDULING_UI_SOURCES_FR)).toHaveLength(298);
+        expect(Object.keys(SCHEDULING_UI_SOURCES_FR)).toHaveLength(301);
     });
     it.each(locales)("covers all sources and preserves template fields in %s", locale => {
         const dictionary = SCHEDULING_UI_TRANSLATIONS[locale];
