@@ -6,6 +6,7 @@ import { Patient } from "../models/Patient.js";
 import { Specialist } from "../models/Specialist.js";
 import { Appointment } from "../models/Appointment.js";
 import { Clinique } from "../models/Clinique.js";
+import { WalkInWaitlistEntry } from "../models/WalkInWaitlistEntry.js";
 import { orderedWalkInClinics, WALK_IN_RADIUS_KM, WALK_IN_TOLERANCE_KM, WALK_IN_MAX_DISTANCE_KM, WALK_IN_EXTENDED_MAX_DISTANCE_KM, WALK_IN_SPECIALTY_PRIORITY } from "./receptionWalkInRouting.js";
 import { IPS_SPECIALTY, URGENTOLOGIST_SPECIALTY, URGENTOLOGIST_DAILY_LIMIT, isUrgentologist } from "../domain/specialties.js";
 import { countUrgentologistConsultations } from "./urgentologistCapacity.js";
@@ -20,7 +21,8 @@ import {
 } from "./appointments.js";
 import { createPatient } from "./patients.js";
 import { isSchedulingDatePast, toSchedulingDateKey } from "../utils/schedulingTime.js";
-import { normalizePatientIdentifierSearch } from "../utils/patientSearchKeys.js";
+import { toUpdatePatientDTO } from "../dto/patient.dto.js";
+import { buildPatientSearchKeys, normalizePatientIdentifierSearch } from "../utils/patientSearchKeys.js";
 
 const MAX_FUTURE_OPTIONS = 8;
 
@@ -130,6 +132,95 @@ export async function listWalkInFamilyMedicineOptions({
         : null;
     if (!patientId && replaceAppointmentId) throw invalidInput("Patient requis pour replanifier.");
     return searchWalkInOptions({ clinicId, patientId, previous, now, compareEarlier: compareEarlier === true, extendedSearchAccepted });
+}
+
+export async function enrollWalkInWaitlist({
+    clinicId, insuranceNumber, channel, telephone, courriel, nom, prenom,
+    consent, patientId, bookingProof, replaceAppointmentId, authUser, ip,
+}) {
+    if (authUser?.role !== "RECEPTION") throw { code: "FORBIDDEN", message: "Accès réservé à la réception." };
+    if (consent !== true) throw { code: "WAITLIST_CONSENT_REQUIRED", message: "Le consentement du patient est requis." };
+    const insurance = typeof insuranceNumber === "string" && insuranceNumber.length <= 40
+        ? normalizePatientIdentifierSearch(insuranceNumber) : "";
+    if (insurance.length < 6) throw invalidInput("Numéro d’assurance maladie invalide.");
+    const fields = toUpdatePatientDTO(patientId === undefined ? { nom, prenom, telephone, courriel } : { telephone, courriel });
+    if (!["sms", "email", "phone"].includes(channel) || !(channel === "email" ? fields.courriel : fields.telephone)) {
+        throw invalidInput("La coordonnée correspondant au mode de contact est requise.");
+    }
+    const contactFields = {
+        ...(fields.telephone ? { telephone: fields.telephone } : {}),
+        ...(fields.courriel ? { courriel: fields.courriel } : {}),
+    };
+
+    const session = await mongoose.startSession();
+    try {
+        return await session.withTransaction(async () => {
+            await assertReceptionClinicAccess(clinicId, authUser, session);
+            const patient = await Patient.findOne({ healthInsuranceNumberSearch: insurance, archivedAt: null },
+                { _id: 1, telephone: 1, courriel: 1 }).session(session).lean();
+            if ((patient ? String(patient._id) : undefined) !== patientId) {
+                throw { code: "RECEPTION_LOOKUP_REQUIRED", message: "Recherchez à nouveau le patient." };
+            }
+            if (!patient && replaceAppointmentId !== undefined) throw invalidInput("Patient requis pour replanifier.");
+            if (patient) await consumeReceptionBookingProof({ bookingProof, authUser, clinicId, patientId, session });
+            const now = new Date();
+            const previous = patient
+                ? validateReplacement(await pendingAppointments(patientId, clinicId, currentSchedulingDay(now), session), replaceAppointmentId)
+                : null;
+            const availability = await searchWalkInOptions({
+                clinicId, patientId, previous, now, session, extendedSearchAccepted: true,
+            });
+            if (availability.search.status !== "exhausted" || availability.search.maxDistanceKm !== WALK_IN_EXTENDED_MAX_DISTANCE_KM) {
+                throw { code: "WAITLIST_SEARCH_CHANGED", message: "Actualisez la recherche de créneaux avant d’inscrire le patient." };
+            }
+
+            const record = patient ?? await createPatient({
+                nom: fields.nom, prenom: fields.prenom, num_assurance_maladie: insurance,
+                country: "CA", healthInsuranceJurisdiction: "QC", ...contactFields,
+            }, authUser, { session, walkInWaitlist: true });
+            const [entry] = await WalkInWaitlistEntry.create([{
+                clinic: clinicId, patient: record._id, channel, consentedAt: now, enrolledBy: authUser.userId,
+            }], { session });
+
+            const changedContacts = Object.fromEntries(Object.entries(contactFields)
+                .filter(([key, value]) => patient && value !== patient[key]));
+            if (Object.keys(changedContacts).length) {
+                const update = { ...changedContacts };
+                if (changedContacts.telephone) update.telephoneSearch = buildPatientSearchKeys(contactFields).telephoneSearch;
+                await Patient.updateOne({ _id: patient._id, archivedAt: null }, { $set: update }, { session, runValidators: true });
+            }
+            if (!patient || Object.keys(changedContacts).length) {
+                await recordPatientAuditEvent({
+                    action: patient ? "PATIENT_UPDATE" : "PATIENT_CREATE", outcome: "SUCCESS",
+                    actorUserId: authUser.userId, actorUsername: authUser.username, actorRole: "RECEPTION", ip: ip ?? null,
+                    patientId: String(record._id), changedFields: patient ? Object.keys(changedContacts)
+                        : ["nom", "prenom", "num_assurance_maladie", ...Object.keys(contactFields)],
+                    requestPath: "/api/reception/walk-in-waitlist", session, throwOnError: true,
+                });
+            }
+            await recordWriteOperationAuditEvent({
+                collectionName: "walkinwaitlistentries", operation: "CREATE", outcome: "SUCCESS",
+                actorUserId: authUser.userId, actorUsername: authUser.username, actorRole: "RECEPTION",
+                ip: ip ?? null, resourceId: String(entry._id), patientId: String(record._id),
+                receptionClinicId: clinicId, requestPath: "/api/reception/walk-in-waitlist",
+                writeConcern: CLINICAL_WRITE_CONCERN, session, throwOnError: true,
+            });
+            return { _id: String(entry._id) };
+        }, { writeConcern: CLINICAL_WRITE_CONCERN });
+    } catch (error) {
+        if (error?.code === 11000 && error.keyPattern?.clinic && error.keyPattern?.patient) {
+            throw { code: "WAITLIST_ALREADY_ENROLLED", message: "Ce patient est déjà sur la liste d’attente de cette clinique." };
+        }
+        if (error?.code === 11000 && error.keyPattern?.healthInsuranceNumberSearch) {
+            throw { code: "RECEPTION_LOOKUP_REQUIRED", message: "Recherchez à nouveau le patient." };
+        }
+        if (error?.code === 11000 && error.keyPattern?.telephoneSearch) {
+            throw { code: "WAITLIST_CONTACT_IN_USE", message: "Vérifiez le numéro de téléphone saisi." };
+        }
+        throw error;
+    } finally {
+        await session.endSession();
+    }
 }
 
 async function clinicSpecialtyOptions({ candidate, specialty, active, patientId, previous, now, session, before = null }) {

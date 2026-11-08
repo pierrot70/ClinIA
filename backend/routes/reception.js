@@ -6,6 +6,7 @@ import {
     createWalkInAppointmentForExistingPatient,
     findReceptionPatientByRamq,
     listWalkInFamilyMedicineOptions,
+    enrollWalkInWaitlist,
     listReceptionHistoricalAppointments,
     recordReceptionHistoricalAttendance,
 } from "../services/reception.js";
@@ -97,6 +98,29 @@ router.get("/walk-in-options", async (req, res) => {
                 retryable: true,
             },
         });
+    }
+});
+
+const waitlistErrors = {
+    FORBIDDEN: 403, INVALID_INPUT: 400, WAITLIST_CONSENT_REQUIRED: 400, RECEPTION_LOOKUP_REQUIRED: 403,
+    RECEPTION_REPLAN_REQUIRED: 409, WAITLIST_SEARCH_CHANGED: 409, WAITLIST_ALREADY_ENROLLED: 409, WAITLIST_CONTACT_IN_USE: 409,
+};
+
+router.post("/walk-in-waitlist", async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    const { clinic, insuranceNumber, channel, telephone, courriel, nom, prenom, consent, patientId, bookingProof, replaceAppointmentId } = req.body ?? {};
+    try {
+        const data = await enrollWalkInWaitlist({
+            clinicId: clinic, insuranceNumber, channel, telephone, courriel, nom, prenom, consent, patientId, bookingProof,
+            replaceAppointmentId, authUser: req.auth, ip: getTrustedRequestIp(req),
+        });
+        return res.status(201).json({ data, meta: { source: "real", model: "mongo" } });
+    } catch (error) {
+        const code = error?.code;
+        if (Object.hasOwn(waitlistErrors, code)) {
+            return res.status(waitlistErrors[code]).json({ error: { code, message: error.message, retryable: false } });
+        }
+        return res.status(500).json({ error: { code: "PERSISTENCE_FAILED", message: "La liste d’attente est indisponible.", retryable: true } });
     }
 });
 

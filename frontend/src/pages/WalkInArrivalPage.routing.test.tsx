@@ -1,5 +1,5 @@
 import { receptionReplanLabels } from "../i18n/receptionReplanLabels";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WalkInArrivalPage } from "./WalkInArrivalPage";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
@@ -9,8 +9,9 @@ import { walkInGuideLabels } from "../i18n/walkInGuideLabels";
 import { UI_LOCALES } from "../i18n/uiLocales";
 import type { WalkInAvailability } from "../services/receptionApi";
 
-const api = vi.hoisted(() => ({ lookup: vi.fn(), slots: vi.fn(), book: vi.fn() }));
+const api = vi.hoisted(() => ({ lookup: vi.fn(), slots: vi.fn(), book: vi.fn(), enroll: vi.fn() }));
 vi.mock("../services/receptionApi", () => ({ findReceptionPatientByRamq: api.lookup, fetchWalkInAvailability: api.slots, createWalkInBooking: api.book }));
+vi.mock("../services/receptionWaitlistApi", () => ({ enrollWalkInWaitlist: api.enroll }));
 vi.mock("../contexts/ReceptionClinicContext", () => ({ useReceptionClinic: () => ({ activeClinic: { _id: "origin", nom: "Origin synthetic clinic" }, isLoading: false }) }));
 function Page({ locale = "en-CA" }: { locale?: string }) {
     return <HomeI18nContext.Provider value={{ locale, strings: HOME_STRINGS_FR, isTranslating: false, setLocaleFromDropdown: vi.fn(), setLocaleFromVoice: vi.fn() }}><WalkInArrivalPage /></HomeI18nContext.Provider>;
@@ -38,6 +39,38 @@ async function searchNew() {
     await screen.findByRole("button", { name: "Refresh available appointments" });
 }
 describe("WalkIn priority destination and assisted GAP", () => {
+    it.each([
+        ["sms", "555-010-1243", "", { telephone: "555-010-1243" }],
+        ["phone", "555-010-1243", "", { telephone: "555-010-1243" }],
+        ["email", "555-010-1243", "synthetic@example.invalid", { telephone: "555-010-1243", courriel: "synthetic@example.invalid" }],
+    ])("saves the new dossier's contact details and waitlist consent for %s", async (channel, telephone, courriel, expected) => {
+        const extendedEmpty: WalkInAvailability = {
+            ...empty("exhausted"), search: { status: "exhausted", radiusKm: 200, maxDistanceKm: 200, distanceMode: "straight_line", examinedClinics: 3 },
+        };
+        api.slots.mockResolvedValueOnce({ data: empty("exhausted") }).mockResolvedValueOnce({ data: extendedEmpty });
+        api.enroll.mockResolvedValue({ data: { _id: "synthetic-entry" } });
+        render(<Page />); await searchNew();
+        expect(screen.queryByRole("button", { name: "Join the waitlist" })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: walkInRoutingLabels("en-CA").extendSearch }));
+        fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Join the waitlist" }));
+        const save = screen.getByRole("button", { name: "Save enrollment" });
+        expect(save).toBeDisabled();
+        fireEvent.change(screen.getByRole("textbox", { name: "First name" }), { target: { value: "Synthetic" } });
+        fireEvent.change(screen.getByRole("textbox", { name: "Last name" }), { target: { value: "Patient" } });
+        fireEvent.change(screen.getByLabelText("Preferred contact method"), { target: { value: channel } });
+        fireEvent.change(screen.getByRole("textbox", { name: "Phone number" }), { target: { value: telephone } });
+        fireEvent.change(screen.getByRole("textbox", { name: "Email address" }), { target: { value: courriel } });
+        expect(api.enroll).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole("checkbox"));
+        fireEvent.click(save);
+        expect(await screen.findByText("The patient was added to the waitlist.")).toBeVisible();
+        expect(api.enroll).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+            clinic: "origin", insuranceNumber: "SYNTHETIC-INSURANCE", channel, consent: true, prenom: "Synthetic", nom: "Patient", ...expected,
+        }));
+        expect(api.book).not.toHaveBeenCalled();
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
     it("shows the server-selected IPS destination and future appointments before the final booking confirmation", async () => {
         render(<Page />); await searchNew();
         const routing = walkInRoutingLabels("en-CA");

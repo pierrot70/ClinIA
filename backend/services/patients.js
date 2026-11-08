@@ -120,14 +120,14 @@ function assertPatientAuditAccess(authUser) {
 export async function createPatient(
     dto,
     authUser,
-    { allowPotentialDuplicate = false, session = null, receivingPhysicianUserId = null } = {}
+    { allowPotentialDuplicate = false, session = null, receivingPhysicianUserId = null, walkInWaitlist = false } = {}
 ) {
     let ownerScope = buildOwnerScope(authUser);
-    // This internal option is only supplied by the transactional reception
-    // booking workflow after validating the receiving physician's active account.
-    if (authUser.role === "RECEPTION" || receivingPhysicianUserId !== null) {
-        if (authUser.role !== "RECEPTION" || !session || !receivingPhysicianUserId ||
-            !mongoose.Types.ObjectId.isValid(receivingPhysicianUserId)) {
+    // Reception can create an unassigned dossier inside a validated WalkIn transaction.
+    if (authUser.role === "RECEPTION" || receivingPhysicianUserId !== null || walkInWaitlist) {
+        const validatedDestination = receivingPhysicianUserId && mongoose.Types.ObjectId.isValid(receivingPhysicianUserId);
+        const unassignedWaitlist = walkInWaitlist === true && receivingPhysicianUserId === null;
+        if (authUser.role !== "RECEPTION" || !session || !(validatedDestination || unassignedWaitlist)) {
             throw createPatientError("FORBIDDEN", "Un médecin responsable validé est requis pour créer ce dossier.");
         }
         // A consultation is not acceptance into the physician's permanent care.

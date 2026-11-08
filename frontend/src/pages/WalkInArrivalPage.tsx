@@ -1,6 +1,8 @@
 import { UiMessage } from "../components/i18n/UiMessage";
 import { ReceptionAttendanceDialog } from "../components/guides/ReceptionAttendanceDialog";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { WalkInWaitlistForm } from "../components/WalkInWaitlist";
+import { walkInWaitlistLabels } from "../i18n/walkInWaitlistLabels";
 import { useUiLabels } from "../hooks/useUiLabels";
 import { labels } from "../i18n/uiLabels";
 import {
@@ -70,6 +72,7 @@ function AvailabilityOptions({
     introduction,
     onCompareEarlier,
     onExtendSearch,
+    waitlistForm,
     extendedSearchAccepted = false,
     patientKind = "new",
     genericProfessionals = false,
@@ -80,6 +83,7 @@ function AvailabilityOptions({
     introduction?: string;
     onCompareEarlier?: () => void;
     onExtendSearch?: () => void;
+    waitlistForm?: ReactNode;
     extendedSearchAccepted?: boolean;
     patientKind?: "new" | "existing" | "replacement";
     genericProfessionals?: boolean;
@@ -92,10 +96,19 @@ function AvailabilityOptions({
     const contextIntroduction = introduction ?? (patientKind === "replacement" ? receptionReplanLabels(locale).kept : patientKind === "existing" ? routing.existingAvailabilityIntro : receptionLabel(locale, "availabilityIntro", source.availabilityIntro));
     const distanceLimit = availability.search ? effectiveSearchDistance(availability.search, extendedSearchAccepted) : null;
     const canExtend = Boolean(onExtendSearch && distanceLimit === 110 && availability.search?.status === "exhausted" && !availability.search.hasUnlocatedClinics);
-    const [gapNoticeOpen, setGapNoticeOpen] = useState(false);
+    const openGapByDefault = availability.search?.status === "exhausted" && !availability.search.hasUnlocatedClinics && !canExtend;
+    const [gapNoticeOpen, setGapNoticeOpen] = useState(openGapByDefault);
+    const [waitlistOpen, setWaitlistOpen] = useState(false);
+    const canEnroll = distanceLimit === 200 && availability.search?.status === "exhausted"
+        && !availability.search.hasUnlocatedClinics && Boolean(waitlistForm);
+    const waitlistLabel = canEnroll ? walkInWaitlistLabels(locale).enroll : "";
+    function openWaitlist() {
+        setGapNoticeOpen(false);
+        setWaitlistOpen(true);
+    }
     useEffect(() => {
-        setGapNoticeOpen(availability.search?.status === "exhausted" && !availability.search.hasUnlocatedClinics && !canExtend);
-    }, [availability, canExtend]);
+        setGapNoticeOpen(openGapByDefault);
+    }, [availability, openGapByDefault]);
     if (availability.search) {
         const exhaustedTitle = routing.exhaustedTitle.replace("{maxDistance}", String(distanceLimit ?? 100));
         const searchLimit = distanceLimit === 200 ? routing.extendedLimit
@@ -123,12 +136,17 @@ function AvailabilityOptions({
                     <button type="button" className="rounded border border-slate-400 bg-white px-3 py-2 text-slate-800" onClick={() => setGapNoticeOpen(true)}>{routing.declineExtension}</button>
                 </div>
             </div>}
+            {canEnroll && !gapNoticeOpen && (waitlistOpen ? waitlistForm :
+                <button type="button" className="rounded border border-blue-500 px-3 py-2 text-blue-800" onClick={openWaitlist}>{waitlistLabel}</button>)}
             {gapNoticeOpen && <div role="dialog" aria-modal="true" aria-labelledby="walkin-gap-notice-title"
                 className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4">
                 <div className="max-w-lg space-y-4 rounded-lg bg-white p-5 shadow-lg">
                     <h3 id="walkin-gap-notice-title" className="font-semibold">{exhaustedTitle}</h3>
                     <p>{routing.gapNotice}</p>
-                    <button type="button" autoFocus className="rounded bg-blue-600 px-3 py-2 text-white" onClick={() => setGapNoticeOpen(false)}>{routing.gapAcknowledge}</button>
+                    <div className="flex flex-wrap gap-2">
+                        <button type="button" autoFocus className="rounded bg-blue-600 px-3 py-2 text-white" onClick={() => setGapNoticeOpen(false)}>{routing.gapAcknowledge}</button>
+                        {canEnroll && <button type="button" className="rounded border border-blue-500 px-3 py-2 text-blue-800" onClick={openWaitlist}>{waitlistLabel}</button>}
+                    </div>
                 </div>
             </div>}
         </div>;
@@ -300,6 +318,11 @@ export function WalkInArrivalPage() {
     const clinicId = activeClinic?._id || "";
     const existingPatient = selectedPatient || patients[0];
     const pending = existingPatient?.existingAppointments || [];
+    const waitlistForm = <WalkInWaitlistForm locale={locale} context={{
+        clinic: clinicId, insuranceNumber: ramq.trim(), patientId: selectedPatient?._id,
+        bookingProof: selectedPatient?.bookingProof, replaceAppointmentId: replacementId,
+    }} />;
+
 
     function clearSelection() {
         requestEpoch.current++;
@@ -765,7 +788,7 @@ export function WalkInArrivalPage() {
                         </div>
                         <button ref={availabilityButton} type="button" onClick={() => void loadWalkInAvailability()} disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{walkInAvailability ? receptionLabel(locale, "refreshAvailability", source.refreshAvailability) : receptionLabel(locale, "searchAvailability", source.searchAvailability)}</button>
                         {loading && <p className="text-sm text-slate-600">{t(source.availabilityLoading)}</p>}
-                        {walkInAvailability && <div ref={availabilityRegion} tabIndex={-1} className={targetClass(guideStep.key === "slots")}><AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} extendedSearchAccepted={extendedSearchAccepted} onExtendSearch={() => void loadWalkInAvailability(clinicId, selectedPatient?._id, replacementId, false, true)} onCompareEarlier={() => void loadWalkInAvailability(clinicId, selectedPatient?._id, replacementId, true, extendedSearchAccepted)} /></div>}
+                        {walkInAvailability && <div ref={availabilityRegion} tabIndex={-1} className={targetClass(guideStep.key === "slots")}><AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} extendedSearchAccepted={extendedSearchAccepted} waitlistForm={waitlistForm} onExtendSearch={() => void loadWalkInAvailability(clinicId, selectedPatient?._id, replacementId, false, true)} onCompareEarlier={() => void loadWalkInAvailability(clinicId, selectedPatient?._id, replacementId, true, extendedSearchAccepted)} /></div>}
                     </div>
                 ) : (
                     <>
@@ -774,7 +797,7 @@ export function WalkInArrivalPage() {
                         {loading && selectedPatient && <p className="mt-3 text-sm text-slate-600">{t(source.availabilityLoading)}</p>}
                         {selectedPatient && walkInAvailability && (
                             <div ref={availabilityRegion} tabIndex={-1} className={"mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4" + targetClass(guideStep.key === "slots")}>
-                                <AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} extendedSearchAccepted={extendedSearchAccepted} onExtendSearch={() => void loadWalkInAvailability(clinicId, selectedPatient?._id, replacementId, false, true)} onCompareEarlier={() => void loadWalkInAvailability(clinicId, selectedPatient?._id, replacementId, true, extendedSearchAccepted)} patientKind={replacementId ? "replacement" : "existing"} />
+                                <AvailabilityOptions availability={walkInAvailability} onChooseSlot={setSelectedSlot} locale={locale} extendedSearchAccepted={extendedSearchAccepted} waitlistForm={waitlistForm} onExtendSearch={() => void loadWalkInAvailability(clinicId, selectedPatient?._id, replacementId, false, true)} onCompareEarlier={() => void loadWalkInAvailability(clinicId, selectedPatient?._id, replacementId, true, extendedSearchAccepted)} patientKind={replacementId ? "replacement" : "existing"} />
                             </div>
                         )}
                     </>
