@@ -1,18 +1,20 @@
 export const SCHEDULING_TIME_ZONE = "America/Toronto";
 
+const schedulingFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: SCHEDULING_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+});
+
 function dateTimeParts(value) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return null;
 
-    const parts = new Intl.DateTimeFormat("en-CA", {
-        timeZone: SCHEDULING_TIME_ZONE,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-    }).formatToParts(date);
+    const parts = schedulingFormatter.formatToParts(date);
     const valueFor = (type) => parts.find((part) => part.type === type)?.value;
 
     return {
@@ -32,6 +34,14 @@ export function toSchedulingDateKey(value) {
 export function toSchedulingTime(value) {
     const parts = dateTimeParts(value);
     return parts ? `${parts.hour}:${parts.minute}` : null;
+}
+
+export function toSchedulingSlot(value) {
+    const parts = dateTimeParts(value);
+    return parts ? {
+        date: `${parts.year}-${parts.month}-${parts.day}`,
+        time: `${parts.hour}:${parts.minute}`,
+    } : null;
 }
 
 export function isSchedulingDatePast(date, now = new Date()) {

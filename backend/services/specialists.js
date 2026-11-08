@@ -8,7 +8,7 @@ import { CLINICAL_QUERY_WRITE_OPTIONS, CLINICAL_WRITE_CONCERN } from "../db/clin
 /* Specialist Service                                                  */
 /* ------------------------------------------------------------------ */
 
-function validateDisponibilites(disponibilites, allowedPastSlots = new Set(), now = Date.now()) {
+function validateDisponibilites(disponibilites, existingSlots = new Set(), now = Date.now()) {
     if (disponibilites === undefined) return;
     if (disponibilites === "__invalid__") {
         throw {
@@ -52,14 +52,13 @@ function validateDisponibilites(disponibilites, allowedPastSlots = new Set(), no
         (a, b) => a.getTime() - b.getTime()
     );
 
-    // Retained history does not constrain the month being scheduled now.
+    // Previously saved slots do not constrain the month of new manual entries.
     let monthKey = null;
 
     for (let i = 0; i < sorted.length; i += 1) {
         const current = sorted[i];
-        const isRetainedPastSlot = current.getTime() < now &&
-            allowedPastSlots.has(current.toISOString());
-        if (current.getTime() < now && !isRetainedPastSlot) {
+        const isRetainedSlot = existingSlots.has(current.toISOString());
+        if (current.getTime() < now && !isRetainedSlot) {
             throw {
                 code: "INVALID_INPUT",
                 message:
@@ -76,7 +75,7 @@ function validateDisponibilites(disponibilites, allowedPastSlots = new Set(), no
                 };
             }
         }
-        if (!isRetainedPastSlot) {
+        if (!isRetainedSlot) {
             const key = `${current.getUTCFullYear()}-${current.getUTCMonth()}`;
             if (monthKey !== null && key !== monthKey) {
                 throw {
@@ -90,7 +89,7 @@ function validateDisponibilites(disponibilites, allowedPastSlots = new Set(), no
     }
 }
 
-function validatePracticeLocations(practiceLocations, existingPastSlotsByClinic = new Map(), now = Date.now()) {
+function validatePracticeLocations(practiceLocations, existingSlotsByClinic = new Map(), now = Date.now()) {
     if (practiceLocations === undefined) return;
     if (practiceLocations === "__invalid__" || !Array.isArray(practiceLocations)) {
         throw {
@@ -122,9 +121,9 @@ function validatePracticeLocations(practiceLocations, existingPastSlotsByClinic 
             };
         }
         clinicIds.add(clinicId);
-        const pastSlots = existingPastSlotsByClinic.get(clinicId);
-        validateDisponibilites(location.disponibilites, pastSlots?.disponibilites, now);
-        validateDisponibilites(location.walkInDisponibilites, pastSlots?.walkInDisponibilites, now);
+        const existingSlots = existingSlotsByClinic.get(clinicId);
+        validateDisponibilites(location.disponibilites, existingSlots?.disponibilites, now);
+        validateDisponibilites(location.walkInDisponibilites, existingSlots?.walkInDisponibilites, now);
         for (const slot of [
             ...(location.disponibilites || []),
             ...(location.walkInDisponibilites || []),
@@ -141,7 +140,7 @@ function validatePracticeLocations(practiceLocations, existingPastSlotsByClinic 
     }
 }
 
-function getExistingPastSlotsByClinic(specialist, now = Date.now()) {
+function getExistingSlotsByClinic(specialist) {
     const locations = Array.isArray(specialist?.practiceLocations) && specialist.practiceLocations.length
         ? specialist.practiceLocations
         : specialist?.clinique_associer
@@ -155,17 +154,17 @@ function getExistingPastSlotsByClinic(specialist, now = Date.now()) {
 
     for (const location of locations) {
         const clinicId = String(location.clinique);
-        const pastSlots = {};
+        const existingSlots = {};
         for (const field of ["disponibilites", "walkInDisponibilites"]) {
-            pastSlots[field] = new Set();
+            existingSlots[field] = new Set();
             for (const slot of location[field] || []) {
                 const date = new Date(slot);
-                if (!Number.isNaN(date.getTime()) && date.getTime() < now) {
-                    pastSlots[field].add(date.toISOString());
+                if (!Number.isNaN(date.getTime())) {
+                    existingSlots[field].add(date.toISOString());
                 }
             }
         }
-        slotsByClinic.set(clinicId, pastSlots);
+        slotsByClinic.set(clinicId, existingSlots);
     }
 
     return slotsByClinic;
@@ -372,7 +371,7 @@ export async function updateSpecialist(id, updates) {
     const availabilityValidationTime = Date.now();
     validatePracticeLocations(
         updates.practiceLocations,
-        getExistingPastSlotsByClinic(existing, availabilityValidationTime),
+        getExistingSlotsByClinic(existing),
         availabilityValidationTime
     );
 

@@ -14,6 +14,7 @@ import {
     isSchedulingDatePast,
     isSchedulingDateTimePast,
     toSchedulingDateKey,
+    toSchedulingSlot,
     toSchedulingTime,
 } from "../utils/schedulingTime.js";
 
@@ -727,7 +728,7 @@ export async function updateAppointmentSchedule(id, { date, time, clinique }, au
     return appointment;
 }
 
-async function runAppointmentWriteTransaction(callback) {
+export async function runAppointmentWriteTransaction(callback) {
     const session = await mongoose.startSession();
 
     try {
@@ -1352,18 +1353,25 @@ async function getSpecialistAvailableTimes(
     return availableTimes;
 }
 
-const AVAILABILITY_REMINDER_MINIMUM_NOTICE_MS = 15 * 60 * 1000;
+export const AVAILABILITY_REMINDER_MINIMUM_NOTICE_MS = 15 * 60 * 1000;
+
+export function ownSpecialistFilter(authUser) {
+    return {
+        accountUserId: authUser.userId,
+        ...(authUser.role === "IPS" ? { specialite: IPS_SPECIALTY } : {}),
+    };
+}
 
 export async function countOwnAvailableSlots(authUser, now = new Date()) {
     const specialist = await Specialist.findOne(
-        {
-            accountUserId: authUser.userId,
-            ...(authUser.role === "IPS" ? { specialite: IPS_SPECIALTY } : {}),
-        },
+        ownSpecialistFilter(authUser),
         { specialite: 1, practiceLocations: 1, clinique_associer: 1, disponibilites: 1, walkInDisponibilites: 1 }
     ).lean();
     if (!specialist) return 0;
+    return (await readAvailabilityInventory(specialist, now)).count;
+}
 
+export async function readAvailabilityInventory(specialist, now, { dates = [], session = null } = {}) {
     const urgentologist = isUrgentologist(specialist.specialite);
     const practiceLocations = getPracticeLocations(specialist);
     const locations = practiceLocations.length ? practiceLocations : [specialist];
@@ -1379,23 +1387,25 @@ export async function countOwnAvailableSlots(authUser, now = new Date()) {
             const start = new Date(slot);
             if (!(start.getTime() >= earliestSlot)) continue;
 
-            const date = toSchedulingDateKey(start);
-            const time = formatTime(start);
+            const { date, time } = toSchedulingSlot(start);
 
             if (!timesByDate.has(date)) timesByDate.set(date, new Set());
             timesByDate.get(date).add(time);
         }
     }
-    if (!timesByDate.size) return 0;
+    const dateKeys = [...new Set([...timesByDate.keys(), ...dates])];
+    const occupied = new Set();
+    const consultationsByDate = new Map();
+    if (!dateKeys.length) return { count: 0, timesByDate, occupied, consultationsByDate };
 
     // A booking blocks this professional's time across all locations.
-    const booked = await Appointment.find(
-        { specialist: specialist._id, date: { $in: [...timesByDate.keys()] }, status: { $in: ["scheduled", "completed"] } },
+    const booked = await readWithSession(Appointment.find(
+        { specialist: specialist._id, date: { $in: dateKeys }, status: { $in: ["scheduled", "completed"] } },
         { date: 1, time: 1, _id: 0 }
-    ).lean();
-    const consultationsByDate = new Map();
+    ), session).lean();
     for (const { date, time } of booked) {
         timesByDate.get(date)?.delete(time);
+        occupied.add(`${date}T${time}`);
         consultationsByDate.set(date, (consultationsByDate.get(date) ?? 0) + 1);
     }
 
@@ -1406,7 +1416,7 @@ export async function countOwnAvailableSlots(authUser, now = new Date()) {
             : times.size;
         count += Math.min(times.size, capacity);
     }
-    return count;
+    return { count, timesByDate, occupied, consultationsByDate };
 }
 
 export async function getAvailableSlots(

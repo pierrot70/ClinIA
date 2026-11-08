@@ -1,7 +1,22 @@
 export const UI_LABELS_FR = {
     availabilityReminder: {
         title: "Rappel de disponibilités",
-        body: "Créneaux disponibles : {count}. Demandez à la gestion clinique d’en ajouter.",
+        body: "Créneaux disponibles : {count}.",
+        complete: "Compléter mes créneaux",
+        working: "Ajout en cours…",
+        schedule: "Mon horaire habituel",
+        scheduleHelp: "Choisissez vos quarts habituels à l’heure de Toronto. ClinIA ajoute des créneaux de 15 minutes dans les quarts restants aujourd’hui.",
+        weekday: "Jour de la semaine",
+        shift: "Quart de travail",
+        selectShift: "Choisir un quart",
+        addRange: "Ajouter un quart",
+        saveAndComplete: "Enregistrer et compléter",
+        result: "Créneaux ajoutés : {added}. Total disponible : {count}.",
+        partial: "Il ne reste pas assez de temps dans vos plages d’aujourd’hui pour atteindre 20 créneaux libres.",
+        overlap: "Deux plages se chevauchent. Choisissez des heures distinctes, même entre cliniques.",
+        invalid: "Vérifiez le jour, la clinique, le type de créneau et le quart choisi.",
+        unavailable: "Demandez à la gestion clinique d’associer votre compte à une fiche professionnelle et à une clinique.",
+        failed: "Impossible de compléter vos créneaux. Réessayez.",
         dismiss: "Fermer le rappel",
     },
     clinicalResultIntegrity: {

@@ -19,6 +19,14 @@ const PracticeLocationSchema = new mongoose.Schema(
 /* Specialist Schema                                                   */
 /* ------------------------------------------------------------------ */
 
+const WeeklyAvailabilityRangeSchema = new mongoose.Schema({
+    clinique: { type: mongoose.Schema.Types.ObjectId, ref: "Clinique", required: true },
+    weekday: { type: Number, required: true, min: 0, max: 6 },
+    start: { type: String, required: true },
+    end: { type: String, required: true },
+    slotType: { type: String, required: true, enum: ["regular", "walk_in"] },
+}, { _id: false });
+
 const SpecialistSchema = new mongoose.Schema(
     {
         nom: {
@@ -83,6 +91,7 @@ const SpecialistSchema = new mongoose.Schema(
         ],
         // New scheduling source of truth. Legacy fields above remain during
         // the compatibility window for existing API consumers and data.
+        weeklyAvailability: { type: [WeeklyAvailabilityRangeSchema], default: undefined, select: false },
         practiceLocations: {
             type: [PracticeLocationSchema],
             default: undefined,

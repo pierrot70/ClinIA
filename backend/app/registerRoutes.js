@@ -1,6 +1,7 @@
 import { requireIpsClinicalScope } from "../middleware/ipsClinicalScope.js";
 import clinicalCareAccessRouter from "../routes/clinicalCareAccess.js";
 import appointmentsRouter from "../routes/appointments.js";
+import ownAvailabilityRouter from "../routes/ownAvailability.js";
 import patientsRouter from "../routes/patients.js";
 import cliniquesRouter from "../routes/cliniques.js";
 import specialistsRouter from "../routes/specialists.js";
@@ -62,6 +63,7 @@ export function registerRoutes(app, deps) {
     app.use("/api/ai", aiAnalyzeRouter || createAiAnalyzeRouter({}));
 
     app.use("/api/auth", authRouter);
+    app.use("/api/my-availability", verifyJWT, requireRole(AUTH_ROLES.MEDECIN, AUTH_ROLES.IPS), ownAvailabilityRouter);
     app.use("/api/consultations", verifyJWT, requireIpsClinicalScope("consultations"), requireRole(AUTH_ROLES.MEDECIN, AUTH_ROLES.IPS),
         massDownloadRestrictionGuard, loi25DataLeakGuard, consultationsRouter);
 
