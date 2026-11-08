@@ -6,7 +6,7 @@ import { Patient } from "../models/Patient.js";
 import { Specialist } from "../models/Specialist.js";
 import { Appointment } from "../models/Appointment.js";
 import { Clinique } from "../models/Clinique.js";
-import { orderedWalkInClinics, WALK_IN_RADIUS_KM, WALK_IN_TOLERANCE_KM, WALK_IN_MAX_DISTANCE_KM, WALK_IN_SPECIALTY_PRIORITY } from "./receptionWalkInRouting.js";
+import { orderedWalkInClinics, WALK_IN_RADIUS_KM, WALK_IN_TOLERANCE_KM, WALK_IN_MAX_DISTANCE_KM, WALK_IN_EXTENDED_MAX_DISTANCE_KM, WALK_IN_SPECIALTY_PRIORITY } from "./receptionWalkInRouting.js";
 import { IPS_SPECIALTY, URGENTOLOGIST_SPECIALTY, URGENTOLOGIST_DAILY_LIMIT, isUrgentologist } from "../domain/specialties.js";
 import { countUrgentologistConsultations } from "./urgentologistCapacity.js";
 import { recordPatientAuditEvent } from "../audit/patientAudit.js";
@@ -116,7 +116,7 @@ function toOption(specialist, date, schedule, slotTypes = {}) {
 // Existing-patient filtering requires the exact origin-clinic lookup proof.
 export async function listWalkInFamilyMedicineOptions({
     clinicId, patientId = null, replaceAppointmentId = null, bookingProof,
-    authUser, now = new Date(), compareEarlier = false,
+    authUser, now = new Date(), compareEarlier = false, extendedSearchAccepted = false,
 }) {
     await assertReceptionClinicAccess(clinicId, authUser);
     if (patientId && !mongoose.Types.ObjectId.isValid(patientId)) throw invalidInput("Patient invalide.");
@@ -129,7 +129,7 @@ export async function listWalkInFamilyMedicineOptions({
         ? validateReplacement(await pendingAppointments(patientId, clinicId, today), replaceAppointmentId)
         : null;
     if (!patientId && replaceAppointmentId) throw invalidInput("Patient requis pour replanifier.");
-    return searchWalkInOptions({ clinicId, patientId, previous, now, compareEarlier: compareEarlier === true });
+    return searchWalkInOptions({ clinicId, patientId, previous, now, compareEarlier: compareEarlier === true, extendedSearchAccepted });
 }
 
 async function clinicSpecialtyOptions({ candidate, specialty, active, patientId, previous, now, session, before = null }) {
@@ -200,7 +200,13 @@ async function earlierWalkInAlternatives({ primary, geography, active, clinicId,
     return alternatives.slice(0, MAX_FUTURE_OPTIONS);
 }
 
-async function searchWalkInOptions({ clinicId, patientId, previous, now = new Date(), session = null, compareEarlier = false }) {
+function walkInSearchLimit(extended) {
+    return extended
+        ? { radiusKm: WALK_IN_EXTENDED_MAX_DISTANCE_KM, maxDistanceKm: WALK_IN_EXTENDED_MAX_DISTANCE_KM }
+        : { radiusKm: WALK_IN_RADIUS_KM, toleranceKm: WALK_IN_TOLERANCE_KM, maxDistanceKm: WALK_IN_MAX_DISTANCE_KM };
+}
+
+async function searchWalkInOptions({ clinicId, patientId, previous, now = new Date(), session = null, compareEarlier = false, extendedSearchAccepted = false }) {
     const today = currentSchedulingDay(now);
     const origin = await Clinique.findOne({ _id: clinicId }, { nom: 1, lat: 1, long: 1 }).session(session).lean();
     if (!origin) throw invalidInput("Clinique introuvable.");
@@ -212,7 +218,11 @@ async function searchWalkInOptions({ clinicId, patientId, previous, now = new Da
         && activeAccounts.get(String(s.accountUserId)) === (s.specialite === IPS_SPECIALTY ? "IPS" : "MEDECIN"));
     const clinicIds = [...new Set(active.flatMap(s => getPracticeLocations(s).map(location => location.clinique)))];
     const clinics = clinicIds.length ? await Clinique.find({ _id: { $in: clinicIds } }, { nom: 1, lat: 1, long: 1 }).session(session).lean() : [];
-    const geography = orderedWalkInClinics(origin, clinics);
+    const localGeography = orderedWalkInClinics(origin, clinics);
+    // A wider search is only meaningful after all potentially local clinics
+    // could be checked. In distance order, local offers still take precedence.
+    const useExtended = extendedSearchAccepted === true && localGeography.originLocated && !localGeography.hasUnlocatedClinics;
+    const geography = useExtended ? orderedWalkInClinics(origin, clinics, WALK_IN_EXTENDED_MAX_DISTANCE_KM) : localGeography;
     let examinedClinics = 0;
     let originUrgentologists;
     for (const candidate of geography.candidates) {
@@ -225,31 +235,34 @@ async function searchWalkInOptions({ clinicId, patientId, previous, now = new Da
             options.sort((left, right) => `${left.date}T${left.slots[0]}`.localeCompare(`${right.date}T${right.slots[0]}`)
                 || `${left.specialist.prenom || ""} ${left.specialist.nom || ""}`.localeCompare(`${right.specialist.prenom || ""} ${right.specialist.nom || ""}`, "fr")
                 || left.specialist._id.localeCompare(right.specialist._id));
+            const outsideLocalLimit = candidate.distanceKm > WALK_IN_MAX_DISTANCE_KM;
             const result = {
                 presentation: "priority", selectedClinic: { _id: destinationId, nom: candidate.clinic.nom, distanceKm: candidate.distanceKm }, prioritySpecialty: specialty,
-                search: { radiusKm: WALK_IN_RADIUS_KM, toleranceKm: WALK_IN_TOLERANCE_KM, maxDistanceKm: WALK_IN_MAX_DISTANCE_KM, status: "found", distanceMode: "straight_line", examinedClinics,
+                search: { ...walkInSearchLimit(outsideLocalLimit), status: "found", distanceMode: "straight_line", examinedClinics,
                     ...(geography.hasUnlocatedClinics ? { hasUnlocatedClinics: true } : {}) },
                 today: options.filter(option => option.date === today), future: options.filter(option => option.date > today).slice(0, MAX_FUTURE_OPTIONS),
                 ...(urgentologists || originUrgentologists ? { urgentologists: urgentologists || originUrgentologists } : {}),
             };
-            if (compareEarlier) result.earlierAlternatives = await earlierWalkInAlternatives({ primary: result, geography, active, clinicId, patientId, previous, now, session });
+            if (compareEarlier) result.earlierAlternatives = await earlierWalkInAlternatives({
+                primary: result, geography: outsideLocalLimit ? geography : localGeography, active, clinicId, patientId, previous, now, session,
+            });
             return result;
         }
     }
     return {
         presentation: "priority", today: [], future: [],
         ...(compareEarlier ? { earlierAlternatives: [] } : {}),
-        search: { radiusKm: WALK_IN_RADIUS_KM, toleranceKm: WALK_IN_TOLERANCE_KM, maxDistanceKm: WALK_IN_MAX_DISTANCE_KM, status: !geography.originLocated || geography.hasUnlocatedClinics ? "location_missing" : "exhausted", distanceMode: "straight_line", examinedClinics,
+        search: { ...walkInSearchLimit(useExtended), status: !geography.originLocated || geography.hasUnlocatedClinics ? "location_missing" : "exhausted", distanceMode: "straight_line", examinedClinics,
             ...(geography.hasUnlocatedClinics ? { hasUnlocatedClinics: true } : {}) },
         ...(originUrgentologists ? { urgentologists: originUrgentologists } : {}),
     };
 }
 
-async function assertWalkInDestination({ originClinicId, clinicId, specialistId, patientId = null, previous = null, date, time, slotType = "walk_in", selectionMode = "priority", session, authUser }) {
+async function assertWalkInDestination({ originClinicId, clinicId, specialistId, patientId = null, previous = null, date, time, slotType = "walk_in", selectionMode = "priority", extendedSearchAccepted = false, session, authUser }) {
     await assertReceptionClinicAccess(originClinicId, authUser, session);
     if (!mongoose.Types.ObjectId.isValid(clinicId)) throw invalidInput("Clinique invalide.");
     if (!["priority", "earlier"].includes(selectionMode)) throw invalidInput("Mode de sélection invalide.");
-    const options = await searchWalkInOptions({ clinicId: originClinicId, patientId, previous, session, compareEarlier: selectionMode === "earlier" });
+    const options = await searchWalkInOptions({ clinicId: originClinicId, patientId, previous, session, compareEarlier: selectionMode === "earlier", extendedSearchAccepted });
     const selected = selectionMode === "earlier"
         ? options.earlierAlternatives?.find(option => option.clinic._id === String(clinicId) && option.specialist._id === String(specialistId) && option.date === date && option.slots.includes(time))
         : options.selectedClinic?._id === String(clinicId)
@@ -383,6 +396,7 @@ export async function createWalkInPatientAndAppointment({
     clinicId,
     originClinicId = clinicId,
     selectionMode = "priority",
+    extendedSearchAccepted = false,
     specialistId,
     date,
     time,
@@ -414,7 +428,7 @@ export async function createWalkInPatientAndAppointment({
     try {
         let result;
         await session.withTransaction(async () => {
-            await assertWalkInDestination({ originClinicId, clinicId, specialistId, date, time, selectionMode, session, authUser });
+            await assertWalkInDestination({ originClinicId, clinicId, specialistId, date, time, selectionMode, extendedSearchAccepted, session, authUser });
             const receivingPhysicianUserId = await requireActiveReceivingPhysician(specialistId, clinicId, session);
             // Reception creates identity data only, never a clinical profile or
             // notes, even if such fields are forged in the HTTP payload.
@@ -516,6 +530,7 @@ export async function createWalkInAppointmentForExistingPatient({
     clinicId,
     originClinicId = clinicId,
     selectionMode = "priority",
+    extendedSearchAccepted = false,
     specialistId,
     patientId,
     date,
@@ -554,7 +569,7 @@ export async function createWalkInAppointmentForExistingPatient({
             const previous = validateReplacement(await pendingAppointments(patientId, originClinicId, today, session), replaceAppointmentId);
             if (String(originClinicId) !== String(clinicId) && (await pendingAppointments(patientId, clinicId, today, session)).length) throw replacementConflict();
             if (previous && String(previous.specialist) === String(specialistId) && previous.date === date && previous.time === time) throw invalidInput("Choisissez un autre créneau.");
-            await assertWalkInDestination({ originClinicId, clinicId, specialistId, patientId, previous, date, time, slotType, selectionMode, session, authUser });
+            await assertWalkInDestination({ originClinicId, clinicId, specialistId, patientId, previous, date, time, slotType, selectionMode, extendedSearchAccepted, session, authUser });
             if (previous) {
                 const changed = await Appointment.updateOne({ _id: previous._id, patient: patientId, clinique: originClinicId, status: "scheduled" },
                     { $set: { status: "rescheduled" } }, { session });

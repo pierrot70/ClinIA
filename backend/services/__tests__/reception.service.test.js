@@ -1176,6 +1176,30 @@ describe("ordered WalkIn clinic and IPS routing", () => {
         expect(result.selectedClinic?._id).toBe(admitted ? nearId : undefined);
         if (!admitted) expect(getAvailableSlotSchedule).not.toHaveBeenCalled();
     });
+    it.each([[110.1, true], [199.9999, true], [200.1, false]])("searches to 200 km after explicit agreement (%s km)", async (distance, admitted) => {
+        toleranceDirectory([professional(ipsId, "IPS", nearId)], distance);
+        const result = await list({ extendedSearchAccepted: true });
+        expect(result.search).toMatchObject({ radiusKm: 200, maxDistanceKm: 200, status: admitted ? "found" : "exhausted" });
+        expect(result.selectedClinic?._id).toBe(admitted ? nearId : undefined);
+    });
+    it("keeps a local offer ahead of a distant one even after agreement", async () => {
+        const professionals = [professional(ipsId, "IPS", nearId), professional(urgentId, "Urgentologue", clinicId)];
+        toleranceDirectory(professionals, 150);
+        const result = await list({ extendedSearchAccepted: true, compareEarlier: true });
+        expect(result).toMatchObject({ selectedClinic: { _id: clinicId }, search: { maxDistanceKm: 110 }, earlierAlternatives: [] });
+    });
+    it("requires agreement again for booking beyond 110 km and rechecks current local availability", async () => {
+        const professionals = [professional(ipsId, "IPS", nearId)];
+        const args = prepareBooking(professionals);
+        toleranceDirectory(professionals, 110.1);
+        await expect(createWalkInPatientAndAppointment(args)).rejects.toMatchObject({ code: "NO_AVAILABILITY" });
+        expect(createPatient).not.toHaveBeenCalled();
+        await expect(createWalkInPatientAndAppointment({ ...args, extendedSearchAccepted: true })).resolves.toMatchObject({ writeAuditRecorded: true });
+        expect(createAppointment).toHaveBeenCalledTimes(1);
+        toleranceDirectory([...professionals, professional(urgentId, "Urgentologue", clinicId)], 110.1);
+        await expect(createWalkInPatientAndAppointment({ ...args, extendedSearchAccepted: true })).rejects.toMatchObject({ code: "NO_AVAILABILITY" });
+        expect(createAppointment).toHaveBeenCalledTimes(1);
+    });
     it.each([[105, true], [110.001, false]])("uses the same limit for comparison and transactional booking (%s km)", async (distance, admitted) => {
         const professionals = [professional(ipsId, "IPS", nearId, "2030-01-02"), professional(urgentId, "Urgentologue", clinicId, "2030-01-31")];
         const args = prepareBooking(professionals);

@@ -29,9 +29,9 @@ export interface WalkInAvailability {
     selectedClinic?: WalkInDestinationClinic;
     prioritySpecialty?: "Urgentologue" | "IPS" | "Medecin de famille";
     search?: {
-        radiusKm: 100;
+        radiusKm: 100 | 200;
         toleranceKm?: 10;
-        maxDistanceKm?: 110;
+        maxDistanceKm?: 110 | 200;
         status: "found" | "exhausted" | "location_missing";
         distanceMode: "straight_line";
         examinedClinics: number;
@@ -56,6 +56,7 @@ export interface CreateWalkInBookingPayload {
     clinic: string;
     originClinic?: string;
     selectionMode?: "priority" | "earlier";
+    extendedSearchAccepted?: true;
     specialist: string;
     date: string;
     time: string;
@@ -104,12 +105,14 @@ export async function fetchWalkInAvailability(
     patientId?: string,
     replaceAppointmentId?: string,
     bookingProof?: string,
-    compareEarlier = false
+    compareEarlier = false,
+    extendedSearchAccepted = false
 ): Promise<ApiResponse<WalkInAvailability>> {
     return withSecurityIncidentGuard((async () => {
         try {
             const query = new URLSearchParams({ clinic: clinicId });
             if (compareEarlier) query.set("compareEarlier", "true");
+            if (extendedSearchAccepted) query.set("extendedSearchAccepted", "true");
             if (patientId) query.set("patient", patientId);
             if (replaceAppointmentId) query.set("replaceAppointmentId", replaceAppointmentId);
             const response = await authFetch(

@@ -1665,6 +1665,10 @@ export const UI_LABELS_FR = {
         earlierHelp: "Comparez les dates, les cliniques et les professions avec le patient avant de choisir. Aucun rendez-vous n’est réservé à cette étape.",
         noEarlier: "Aucun rendez-vous plus tôt trouvé. La proposition initiale reste disponible à la sélection.",
 
+        extendConsent: "Le patient accepte-t-il de chercher un rendez-vous jusqu’à 200 km à vol d’oiseau de la clinique actuelle ?",
+        extendSearch: "Accord du patient – chercher jusqu’à 200 km",
+        declineExtension: "Le patient décline – voir le GAP",
+        extendedLimit: "Recherche élargie à 200 km à vol d’oiseau avec l’accord du patient.",
         gapNotice: "La réception peut orienter le patient vers le Guichet d’accès à la première ligne (GAP), selon sa situation. ClinIA n’effectue aucune demande ni réservation au GAP.",
         gapAcknowledge: "Compris",
         guideUnavailableDescription: "Consultez l’avis destiné à la réception lorsqu’aucun créneau n’est trouvé. ClinIA ne réserve rien au GAP.",

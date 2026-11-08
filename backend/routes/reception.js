@@ -72,6 +72,7 @@ router.get("/walk-in-options", async (req, res) => {
             patientId: req.query.patient,
             replaceAppointmentId: req.query.replaceAppointmentId,
             compareEarlier: req.query.compareEarlier === "true",
+            ...(req.query.extendedSearchAccepted === "true" ? { extendedSearchAccepted: true } : {}),
             bookingProof: req.get?.("X-Reception-Booking-Proof") ?? req.headers?.["x-reception-booking-proof"],
             authUser: req.auth,
         });
@@ -176,6 +177,9 @@ router.post("/walk-in-bookings", async (req, res) => {
     if (req.body?.selectionMode !== undefined && !["priority", "earlier"].includes(req.body.selectionMode)) {
         return res.status(400).json({ error: { code: "INVALID_INPUT", message: "Mode de sélection invalide.", retryable: false } });
     }
+    if (req.body?.extendedSearchAccepted !== undefined && typeof req.body.extendedSearchAccepted !== "boolean") {
+        return res.status(400).json({ error: { code: "INVALID_INPUT", message: "Confirmation de recherche élargie invalide.", retryable: false } });
+    }
     if (commonFieldsAreMissing || (existingPatientId && req.body?.patient) || (req.body?.replaceAppointmentId && !existingPatientId)) {
         return res.status(400).json({
             error: {
@@ -219,6 +223,7 @@ router.post("/walk-in-bookings", async (req, res) => {
             clinicId: req.body.clinic,
             originClinicId: req.body.originClinic,
             selectionMode: req.body.selectionMode ?? "priority",
+            ...(req.body.extendedSearchAccepted === true ? { extendedSearchAccepted: true } : {}),
             specialistId: req.body.specialist,
             date: req.body.date,
             time: req.body.time,

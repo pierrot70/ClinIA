@@ -77,10 +77,13 @@ describe("WalkIn priority destination and assisted GAP", () => {
         expect(screen.getByRole("button", { name: /09:00/ })).toBeEnabled();
         expect(screen.queryByText(walkInRoutingLabels("en-CA").exhaustedTitle.replace("{maxDistance}", "110"))).not.toBeInTheDocument();
     });
-    it.each(UI_LOCALES)("shows a local GAP notice once per exhausted result, without an external link or booking in %s", async locale => {
+    it.each(UI_LOCALES)("offers expansion before GAP and shows the notice on decline in %s", async locale => {
         api.slots.mockResolvedValue({ data: empty("exhausted") });
         const { rerender } = render(<Page />); await searchNew(); rerender(<Page locale={locale} />);
         const routing = walkInRoutingLabels(locale);
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: routing.extendSearch })).toBeVisible();
+        fireEvent.click(screen.getByRole("button", { name: routing.declineExtension }));
         const dialog = await screen.findByRole("dialog", { name: routing.exhaustedTitle.replace("{maxDistance}", "110") });
         expect(dialog).toHaveTextContent(routing.gapNotice);
         expect(screen.queryByRole("link")).not.toBeInTheDocument();
@@ -89,9 +92,42 @@ describe("WalkIn priority destination and assisted GAP", () => {
         rerender(<Page locale="en-CA" />);
         expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "Refresh available appointments" }));
-        expect(await screen.findByRole("dialog", { name: walkInRoutingLabels("en-CA").exhaustedTitle.replace("{maxDistance}", "110") })).toBeVisible();
+        expect(await screen.findByRole("button", { name: walkInRoutingLabels("en-CA").extendSearch })).toBeVisible();
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
         expect(api.book).not.toHaveBeenCalled();
         expect(fetch).not.toHaveBeenCalled();
+    });
+    it("sends explicit agreement when searching and booking a 110.1 km offer", async () => {
+        const extended: WalkInAvailability = {
+            ...found, selectedClinic: { ...found.selectedClinic!, distanceKm: 110.1 },
+            search: { radiusKm: 200, maxDistanceKm: 200, status: "found", distanceMode: "straight_line", examinedClinics: 2 },
+        };
+        api.slots.mockResolvedValueOnce({ data: empty("exhausted") }).mockResolvedValueOnce({ data: extended });
+        render(<Page />); await searchNew();
+        const routing = walkInRoutingLabels("en-CA");
+        expect(screen.queryByRole("button", { name: /09:00/ })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: routing.extendSearch }));
+        fireEvent.click(await screen.findByRole("button", { name: /09:00/ }));
+        expect(api.slots).toHaveBeenLastCalledWith("origin", undefined, undefined, undefined, false, true);
+        expect(screen.getByText(routing.distance.replace("{distance}", "110.1"))).toBeVisible();
+        fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Fictional" } });
+        fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "WalkIn" } });
+        fireEvent.click(screen.getByRole("button", { name: "Create patient and appointment" }));
+        await screen.findByRole("button", { name: "Search for patient" });
+        expect(api.book).toHaveBeenCalledWith(expect.objectContaining({ extendedSearchAccepted: true, originClinic: "origin", clinic: "nearby" }));
+    });
+    it("shows GAP only after an agreed extended search returns no offer", async () => {
+        const extended: WalkInAvailability = {
+            ...empty("exhausted"),
+            search: { radiusKm: 200, maxDistanceKm: 200, status: "exhausted", distanceMode: "straight_line", examinedClinics: 3 },
+        };
+        api.slots.mockResolvedValueOnce({ data: empty("exhausted") }).mockResolvedValueOnce({ data: extended });
+        render(<Page />); await searchNew();
+        const routing = walkInRoutingLabels("en-CA");
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: routing.extendSearch }));
+        expect(await screen.findByRole("dialog", { name: routing.exhaustedTitle.replace("{maxDistance}", "200") })).toBeVisible();
+        expect(api.book).not.toHaveBeenCalled();
     });
     it("does not claim no availability or offer GAP when clinic coordinates are incomplete", async () => {
         api.slots.mockResolvedValue({ data: empty("location_missing") });
@@ -135,7 +171,6 @@ describe("WalkIn priority destination and assisted GAP", () => {
         api.slots.mockResolvedValue({ data: empty("exhausted") });
         render(<Page />); await searchNew();
         const routing = walkInRoutingLabels("en-CA");
-        fireEvent.click(screen.getByRole("button", { name: routing.gapAcknowledge }));
         fireEvent.click(screen.getByRole("button", { name: walkInGuideLabels("en-CA").start }));
         expect(screen.getByText(routing.guideUnavailableTitle)).toBeVisible();
         fireEvent.click(screen.getByRole("button", { name: routing.guideUnavailableAction }));
