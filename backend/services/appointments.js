@@ -1352,6 +1352,8 @@ async function getSpecialistAvailableTimes(
     return availableTimes;
 }
 
+const AVAILABILITY_REMINDER_MINIMUM_NOTICE_MS = 15 * 60 * 1000;
+
 export async function countOwnAvailableSlots(authUser, now = new Date()) {
     const specialist = await Specialist.findOne(
         {
@@ -1365,8 +1367,7 @@ export async function countOwnAvailableSlots(authUser, now = new Date()) {
     const urgentologist = isUrgentologist(specialist.specialite);
     const practiceLocations = getPracticeLocations(specialist);
     const locations = practiceLocations.length ? practiceLocations : [specialist];
-    const today = toSchedulingDateKey(now);
-    const currentTime = toSchedulingTime(now);
+    const earliestSlot = now.getTime() + AVAILABILITY_REMINDER_MINIMUM_NOTICE_MS;
     const timesByDate = new Map();
 
     for (const location of locations) {
@@ -1375,10 +1376,11 @@ export async function countOwnAvailableSlots(authUser, now = new Date()) {
             ...(location.walkInDisponibilites || []),
         ];
         for (const slot of slots) {
-            const date = toSchedulingDateKey(slot);
-            if (!date || date < today) continue;
-            const time = formatTime(slot);
-            if (date === today && time <= currentTime) continue;
+            const start = new Date(slot);
+            if (!(start.getTime() >= earliestSlot)) continue;
+
+            const date = toSchedulingDateKey(start);
+            const time = formatTime(start);
 
             if (!timesByDate.has(date)) timesByDate.set(date, new Set());
             timesByDate.get(date).add(time);

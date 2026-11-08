@@ -131,13 +131,19 @@ describe("appointments service", () => {
         const specialist = "507f1f77bcf86cd799439021";
         const slot = (time) => new Date(`2099-01-01T${time}:00Z`);
 
-        it("counts future free times once across slot types and clinics, scoped to the signed-in IPS", async () => {
+        it("counts free times at least 15 minutes away once across slot types and clinics for the signed-in IPS", async () => {
             specialistFindOne.mockReturnValue({ lean: async () => ({
                 _id: specialist,
                 specialite: "IPS",
                 disponibilites: [slot("22:00")], // Superseded by practiceLocations.
                 practiceLocations: [
-                    { clinique: "a", disponibilites: [slot("14:00"), slot("15:00"), slot("15:30"), slot("16:00"), slot("16:30")] },
+                    {
+                        clinique: "a",
+                        disponibilites: [
+                            slot("14:00"), slot("15:00"), new Date("2099-01-01T15:14:59.999Z"),
+                            slot("15:15"), slot("15:30"), slot("16:00"), slot("16:30"),
+                        ],
+                    },
                     { clinique: "b", walkInDisponibilites: [slot("16:30"), slot("17:00")] },
                 ],
             }) });
@@ -146,7 +152,7 @@ describe("appointments service", () => {
                 { date: "2099-01-01", time: "11:00" }, // completed
             ] });
 
-            await expect(countOwnAvailableSlots({ ...authUser, role: "IPS" }, now)).resolves.toBe(2);
+            await expect(countOwnAvailableSlots({ ...authUser, role: "IPS" }, now)).resolves.toBe(3);
             expect(specialistFindOne).toHaveBeenCalledWith(
                 { accountUserId: authUser.userId, specialite: "IPS" }, expect.any(Object)
             );
