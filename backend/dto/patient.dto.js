@@ -40,7 +40,7 @@ function normalizeBoundedString(value, field, fallback = "") {
     return normalized;
 }
 
-function normalizeTelephone(value) {
+export function normalizeTelephone(value) {
     const telephone = normalizeBoundedString(value, "telephone", undefined);
     if (telephone === undefined || telephone === "") return undefined;
 

@@ -1655,6 +1655,7 @@ export const UI_LABELS_FR = {
     walkInWaitlist: {
         enroll: "Inscrire sur la liste d’attente",
         channel: "Mode de contact choisi",
+        smsNumber: "Numéro pour les SMS",
         chooseChannel: "Choisir un mode de contact",
         sms: "SMS",
         email: "Courriel",

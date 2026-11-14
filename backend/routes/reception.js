@@ -108,10 +108,10 @@ const waitlistErrors = {
 
 router.post("/walk-in-waitlist", async (req, res) => {
     res.set("Cache-Control", "no-store");
-    const { clinic, insuranceNumber, channel, telephone, courriel, nom, prenom, consent, patientId, bookingProof, replaceAppointmentId } = req.body ?? {};
+    const { clinic, insuranceNumber, channel, telephone, telephoneSms, courriel, nom, prenom, consent, patientId, bookingProof, replaceAppointmentId } = req.body ?? {};
     try {
         const data = await enrollWalkInWaitlist({
-            clinicId: clinic, insuranceNumber, channel, telephone, courriel, nom, prenom, consent, patientId, bookingProof,
+            clinicId: clinic, insuranceNumber, channel, telephone, telephoneSms, courriel, nom, prenom, consent, patientId, bookingProof,
             replaceAppointmentId, authUser: req.auth, ip: getTrustedRequestIp(req),
         });
         return res.status(201).json({ data, meta: { source: "real", model: "mongo" } });

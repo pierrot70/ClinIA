@@ -40,10 +40,10 @@ async function searchNew() {
 }
 describe("WalkIn priority destination and assisted GAP", () => {
     it.each([
-        ["sms", "555-010-1243", "", { telephone: "555-010-1243" }],
-        ["phone", "555-010-1243", "", { telephone: "555-010-1243" }],
-        ["email", "555-010-1243", "synthetic@example.invalid", { telephone: "555-010-1243", courriel: "synthetic@example.invalid" }],
-    ])("saves the new dossier's contact details and waitlist consent for %s", async (channel, telephone, courriel, expected) => {
+        ["sms", "555-010-1243", "555-010-1244", "", { telephone: "555-010-1243", telephoneSms: "555-010-1244" }],
+        ["phone", "555-010-1243", "", "", { telephone: "555-010-1243" }],
+        ["email", "555-010-1243", "", "synthetic@example.invalid", { telephone: "555-010-1243", courriel: "synthetic@example.invalid" }],
+    ])("saves the new dossier's contact details and waitlist consent for %s", async (channel, telephone, telephoneSms, courriel, expected) => {
         const extendedEmpty: WalkInAvailability = {
             ...empty("exhausted"), search: { status: "exhausted", radiusKm: 200, maxDistanceKm: 200, distanceMode: "straight_line", examinedClinics: 3 },
         };
@@ -59,6 +59,9 @@ describe("WalkIn priority destination and assisted GAP", () => {
         fireEvent.change(screen.getByRole("textbox", { name: "Last name" }), { target: { value: "Patient" } });
         fireEvent.change(screen.getByLabelText("Preferred contact method"), { target: { value: channel } });
         fireEvent.change(screen.getByRole("textbox", { name: "Phone number" }), { target: { value: telephone } });
+        const smsField = screen.getByRole("textbox", { name: "Number for SMS" });
+        expect(smsField).toHaveProperty("required", channel === "sms");
+        fireEvent.change(smsField, { target: { value: telephoneSms } });
         fireEvent.change(screen.getByRole("textbox", { name: "Email address" }), { target: { value: courriel } });
         expect(api.enroll).not.toHaveBeenCalled();
         fireEvent.click(screen.getByRole("checkbox"));

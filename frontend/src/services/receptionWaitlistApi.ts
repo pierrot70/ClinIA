@@ -17,6 +17,7 @@ interface Enrollment extends WaitlistPatientContext {
     nom?: string;
     prenom?: string;
     telephone?: string;
+    telephoneSms?: string;
     courriel?: string;
     consent: true;
 }

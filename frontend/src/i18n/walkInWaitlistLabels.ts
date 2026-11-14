@@ -12,6 +12,7 @@ const rows: Record<keyof typeof source, readonly string[]> = {
     phone: [source.phone, "Phone call", "Llamada telefónica", "전화 통화", "Cuộc gọi", "Telefonsamtale", "電話", "电话", "שיחת טלפון"],
     emailAddress: [source.emailAddress, "Email address", "Dirección de correo electrónico", "이메일 주소", "Địa chỉ email", "E-postadresse", "メールアドレス", "电子邮件地址", "כתובת דוא״ל"],
     phoneNumber: [source.phoneNumber, "Phone number", "Número de teléfono", "전화번호", "Số điện thoại", "Telefonnummer", "電話番号", "电话号码", "מספר טלפון"],
+    smsNumber: [source.smsNumber, "Number for SMS", "Número para SMS", "문자 메시지 수신 번호", "Số nhận SMS", "Nummer for SMS", "SMS受信用の電話番号", "短信接收号码", "מספר לקבלת מסרונים"],
     consent: [source.consent, "The patient agrees to join the waitlist and be contacted using the selected method.", "El paciente acepta inscribirse en la lista de espera y que se le contacte por el medio elegido.", "환자는 대기 명단 등록 및 선택한 방법으로 연락받는 데 동의합니다.", "Người bệnh đồng ý vào danh sách chờ và được liên hệ theo cách đã chọn.", "Pasienten samtykker til ventelisten og til å bli kontaktet på valgt måte.", "患者は待機リストへの登録と、選択した方法で連絡を受けることに同意します。", "患者同意加入候补名单并通过所选方式接收联系。", "המטופל מסכים להירשם לרשימת ההמתנה ולקבל פנייה באמצעי שנבחר."],
     save: [source.save, "Save enrollment", "Guardar inscripción", "등록 저장", "Lưu đăng ký", "Lagre påmeldingen", "登録を保存", "保存登记", "שמירת הרישום"],
     saving: [source.saving, "Saving the enrollment…", "Guardando la inscripción…", "등록을 저장하는 중…", "Đang lưu đăng ký…", "Lagrer påmeldingen…", "登録を保存中…", "正在保存登记…", "הרישום נשמר…"],

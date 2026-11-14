@@ -18,6 +18,7 @@ export function WalkInWaitlistForm({ locale, context }: {
     const [prenom, setFirstName] = useState("");
     const [nom, setLastName] = useState("");
     const [telephone, setTelephone] = useState("");
+    const [telephoneSms, setTelephoneSms] = useState("");
     const [courriel, setEmail] = useState("");
     const [consent, setConsent] = useState(false);
     const [state, setState] = useState<"editing" | "saving" | "saved">("editing");
@@ -35,6 +36,7 @@ export function WalkInWaitlistForm({ locale, context }: {
                 ...context, channel, consent: true,
                 ...(!context.patientId ? { prenom: prenom.trim(), nom: nom.trim() } : {}),
                 ...(telephone.trim() ? { telephone: telephone.trim() } : {}),
+                ...(telephoneSms.trim() ? { telephoneSms: telephoneSms.trim() } : {}),
                 ...(courriel.trim() ? { courriel: courriel.trim() } : {}),
             });
             if ("error" in response) {
@@ -51,6 +53,7 @@ export function WalkInWaitlistForm({ locale, context }: {
                 return;
             }
             setTelephone("");
+            setTelephoneSms("");
             setEmail("");
             setState("saved");
         } finally {
@@ -79,7 +82,10 @@ export function WalkInWaitlistForm({ locale, context }: {
             </select></label>
             {channel && <div className="grid gap-3 sm:grid-cols-2">
                 <label>{text.phoneNumber}
-                    <input className={inputClass} type="tel" value={telephone} maxLength={32} required={channel !== "email"} onChange={event => setTelephone(event.target.value)} />
+                    <input className={inputClass} type="tel" value={telephone} maxLength={32} required={channel === "phone"} onChange={event => setTelephone(event.target.value)} />
+                </label>
+                <label>{text.smsNumber}
+                    <input className={inputClass} type="tel" value={telephoneSms} maxLength={32} required={channel === "sms"} onChange={event => setTelephoneSms(event.target.value)} />
                 </label>
                 <label>{text.emailAddress}
                     <input className={inputClass} type="email" value={courriel} maxLength={254} required={channel === "email"} onChange={event => setEmail(event.target.value)} />

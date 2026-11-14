@@ -21,7 +21,7 @@ import {
 } from "./appointments.js";
 import { createPatient } from "./patients.js";
 import { isSchedulingDatePast, toSchedulingDateKey } from "../utils/schedulingTime.js";
-import { toUpdatePatientDTO } from "../dto/patient.dto.js";
+import { normalizeTelephone, toUpdatePatientDTO } from "../dto/patient.dto.js";
 import { buildPatientSearchKeys, normalizePatientIdentifierSearch } from "../utils/patientSearchKeys.js";
 
 const MAX_FUTURE_OPTIONS = 8;
@@ -136,7 +136,7 @@ export async function listWalkInFamilyMedicineOptions({
 }
 
 export async function enrollWalkInWaitlist({
-    clinicId, insuranceNumber, channel, telephone, courriel, nom, prenom,
+    clinicId, insuranceNumber, channel, telephone, telephoneSms, courriel, nom, prenom,
     consent, patientId, bookingProof, replaceAppointmentId, authUser, ip,
 }) {
     if (authUser?.role !== "RECEPTION") throw { code: "FORBIDDEN", message: "Accès réservé à la réception." };
@@ -145,11 +145,16 @@ export async function enrollWalkInWaitlist({
         ? normalizePatientIdentifierSearch(insuranceNumber) : "";
     if (insurance.length < 6) throw invalidInput("Numéro d’assurance maladie invalide.");
     const fields = toUpdatePatientDTO(patientId === undefined ? { nom, prenom, telephone, courriel } : { telephone, courriel });
-    if (!["sms", "email", "phone"].includes(channel) || !(channel === "email" ? fields.courriel : fields.telephone)) {
+    const smsNumber = normalizeTelephone(telephoneSms);
+    const requiredContact = channel === "sms" ? smsNumber
+        : channel === "phone" ? fields.telephone
+        : channel === "email" ? fields.courriel : undefined;
+    if (!requiredContact) {
         throw invalidInput("La coordonnée correspondant au mode de contact est requise.");
     }
     const contactFields = {
         ...(fields.telephone ? { telephone: fields.telephone } : {}),
+        ...(smsNumber ? { telephoneSms: smsNumber } : {}),
         ...(fields.courriel ? { courriel: fields.courriel } : {}),
     };
 
@@ -158,7 +163,7 @@ export async function enrollWalkInWaitlist({
         return await session.withTransaction(async () => {
             await assertReceptionClinicAccess(clinicId, authUser, session);
             const patient = await Patient.findOne({ healthInsuranceNumberSearch: insurance, archivedAt: null },
-                { _id: 1, telephone: 1, courriel: 1 }).session(session).lean();
+                { _id: 1, telephone: 1, telephoneSms: 1, courriel: 1 }).session(session).lean();
             if ((patient ? String(patient._id) : undefined) !== patientId) {
                 throw { code: "RECEPTION_LOOKUP_REQUIRED", message: "Recherchez à nouveau le patient." };
             }

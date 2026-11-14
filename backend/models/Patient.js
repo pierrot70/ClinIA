@@ -187,6 +187,10 @@ const PatientSchema = new mongoose.Schema(
             default: undefined,
             trim: true,
         },
+        telephoneSms: {
+            type: String,
+            trim: true,
+        },
         courriel: {
             type: String,
             default: "",
