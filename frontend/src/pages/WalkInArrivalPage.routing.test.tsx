@@ -74,7 +74,10 @@ describe("WalkIn priority destination and assisted GAP", () => {
         expect(fetch).not.toHaveBeenCalled();
     });
 
-    it("highlights an invalid optional SMS number without updating an existing dossier", async () => {
+    it.each([
+        { field: "SMS", channel: "phone", message: "The SMS number is invalid. Enter a number with 7 to 15 digits." },
+        { field: "phone", channel: "sms", message: "The phone number is invalid. Enter a number with 7 to 15 digits." },
+    ])("highlights an invalid optional $field number without updating an existing dossier", async ({ field, channel, message }) => {
         const extendedEmpty: WalkInAvailability = {
             ...empty("exhausted"), search: { status: "exhausted", radiusKm: 200, maxDistanceKm: 200, distanceMode: "straight_line", examinedClinics: 3 },
         };
@@ -88,33 +91,38 @@ describe("WalkIn priority destination and assisted GAP", () => {
         fireEvent.click(screen.getByRole("button", { name: "View available appointments" }));
         fireEvent.click(await screen.findByRole("button", { name: walkInRoutingLabels("en-CA").extendSearch }));
         fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Join the waitlist" }));
-        fireEvent.change(screen.getByLabelText("Preferred contact method"), { target: { value: "phone" } });
+        fireEvent.change(screen.getByLabelText("Preferred contact method"), { target: { value: channel } });
         const phone = screen.getByRole("textbox", { name: "Phone number" });
         const sms = screen.getByRole("textbox", { name: "Number for SMS" });
         const email = screen.getByRole("textbox", { name: "Email address" });
-        fireEvent.change(phone, { target: { value: "555-010-1243" } });
-        fireEvent.change(sms, { target: { value: "123" } });
+        const validPhone = "+1 (555) 010-1243";
+        const validSms = "+1 (555) 010-1244";
+        const invalidField = field === "phone" ? phone : sms;
+        const otherField = field === "phone" ? sms : phone;
+        const correctedValue = field === "phone" ? validPhone : validSms;
+        const otherValue = field === "phone" ? validSms : validPhone;
+        fireEvent.change(invalidField, { target: { value: "123" } });
+        fireEvent.change(otherField, { target: { value: otherValue } });
         fireEvent.change(email, { target: { value: "synthetic@example.invalid" } });
         fireEvent.click(screen.getByRole("checkbox"));
         const save = screen.getByRole("button", { name: "Save enrollment" });
         fireEvent.click(save);
 
-        const message = "The SMS number is invalid. Enter a number with 7 to 15 digits.";
         expect(screen.getByText(message)).toBeVisible();
         expect(screen.getByText(message)).toHaveAttribute("role", "alert");
-        expect(sms).toHaveFocus();
-        expect(sms).toHaveAttribute("aria-invalid", "true");
-        expect(sms).toHaveAccessibleDescription(message);
-        expect(phone).toHaveValue("555-010-1243");
+        expect(invalidField).toHaveFocus();
+        expect(invalidField).toHaveAttribute("aria-invalid", "true");
+        expect(invalidField).toHaveAccessibleDescription(message);
+        expect(otherField).toHaveValue(otherValue);
         expect(email).toHaveValue("synthetic@example.invalid");
         expect(api.enroll).not.toHaveBeenCalled();
 
-        fireEvent.change(sms, { target: { value: "+1 (555) 010-1244" } });
+        fireEvent.change(invalidField, { target: { value: correctedValue } });
         expect(screen.queryByText(message)).not.toBeInTheDocument();
         fireEvent.click(save);
         expect(await screen.findByText("The patient was added to the waitlist.")).toBeVisible();
         expect(api.enroll).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
-            patientId: "known", telephone: "555-010-1243", telephoneSms: "+1 (555) 010-1244", courriel: "synthetic@example.invalid",
+            patientId: "known", telephone: validPhone, telephoneSms: validSms, courriel: "synthetic@example.invalid",
         }));
     });
 

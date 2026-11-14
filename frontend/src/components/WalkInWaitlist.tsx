@@ -7,7 +7,16 @@ import {
     type WaitlistPatientContext, type WalkInContactChannel,
 } from "../services/receptionWaitlistApi";
 
-const inputClass = "block w-full rounded border border-slate-300 bg-white px-3 py-2";
+const inputClass = "block w-full rounded border bg-white px-3 py-2";
+const validInputClass = `${inputClass} border-slate-300`;
+const invalidInputClass = `${inputClass} border-red-700 ring-1 ring-red-700`;
+const contactErrorClass = "mt-2 rounded bg-red-50 p-2 font-semibold text-red-800";
+
+// Match the server-side telephone validation used for both numbers.
+function isValidTelephone(number: string) {
+    const digitCount = number.replace(/\D/g, "").length;
+    return number.length <= 32 && /^\+?[\d().\s-]+$/u.test(number) && digitCount >= 7 && digitCount <= 15;
+}
 
 export function WalkInWaitlistForm({ locale, context }: {
     locale: string;
@@ -23,8 +32,11 @@ export function WalkInWaitlistForm({ locale, context }: {
     const [consent, setConsent] = useState(false);
     const [state, setState] = useState<"editing" | "saving" | "saved">("editing");
     const [error, setError] = useState("");
+    const [invalidPhone, setInvalidPhone] = useState(false);
     const [invalidSms, setInvalidSms] = useState(false);
+    const phoneInput = useRef<HTMLInputElement>(null);
     const smsInput = useRef<HTMLInputElement>(null);
+    const phoneErrorId = useId();
     const smsErrorId = useId();
     const pending = useRef(false);
 
@@ -32,15 +44,17 @@ export function WalkInWaitlistForm({ locale, context }: {
         event.preventDefault();
         if (!channel || !consent || pending.current) return;
         setError("");
+        const phoneNumber = telephone.trim();
         const smsNumber = telephoneSms.trim();
-        if (smsNumber || channel === "sms") {
-            const digitCount = smsNumber.replace(/\D/g, "").length;
-            if (smsNumber.length > 32 || !/^\+?[\d().\s-]+$/u.test(smsNumber) || digitCount < 7 || digitCount > 15) {
-                setInvalidSms(true);
-                smsInput.current?.focus({ preventScroll: true });
-                smsInput.current?.scrollIntoView?.({ block: "center", behavior: "instant" });
-                return;
-            }
+        const phoneError = Boolean(phoneNumber || channel === "phone") && !isValidTelephone(phoneNumber);
+        const smsError = Boolean(smsNumber || channel === "sms") && !isValidTelephone(smsNumber);
+        setInvalidPhone(phoneError);
+        setInvalidSms(smsError);
+        if (phoneError || smsError) {
+            const invalidInput = phoneError ? phoneInput.current : smsInput.current;
+            invalidInput?.focus({ preventScroll: true });
+            invalidInput?.scrollIntoView?.({ block: "center", behavior: "instant" });
+            return;
         }
         pending.current = true;
         setState("saving");
@@ -48,7 +62,7 @@ export function WalkInWaitlistForm({ locale, context }: {
             const response = await enrollWalkInWaitlist({
                 ...context, channel, consent: true,
                 ...(!context.patientId ? { prenom: prenom.trim(), nom: nom.trim() } : {}),
-                ...(telephone.trim() ? { telephone: telephone.trim() } : {}),
+                ...(phoneNumber ? { telephone: phoneNumber } : {}),
                 ...(smsNumber ? { telephoneSms: smsNumber } : {}),
                 ...(courriel.trim() ? { courriel: courriel.trim() } : {}),
             });
@@ -81,27 +95,43 @@ export function WalkInWaitlistForm({ locale, context }: {
         <fieldset className="space-y-3 disabled:opacity-70" disabled={state === "saving"}>
             {!context.patientId && <div className="grid gap-3 sm:grid-cols-2">
                 <label>{receptionLabel(locale, "firstNameLabel", UI_LABELS_FR.walkInArrival.firstNameLabel)}
-                    <input className={inputClass} value={prenom} maxLength={120} required onChange={event => setFirstName(event.target.value)} />
+                    <input className={validInputClass} value={prenom} maxLength={120} required onChange={event => setFirstName(event.target.value)} />
                 </label>
                 <label>{receptionLabel(locale, "lastNameLabel", UI_LABELS_FR.walkInArrival.lastNameLabel)}
-                    <input className={inputClass} value={nom} maxLength={120} required onChange={event => setLastName(event.target.value)} />
+                    <input className={validInputClass} value={nom} maxLength={120} required onChange={event => setLastName(event.target.value)} />
                 </label>
             </div>}
-            <label>{text.channel}<select className={inputClass} value={channel} required onChange={event => setChannel(event.target.value as WalkInContactChannel | "")}>
+            <label>{text.channel}<select className={validInputClass} value={channel} required onChange={event => setChannel(event.target.value as WalkInContactChannel | "")}>
                 <option value="">{text.chooseChannel}</option>
                 <option value="sms">{text.sms}</option>
                 <option value="email">{text.email}</option>
                 <option value="phone">{text.phone}</option>
             </select></label>
             {channel && <div className="grid gap-3 sm:grid-cols-2">
-                <label>{text.phoneNumber}
-                    <input className={inputClass} type="tel" value={telephone} maxLength={32} required={channel === "phone"} onChange={event => setTelephone(event.target.value)} />
-                </label>
+                <div>
+                    <label>{text.phoneNumber}
+                        <input
+                            ref={phoneInput}
+                            className={invalidPhone ? invalidInputClass : validInputClass}
+                            type="tel"
+                            value={telephone}
+                            maxLength={32}
+                            required={channel === "phone"}
+                            aria-invalid={invalidPhone || undefined}
+                            aria-describedby={invalidPhone ? phoneErrorId : undefined}
+                            onChange={event => {
+                                setTelephone(event.target.value);
+                                setInvalidPhone(false);
+                            }}
+                        />
+                    </label>
+                    {invalidPhone && <p id={phoneErrorId} role="alert" className={contactErrorClass}>{text.invalidPhoneNumber}</p>}
+                </div>
                 <div>
                     <label>{text.smsNumber}
                         <input
                             ref={smsInput}
-                            className={invalidSms ? `${inputClass} border-red-700 ring-1 ring-red-700` : inputClass}
+                            className={invalidSms ? invalidInputClass : validInputClass}
                             type="tel"
                             value={telephoneSms}
                             maxLength={32}
@@ -114,10 +144,10 @@ export function WalkInWaitlistForm({ locale, context }: {
                             }}
                         />
                     </label>
-                    {invalidSms && <p id={smsErrorId} role="alert" className="mt-2 rounded bg-red-50 p-2 font-semibold text-red-800">{text.invalidSmsNumber}</p>}
+                    {invalidSms && <p id={smsErrorId} role="alert" className={contactErrorClass}>{text.invalidSmsNumber}</p>}
                 </div>
                 <label>{text.emailAddress}
-                    <input className={inputClass} type="email" value={courriel} maxLength={254} required={channel === "email"} onChange={event => setEmail(event.target.value)} />
+                    <input className={validInputClass} type="email" value={courriel} maxLength={254} required={channel === "email"} onChange={event => setEmail(event.target.value)} />
                 </label>
             </div>}
             <label className="flex items-start gap-2">
