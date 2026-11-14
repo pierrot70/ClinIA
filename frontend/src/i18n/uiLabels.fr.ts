@@ -1656,6 +1656,7 @@ export const UI_LABELS_FR = {
         enroll: "Inscrire sur la liste d’attente",
         channel: "Mode de contact choisi",
         smsNumber: "Numéro pour les SMS",
+        invalidSmsNumber: "Le numéro pour les SMS est invalide. Entrez un numéro de 7 à 15 chiffres.",
         chooseChannel: "Choisir un mode de contact",
         sms: "SMS",
         email: "Courriel",

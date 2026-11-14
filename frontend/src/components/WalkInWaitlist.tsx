@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 import { receptionLabel } from "../i18n/receptionLabels";
 import { walkInWaitlistLabels } from "../i18n/walkInWaitlistLabels";
@@ -23,20 +23,33 @@ export function WalkInWaitlistForm({ locale, context }: {
     const [consent, setConsent] = useState(false);
     const [state, setState] = useState<"editing" | "saving" | "saved">("editing");
     const [error, setError] = useState("");
+    const [invalidSms, setInvalidSms] = useState(false);
+    const smsInput = useRef<HTMLInputElement>(null);
+    const smsErrorId = useId();
     const pending = useRef(false);
 
     async function save(event: FormEvent) {
         event.preventDefault();
         if (!channel || !consent || pending.current) return;
-        pending.current = true;
         setError("");
+        const smsNumber = telephoneSms.trim();
+        if (smsNumber || channel === "sms") {
+            const digitCount = smsNumber.replace(/\D/g, "").length;
+            if (smsNumber.length > 32 || !/^\+?[\d().\s-]+$/u.test(smsNumber) || digitCount < 7 || digitCount > 15) {
+                setInvalidSms(true);
+                smsInput.current?.focus({ preventScroll: true });
+                smsInput.current?.scrollIntoView?.({ block: "center", behavior: "instant" });
+                return;
+            }
+        }
+        pending.current = true;
         setState("saving");
         try {
             const response = await enrollWalkInWaitlist({
                 ...context, channel, consent: true,
                 ...(!context.patientId ? { prenom: prenom.trim(), nom: nom.trim() } : {}),
                 ...(telephone.trim() ? { telephone: telephone.trim() } : {}),
-                ...(telephoneSms.trim() ? { telephoneSms: telephoneSms.trim() } : {}),
+                ...(smsNumber ? { telephoneSms: smsNumber } : {}),
                 ...(courriel.trim() ? { courriel: courriel.trim() } : {}),
             });
             if ("error" in response) {
@@ -84,9 +97,25 @@ export function WalkInWaitlistForm({ locale, context }: {
                 <label>{text.phoneNumber}
                     <input className={inputClass} type="tel" value={telephone} maxLength={32} required={channel === "phone"} onChange={event => setTelephone(event.target.value)} />
                 </label>
-                <label>{text.smsNumber}
-                    <input className={inputClass} type="tel" value={telephoneSms} maxLength={32} required={channel === "sms"} onChange={event => setTelephoneSms(event.target.value)} />
-                </label>
+                <div>
+                    <label>{text.smsNumber}
+                        <input
+                            ref={smsInput}
+                            className={invalidSms ? `${inputClass} border-red-700 ring-1 ring-red-700` : inputClass}
+                            type="tel"
+                            value={telephoneSms}
+                            maxLength={32}
+                            required={channel === "sms"}
+                            aria-invalid={invalidSms || undefined}
+                            aria-describedby={invalidSms ? smsErrorId : undefined}
+                            onChange={event => {
+                                setTelephoneSms(event.target.value);
+                                setInvalidSms(false);
+                            }}
+                        />
+                    </label>
+                    {invalidSms && <p id={smsErrorId} role="alert" className="mt-2 rounded bg-red-50 p-2 font-semibold text-red-800">{text.invalidSmsNumber}</p>}
+                </div>
                 <label>{text.emailAddress}
                     <input className={inputClass} type="email" value={courriel} maxLength={254} required={channel === "email"} onChange={event => setEmail(event.target.value)} />
                 </label>

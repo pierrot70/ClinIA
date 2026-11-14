@@ -74,6 +74,50 @@ describe("WalkIn priority destination and assisted GAP", () => {
         expect(fetch).not.toHaveBeenCalled();
     });
 
+    it("highlights an invalid optional SMS number without updating an existing dossier", async () => {
+        const extendedEmpty: WalkInAvailability = {
+            ...empty("exhausted"), search: { status: "exhausted", radiusKm: 200, maxDistanceKm: 200, distanceMode: "straight_line", examinedClinics: 3 },
+        };
+        api.lookup.mockResolvedValue({ data: { _id: "known", bookingProof: "synthetic-proof", prenom: "Fictional", nom: "Known", existingAppointments: [] } });
+        api.slots.mockResolvedValueOnce({ data: empty("exhausted") }).mockResolvedValueOnce({ data: extendedEmpty });
+        api.enroll.mockResolvedValue({ data: { _id: "synthetic-entry" } });
+        render(<Page />);
+        fireEvent.change(screen.getByRole("textbox"), { target: { value: "SYNTHETIC-INSURANCE" } });
+        fireEvent.click(screen.getByRole("button", { name: "Search for patient" }));
+        fireEvent.click(await screen.findByRole("button", { name: /Select/ }));
+        fireEvent.click(screen.getByRole("button", { name: "View available appointments" }));
+        fireEvent.click(await screen.findByRole("button", { name: walkInRoutingLabels("en-CA").extendSearch }));
+        fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Join the waitlist" }));
+        fireEvent.change(screen.getByLabelText("Preferred contact method"), { target: { value: "phone" } });
+        const phone = screen.getByRole("textbox", { name: "Phone number" });
+        const sms = screen.getByRole("textbox", { name: "Number for SMS" });
+        const email = screen.getByRole("textbox", { name: "Email address" });
+        fireEvent.change(phone, { target: { value: "555-010-1243" } });
+        fireEvent.change(sms, { target: { value: "123" } });
+        fireEvent.change(email, { target: { value: "synthetic@example.invalid" } });
+        fireEvent.click(screen.getByRole("checkbox"));
+        const save = screen.getByRole("button", { name: "Save enrollment" });
+        fireEvent.click(save);
+
+        const message = "The SMS number is invalid. Enter a number with 7 to 15 digits.";
+        expect(screen.getByText(message)).toBeVisible();
+        expect(screen.getByText(message)).toHaveAttribute("role", "alert");
+        expect(sms).toHaveFocus();
+        expect(sms).toHaveAttribute("aria-invalid", "true");
+        expect(sms).toHaveAccessibleDescription(message);
+        expect(phone).toHaveValue("555-010-1243");
+        expect(email).toHaveValue("synthetic@example.invalid");
+        expect(api.enroll).not.toHaveBeenCalled();
+
+        fireEvent.change(sms, { target: { value: "+1 (555) 010-1244" } });
+        expect(screen.queryByText(message)).not.toBeInTheDocument();
+        fireEvent.click(save);
+        expect(await screen.findByText("The patient was added to the waitlist.")).toBeVisible();
+        expect(api.enroll).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+            patientId: "known", telephone: "555-010-1243", telephoneSms: "+1 (555) 010-1244", courriel: "synthetic@example.invalid",
+        }));
+    });
+
     it("shows the server-selected IPS destination and future appointments before the final booking confirmation", async () => {
         render(<Page />); await searchNew();
         const routing = walkInRoutingLabels("en-CA");
