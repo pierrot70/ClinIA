@@ -16,7 +16,7 @@
     "dotenv": "17.2.3",
     "express": "4.22.3",
     "jsonwebtoken": "9.0.2",
-    "mongoose": "9.7.4",
+    "mongoose": "9.11.4",
     "nodemailer": "10.1.4",
     "openai": "6.9.0"
   },
