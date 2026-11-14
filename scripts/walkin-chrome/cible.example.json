@@ -1,0 +1,10 @@
+{
+  "ssh": "clinia-coolify",
+  "project": "projet-compose-clinia",
+  "clinicId": "ID_MONGO_CLINIQUE_FICTIVE",
+  "userId": "ID_MONGO_RECEPTIONCOOL1",
+  "original": [
+    "ID_MONGO_CLINIQUE_HABITUELLE_1",
+    "ID_MONGO_CLINIQUE_HABITUELLE_2"
+  ]
+}
