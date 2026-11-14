@@ -1,5 +1,5 @@
 import { receptionReplanLabels } from "../i18n/receptionReplanLabels";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WalkInArrivalPage } from "./WalkInArrivalPage";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
@@ -39,6 +39,32 @@ async function searchNew() {
     await screen.findByRole("button", { name: "Refresh available appointments" });
 }
 describe("WalkIn priority destination and assisted GAP", () => {
+    it("opens the new-patient path when an explicit click joins a pending automatic lookup", async () => {
+        let finishLookup!: (response: { data: null }) => void;
+        api.lookup.mockReturnValueOnce(new Promise(resolve => { finishLookup = resolve; }));
+        vi.useFakeTimers();
+        try {
+            render(<Page />);
+            fireEvent.change(screen.getByRole("textbox"), { target: { value: "SYNTHETIC-INSURANCE" } });
+            await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+
+            expect(api.lookup).toHaveBeenCalledTimes(1);
+            expect(api.slots).not.toHaveBeenCalled();
+            const search = screen.getByRole("button", { name: "Search for patient" });
+            expect(search).toBeEnabled();
+            fireEvent.click(search);
+            expect(search).toBeDisabled();
+            expect(api.lookup).toHaveBeenCalledTimes(1);
+
+            await act(async () => { finishLookup({ data: null }); });
+            expect(screen.getByRole("heading", { name: "New patient" })).toBeVisible();
+            expect(api.slots).toHaveBeenCalledTimes(1);
+            expect(api.enroll).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it.each([
         ["sms", "555-010-1243", "555-010-1244", "", { telephone: "555-010-1243", telephoneSms: "555-010-1244" }],
         ["phone", "555-010-1243", "", "", { telephone: "555-010-1243" }],

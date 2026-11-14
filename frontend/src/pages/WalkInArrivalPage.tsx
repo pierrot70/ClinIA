@@ -279,6 +279,7 @@ export function WalkInArrivalPage() {
     const routing = walkInRoutingLabels(locale);
     const requestEpoch = useRef(0);
     const lastLookupKey = useRef("");
+    const pendingLookup = useRef<{ key: string; result: ReturnType<typeof findReceptionPatientByRamq> } | null>(null);
     const automaticLookup = useRef<(automatic?: boolean) => Promise<void>>(async () => {});
     const [attendancePatient, setAttendancePatient] = useState<ReceptionPatient | null>(null);
     const [guideActive, setGuideActive] = useState(false);
@@ -327,6 +328,7 @@ export function WalkInArrivalPage() {
     function clearSelection() {
         requestEpoch.current++;
         lastLookupKey.current = "";
+        pendingLookup.current = null;
         setAttendancePatient(null);
         setNeedsLookup(false);
         setDetailsReviewed(false);
@@ -388,7 +390,9 @@ export function WalkInArrivalPage() {
     }
 
     async function searchPatient(automatic = false) {
-        lastLookupKey.current = `${clinicId}:${ramq.trim()}`;
+        const insurance = ramq.trim();
+        const key = `${clinicId}:${insurance}`;
+        lastLookupKey.current = key;
         setAttendancePatient(null);
         setNeedsLookup(false);
         setDetailsReviewed(false);
@@ -404,7 +408,7 @@ export function WalkInArrivalPage() {
         setIsNewPatient(false);
         setSelectedSlot(null);
         setNewPatient({ prenom: "", nom: "" });
-        if (!ramq.trim()) {
+        if (!insurance) {
             setError(receptionLabel(locale, "noPatient", source.noPatient));
             return;
         }
@@ -414,8 +418,15 @@ export function WalkInArrivalPage() {
             return;
         }
 
-        setLoading(true);
-        const response = await findReceptionPatientByRamq(clinicId, ramq.trim());
+        if (!automatic) setLoading(true);
+        // An explicit click can adopt the in-flight automatic lookup. The
+        // request epoch gives only the explicit caller control of the result.
+        const lookup = pendingLookup.current?.key === key
+            ? pendingLookup.current
+            : { key, result: findReceptionPatientByRamq(clinicId, insurance) };
+        pendingLookup.current = lookup;
+        const response = await lookup.result;
+        if (pendingLookup.current === lookup) pendingLookup.current = null;
         if (epoch !== requestEpoch.current) return;
         setLoading(false);
 
