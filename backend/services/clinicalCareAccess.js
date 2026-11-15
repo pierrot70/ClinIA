@@ -4,6 +4,7 @@ import { Specialist } from "../models/Specialist.js";
 import { Patient } from "../models/Patient.js";
 import { PatientConsultationNote } from "../models/PatientConsultationNote.js";
 import { ClinicalCareAccessGrant } from "../models/ClinicalCareAccessGrant.js";
+import { PatientCareTransfer } from "../models/PatientCareTransfer.js";
 import { PatientSharedConsultationNote } from "../models/PatientSharedConsultationNote.js";
 import { isIps } from "../domain/specialties.js";
 import { recordPatientAuditEvent } from "../audit/patientAudit.js";
@@ -227,5 +228,180 @@ export async function appendSharedCareNote(grantId, note, auth, metadata = {}) {
             changedFields: ["sharedConsultationNote"], auth, metadata, session });
         assertNotExpired(grant);
         return { data: { _id: key(entry) }, writeAuditRecorded: true };
+    });
+}
+
+const TRANSFER_DURATION_MS = MAX_MINUTES * 60000;
+const FAMILY_SPECIALTIES = ["Medecin de famille", "Médecin de famille", "Medecine familiale", "Médecine familiale"];
+
+function transferDTO(transfer) {
+    return {
+        _id: key(transfer),
+        patientId: key(transfer.patientId),
+        targetUserId: key(transfer.targetUserId),
+        status: transfer.status === "PENDING" && new Date(transfer.expiresAt) <= new Date() ? "EXPIRED" : transfer.status,
+        createdAt: transfer.createdAt,
+        expiresAt: transfer.expiresAt,
+        consentRecordedAt: transfer.consentRecordedAt,
+        resolvedAt: transfer.resolvedAt,
+    };
+}
+
+const transferPatient = patient => ({ _id: key(patient), nom: patient.nom, prenom: patient.prenom });
+
+async function familyPhysician(userId, session = null) {
+    const target = await professional(userId, "MEDECIN", session);
+    if (!FAMILY_SPECIALTIES.includes(target.directory.specialite)) fail("FORBIDDEN");
+    return target;
+}
+
+export async function getCareTransferContext(patientId, auth) {
+    await actor(auth, "IPS");
+    const patient = await ownedPatient(patientId, auth.userId);
+    const directory = await Specialist.find({
+        specialite: { $in: FAMILY_SPECIALTIES }, accountUserId: { $type: "objectId" },
+    }, { accountUserId: 1, nom: 1, prenom: 1 }).sort({ nom: 1, prenom: 1, _id: 1 }).lean();
+    const accounts = await AdminUser.find({
+        _id: { $in: directory.map(entry => entry.accountUserId) }, role: "MEDECIN", isActive: true,
+    }, { username: 1 }).lean();
+    const byAccount = new Map(accounts.map(account => [key(account), account.username]));
+    const clinicians = directory.filter(entry => byAccount.has(key(entry.accountUserId))).map(entry => ({
+        _id: key(entry.accountUserId), nom: entry.nom, prenom: entry.prenom, username: byAccount.get(key(entry.accountUserId)),
+    }));
+    return { patient: transferPatient(patient), clinicians };
+}
+
+export async function listCareTransfers(auth, metadata = {}) {
+    const sender = auth?.role === "IPS";
+    const identity = await actor(auth, sender ? "IPS" : "MEDECIN");
+    if (!sender && !FAMILY_SPECIALTIES.includes(identity.directory.specialite)) return [];
+    const scope = sender ? { issuerUserId: auth.userId } : { targetUserId: auth.userId, $or: [
+        { status: "PENDING", expiresAt: { $gt: new Date() } }, { status: "ACCEPTED" },
+    ] };
+    const transfers = await PatientCareTransfer.find(scope).sort({ createdAt: -1, _id: -1 }).limit(100).lean();
+    const results = [];
+    for (const transfer of transfers) {
+        try {
+            const expectedOwner = transfer.status === "ACCEPTED" ? key(transfer.targetUserId) : key(transfer.issuerUserId);
+            // The issuer can keep the decision history after transfer, without retaining patient identity access.
+            const patient = sender && transfer.status === "ACCEPTED" ? null : await ownedPatient(key(transfer.patientId), expectedOwner);
+            if (!sender && transfer.status === "PENDING") {
+                await professional(key(transfer.issuerUserId), "IPS");
+                assertNotExpired(transfer);
+            }
+            const other = await AdminUser.findById(sender ? transfer.targetUserId : transfer.issuerUserId, { username: 1 }).lean();
+            results.push({ ...transferDTO(transfer), patient: patient ? transferPatient(patient) : null, professional: other?.username ?? "" });
+        } catch (error) { if (error?.code !== "FORBIDDEN") throw error; }
+    }
+    await clinicalAudit(null, auth, metadata);
+    return results;
+}
+
+async function transferAudit(transfer, operation, changedFields, auth, metadata, session) {
+    await writeAudit({ collectionName: "patientcaretransfers", operation, resourceId: transfer._id,
+        patientId: transfer.patientId, changedFields, auth, metadata, session });
+}
+
+export async function requestCareTransfer(patientId, { targetUserId, patientConsent } = {}, auth, metadata = {}) {
+    checkedId(patientId);
+    checkedId(targetUserId);
+    if (patientConsent !== true) fail("TRANSFER_CONSENT_REQUIRED");
+    try {
+        return await transaction(async session => {
+            const issuer = await actor(auth, "IPS", session);
+            const target = await familyPhysician(targetUserId, session);
+            await lockProfessionals([issuer, target], session);
+            await ownedPatient(patientId, auth.userId, session, true);
+            const now = new Date();
+            const expired = await PatientCareTransfer.findOneAndUpdate(
+                { patientId, status: "PENDING", expiresAt: { $lte: now } },
+                { $set: { status: "EXPIRED", resolvedAt: now } }, { session, returnDocument: "after" },
+            ).lean();
+            if (expired) await transferAudit(expired, "UPDATE", ["status", "resolvedAt"], auth, metadata, session);
+            if (await PatientCareTransfer.exists({ patientId, status: "PENDING" }).session(session)) fail("TRANSFER_ALREADY_PENDING");
+            const [transfer] = await PatientCareTransfer.create([{
+                patientId, issuerUserId: auth.userId, targetUserId, consentRecordedAt: now,
+                expiresAt: new Date(now.getTime() + TRANSFER_DURATION_MS),
+            }], { session });
+            await transferAudit(transfer, "CREATE", ["targetUserId", "consentRecordedAt", "expiresAt", "status"], auth, metadata, session);
+            return { data: transferDTO(transfer), writeAuditRecorded: true };
+        });
+    } catch (error) {
+        if (error?.code === 11000 && error.keyPattern?.patientId === 1) fail("TRANSFER_ALREADY_PENDING");
+        throw error;
+    }
+}
+
+async function targetTransfer(transferId, auth, session, accepted = false) {
+    checkedId(transferId);
+    if (auth?.role !== "MEDECIN") fail("FORBIDDEN");
+    const recipient = await familyPhysician(auth.userId, session);
+    const available = { status: "PENDING", expiresAt: { $gt: new Date() } };
+    const transfer = await PatientCareTransfer.findOne({
+        _id: transferId, targetUserId: auth.userId,
+        ...(accepted ? { $or: [available, { status: "ACCEPTED" }] } : available),
+    }).session(session).lean();
+    if (!transfer) fail("FORBIDDEN");
+    const pending = transfer.status === "PENDING";
+    const issuer = pending ? await professional(key(transfer.issuerUserId), "IPS", session) : null;
+    await lockProfessionals(issuer ? [recipient, issuer] : [recipient], session);
+    const patient = await ownedPatient(key(transfer.patientId), pending ? key(transfer.issuerUserId) : auth.userId, session, true, accepted);
+    return { transfer, patient };
+}
+
+export async function readCareTransferRecord(transferId, auth, metadata = {}) {
+    return transaction(async session => {
+        const { transfer, patient } = await targetTransfer(transferId, auth, session, true);
+        const notes = await attributedNotes(patient._id, session);
+        await clinicalAudit(patient._id, auth, metadata, session);
+        if (transfer.status === "PENDING") assertNotExpired(transfer);
+        return { transfer: transferDTO(transfer), patient: transferPatient(patient), profile: clinicalProfile(patient.secure_request_profile), ...notes };
+    });
+}
+
+async function resolveTransfer(transfer, status, auth, metadata, session) {
+    const now = new Date();
+    const changed = await PatientCareTransfer.findOneAndUpdate({
+        _id: transfer._id, status: "PENDING", expiresAt: { $gt: now },
+    }, { $set: { status, resolvedAt: now } }, { session, returnDocument: "after" }).lean();
+    if (!changed) fail("FORBIDDEN");
+    await transferAudit(changed, "UPDATE", ["status", "resolvedAt"], auth, metadata, session);
+    assertNotExpired(transfer);
+    return { data: transferDTO(changed), writeAuditRecorded: true };
+}
+
+export async function decideCareTransfer(transferId, { decision } = {}, auth, metadata = {}) {
+    if (!["accept", "decline"].includes(decision)) fail("INVALID_INPUT");
+    try {
+        return await transaction(async session => {
+            const { transfer, patient } = await targetTransfer(transferId, auth, session);
+            if (decision === "decline") return resolveTransfer(transfer, "DECLINED", auth, metadata, session);
+            const changed = await Patient.updateOne({ _id: patient._id, ownerUserId: transfer.issuerUserId, archivedAt: null },
+                { $set: { ownerUserId: transfer.targetUserId } }, { session });
+            if (changed.modifiedCount !== 1) fail("FORBIDDEN");
+            await writeAudit({ collectionName: "patients", operation: "UPDATE", resourceId: patient._id, patientId: patient._id,
+                changedFields: ["ownerUserId"], auth, metadata, session });
+            await recordPatientAuditEvent({ action: "PATIENT_CARE_ACCEPT", outcome: "SUCCESS", patientId: patient._id,
+                actorUserId: auth.userId, actorUsername: auth.username, actorRole: auth.role, ip: metadata.ip ?? null,
+                requestPath: "/api/clinical-care-access", changedFields: ["ownerUserId"], session, throwOnError: true });
+            return resolveTransfer(transfer, "ACCEPTED", auth, metadata, session);
+        });
+    } catch (error) {
+        if (error?.code === 11000 && error.keyPattern?.ownerUserId === 1) fail("TRANSFER_PATIENT_CONFLICT");
+        throw error;
+    }
+}
+
+export async function cancelCareTransfer(transferId, auth, metadata = {}) {
+    checkedId(transferId);
+    return transaction(async session => {
+        const issuer = await actor(auth, "IPS", session);
+        await lockProfessional(issuer, session);
+        const transfer = await PatientCareTransfer.findOne({
+            _id: transferId, issuerUserId: auth.userId, status: "PENDING", expiresAt: { $gt: new Date() },
+        }).session(session).lean();
+        if (!transfer) fail("FORBIDDEN");
+        await ownedPatient(key(transfer.patientId), auth.userId, session, true);
+        return resolveTransfer(transfer, "CANCELLED", auth, metadata, session);
     });
 }

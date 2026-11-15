@@ -42,6 +42,27 @@ export interface SharedCareRecord {
     canAppendNote: boolean;
 }
 
+export type CareTransferStatus = "PENDING" | "ACCEPTED" | "DECLINED" | "CANCELLED" | "EXPIRED";
+type TransferPatient = SharedCareRecord["patient"];
+
+export interface CareTransfer {
+    _id: string;
+    patientId: string;
+    targetUserId: string;
+    status: CareTransferStatus;
+    createdAt: string;
+    expiresAt: string;
+    consentRecordedAt: string;
+    resolvedAt: string | null;
+    patient?: TransferPatient | null;
+    professional?: string;
+}
+export interface CareTransferContext {
+    patient: TransferPatient;
+    clinicians: { _id: string; nom: string; prenom: string; username: string }[];
+}
+export type CareTransferRecord = Omit<SharedCareRecord, "grant" | "canAppendNote"> & { transfer: CareTransfer };
+
 const prefix = "/api/clinical-care-access";
 async function request<T>(path: string, body?: unknown): Promise<ApiResponse<T>> {
     return withSecurityIncidentGuard((async () => {
@@ -69,3 +90,15 @@ export const listPatientSharedCareNotes = (patientId: string) => request<{ share
 export function careGrantIsActive(grant: CareGrant, now = Date.now()) {
     return grant.status === "ACTIVE" && grant.permission === "READ_APPEND" && Number.isFinite(Date.parse(grant.expiresAt)) && Date.parse(grant.expiresAt) > now;
 }
+
+export const getCareTransferContext = (patientId: string) =>
+    request<CareTransferContext>("/patients/" + encodeURIComponent(patientId) + "/transfer-context");
+export const listCareTransfers = () => request<CareTransfer[]>("/transfers");
+export const requestCareTransfer = (patientId: string, targetUserId: string, patientConsent: boolean) =>
+    request<CareTransfer>("/patients/" + encodeURIComponent(patientId) + "/transfers", { targetUserId, patientConsent });
+export const readCareTransferRecord = (transferId: string) =>
+    request<CareTransferRecord>("/transfers/" + encodeURIComponent(transferId) + "/record");
+export const decideCareTransfer = (transferId: string, decision: "accept" | "decline") =>
+    request<CareTransfer>("/transfers/" + encodeURIComponent(transferId) + "/decision", { decision });
+export const cancelCareTransfer = (transferId: string) =>
+    request<CareTransfer>("/transfers/" + encodeURIComponent(transferId) + "/cancel", {});

@@ -29,6 +29,7 @@ import { WalkInArrivalPage } from "./pages/WalkInArrivalPage";
 import { PatientsPage } from "./pages/PatientsPage";
 import { ConsultationsPage } from "./pages/ConsultationsPage";
 import { ClinicalCareAccessPage } from "./pages/ClinicalCareAccessPage";
+import { PatientCareTransferPage } from "./pages/PatientCareTransferPage";
 import { PatientAuditLogsPage } from "./pages/PatientAuditLogsPage";
 import { OpenAILogsPage } from "./pages/OpenAILogsPage";
 import { DbStatusPage } from "./pages/DbStatusPage";
@@ -312,6 +313,7 @@ const App: React.FC = () => {
                     <Route path="/patient-summary" element={<ProtectedRoute allowedRoles={[...CLINICAL_ROLES]}><PatientSummary /></ProtectedRoute>} />
                     <Route path="/consultations" element={<ProtectedRoute allowedRoles={["MEDECIN", "IPS"]}><ConsultationsPage /></ProtectedRoute>} />
                     <Route path="/clinical-care-access" element={<ProtectedRoute allowedRoles={["IPS", "MEDECIN"]}><ClinicalCareAccessPage /></ProtectedRoute>} />
+                    <Route path="/clinical-care-transfer" element={<ProtectedRoute allowedRoles={["IPS", "MEDECIN"]}><PatientCareTransferPage /></ProtectedRoute>} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/security/change-password-required" element={<ChangePasswordRequiredPage />} />
                     <Route path="/security/password-reset-required" element={<PasswordResetRequiredPage />} />

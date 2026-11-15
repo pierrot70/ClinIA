@@ -1,13 +1,15 @@
 import express from "express";
 import { requireRole } from "../middleware/requireRole.js";
 import { listEligibleCareClinicians, listPatientCareGrants, issuePatientCareGrant, revokePatientCareGrant, listIncomingCareGrants, readSharedCareRecord, listOwnedSharedCareNotes, appendSharedCareNote } from "../services/clinicalCareAccess.js";
+import { getCareTransferContext, listCareTransfers, requestCareTransfer, readCareTransferRecord, decideCareTransfer, cancelCareTransfer } from "../services/clinicalCareAccess.js";
 import { getTrustedRequestIp } from "../utils/requestIp.js";
 import { getRequestContext } from "../app/requestContext.js";
 import { createWriteVerificationContext, buildWriteVerificationMeta } from "../audit/writeVerification.js";
 
 const router = express.Router();
 const failure = (res, error) => {
-    const codes = { INVALID_INPUT: 400, FORBIDDEN: 403, CARE_ACCESS_ALREADY_ACTIVE: 409 };
+    const codes = { INVALID_INPUT: 400, FORBIDDEN: 403, CARE_ACCESS_ALREADY_ACTIVE: 409,
+        TRANSFER_CONSENT_REQUIRED: 400, TRANSFER_ALREADY_PENDING: 409, TRANSFER_PATIENT_CONFLICT: 409 };
     const code = Object.hasOwn(codes, error?.code) ? error.code : "PERSISTENCE_FAILED";
     return res.status(codes[code] || 500).json({ error: { code, message: "La demande d’accès clinique ne peut pas être traitée.", retryable: false } });
 };
@@ -35,4 +37,12 @@ router.get("/patients/:id/notes", requireRole("IPS"), handle((req, meta) => list
 router.get("/grants", requireRole("MEDECIN"), handle((req, meta) => listIncomingCareGrants(req.auth, meta)));
 router.get("/grants/:id/record", requireRole("MEDECIN"), handle((req, meta) => readSharedCareRecord(req.params.id, req.auth, meta)));
 router.post("/grants/:id/notes", requireRole("MEDECIN"), handle((req, meta) => appendSharedCareNote(req.params.id, req.body.note, req.auth, meta), { write: true, status: 201, fields: ["note"] }));
+router.get("/patients/:id/transfer-context", requireRole("IPS"), handle(req => getCareTransferContext(req.params.id, req.auth)));
+router.get("/transfers", requireRole("IPS", "MEDECIN"), handle((req, meta) => listCareTransfers(req.auth, meta)));
+router.post("/patients/:id/transfers", requireRole("IPS"), handle((req, meta) => requestCareTransfer(req.params.id, req.body, req.auth, meta),
+    { write: true, status: 201, fields: ["targetUserId", "patientConsent"] }));
+router.get("/transfers/:id/record", requireRole("MEDECIN"), handle((req, meta) => readCareTransferRecord(req.params.id, req.auth, meta)));
+router.post("/transfers/:id/decision", requireRole("MEDECIN"), handle((req, meta) => decideCareTransfer(req.params.id, req.body, req.auth, meta),
+    { write: true, fields: ["decision"] }));
+router.post("/transfers/:id/cancel", requireRole("IPS"), handle((req, meta) => cancelCareTransfer(req.params.id, req.auth, meta), { write: true }));
 export default router;

@@ -17,6 +17,7 @@ export function ClinicalCareAccessPage() {
     const { locale } = useContext(HomeI18nContext) || { locale: "fr" };
     const text = clinicalCareAccessLabels(locale);
     const receiptLabels = useUiLabelTree(UI_LABELS_FR.writeVerification);
+    const transferLabels = useUiLabelTree(UI_LABELS_FR.patientCareTransfer);
     const [grants, setGrants] = useState<CareGrant[]>([]);
     const [record, setRecord] = useState<SharedCareRecord | null>(null);
     const [loading, setLoading] = useState(false);
@@ -83,13 +84,16 @@ export function ClinicalCareAccessPage() {
         await open(grant, true);
         if (request + 1 === epoch.current) setReceipt(verification);
     };
+    const transfersLink = <Link to="/clinical-care-transfer" className="inline-block rounded border border-blue-300 px-3 py-2 text-blue-800">{transferLabels.title}</Link>;
     if (user?.role === "IPS") return <section className="mx-auto max-w-4xl space-y-4 p-6">
         <h1 className="text-2xl font-semibold">{text.title}</h1><p>{text.ownerInstructions}</p>
         <p>{text.rights}</p><p>{text.ownerPreserved}</p><Link to="/patients" className="inline-block rounded bg-blue-600 px-3 py-2 text-white">{text.ownPatients}</Link>
+        <div>{transfersLink}</div>
     </section>;
     if (user?.role !== "MEDECIN") return <p role="alert" className="p-6">{text.unavailable}</p>;
     return <section className="mx-auto max-w-5xl space-y-5 p-6">
         <header><h1 className="text-2xl font-semibold">{text.title}</h1><p>{text.description}</p></header>
+        {transfersLink}
         {error && <p role="alert">{text[error]}</p>}
         {message && <p role="status">{text[message]}</p>}
         <button type="button" disabled={loading || busy || !!note.trim()} className="rounded border px-3 py-2" onClick={() => void load()}>{text.refresh}</button>

@@ -1,4 +1,5 @@
 import { clinicalCareAccessLabels } from "./clinicalCareAccessLabels";
+import { patientCareTransferLabels } from "./patientCareTransferLabels";
 import { walkInRoutingLabels } from "./walkInRoutingLabels";
 import { walkInWaitlistLabels } from "./walkInWaitlistLabels";
 import { clinicalResultIntegrityLabels } from "./clinicalResultIntegrityLabels";
@@ -84,6 +85,7 @@ function indexedLabels(locale: string) {
         [UI_LABELS_FR.walkInRouting, walkInRoutingLabels(locale)],
         [UI_LABELS_FR.walkInWaitlist, walkInWaitlistLabels(locale)],
         [UI_LABELS_FR.clinicalCareAccess, clinicalCareAccessLabels(locale)],
+        [UI_LABELS_FR.patientCareTransfer, patientCareTransferLabels(locale)],
         [UI_LABELS_FR.walkInGuide, walkInGuideLabels(locale)],
         [UI_LABELS_FR.receptionAttendance, receptionAttendanceLabels(locale)],
         [UI_LABELS_FR.validationReports, validationReportLabels(locale)],
