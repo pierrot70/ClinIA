@@ -24,6 +24,12 @@ Les déploiements ClinIA sur Coolify sont manuels. Au 15 novembre 2026, la
 production est épinglée sur `d1437799a21bfbf6f55c66bc3b9890c614a7ec25`
 (`d143779`).
 
+Sur `coolify`, les trois commits qui suivent `d143779` sont uniquement
+documentaires. `f954edf` consigne le résultat de la passe WalkIn, `93dae58`
+documente le déploiement manuel et `b39fe83` ajoute la checklist. Aucun
+déploiement applicatif n’est nécessaire pour ces trois commits. La production
+reste épinglée sur `d143779`.
+
 ### Checklist du prochain déploiement applicatif
 
 - [ ] Confirmer que le CI a réussi sur `coolify` pour le commit applicatif et
