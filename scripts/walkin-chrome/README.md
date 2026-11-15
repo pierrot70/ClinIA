@@ -18,6 +18,17 @@ reprennent les mêmes six ordres avec des patients absents de MongoDB au départ
 | 5 | 11 | Courriel → appel → SMS |
 | 6 | 12 | Courriel → SMS → appel |
 
+## Déploiement de la production
+
+Les déploiements ClinIA sur Coolify sont manuels. Au 15 novembre 2026, la
+production est épinglée sur `d1437799a21bfbf6f55c66bc3b9890c614a7ec25`
+(`d143779`).
+
+Au prochain déploiement applicatif, remplacer dans Coolify le commit épinglé
+par le SHA du commit applicatif validé, puis lancer le déploiement manuellement.
+Mettre à jour le SHA indiqué dans ce guide après avoir vérifié la version en
+service.
+
 ## Lancer la passe
 
 Lancer les commandes depuis `scripts/walkin-chrome`, avec Node.js. Sous
