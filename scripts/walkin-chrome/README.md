@@ -21,14 +21,13 @@ reprennent les mêmes six ordres avec des patients absents de MongoDB au départ
 ## Déploiement de la production
 
 Les déploiements ClinIA sur Coolify sont manuels. Au 15 novembre 2026, la
-production est épinglée sur `d1437799a21bfbf6f55c66bc3b9890c614a7ec25`
-(`d143779`).
+production est épinglée sur `6e9a71200bab429633d53ad6ef09b6fd851d5c88`
+(`6e9a712`).
 
 Sur `coolify`, les trois commits qui suivent `d143779` sont uniquement
 documentaires. `f954edf` consigne le résultat de la passe WalkIn, `93dae58`
 documente le déploiement manuel et `b39fe83` ajoute la checklist. Aucun
-déploiement applicatif n’est nécessaire pour ces trois commits. La production
-reste épinglée sur `d143779`.
+déploiement applicatif n’était nécessaire pour ces trois commits.
 
 ### Checklist du prochain déploiement applicatif
 
@@ -39,8 +38,11 @@ reste épinglée sur `d143779`.
   la valeur affichée.
 - [ ] Lancer le déploiement manuellement. Attendre le statut **Finished**, puis
   vérifier que `/api/health/ready` renvoie `ok` avec le nouveau SHA.
-- [ ] Mettre à jour le SHA dans ce guide. Relancer les 12 scénarios WalkIn sur
-  demande, sans pause ajoutée et avec arrêt au premier échec.
+- [ ] Mettre à jour le SHA dans ce guide.
+- [ ] Après environ cinq déploiements applicatifs depuis la dernière passe
+  complète, relancer manuellement les 12 scénarios WalkIn sur demande, sans
+  pause ajoutée et avec arrêt au premier échec. Dernière passe complète le
+  15 novembre 2026 sur `6e9a712`, avec 12 scénarios réussis sur 12.
 
 ## Lancer la passe
 
