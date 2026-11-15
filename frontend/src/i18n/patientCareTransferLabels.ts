@@ -42,7 +42,7 @@ const status: Record<keyof TransferLabels["status"], Translation> = {
     ACCEPTED: ["Accepted", "Aceptada", "수락됨", "Đã chấp nhận", "Godtatt", "承諾済み", "已接受", "התקבלה"],
     DECLINED: ["Declined", "Rechazada", "거절됨", "Đã từ chối", "Avslått", "辞退済み", "已拒绝", "נדחתה"],
     CANCELLED: ["Withdrawn", "Retirada", "철회됨", "Đã rút", "Trukket", "取り下げ済み", "已撤回", "נמשכה"],
-    EXPIRED: ["Expired", "Caducada", "만료됨", "Đã hết hạn", "Utløpt", "期限切れ", "已过期", "פג תוקף"],
+    EXPIRED: ["Request expired", "Solicitud caducada", "요청 만료됨", "Yêu cầu đã hết hạn", "Forespørselen har utløpt", "依頼の有効期限切れ", "申请已过期", "תוקף הבקשה פג"],
 };
 
 const languages = ["en", "es", "ko", "vi", "no", "ja", "zh", "he"];

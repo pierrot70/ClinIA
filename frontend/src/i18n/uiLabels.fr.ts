@@ -1625,7 +1625,7 @@ export const UI_LABELS_FR = {
             ACCEPTED: "Accepté",
             DECLINED: "Refusé",
             CANCELLED: "Retiré",
-            EXPIRED: "Expiré",
+            EXPIRED: "Demande expirée",
         },
     },
     clinicalCareAccess: {
