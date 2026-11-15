@@ -16,7 +16,7 @@ import { sendPasswordRecoveryCode, sendPasswordChangedConfirmation } from "../se
 import { AdminUser } from "../models/AdminUser.js";
 import { RefreshTokenSession } from "../models/RefreshTokenSession.js";
 import { completePasswordRecovery, requestPasswordRecoveryCode, verifyPasswordRecoveryCode, hashPasswordRecoveryCode, hashPasswordRecoveryGrant } from "../services/passwordRecovery.js";
-import { login, refresh, completeMfaLogin, reauthenticate, resetUserPassword, completeForcedPasswordChange } from "../services/auth.js";
+import { login, refresh, completeMfaLogin, reauthenticate, resetUserPassword, completeForcedPasswordChange, register, updateUser } from "../services/auth.js";
 import { createMfaSecret, encryptMfaSecret, hashRecoveryCode } from "../services/auth/mfa.js";
 import { run as runAdminResetSmoke } from "../../scripts/auth-admin-reset-smoke.mjs";
 import { isTokenFromInactiveSession } from "../auth/sessionAccess.js";
@@ -80,6 +80,27 @@ afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllEnvs(); 
 afterAll(async () => {
     if (ownsDatabase && mongoose.connection.readyState === 1) await mongoose.connection.dropDatabase();
     await mongoose.disconnect();
+});
+
+it("supports multiple IPS accounts without email alongside a legacy null email", async () => {
+    await AdminUser.collection.updateOne({ _id: user._id }, { $set: { email: null } });
+    const authUser = { userId: user._id, username: user.username, role: "SUPERADMIN" };
+    const create = (username, optionalEmail) => register({
+        username, email: optionalEmail, password: newPassword, role: "IPS", authUser, req,
+    });
+
+    const first = await create("ips-no-email-one");
+    const second = await create("ips-no-email-two", null);
+    expect(first.user.email).toBeNull();
+    expect(second.user.email).toBeNull();
+    expect(await AdminUser.countDocuments({ role: "IPS", email: { $exists: false } })).toBe(2);
+
+    const updateEmail = email => updateUser({ userId: first.user.id, updates: { email }, authUser, req });
+    await updateEmail(email);
+    await expect(create("ips-duplicate-email", email)).rejects.toMatchObject({ code: "USER_EXISTS" });
+    await expect(updateEmail(null)).resolves.toMatchObject({ user: { email: null } });
+    expect(await AdminUser.countDocuments({ role: "IPS", email: { $exists: false } })).toBe(2);
+    expect((await AdminUser.collection.findOne({ _id: user._id })).email).toBeNull();
 });
 
 it("allows only one completion for a recovery grant", async () => {

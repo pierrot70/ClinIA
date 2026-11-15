@@ -10,7 +10,6 @@ const AdminUserSchema = new mongoose.Schema({
     },
     email: {
         type: String,
-        default: null,
         unique: true,
         sparse: true,
         lowercase: true,

@@ -280,19 +280,18 @@ const UserRegisterPage: React.FC = () => {
     };
 
     useEffect(() => {
-        if (!error && !success) {
+        if (!success) {
             return;
         }
 
         const timerId = window.setTimeout(() => {
-            setError(null);
             setSuccess(null);
         }, 3400);
 
         return () => {
             window.clearTimeout(timerId);
         };
-    }, [error, success]);
+    }, [success]);
 
     useEffect(() => {
         if (editSaveStatus !== "success" && editSaveStatus !== "error") {
@@ -663,7 +662,7 @@ const UserRegisterPage: React.FC = () => {
             )}
 
             {error && (
-                <div className="clinia-fade-feedback mb-4 rounded bg-red-50 p-3 text-sm text-red-700">
+                <div role="alert" className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">
                     <UiMessage message={error} />
                 </div>
             )}

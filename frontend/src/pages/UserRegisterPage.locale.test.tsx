@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
@@ -48,6 +48,35 @@ describe("user management feedback and dynamic values", () => {
         }
         expect(api.reauth).toHaveBeenCalledTimes(1);
         expect(api.authFetch.mock.calls.filter(([url]) => url.includes("reset-password"))).toHaveLength(1);
+    });
+
+    it("keeps a creation error visible past the feedback timeout until a new attempt", async () => {
+        render(<Page locale="fr-CA" />);
+        await screen.findByRole("button", { name: labels.pageUi.modifier });
+        const username = screen.getByLabelText(labels.pageUi.nomDUtilisateur);
+        const submit = screen.getByRole("button", { name: labels.pageUi.creerLUtilisateur });
+        fireEvent.change(username, { target: { value: "ips-synthetique" } });
+        fireEvent.change(screen.getByLabelText(labels.pageUi.motDePasse), {
+            target: { value: temporaryPassword },
+        });
+        api.authFetch.mockResolvedValueOnce(response({ error: {} }, false));
+
+        vi.useFakeTimers();
+        try {
+            await act(async () => { fireEvent.click(submit); });
+            const error = screen.getByRole("alert");
+            expect(error).toBeVisible();
+            expect(error).not.toHaveClass("clinia-fade-feedback");
+            act(() => { vi.advanceTimersByTime(10_000); });
+            expect(error).toBeVisible();
+            expect(username).toHaveValue("ips-synthetique");
+
+            api.authFetch.mockResolvedValueOnce(response({ data: { user: { username: "ips-synthetique" } } }));
+            await act(async () => { fireEvent.click(submit); });
+            expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("translates the save-error prefix and uses a localized fallback for unknown server details", async () => {

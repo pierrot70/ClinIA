@@ -1322,7 +1322,7 @@ export async function register({
         : [];
     const created = await AdminUser.create({
         username: uniqueUsername,
-        email: normalizedEmail,
+        ...(normalizedEmail ? { email: normalizedEmail } : {}),
         passwordHash,
         role,
         assignedClinics: normalizedAssignedClinics,
@@ -1343,7 +1343,7 @@ export async function register({
         user: {
             id: String(created._id),
             username: created.username,
-            email: created.email,
+            email: created.email ?? null,
             role: created.role,
             assignedClinics: normalizedAssignedClinics,
             mfaRequired: created.mfaRequired === true,
@@ -1539,7 +1539,7 @@ export async function updateUser({ userId, updates, authUser, req }) {
     }
 
     if (typeof updates?.email !== "undefined") {
-        next.email = normalizeOptionalEmail(updates.email);
+        next.email = normalizeOptionalEmail(updates.email) ?? undefined;
     }
 
     if (typeof updates?.role === "string") {
