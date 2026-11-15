@@ -24,10 +24,17 @@ Les déploiements ClinIA sur Coolify sont manuels. Au 15 novembre 2026, la
 production est épinglée sur `d1437799a21bfbf6f55c66bc3b9890c614a7ec25`
 (`d143779`).
 
-Au prochain déploiement applicatif, remplacer dans Coolify le commit épinglé
-par le SHA du commit applicatif validé, puis lancer le déploiement manuellement.
-Mettre à jour le SHA indiqué dans ce guide après avoir vérifié la version en
-service.
+### Checklist du prochain déploiement applicatif
+
+- [ ] Confirmer que le CI a réussi sur `coolify` pour le commit applicatif et
+  copier son SHA complet.
+- [ ] Dans Coolify, noter le SHA actuellement épinglé comme point de retour.
+- [ ] Remplacer le SHA épinglé par celui du commit validé, enregistrer et vérifier
+  la valeur affichée.
+- [ ] Lancer le déploiement manuellement. Attendre le statut **Finished**, puis
+  vérifier que `/api/health/ready` renvoie `ok` avec le nouveau SHA.
+- [ ] Mettre à jour le SHA dans ce guide. Relancer les 12 scénarios WalkIn sur
+  demande, sans pause ajoutée et avec arrêt au premier échec.
 
 ## Lancer la passe
 
