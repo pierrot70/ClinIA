@@ -69,3 +69,7 @@ Le fichier local est ignoré par Git. Se connecter à ClinIA dans Chrome avec
 Conserver `passe-en-cours.json` si le nettoyage échoue ou si la préparation
 s’interrompt après le contrôle initial. Il contient les références
 nécessaires à la reprise du nettoyage. Les journaux d’audit restent en place.
+
+## Historique des validations en production
+
+- [15 novembre 2026 · `d143779` · 12 scénarios sur 12](../../docs/production-validation-walkin-20261115-d143779.md)
