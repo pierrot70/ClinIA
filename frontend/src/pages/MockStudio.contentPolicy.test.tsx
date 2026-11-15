@@ -6,8 +6,10 @@ import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 import { getLocalUiTranslation } from "../i18n/localUiTranslations";
 import MockStudio from "./MockStudio";
 
-const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
-vi.mock("../hooks/useAuth", () => ({ useAuth: () => ({ authFetch: mocks.authFetch }) }));
+const mocks = vi.hoisted(() => ({ authFetch: vi.fn(), role: "ADMIN" }));
+vi.mock("../hooks/useAuth", () => ({
+    useAuth: () => ({ authFetch: mocks.authFetch, user: { role: mocks.role } }),
+}));
 const content = {
     synthetic_condition: { match: ["hypertension", "pression élevée"], patient_summary: "English simulated summary.",
         treatments: [{ name: "English option", justification: "English rationale.", contraindications: ["English caution"], efficacy: 50 }] },
@@ -18,10 +20,27 @@ function Page({ locale }: { locale: string }) {
     </HomeI18nContext.Provider></MemoryRouter>;
 }
 beforeEach(() => {
+    mocks.role = "ADMIN";
     mocks.authFetch.mockReset();
     mocks.authFetch.mockResolvedValue({ status: 200, ok: true, json: async () => structuredClone(content) });
 });
 afterEach(cleanup);
+
+describe("Mock Studio user management link", () => {
+    const link = { name: UI_LABELS_FR.pageUi.gererLesUtilisateurs };
+
+    it("hides user management for ADMIN while keeping Mock Studio available", async () => {
+        render(<Page locale="fr-CA" />);
+        await screen.findByRole("heading", { name: UI_LABELS_FR.pageUi.clinIAMockStudioAdmin });
+        expect(screen.queryByRole("link", link)).not.toBeInTheDocument();
+    });
+
+    it("shows user management for SUPERADMIN", async () => {
+        mocks.role = "SUPERADMIN";
+        render(<Page locale="fr-CA" />);
+        expect(await screen.findByRole("link", link)).toHaveAttribute("href", "/admin/users/manage");
+    });
+});
 
 describe("MockStudio source language", () => {
     it("preserves English fields and matching aliases when UI language changes and saves raw values", async () => {

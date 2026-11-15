@@ -34,7 +34,7 @@ const MockStudio: React.FC = () => {
     const [info, setInfo] = useState<string | null>(null);
 
     const navigate = useNavigate();
-    const { authFetch } = useAuth();
+    const { authFetch, user } = useAuth();
 
     // ------------------------------------------
     // 🔐 Charger les mocks (JWT obligatoire)
@@ -204,11 +204,14 @@ const MockStudio: React.FC = () => {
                         {t(labels.pageUi.clinIAMockStudioAdmin)}</h1>
                     <p className="text-sm text-gray-600">
                         {t(labels.pageUi.editeurDesReponsesSimuleesParDiagnostic)}</p>
-                    <Link
-                        to="/admin/users/manage"
-                        className="mt-2 inline-block text-sm text-blue-600 hover:text-blue-700"
-                    >
-                        {t(labels.pageUi.gererLesUtilisateurs)}</Link>
+                    {user?.role === "SUPERADMIN" && (
+                        <Link
+                            to="/admin/users/manage"
+                            className="mt-2 inline-block text-sm text-blue-600 hover:text-blue-700"
+                        >
+                            {t(labels.pageUi.gererLesUtilisateurs)}
+                        </Link>
+                    )}
                 </div>
                 <button
                     onClick={handleSave}
