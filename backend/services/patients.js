@@ -187,9 +187,10 @@ export async function createPatient(
 }
 
 export async function listPatients(filters = {}, opts = {}, authUser) {
+    const includeOwnMarker = ["IPS", "MEDECIN"].includes(authUser?.role);
     const patientListProjection =
         "_id nom prenom num_assurance_maladie addresse telephone archivedAt" +
-        (authUser?.role === "IPS" ? " ownerUserId" : "");
+        (includeOwnMarker ? " ownerUserId" : "");
     const archiveStatus = opts.archiveStatus === "archived" ? "archived" : "active";
     const query = {
         ...buildOwnerScope(authUser),
@@ -282,7 +283,7 @@ export async function listPatients(filters = {}, opts = {}, authUser) {
             archivedAt: patient.archivedAt,
             // This is the caller's already-known identity, never another
             // professional's ID or a broader patient access capability.
-            ...(authUser?.role === "IPS" && String(patient.ownerUserId || "") === authUser.userId
+            ...(includeOwnMarker && String(patient.ownerUserId || "") === authUser.userId
                 ? { ownerUserId: authUser.userId } : {}),
         })),
         meta: {

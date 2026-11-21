@@ -81,7 +81,7 @@ choisir **Transférer ce dossier**, sélectionner un médecin de famille actif e
 confirmer l’accord du patient. ClinIA vérifie la spécialité de l’urgentologue
 dans l’annuaire professionnel associé à son compte médecin.
 
-La liste propose uniquement les médecins de famille actifs qui ont indiqué
+La liste propose les médecins de famille actifs de la clinique actuelle qui ont indiqué
 dans la page des transferts qu’ils acceptent de nouveaux patients. Par défaut,
 un médecin reste absent de cette liste jusqu’à son accord explicite. Il peut
 modifier ce choix à tout moment. ClinIA vérifie encore sa disponibilité à
@@ -93,18 +93,26 @@ seule et accepter ou refuser la demande. L’acceptation lui attribue le dossier
 et ses droits de modification. Un refus, un retrait par l’émetteur ou
 l’expiration laisse le dossier à son responsable actuel.
 
-### Appel général en l’absence de médecin disponible
+### Appel aux médecins de famille de deux cliniques au maximum
 
-Quand la liste de destinataires est vide, l’IPS ou l’urgentologue responsable
-peut recueillir l’accord du patient pour un appel général. Tous les médecins
-de famille actifs peuvent alors voir l’invitation dans ClinIA, y compris ceux
-qui n’ont pas indiqué accepter de nouveaux patients. L’invitation est anonyme.
-Le premier médecin qui accepte obtient la responsabilité du dossier. Les
-autres médecins ne reçoivent aucun accès au dossier par cet appel.
+Avec l’accord du patient, l’IPS ou l’urgentologue responsable peut adresser
+un appel à tous les médecins de famille actifs de la clinique actuelle,
+y compris ceux qui ne se sont pas déclarés disponibles pour les transferts
+directs. Si le professionnel exerce dans plusieurs cliniques, il choisit celle
+depuis laquelle il fait la demande.
 
-Après 48 heures sans acceptation, ClinIA signale la demande à son émetteur.
-Le délai sert de rappel : la demande reste ouverte jusqu’à sa prise en charge
-ou son retrait par l’émetteur. Ce suivi se fait dans l’application.
+Tant que l’appel reste sans acceptation, ClinIA peut proposer la clinique
+la plus proche qui compte un médecin de famille actif. La distance est
+calculée à vol d’oiseau à partir des coordonnées des cliniques. L’émetteur
+recueille l’accord du patient pour cette clinique avant d’y élargir le même
+appel. Les médecins des deux cliniques peuvent alors répondre. Le premier
+médecin qui accepte devient responsable du dossier. Jusque-là, les médecins
+sollicités voient une invitation anonyme.
+
+Après 48 heures sans acceptation, ClinIA affiche un rappel à l’émetteur.
+L’élargissement est manuel et peut se faire avant ce rappel.
+Le paramètre serveur `GENERAL_TRANSFER_MAX_CLINICS` fixe le nombre maximal
+de cliniques contactées par appel, clinique de départ comprise. Sa valeur par défaut est 2.
 
 ## Autorisation accordée à un médecin ou urgentologue
 

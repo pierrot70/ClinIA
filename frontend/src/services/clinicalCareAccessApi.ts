@@ -45,6 +45,8 @@ export interface SharedCareRecord {
 export type CareTransferStatus = "PENDING" | "ACCEPTED" | "DECLINED" | "CANCELLED" | "EXPIRED";
 type TransferPatient = SharedCareRecord["patient"];
 
+type TransferClinic = { _id: string; nom: string };
+
 export interface CareTransfer {
     _id: string;
     kind: "DIRECT" | "GENERAL";
@@ -59,9 +61,14 @@ export interface CareTransfer {
     resolvedAt: string | null;
     patient?: TransferPatient | null;
     professional?: string;
+    contactedClinics?: (TransferClinic & { consentRecordedAt: string })[];
+    nextClinic?: TransferClinic | null;
+    maxClinics?: number;
 }
 export interface CareTransferContext {
     patient: TransferPatient;
+    clinics: TransferClinic[];
+    clinicId: string | null;
     clinicians: { _id: string; nom: string; prenom: string; username: string }[];
 }
 export type CareTransferRecord = Omit<SharedCareRecord, "grant" | "canAppendNote"> & { transfer: CareTransfer };
@@ -101,13 +108,17 @@ export const getCareTransferCapabilities = () =>
     request<{ canInitiate: boolean; acceptsNewPatients: boolean | null }>("/transfer-capabilities");
 export const setCareTransferPreference = (acceptsNewPatients: boolean) =>
     request<{ acceptsNewPatients: boolean }>("/transfer-preference", { acceptsNewPatients });
-export const getCareTransferContext = (patientId: string) =>
-    request<CareTransferContext>("/patients/" + encodeURIComponent(patientId) + "/transfer-context");
+export const getCareTransferContext = (patientId: string, clinicId?: string) => {
+    const search = clinicId ? "?clinicId=" + encodeURIComponent(clinicId) : "";
+    return request<CareTransferContext>("/patients/" + encodeURIComponent(patientId) + "/transfer-context" + search);
+};
 export const listCareTransfers = () => request<CareTransfer[]>("/transfers");
-export const requestCareTransfer = (patientId: string, targetUserId: string, patientConsent: boolean) =>
-    request<CareTransfer>("/patients/" + encodeURIComponent(patientId) + "/transfers", { targetUserId, patientConsent });
-export const requestGeneralCareTransfer = (patientId: string, patientConsent: boolean) =>
-    request<CareTransfer>("/patients/" + encodeURIComponent(patientId) + "/general-transfer", { patientConsent });
+export const requestCareTransfer = (patientId: string, targetUserId: string, patientConsent: boolean, clinicId: string) =>
+    request<CareTransfer>("/patients/" + encodeURIComponent(patientId) + "/transfers", { targetUserId, patientConsent, clinicId });
+export const requestGeneralCareTransfer = (patientId: string, patientConsent: boolean, clinicId: string) =>
+    request<CareTransfer>("/patients/" + encodeURIComponent(patientId) + "/general-transfer", { patientConsent, clinicId });
+export const extendGeneralCareTransfer = (transferId: string, clinicId: string, patientConsent: boolean) =>
+    request<CareTransfer>("/transfers/" + encodeURIComponent(transferId) + "/extend", { clinicId, patientConsent });
 export const readCareTransferRecord = (transferId: string) =>
     request<CareTransferRecord>("/transfers/" + encodeURIComponent(transferId) + "/record");
 export const decideCareTransfer = (transferId: string, decision: "accept" | "decline") =>

@@ -9,7 +9,8 @@ export type ApiErrorCode =
     | "AI_DEGRADED"           // IA OK mais fallback/mock utilisé
     | "PERSISTENCE_FAILED"    // Mongo indisponible
     | "FORBIDDEN"
-    | "TRANSFER_RECIPIENT_AVAILABLE"
+    | "TRANSFER_EXTENSION_UNAVAILABLE"
+    | "TRANSFER_CLINIC_REQUIRED"
     | "TRANSFER_ALREADY_PENDING"
     | "TRANSFER_RECIPIENT_UNAVAILABLE"
     | "CARE_ACCESS_ALREADY_ACTIVE"

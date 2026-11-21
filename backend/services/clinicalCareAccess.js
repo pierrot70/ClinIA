@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 import { AdminUser } from "../models/AdminUser.js";
+import { Clinique } from "../models/Clinique.js";
+import { FAMILY_SPECIALTIES, GENERAL_TRANSFER_MAX_CLINICS, clinicIds, extensionDirectory, mayExtend, nextGeneralClinic } from "./generalTransferClinics.js";
 import { Specialist } from "../models/Specialist.js";
 import { Patient } from "../models/Patient.js";
 import { PatientConsultationNote } from "../models/PatientConsultationNote.js";
@@ -29,7 +31,7 @@ function grantDTO(grant) {
 async function professional(userId, role, session = null) {
     if (!id(userId) || !["IPS", "MEDECIN"].includes(role)) fail("FORBIDDEN");
     const account = await AdminUser.findOne({ _id: userId, role, isActive: true }, { _id: 1, username: 1, acceptsNewPatients: 1 }).session(session).lean();
-    const directory = account ? await Specialist.findOne({ accountUserId: userId }, { _id: 1, specialite: 1, nom: 1, prenom: 1 }).session(session).lean() : null;
+    const directory = account ? await Specialist.findOne({ accountUserId: userId }, { _id: 1, specialite: 1, nom: 1, prenom: 1, clinique_associer: 1, "practiceLocations.clinique": 1 }).session(session).lean() : null;
     if (!account || !directory || typeof directory.specialite !== "string" || !directory.specialite.trim()
         || (role === "IPS" ? !isIps(directory.specialite) : isIps(directory.specialite))) fail("FORBIDDEN");
     return { account, directory, role };
@@ -234,14 +236,19 @@ export async function appendSharedCareNote(grantId, note, auth, metadata = {}) {
 const TRANSFER_DURATION_MS = MAX_MINUTES * 60000;
 const GENERAL_REMINDER_MS = 48 * 60 * 60 * 1000;
 const GENERAL_PENDING = { kind: "GENERAL", status: "PENDING", targetUserId: null };
-const FAMILY_SPECIALTIES = ["Medecin de famille", "Médecin de famille", "Medecine familiale", "Médecine familiale"];
 
-function transferDTO(transfer, showReminder = false) {
+function transferDTO(transfer, sender = false, nextClinic = null) {
     const general = transfer.kind === "GENERAL";
-    const reminderAt = general && showReminder && transfer.status === "PENDING"
+    const reminderAt = general && sender && transfer.contactedClinics?.length && transfer.status === "PENDING"
         ? new Date(new Date(transfer.createdAt).getTime() + GENERAL_REMINDER_MS) : null;
     return {
         kind: transfer.kind ?? "DIRECT", reminderAt, reminderDue: reminderAt !== null && reminderAt <= new Date(),
+        ...(general && sender ? {
+            contactedClinics: (transfer.contactedClinics ?? []).map(entry => ({
+                _id: key(entry.clinicId), nom: entry.nom, consentRecordedAt: entry.consentRecordedAt,
+            })),
+            nextClinic, maxClinics: GENERAL_TRANSFER_MAX_CLINICS,
+        } : {}),
         _id: key(transfer),
         patientId: transfer.patientId ? key(transfer.patientId) : null,
         targetUserId: transfer.targetUserId ? key(transfer.targetUserId) : null,
@@ -292,10 +299,25 @@ export async function setTransferPreference(acceptsNewPatients, auth, metadata =
     });
 }
 
-async function availableFamilyPhysicians(session = null) {
+async function transferClinicScope(issuer, requestedId, session = null) {
+    if (requestedId !== undefined) checkedId(requestedId);
+    const affiliations = clinicIds(issuer.directory);
+    const clinics = await Clinique.find({ _id: { $in: affiliations } }, { nom: 1 })
+        .sort({ nom: 1, _id: 1 }).session(session).lean();
+    const clinicId = requestedId?.toLowerCase() ?? (clinics.length === 1 ? key(clinics[0]) : null);
+    if (clinicId && !clinics.some(clinic => key(clinic) === clinicId)) fail("FORBIDDEN");
+    return { clinics: clinics.map(clinic => ({ _id: key(clinic), nom: clinic.nom })), clinicId };
+}
+
+async function availableFamilyPhysicians(clinicId, session = null) {
     const directory = await Specialist.find({
         specialite: { $in: FAMILY_SPECIALTIES }, accountUserId: { $type: "objectId" },
+        $or: [
+            { "practiceLocations.clinique": clinicId },
+            { "practiceLocations.0": { $exists: false }, clinique_associer: clinicId },
+        ],
     }, { accountUserId: 1, nom: 1, prenom: 1 }).sort({ nom: 1, prenom: 1, _id: 1 }).session(session).lean();
+    if (!directory.length) return [];
     const accounts = await AdminUser.find({
         _id: { $in: directory.map(entry => entry.accountUserId) }, role: "MEDECIN", isActive: true, acceptsNewPatients: true,
     }, { username: 1 }).session(session).lean();
@@ -305,18 +327,22 @@ async function availableFamilyPhysicians(session = null) {
     }));
 }
 
-export async function getCareTransferContext(patientId, auth) {
-    await transferIssuer(auth?.userId, auth?.role);
+export async function getCareTransferContext(patientId, auth, requestedClinicId) {
+    const issuer = await transferIssuer(auth?.userId, auth?.role);
     const patient = await ownedPatient(patientId, auth.userId);
-    return { patient: transferPatient(patient), clinicians: await availableFamilyPhysicians() };
+    const scope = await transferClinicScope(issuer, requestedClinicId);
+    const clinicians = scope.clinicId ? await availableFamilyPhysicians(scope.clinicId) : [];
+    return { patient: transferPatient(patient), ...scope, clinicians };
 }
 
 // Only the invitation ID and its creation time may leave this query. Even
 // temporarily, a broadcast is hidden once the patient is archived, reassigned,
 // or the original issuer no longer has an eligible active professional account.
-function openGeneralInvitations(issuer = null) {
-    const match = { ...GENERAL_PENDING };
-    if (issuer) Object.assign(match, { issuerUserId: issuer.account._id, issuerRole: issuer.role });
+function openGeneralInvitations(identity, recipientClinics = []) {
+    const sender = canInitiateTransfer(identity);
+    const match = sender
+        ? { ...GENERAL_PENDING, issuerUserId: identity.account._id, issuerRole: identity.role, "contactedClinics.0": { $exists: true } }
+        : { ...GENERAL_PENDING, "contactedClinics.clinicId": { $in: recipientClinics } };
     const pipeline = [
         { $match: match },
         { $sort: { createdAt: 1, _id: 1 } },
@@ -328,7 +354,7 @@ function openGeneralInvitations(issuer = null) {
         } },
         { $match: { "ownedPatient.0": { $exists: true } } },
     ];
-    if (!issuer) {
+    if (!sender) {
         pipeline.push(
             { $lookup: {
                 from: AdminUser.collection.name, localField: "issuerUserId", foreignField: "_id",
@@ -350,6 +376,12 @@ function openGeneralInvitations(issuer = null) {
     return PatientCareTransfer.aggregate(pipeline);
 }
 
+// Aggregation does not cast strings to ObjectIds. Removed clinics and stale directory
+// references must not grant access to an outstanding general invitation.
+async function currentRecipientClinics(recipient, session = null) {
+    return Clinique.distinct("_id", { _id: { $in: clinicIds(recipient.directory) } }).session(session);
+}
+
 export async function getTransferReminder(auth) {
     const identity = await professional(auth?.userId, auth?.role);
     const result = { overdueCount: 0, nextReminderAt: null, incomingGeneral: false };
@@ -362,7 +394,7 @@ export async function getTransferReminder(auth) {
         result.overdueCount = counts.overdue[0]?.count ?? 0;
         if (counts.upcoming.length) result.nextReminderAt = new Date(counts.upcoming[0].createdAt.getTime() + GENERAL_REMINDER_MS);
     } else if (FAMILY_SPECIALTIES.includes(identity.directory.specialite)) {
-        result.incomingGeneral = (await openGeneralInvitations().limit(1)).length !== 0;
+        result.incomingGeneral = (await openGeneralInvitations(identity, await currentRecipientClinics(identity)).limit(1)).length !== 0;
     }
     return result;
 }
@@ -388,6 +420,8 @@ export async function listCareTransfers(auth, metadata = {}) {
     ]);
     // A decision can commit between the two reads. Prefer the final status.
     const transfers = new Map([...pending, ...recentHistory].map(row => [key(row), row]));
+    const directory = sender && pending.some(transfer => mayExtend(transfer, identity))
+        ? await extensionDirectory(identity) : null;
     const results = [];
     for (const transfer of transfers.values()) {
         try {
@@ -399,11 +433,12 @@ export async function listCareTransfers(auth, metadata = {}) {
                 assertNotExpired(transfer);
             }
             const other = await AdminUser.findById(sender ? transfer.targetUserId : transfer.issuerUserId, { username: 1 }).lean();
-            results.push({ ...transferDTO(transfer, sender), patient: patient ? transferPatient(patient) : null, professional: other?.username ?? "" });
+            const next = directory && mayExtend(transfer, identity) ? nextGeneralClinic(transfer, directory) : null;
+            results.push({ ...transferDTO(transfer, sender, next), patient: patient ? transferPatient(patient) : null, professional: other?.username ?? "" });
         } catch (error) { if (error?.code !== "FORBIDDEN") throw error; }
     }
     if (!sender) {
-        for (const invitation of await openGeneralInvitations()) {
+        for (const invitation of await openGeneralInvitations(identity, await currentRecipientClinics(identity))) {
             results.push({
                 ...transferDTO({ ...invitation, kind: "GENERAL", status: "PENDING" }),
                 patient: null, professional: "",
@@ -419,15 +454,15 @@ async function transferAudit(transfer, operation, changedFields, auth, metadata,
         patientId: transfer.patientId, changedFields, auth, metadata, session });
 }
 
-export function requestCareTransfer(patientId, { targetUserId, patientConsent } = {}, auth, metadata = {}) {
-    return createTransfer(patientId, checkedId(targetUserId), patientConsent, auth, metadata);
+export function requestCareTransfer(patientId, { targetUserId, patientConsent, clinicId } = {}, auth, metadata = {}) {
+    return createTransfer(patientId, checkedId(targetUserId), patientConsent, clinicId, auth, metadata);
 }
 
-export function requestGeneralTransfer(patientId, { patientConsent } = {}, auth, metadata = {}) {
-    return createTransfer(patientId, null, patientConsent, auth, metadata);
+export function requestGeneralTransfer(patientId, { patientConsent, clinicId } = {}, auth, metadata = {}) {
+    return createTransfer(patientId, null, patientConsent, clinicId, auth, metadata);
 }
 
-async function createTransfer(patientId, targetUserId, patientConsent, auth, metadata) {
+async function createTransfer(patientId, targetUserId, patientConsent, requestedClinicId, auth, metadata) {
     checkedId(patientId);
     if (patientConsent !== true) fail("TRANSFER_CONSENT_REQUIRED");
     try {
@@ -436,8 +471,12 @@ async function createTransfer(patientId, targetUserId, patientConsent, auth, met
             const target = targetUserId ? await familyPhysician(targetUserId, session) : null;
             await lockProfessionals(target ? [issuer, target] : [issuer], session);
             await ownedPatient(patientId, auth.userId, session, true);
-            if (!target && (await availableFamilyPhysicians(session)).length) fail("TRANSFER_RECIPIENT_AVAILABLE");
-            if (target && target.account.acceptsNewPatients !== true) fail("TRANSFER_RECIPIENT_UNAVAILABLE");
+            const { clinics, clinicId } = await transferClinicScope(issuer, requestedClinicId, session);
+            if (!clinicId) fail("TRANSFER_CLINIC_REQUIRED");
+            if (target) {
+                const local = clinicIds(target.directory).includes(clinicId);
+                if (!local || target.account.acceptsNewPatients !== true) fail("TRANSFER_RECIPIENT_UNAVAILABLE");
+            }
             const now = new Date();
             const expired = await PatientCareTransfer.findOneAndUpdate(
                 { patientId, status: "PENDING", expiresAt: { $lte: now } },
@@ -447,10 +486,13 @@ async function createTransfer(patientId, targetUserId, patientConsent, auth, met
             if (await PatientCareTransfer.exists({ patientId, status: "PENDING" }).session(session)) fail("TRANSFER_ALREADY_PENDING");
             const [transfer] = await PatientCareTransfer.create([{
                 patientId, issuerUserId: auth.userId, issuerRole: issuer.role, consentRecordedAt: now,
-                ...(target ? { kind: "DIRECT", targetUserId, expiresAt: new Date(now.getTime() + TRANSFER_DURATION_MS) } : { kind: "GENERAL" }),
+                ...(target ? { kind: "DIRECT", targetUserId, expiresAt: new Date(now.getTime() + TRANSFER_DURATION_MS) } : {
+                    kind: "GENERAL", contactedClinics: [{ clinicId, nom: clinics.find(clinic => clinic._id === clinicId).nom, consentRecordedAt: now }],
+                }),
             }], { session });
-            await transferAudit(transfer, "CREATE", ["kind", "issuerRole", "consentRecordedAt", "status", ...(target ? ["targetUserId", "expiresAt"] : [])], auth, metadata, session);
-            return { data: transferDTO(transfer, true), writeAuditRecorded: true };
+            await transferAudit(transfer, "CREATE", ["kind", "issuerRole", "consentRecordedAt", "status", ...(target ? ["targetUserId", "expiresAt"] : ["contactedClinics"])], auth, metadata, session);
+            const next = mayExtend(transfer, issuer) ? nextGeneralClinic(transfer, await extensionDirectory(issuer, session)) : null;
+            return { data: transferDTO(transfer, true, next), writeAuditRecorded: true };
         });
     } catch (error) {
         if (error?.code === 11000 && error.keyPattern?.patientId === 1) fail("TRANSFER_ALREADY_PENDING");
@@ -458,13 +500,43 @@ async function createTransfer(patientId, targetUserId, patientConsent, auth, met
     }
 }
 
+export async function extendGeneralTransfer(transferId, { clinicId, patientConsent } = {}, auth, metadata = {}) {
+    checkedId(transferId); checkedId(clinicId);
+    if (patientConsent !== true) fail("TRANSFER_CONSENT_REQUIRED");
+    return transaction(async session => {
+        const issuer = await transferIssuer(auth?.userId, auth?.role, session);
+        await lockProfessional(issuer, session);
+        const scope = { _id: transferId, issuerUserId: auth.userId, issuerRole: issuer.role, ...GENERAL_PENDING };
+        const transfer = await PatientCareTransfer.findOne(scope).session(session).lean();
+        if (!transfer) fail("FORBIDDEN");
+        await ownedPatient(key(transfer.patientId), auth.userId, session, true);
+        const origin = transfer.contactedClinics?.[0];
+        if (!origin) fail("TRANSFER_EXTENSION_UNAVAILABLE");
+        await transferClinicScope(issuer, key(origin.clinicId), session);
+        if (!mayExtend(transfer, issuer)) fail("TRANSFER_EXTENSION_UNAVAILABLE");
+        const directory = await extensionDirectory(issuer, session);
+        const next = nextGeneralClinic(transfer, directory);
+        if (next?._id !== clinicId.toLowerCase()) fail("TRANSFER_EXTENSION_UNAVAILABLE");
+        const changed = await PatientCareTransfer.findOneAndUpdate({
+            ...scope, "contactedClinics.clinicId": { $ne: next._id },
+            [`contactedClinics.${transfer.contactedClinics.length}`]: { $exists: false },
+        }, { $push: { contactedClinics: { clinicId: next._id, nom: next.nom, consentRecordedAt: new Date() } } },
+        { session, returnDocument: "after", runValidators: true }).lean();
+        if (!changed) fail("TRANSFER_EXTENSION_UNAVAILABLE");
+        await transferAudit(changed, "UPDATE", ["contactedClinics"], auth, metadata, session);
+        return { data: transferDTO(changed, true, mayExtend(changed, issuer) ? nextGeneralClinic(changed, directory) : null), writeAuditRecorded: true };
+    });
+}
+
 async function targetTransfer(transferId, auth, session, action) {
     checkedId(transferId);
     if (auth?.role !== "MEDECIN") fail("FORBIDDEN");
     const recipient = await familyPhysician(auth.userId, session);
-    const eligible = [{ targetUserId: auth.userId, status: "PENDING", expiresAt: { $gt: new Date() } }];
+    const eligible = [{ kind: { $ne: "GENERAL" }, targetUserId: auth.userId, status: "PENDING", expiresAt: { $gt: new Date() } }];
     if (action === "read") eligible.push({ targetUserId: auth.userId, status: "ACCEPTED" });
-    if (action === "accept") eligible.push(GENERAL_PENDING);
+    if (action === "accept") eligible.push({
+        ...GENERAL_PENDING, "contactedClinics.clinicId": { $in: await currentRecipientClinics(recipient, session) },
+    });
     const transfer = await PatientCareTransfer.findOne({ _id: transferId, $or: eligible }).session(session).lean();
     if (!transfer) fail("FORBIDDEN");
     const pending = transfer.status === "PENDING";

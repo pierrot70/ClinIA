@@ -297,7 +297,7 @@ describe("patients service audit logs", () => {
             archivedAt: null,
         });
         expect(select).toHaveBeenCalledWith(
-            "_id nom prenom num_assurance_maladie addresse telephone archivedAt"
+            "_id nom prenom num_assurance_maladie addresse telephone archivedAt ownerUserId"
         );
     });
 
@@ -488,17 +488,18 @@ describe("patients service audit logs", () => {
         ).toHaveLength(81);
     });
 
-    it.each([["IPS", true], ["MEDECIN", false]])("returns the owner marker only for the connected IPS on its own list (%s)", async (role, hasOwnerMarker) => {
+    it.each(["IPS", "MEDECIN"])("returns the owner marker only for the connected professional’s own patient (%s)", async role => {
         const userId = "507f1f77bcf86cd799439011";
         const query = patientListQuery([{ _id: "synthetic-own-patient", nom: "Synthetic", prenom: "Test", ownerUserId: userId,
-            secure_request_profile: { clinicalNotes: "MUST_NOT_APPEAR" }, documents: [{ title: "MUST_NOT_APPEAR" }] }]);
+            secure_request_profile: { clinicalNotes: "MUST_NOT_APPEAR" }, documents: [{ title: "MUST_NOT_APPEAR" }] },
+            { _id: "synthetic-other-patient", ownerUserId: "MUST_NOT_APPEAR" }]);
         patientFind.mockReturnValue(query);
         patientCountDocuments.mockResolvedValue(1);
         const result = await listPatients({}, {}, { userId, role });
         expect(patientFind).toHaveBeenCalledWith({ ownerUserId: userId, archivedAt: null });
-        expect(query.select).toHaveBeenCalledWith("_id nom prenom num_assurance_maladie addresse telephone archivedAt" + (hasOwnerMarker ? " ownerUserId" : ""));
-        if (hasOwnerMarker) expect(result.data[0].ownerUserId).toBe(userId);
-        else expect(result.data[0]).not.toHaveProperty("ownerUserId");
+        expect(query.select).toHaveBeenCalledWith("_id nom prenom num_assurance_maladie addresse telephone archivedAt ownerUserId");
+        expect(result.data[0].ownerUserId).toBe(userId);
+        expect(result.data[1]).not.toHaveProperty("ownerUserId");
         expect(JSON.stringify(result.data)).not.toContain("MUST_NOT_APPEAR");
     });
 

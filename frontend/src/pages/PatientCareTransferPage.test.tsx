@@ -6,7 +6,7 @@ import { PatientCareTransferPage } from "./PatientCareTransferPage";
 
 const api = vi.hoisted(() => ({
     user: { id: "synthetic-ips", role: "IPS" },
-    getCareTransferCapabilities: vi.fn(), setCareTransferPreference: vi.fn(), getCareTransferContext: vi.fn(), listCareTransfers: vi.fn(), requestCareTransfer: vi.fn(), requestGeneralCareTransfer: vi.fn(),
+    getCareTransferCapabilities: vi.fn(), setCareTransferPreference: vi.fn(), getCareTransferContext: vi.fn(), listCareTransfers: vi.fn(), requestCareTransfer: vi.fn(), requestGeneralCareTransfer: vi.fn(), extendGeneralCareTransfer: vi.fn(),
     readCareTransferRecord: vi.fn(), decideCareTransfer: vi.fn(), cancelCareTransfer: vi.fn(),
 }));
 vi.mock("../hooks/useAuth", () => ({ useAuth: () => ({ user: api.user }) }));
@@ -15,6 +15,9 @@ vi.mock("../services/clinicalCareAccessApi", () => api);
 const text = UI_LABELS_FR.patientCareTransfer;
 const patient = { _id: "synthetic-patient", nom: "Fictif", prenom: "Patient" };
 const clinician = { _id: "synthetic-family", nom: "Famille", prenom: "Médecin", username: "synthetic-family" };
+const clinic = { _id: "clinic-a", nom: "Clinique A" };
+const neighbor = { _id: "clinic-b", nom: "Clinique B" };
+const context = { patient, clinics: [clinic], clinicId: clinic._id };
 const transfer = () => ({
     _id: "synthetic-transfer", patientId: patient._id, patient, targetUserId: clinician._id, status: "PENDING",
     expiresAt: new Date(Date.now() + 60000).toISOString(), createdAt: new Date().toISOString(),
@@ -31,7 +34,7 @@ beforeEach(() => {
     api.user = { id: "synthetic-ips", role: "IPS" };
     api.getCareTransferCapabilities.mockResolvedValue({ data: { canInitiate: false } });
     api.listCareTransfers.mockResolvedValue({ data: [] });
-    api.getCareTransferContext.mockResolvedValue({ data: { patient, clinicians: [clinician] } });
+    api.getCareTransferContext.mockResolvedValue({ data: { ...context, clinicians: [clinician] } });
 });
 afterEach(cleanup);
 
@@ -54,8 +57,39 @@ describe("patient care transfer", () => {
         api.listCareTransfers.mockResolvedValue({ data: [pending] });
         fireEvent.click(submit);
         await screen.findByText(text.sent);
-        expect(api.requestCareTransfer).toHaveBeenCalledExactlyOnceWith(patient._id, clinician._id, true);
+        expect(api.requestCareTransfer).toHaveBeenCalledExactlyOnceWith(patient._id, clinician._id, true, clinic._id);
         expect(await screen.findByRole("button", { name: text.cancel })).toBeVisible();
+    });
+
+    it("clears the physician and consent when switching between two practice locations", async () => {
+        const other = { _id: "clinic-b", nom: "Clinique B" };
+        const clinics = [clinic, other];
+        api.getCareTransferContext.mockImplementation(async (_patientId: string, clinicId?: string) => ({
+            data: { patient, clinics, clinicId: clinicId ?? null, clinicians: clinicId === clinic._id ? [clinician] : [] },
+        }));
+        renderPage({ patientId: patient._id });
+        const location = await screen.findByRole("combobox", { name: text.currentClinic });
+        expect(screen.queryByRole("button", { name: text.sendGeneral })).not.toBeInTheDocument();
+        expect(screen.queryByText(text.noPhysicians)).not.toBeInTheDocument();
+        fireEvent.change(location, { target: { value: clinic._id } });
+        const physician = await screen.findByRole("combobox", { name: text.choosePhysician });
+        fireEvent.change(physician, { target: { value: clinician._id } });
+        fireEvent.click(screen.getByRole("checkbox", { name: text.consent }));
+        expect(screen.getByRole("button", { name: text.send })).toBeEnabled();
+        fireEvent.change(location, { target: { value: other._id } });
+        await screen.findByText(text.noPhysicians);
+        expect(screen.queryByRole("combobox", { name: text.choosePhysician })).not.toBeInTheDocument();
+        expect(screen.getByRole("checkbox", { name: text.generalConsent.replace("{clinic}", other.nom) })).not.toBeChecked();
+        expect(screen.getByRole("button", { name: text.sendGeneral })).toBeDisabled();
+        expect(api.getCareTransferContext).toHaveBeenLastCalledWith(patient._id, other._id);
+    });
+
+    it("explains a missing clinic affiliation before offering any transfer", async () => {
+        api.getCareTransferContext.mockResolvedValue({ data: { patient, clinics: [], clinicId: null, clinicians: [] } });
+        renderPage({ patientId: patient._id });
+        await screen.findByText(text.noClinic);
+        expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: text.sendGeneral })).not.toBeInTheDocument();
     });
 
     it("lets a family physician opt in and out, showing the last confirmed preference after a failed save", async () => {
@@ -88,9 +122,9 @@ describe("patient care transfer", () => {
 
     it("reloads available doctors and requires new consent after the selected doctor opts out", async () => {
         const other = { ...clinician, _id: "other-doctor", username: "other-doctor" };
-        api.getCareTransferContext.mockResolvedValueOnce({ data: { patient, clinicians: [clinician, other] } })
-            .mockResolvedValueOnce({ data: { patient, clinicians: [other] } })
-            .mockResolvedValue({ data: { patient, clinicians: [] } });
+        api.getCareTransferContext.mockResolvedValueOnce({ data: { ...context, clinicians: [clinician, other] } })
+            .mockResolvedValueOnce({ data: { ...context, clinicians: [other] } })
+            .mockResolvedValue({ data: { ...context, clinicians: [] } });
         api.requestCareTransfer.mockResolvedValue({ error: { code: "TRANSFER_RECIPIENT_UNAVAILABLE" } });
         renderPage({ patientId: patient._id });
         const select = await screen.findByRole("combobox");
@@ -112,19 +146,19 @@ describe("patient care transfer", () => {
     });
 
     it("offers an anonymous general invitation only after separate consent when direct recipients run out", async () => {
-        api.getCareTransferContext.mockResolvedValue({ data: { patient, clinicians: [] } });
+        api.getCareTransferContext.mockResolvedValue({ data: { ...context, clinicians: [] } });
         const general = { ...transfer(), kind: "GENERAL", expiresAt: null, targetUserId: null };
         api.requestGeneralCareTransfer.mockResolvedValue({ data: general });
         renderPage({ patientId: patient._id });
         const send = await screen.findByRole("button", { name: text.sendGeneral });
         expect(send).toBeDisabled();
         expect(screen.queryByText(text.terms)).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole("checkbox", { name: text.generalConsent }));
+        fireEvent.click(screen.getByRole("checkbox", { name: text.generalConsent.replace("{clinic}", clinic.nom) }));
         api.listCareTransfers.mockResolvedValue({ data: [general] });
         fireEvent.click(send);
         await screen.findByText(text.sent);
         const withdraw = await screen.findByRole("button", { name: text.cancel });
-        expect(api.requestGeneralCareTransfer).toHaveBeenCalledExactlyOnceWith(patient._id, true);
+        expect(api.requestGeneralCareTransfer).toHaveBeenCalledExactlyOnceWith(patient._id, true, clinic._id);
         expect(api.requestCareTransfer).not.toHaveBeenCalled();
         api.cancelCareTransfer.mockResolvedValue({ data: { ...general, status: "CANCELLED" } });
         api.listCareTransfers.mockResolvedValue({ data: [] });
@@ -133,17 +167,70 @@ describe("patient care transfer", () => {
         expect(api.cancelCareTransfer).toHaveBeenCalledExactlyOnceWith(general._id);
     });
 
-    it("refreshes direct recipients and clears the general consent if a doctor becomes available", async () => {
-        api.getCareTransferContext.mockResolvedValueOnce({ data: { patient, clinicians: [] } })
-            .mockResolvedValue({ data: { patient, clinicians: [clinician] } });
-        api.requestGeneralCareTransfer.mockResolvedValue({ error: { code: "TRANSFER_RECIPIENT_AVAILABLE" } });
+    it("offers the local call even with an available direct recipient and requires fresh consent for each audience", async () => {
         renderPage({ patientId: patient._id });
-        fireEvent.click(await screen.findByRole("checkbox", { name: text.generalConsent }));
+        fireEvent.change(await screen.findByRole("combobox", { name: text.choosePhysician }), { target: { value: clinician._id } });
+        fireEvent.click(screen.getByRole("checkbox", { name: text.consent }));
+        fireEvent.click(screen.getByRole("radio", { name: text.localMode }));
+        const localConsent = { name: text.generalConsent.replace("{clinic}", clinic.nom) };
+        expect(screen.getByRole("checkbox", localConsent)).not.toBeChecked();
+        expect(screen.getByRole("button", { name: text.sendGeneral })).toBeDisabled();
+        fireEvent.click(screen.getByRole("checkbox", localConsent));
+        fireEvent.click(screen.getByRole("radio", { name: text.directMode }));
+        expect(screen.getByRole("button", { name: text.send })).toBeDisabled();
+        fireEvent.click(screen.getByRole("radio", { name: text.localMode }));
+        fireEvent.click(screen.getByRole("checkbox", localConsent));
+        api.requestGeneralCareTransfer.mockResolvedValue({ data: { ...transfer(), kind: "GENERAL" } });
         fireEvent.click(screen.getByRole("button", { name: text.sendGeneral }));
-        await screen.findByText(text.directAvailable);
-        expect(await screen.findByRole("combobox")).toHaveValue("");
-        expect(screen.getByRole("checkbox", { name: text.consent })).not.toBeChecked();
-        expect(screen.queryByRole("button", { name: text.sendGeneral })).not.toBeInTheDocument();
+        await screen.findByText(text.sent);
+        expect(api.requestGeneralCareTransfer).toHaveBeenCalledExactlyOnceWith(patient._id, true, clinic._id);
+        expect(api.requestCareTransfer).not.toHaveBeenCalled();
+    });
+
+    const localCall = () => ({
+        ...transfer(), kind: "GENERAL", expiresAt: null, targetUserId: null, reminderDue: false,
+        contactedClinics: [{ ...clinic, consentRecordedAt: new Date().toISOString() }], nextClinic: neighbor, maxClinics: 2,
+    });
+    it("requires consent naming the neighboring clinic to extend the same call, then shows the two-clinic limit", async () => {
+        const pending = localCall();
+        api.listCareTransfers.mockResolvedValue({ data: [pending] });
+        renderPage();
+        const extend = await screen.findByRole("button", { name: text.extend });
+        expect(extend).toBeDisabled();
+        expect(screen.queryByText(text.generalOverdue)).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("checkbox", { name: text.extensionConsent.replace("{clinic}", neighbor.nom) }));
+        const expanded = { ...pending, contactedClinics: [...pending.contactedClinics, neighbor], nextClinic: null };
+        api.extendGeneralCareTransfer.mockResolvedValue({ data: expanded });
+        api.listCareTransfers.mockResolvedValue({ data: [expanded] });
+        fireEvent.click(extend);
+        await screen.findByText(text.extended);
+        expect(api.extendGeneralCareTransfer).toHaveBeenCalledExactlyOnceWith(pending._id, neighbor._id, true);
+        await screen.findByText(text.clinicLimit.replace("{count}", "2"));
+        expect(screen.getByText(clinic.nom + ", " + neighbor.nom)).toBeVisible();
+        expect(screen.queryByRole("button", { name: text.extend })).not.toBeInTheDocument();
+    });
+
+    it("requires a new consent when the suggested clinic changes before submission", async () => {
+        const pending = localCall();
+        api.listCareTransfers.mockResolvedValue({ data: [pending] });
+        renderPage();
+        fireEvent.click(await screen.findByRole("checkbox", { name: text.extensionConsent.replace("{clinic}", neighbor.nom) }));
+        api.extendGeneralCareTransfer.mockResolvedValue({ error: { code: "TRANSFER_EXTENSION_UNAVAILABLE" } });
+        const replacement = { _id: "clinic-c", nom: "Clinique C" };
+        api.listCareTransfers.mockResolvedValue({ data: [{ ...pending, nextClinic: replacement }] });
+        fireEvent.click(screen.getByRole("button", { name: text.extend }));
+        await screen.findByText(text.extensionChanged);
+        expect(await screen.findByRole("checkbox", { name: text.extensionConsent.replace("{clinic}", replacement.nom) })).not.toBeChecked();
+        expect(screen.getByRole("button", { name: text.extend })).toBeDisabled();
+    });
+
+    it.each([false, true])("only offers withdrawal with no eligible neighbor or an unscoped legacy call (legacy=%s)", async legacy => {
+        const call = localCall();
+        api.listCareTransfers.mockResolvedValue({ data: [{ ...call, nextClinic: null, contactedClinics: legacy ? [] : call.contactedClinics }] });
+        renderPage();
+        await screen.findByText(legacy ? text.legacyScope : text.noNeighbor);
+        expect(screen.getByRole("button", { name: text.cancel })).toBeEnabled();
+        expect(screen.queryByRole("button", { name: text.extend })).not.toBeInTheDocument();
     });
 
     it("shows a reminder on the sender's open page when the 48-hour deadline is reached", async () => {
@@ -161,13 +248,15 @@ describe("patient care transfer", () => {
         api.user = { id: clinician._id, role: "MEDECIN" };
         api.getCareTransferCapabilities.mockResolvedValue({ data: { canInitiate: false, acceptsNewPatients: false } });
         // The interface must mask unsolicited identifying fields as well as handle the normal anonymous DTO.
-        const general = { ...transfer(), kind: "GENERAL", expiresAt: null, professional: "hidden-issuer" };
+        const general = { ...transfer(), kind: "GENERAL", expiresAt: null, professional: "hidden-issuer", nextClinic: neighbor, contactedClinics: [clinic], maxClinics: 2 };
         api.listCareTransfers.mockResolvedValueOnce({ data: [general] }).mockResolvedValue({ data: [] });
         renderPage();
         const accept = await screen.findByRole("button", { name: text.acceptGeneral });
         expect(screen.getByText(text.generalTerms)).toBeVisible();
         expect(screen.queryByText("Patient Fictif")).not.toBeInTheDocument();
         expect(screen.queryByText("hidden-issuer")).not.toBeInTheDocument();
+        expect(screen.queryByText(clinic.nom)).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: text.extend })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: text.open })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: text.decline })).not.toBeInTheDocument();
         api.decideCareTransfer.mockResolvedValue(outcome === "accept"

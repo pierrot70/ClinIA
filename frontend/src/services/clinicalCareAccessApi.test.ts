@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createPatientCareGrant, appendSharedCareNote, readSharedCareRecord, revokePatientCareGrant, listPatientCareGrants, listReceivedCareGrants } from "./clinicalCareAccessApi";
+import { extendGeneralCareTransfer, createPatientCareGrant, appendSharedCareNote, readSharedCareRecord, revokePatientCareGrant, listPatientCareGrants, listReceivedCareGrants } from "./clinicalCareAccessApi";
 const transport = vi.hoisted(() => ({ authFetch: vi.fn() }));
 vi.mock("./authService", () => ({ authFetch: transport.authFetch }));
 beforeEach(() => { vi.clearAllMocks(); transport.authFetch.mockResolvedValue({ json: async () => ({ data: {}, meta: {} }) }); vi.stubGlobal("fetch", vi.fn(() => { throw Error("External request forbidden"); })); });
@@ -11,6 +11,13 @@ describe("dedicated clinical care API boundaries", () => {
         expect(url).toBe("/api/clinical-care-access/patients/synthetic%2Fpatient/grants");
         expect(init.method).toBe("POST"); expect(JSON.parse(init.body)).toEqual({ targetUserId: "target", durationMinutes: 60 });
         expect(init.body).not.toContain("ownerUserId"); expect(init.body).not.toContain("permissions"); expect(fetch).not.toHaveBeenCalled();
+    });
+    it("extends the existing invitation with the agreed clinic as the only recipient input", async () => {
+        await extendGeneralCareTransfer("transfer/id", "neighbor", true);
+        const [url, init] = transport.authFetch.mock.calls[0];
+        expect(url).toBe("/api/clinical-care-access/transfers/transfer%2Fid/extend");
+        expect(init.method).toBe("POST");
+        expect(JSON.parse(init.body)).toEqual({ clinicId: "neighbor", patientConsent: true });
     });
     it("sends note text only in the same-origin append endpoint body, without patient ownership or old notes", async () => {
         await appendSharedCareNote("synthetic-grant", "SYNTHETIC clinical note");

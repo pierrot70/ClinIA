@@ -8,7 +8,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useUiLabels, useUiLabelTree } from "../hooks/useUiLabels";
 import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 import {
-    cancelCareTransfer, decideCareTransfer, getCareTransferContext, listCareTransfers, readCareTransferRecord,
+    cancelCareTransfer, decideCareTransfer, extendGeneralCareTransfer, getCareTransferContext, listCareTransfers, readCareTransferRecord,
     requestCareTransfer, requestGeneralCareTransfer, setCareTransferPreference, type CareTransfer, type CareTransferContext, type CareTransferRecord,
 } from "../services/clinicalCareAccessApi";
 
@@ -19,7 +19,7 @@ const isPending = (transfer: CareTransfer) => transfer.status === "PENDING"
     && (transfer.kind === "GENERAL" || (transfer.expiresAt !== null && Date.parse(transfer.expiresAt) > Date.now()));
 const patientName = (patient: CareTransferContext["patient"]) => [patient.prenom, patient.nom].filter(Boolean).join(" ");
 
-const messages = { general: "sent", send: "sent", accept: "accepted", decline: "declined", cancel: "cancelled" } as const;
+const messages = { general: "sent", extend: "extended", send: "sent", accept: "accepted", decline: "declined", cancel: "cancelled" } as const;
 type TransferAction = keyof typeof messages;
 function transferErrorSource(code: string) {
     switch (code) {
@@ -47,12 +47,13 @@ export function PatientCareTransferPage() {
 function CareTransfers({ sender, patientId, initialPreference }: { sender: boolean; patientId: string | null; initialPreference: boolean | null }) {
     const text = useUiLabelTree(labels);
     const shared = useUiLabelTree(UI_LABELS_FR.clinicalCareAccess);
-    const { locale } = useUiLabels();
+    const { locale, t } = useUiLabels();
     const [transfers, setTransfers] = useState<CareTransfer[]>([]);
     const [context, setContext] = useState<CareTransferContext | null>(null);
     const [record, setRecord] = useState<CareTransferRecord | null>(null);
     const [target, setTarget] = useState("");
     const [consent, setConsent] = useState(false);
+    const [allLocal, setAllLocal] = useState(false);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -60,6 +61,7 @@ function CareTransfers({ sender, patientId, initialPreference }: { sender: boole
     const [acceptsNewPatients, setAcceptsNewPatients] = useState(initialPreference);
     const epoch = useRef(0);
     const writing = useRef(false);
+    const selectedClinic = useRef<string | undefined>(undefined);
 
     const savePreference = async (value: boolean) => {
         if (writing.current) return;
@@ -78,22 +80,27 @@ function CareTransfers({ sender, patientId, initialPreference }: { sender: boole
         const request = ++epoch.current;
         setLoading(true);
         setError(notice);
+        setAllLocal(false);
         setTarget("");
         setConsent(false);
         setRecord(null);
         const [list, candidate] = await Promise.all([
             listCareTransfers(),
-            patientId ? getCareTransferContext(patientId) : null,
+            patientId ? getCareTransferContext(patientId, selectedClinic.current) : null,
         ]);
         if (request !== epoch.current) return;
         setLoading(false);
         if ("error" in list) setError(transferErrorSource(list.error.code));
         else setTransfers(list.data);
         if (candidate && "error" in candidate) {
+            selectedClinic.current = undefined;
             setContext(null);
             setError(transferErrorSource(candidate.error.code));
         }
-        else if (candidate) setContext(candidate.data);
+        else if (candidate) {
+            selectedClinic.current = candidate.data.clinicId ?? undefined;
+            setContext(candidate.data);
+        }
     }, [patientId]);
 
     useEffect(() => {
@@ -156,12 +163,18 @@ function CareTransfers({ sender, patientId, initialPreference }: { sender: boole
         if (request !== epoch.current) return;
         setBusy(false);
         if ("error" in response) {
+            if ((action === "send" || action === "general") &&
+                (response.error.code === "TRANSFER_CLINIC_REQUIRED" || response.error.code === "FORBIDDEN")) {
+                selectedClinic.current = undefined;
+                await load(UI_LABELS_FR.clinicalCareAccess.unavailable);
+                return;
+            }
             if (action === "send" && response.error.code === "TRANSFER_RECIPIENT_UNAVAILABLE") {
                 await load(labels.recipientUnavailable);
                 return;
             }
-            if (action === "general" && response.error.code === "TRANSFER_RECIPIENT_AVAILABLE") {
-                await load(labels.directAvailable);
+            if (action === "extend" && response.error.code === "TRANSFER_EXTENSION_UNAVAILABLE") {
+                await load(labels.extensionChanged);
                 return;
             }
             if (transfer?.kind === "GENERAL" && response.error.code === "FORBIDDEN") {
@@ -183,11 +196,21 @@ function CareTransfers({ sender, patientId, initialPreference }: { sender: boole
         await load();
     };
 
+    const general = allLocal || context?.clinicians.length === 0;
+    const clinicName = context?.clinics.find(clinic => clinic._id === context.clinicId)?.nom;
+
+    const chooseGeneral = (value: boolean) => {
+        setAllLocal(value);
+        setTarget("");
+        setConsent(false);
+    };
+
     const send = () => {
-        if (!context || !consent) return;
-        if (!context.clinicians.length) return submit("general", () => requestGeneralCareTransfer(context.patient._id, consent));
+        const clinicId = context?.clinicId;
+        if (!context || !clinicId || !consent) return;
+        if (general) return submit("general", () => requestGeneralCareTransfer(context.patient._id, consent, clinicId));
         if (context.clinicians.some(clinician => clinician._id === target)) {
-            return submit("send", () => requestCareTransfer(context.patient._id, target, consent));
+            return submit("send", () => requestCareTransfer(context.patient._id, target, consent, clinicId));
         }
     };
 
@@ -218,10 +241,30 @@ function CareTransfers({ sender, patientId, initialPreference }: { sender: boole
         {sender && context && <section className="space-y-3 rounded border bg-white p-4">
             <h2 className="text-lg font-semibold">{text.sendHeading}</h2>
             <p className="font-semibold" translate="no">{patientName(context.patient)}</p>
-            {pendingForPatient ? <p>{text.alreadyPending}</p> :
+            {!pendingForPatient && context.clinics.length > 1 && <label className="block">{text.currentClinic}
+                <select className="ml-2 rounded border p-2" value={context.clinicId ?? ""} disabled={loading || busy}
+                    onChange={event => {
+                        selectedClinic.current = event.target.value || undefined;
+                        setMessage(null);
+                        void load();
+                    }}>
+                    <option value="">{t(UI_LABELS_FR.walkInArrival.chooseClinic)}</option>
+                    {context.clinics.map(clinic => <option key={clinic._id} value={clinic._id}>{clinic.nom}</option>)}
+                </select>
+            </label>}
+            {!pendingForPatient && context.clinics.length === 1 && <p>{text.currentClinic} · <strong translate="no">{context.clinics[0].nom}</strong></p>}
+            {!pendingForPatient && context.clinics.length === 0 && <p>{text.noClinic}</p>}
+            {pendingForPatient && <p>{text.alreadyPending}</p>}
+            {!pendingForPatient && context.clinicId &&
                 <form className="space-y-3" onSubmit={event => { event.preventDefault(); void send(); }}>
-                    <p>{context.clinicians.length ? text.terms : text.noPhysicians}</p>
-                    {context.clinicians.length > 0 && <label className="block">{text.choosePhysician}
+                    {context.clinicians.length ? <div className="flex flex-wrap gap-4">
+                        <label><input type="radio" name="audience" checked={!general} disabled={busy || loading}
+                            onChange={() => chooseGeneral(false)} /> {text.directMode}</label>
+                        <label><input type="radio" name="audience" checked={general} disabled={busy || loading}
+                            onChange={() => chooseGeneral(true)} /> {text.localMode}</label>
+                    </div> : <p>{text.noPhysicians}</p>}
+                    {!general && <p>{text.terms}</p>}
+                    {!general && <label className="block">{text.choosePhysician}
                         <select className="ml-2 rounded border p-2" value={target} disabled={busy || loading} onChange={event => {
                             setTarget(event.target.value);
                             setConsent(false);
@@ -232,9 +275,9 @@ function CareTransfers({ sender, patientId, initialPreference }: { sender: boole
                             </option>)}
                         </select>
                     </label>}
-                    <label className="flex items-start gap-2"><input type="checkbox" checked={consent} disabled={(context.clinicians.length > 0 && !target) || busy || loading}
-                        onChange={event => setConsent(event.target.checked)} />{context.clinicians.length ? text.consent : text.generalConsent}</label>
-                    <button type="submit" className={actionClass} disabled={!consent || busy || loading}>{context.clinicians.length ? text.send : text.sendGeneral}</button>
+                    <label className="flex items-start gap-2"><input type="checkbox" checked={consent} disabled={(!general && !target) || busy || loading}
+                        onChange={event => setConsent(event.target.checked)} />{general ? text.generalConsent.replace("{clinic}", () => clinicName ?? "") : text.consent}</label>
+                    <button type="submit" className={actionClass} disabled={!consent || busy || loading}>{general ? text.sendGeneral : text.send}</button>
                 </form>}
         </section>}
         <section className="space-y-3">
@@ -253,6 +296,9 @@ function CareTransfers({ sender, patientId, initialPreference }: { sender: boole
                         <span>{new Date(transfer.createdAt).toLocaleString(locale)}</span>
                         {pending && transfer.expiresAt && <span>{shared.expires.replace("{date}", new Date(transfer.expiresAt).toLocaleString(locale))}</span>}
                         {sender && pending && transfer.kind === "GENERAL" && transfer.reminderDue && <p role="status">{text.generalOverdue}</p>}
+                        {sender && transfer.kind === "GENERAL" && <GeneralCallScope key={transfer.nextClinic?._id ?? transfer._id}
+                            transfer={transfer} disabled={busy || loading} onExtend={clinicId =>
+                                submit("extend", () => extendGeneralCareTransfer(transfer._id, clinicId, true), transfer)} />}
                         {anonymous && <div className="space-y-2">
                             <p>{text.generalTerms}</p>
                             <button type="button" className={actionClass} disabled={busy || loading}
@@ -285,4 +331,33 @@ function CareTransfers({ sender, patientId, initialPreference }: { sender: boole
             </div>}
         </section>}
     </section>;
+}
+
+function GeneralCallScope({ transfer, disabled, onExtend }: {
+    transfer: CareTransfer; disabled: boolean; onExtend: (clinicId: string) => void;
+}) {
+    const text = useUiLabelTree(labels);
+    const [consent, setConsent] = useState(false);
+    const clinics = transfer.contactedClinics ?? [];
+    const next = transfer.nextClinic;
+    const pending = isPending(transfer);
+    if (!clinics.length) return pending ? <p>{text.legacyScope}</p> : null;
+
+    const atLimit = transfer.maxClinics !== undefined && clinics.length >= transfer.maxClinics;
+    return <div className="w-full space-y-2">
+        <p>{text.contactedClinics} · <span translate="no">{clinics.map(clinic => clinic.nom).join(", ")}</span></p>
+        {atLimit && <p>{text.clinicLimit.replace("{count}", String(transfer.maxClinics))}</p>}
+        {pending && !atLimit && (next ? <div className="space-y-2">
+            <p>{text.extensionHint}</p>
+            <label className="flex items-start gap-2">
+                <input type="checkbox" checked={consent} disabled={disabled} onChange={event => setConsent(event.target.checked)} />
+                {text.extensionConsent.replace("{clinic}", () => next.nom)}
+            </label>
+            <button type="button" className={actionClass} disabled={disabled || !consent} onClick={() => {
+                if (!consent) return;
+                setConsent(false);
+                onExtend(next._id);
+            }}>{text.extend}</button>
+        </div> : <p>{text.noNeighbor}</p>)}
+    </div>;
 }
