@@ -67,6 +67,22 @@ le dépôt ; les liens symboliques ne permettent pas de sortir de ce périmètre
 Les liens externes ne sont pas téléchargés : leur disponibilité HTTP ne fait
 pas partie de ce contrôle léger.
 
+## Validation sur GitHub du 21 novembre 2026
+
+Le premier push de la nouvelle branche `maintenance/docs-only-smoke-20261121`
+a validé le parcours documentaire avec le commit
+`64a2f3955d6de5e0c0819e1a456d900b10029545`. Le diff contenait uniquement un ajout
+dans `docs/ci-documentation.md`.
+
+- Les contrôles de classification, de format Markdown et de liens locaux ont réussi.
+- Les 11 étapes applicatives des jobs backend et frontend ont été ignorées.
+- Les deux jobs requis ont validé le résultat du contrôle documentaire.
+- Coolify comptait 62 déploiements avant et après le test, avec aucun déploiement actif.
+- La production est restée épinglée sur `46f8a98`.
+
+[Exécution CI vérifiée](https://github.com/pierrot70/ClinIA/actions/runs/44915282878) ·
+[Commit documentaire testé](https://github.com/pierrot70/ClinIA/commit/64a2f3955d6de5e0c0819e1a456d900b10029545)
+
 ## Rejouer les contrôles
 
 Depuis la racine, avec Git, Python 3 et Bash disponibles :
