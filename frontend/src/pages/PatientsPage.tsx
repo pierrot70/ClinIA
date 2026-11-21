@@ -29,6 +29,7 @@ import {
     WriteVerificationReceipt,
 } from "../components/system/WriteVerificationReceipt";
 import { PatientClinicalNotesModal } from "../components/clinical/PatientClinicalNotesModal";
+import { useCareTransferMode } from "../hooks/useCareTransferMode";
 import { useAuth } from "../hooks/useAuth";
 import {
     createPhysicianClinicalSupportRequest,
@@ -213,6 +214,7 @@ function usePatientsPageLabels(targetLang: string) {
 export function PatientsPage() {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { mode: transferMode } = useCareTransferMode(user);
     const canManageArchive = user?.role !== "IPS";
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
@@ -1170,7 +1172,7 @@ export function PatientsPage() {
                                         <button className="min-h-11 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-xs hover:bg-slate-50" onClick={() => handleEdit(p)}>{ui.edit}</button>
                                         <button className="min-h-11 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-xs hover:bg-slate-50" onClick={() => handleOpenClinicalNotes(p._id)}>{ui.clinicalNotesOpen}</button>
                                         {user?.role === "IPS" && p.ownerUserId === user.id && !p.archivedAt && <button type="button" className="col-span-2 rounded border border-blue-300 px-3 py-2 text-blue-800" onClick={() => setCareSharingPatient(p)}>{clinicalCareAccessLabels(targetLang).manage}</button>}
-                                        {user?.role === "IPS" && p.ownerUserId === user.id && !p.archivedAt && <button type="button" className="rounded border px-3 py-2 text-blue-800" onClick={() => navigate("/clinical-care-transfer", { state: { patientId: p._id } })}>{t(labels.patientCareTransfer.start)}</button>}
+                                        {transferMode === "sender" && user?.id && p.ownerUserId === user.id && !p.archivedAt && <button type="button" className="rounded border px-3 py-2 text-blue-800" onClick={() => navigate("/clinical-care-transfer", { state: { patientId: p._id } })}>{t(labels.patientCareTransfer.start)}</button>}
                                         {user?.role === "MEDECIN" && <button type="button" className="col-span-2 min-h-11 rounded border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 shadow-xs disabled:opacity-60" disabled={supportRequestPatientIds.has(p._id)} onClick={() => void handleRequestSupport(p)}>{supportRequestPatientIds.has(p._id) ? ui.supportRequestPending : ui.requestSupport}</button>}
                                         {canManageArchive && <button className="col-span-2 min-h-11 rounded border border-amber-400 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 shadow-xs" disabled={busyIds[p._id]} onClick={() => handleArchive(p._id)}>{ui.archiveLabel}</button>}
                                     </>)}
@@ -1336,7 +1338,7 @@ export function PatientsPage() {
                                                     {ui.clinicalNotesOpen}
                                                 </button>
                                                 {user?.role === "IPS" && p.ownerUserId === user.id && !p.archivedAt && <button type="button" className="rounded border px-3 py-1 text-blue-700" onClick={() => setCareSharingPatient(p)}>{clinicalCareAccessLabels(targetLang).manage}</button>}
-                                                {user?.role === "IPS" && p.ownerUserId === user.id && !p.archivedAt && <button type="button" className="rounded border px-3 py-2 text-blue-800" onClick={() => navigate("/clinical-care-transfer", { state: { patientId: p._id } })}>{t(labels.patientCareTransfer.start)}</button>}
+                                                {transferMode === "sender" && user?.id && p.ownerUserId === user.id && !p.archivedAt && <button type="button" className="rounded border px-3 py-2 text-blue-800" onClick={() => navigate("/clinical-care-transfer", { state: { patientId: p._id } })}>{t(labels.patientCareTransfer.start)}</button>}
                                                 {user?.role === "MEDECIN" && (
                                                     <button
                                                         type="button"

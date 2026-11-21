@@ -47,11 +47,14 @@ type TransferPatient = SharedCareRecord["patient"];
 
 export interface CareTransfer {
     _id: string;
-    patientId: string;
-    targetUserId: string;
+    kind: "DIRECT" | "GENERAL";
+    reminderDue: boolean;
+    reminderAt: string | null;
+    patientId: string | null;
+    targetUserId: string | null;
     status: CareTransferStatus;
     createdAt: string;
-    expiresAt: string;
+    expiresAt: string | null;
     consentRecordedAt: string;
     resolvedAt: string | null;
     patient?: TransferPatient | null;
@@ -91,11 +94,20 @@ export function careGrantIsActive(grant: CareGrant, now = Date.now()) {
     return grant.status === "ACTIVE" && grant.permission === "READ_APPEND" && Number.isFinite(Date.parse(grant.expiresAt)) && Date.parse(grant.expiresAt) > now;
 }
 
+export const getGeneralTransferNotice = () =>
+    request<{ overdueCount: number; nextReminderAt: string | null; incomingGeneral: boolean }>("/transfer-reminder");
+
+export const getCareTransferCapabilities = () =>
+    request<{ canInitiate: boolean; acceptsNewPatients: boolean | null }>("/transfer-capabilities");
+export const setCareTransferPreference = (acceptsNewPatients: boolean) =>
+    request<{ acceptsNewPatients: boolean }>("/transfer-preference", { acceptsNewPatients });
 export const getCareTransferContext = (patientId: string) =>
     request<CareTransferContext>("/patients/" + encodeURIComponent(patientId) + "/transfer-context");
 export const listCareTransfers = () => request<CareTransfer[]>("/transfers");
 export const requestCareTransfer = (patientId: string, targetUserId: string, patientConsent: boolean) =>
     request<CareTransfer>("/patients/" + encodeURIComponent(patientId) + "/transfers", { targetUserId, patientConsent });
+export const requestGeneralCareTransfer = (patientId: string, patientConsent: boolean) =>
+    request<CareTransfer>("/patients/" + encodeURIComponent(patientId) + "/general-transfer", { patientConsent });
 export const readCareTransferRecord = (transferId: string) =>
     request<CareTransferRecord>("/transfers/" + encodeURIComponent(transferId) + "/record");
 export const decideCareTransfer = (transferId: string, decision: "accept" | "decline") =>

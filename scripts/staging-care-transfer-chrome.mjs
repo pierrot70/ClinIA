@@ -1,6 +1,7 @@
 // Call the exported steps with a Chrome tab and disposable staging fixtures:
 // { ips: { username, password }, physician: { username, password },
 //   patient: { surname, firstName, updatedFirstName, originalNote } }.
+// The disposable family physician must opt in to new patients on the transfers page before the IPS step.
 // The split steps allow a reviewer to inspect the pending and read-only screens.
 const staging = "http://localhost:5174";
 const visible = { state: "visible", timeout: 15000 };

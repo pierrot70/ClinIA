@@ -71,6 +71,8 @@ const AdminUserSchema = new mongoose.Schema({
         type: Date,
         default: null,
     },
+    // Transfer acceptance is personal to the account. Missing is an opt-out.
+    acceptsNewPatients: { type: Boolean, select: false },
     clinicianCommentsInboxSeenAt: {
         type: Date,
         default: null,

@@ -50,7 +50,10 @@ beforeEach(async () => {
     expect(await mongoose.connection.db.listCollections().toArray()).toHaveLength(0); ownsDatabase = true;
     for (const model of Object.values(mongoose.models)) { await model.createCollection(); await model.createIndexes(); }
     users = {}; tokens = {};
-    for (const [name, role, specialty] of [["ips", "IPS", "IPS"], ["doctor", "MEDECIN", "Urgentologue"], ["other", "MEDECIN", "Medecin de famille"], ["reception", "RECEPTION", null]]) {
+    for (const [name, role, specialty] of [
+        ["ips", "IPS", "IPS"], ["doctor", "MEDECIN", "Urgentologue"], ["other", "MEDECIN", "Medecin de famille"],
+        ["secondFamily", "MEDECIN", "Médecine familiale"], ["reception", "RECEPTION", null],
+    ]) {
         const sid = randomUUID();
         const user = await AdminUser.create({ username: `synthetic_care_${name}`, email: `synthetic-care-${name}@example.invalid`, role, isActive: true,
             passwordHash: "SYNTHETIC_NOT_A_LOGIN_PASSWORD", authVersion: 0, activeSessionIds: [sid], sessionStartedAt: new Date(), lastActivityAt: new Date() });
@@ -158,12 +161,58 @@ describe("dedicated, revocable IPS care sharing on a real disposable replica set
     });
 });
 
-describe("permanent transfer from IPS to a family physician", () => {
+describe("permanent transfer to a family physician", () => {
     const ask = (body = {}, sender = "ips") => request("/patients/" + patient._id + "/transfers", sender, {
         targetUserId: String(users.other._id), patientConsent: true, ...body,
     });
+    const preference = (actor, acceptsNewPatients) => request("/transfer-preference", actor, { acceptsNewPatients });
+    beforeEach(async () => {
+        await AdminUser.updateOne({ _id: users.other._id }, { $set: { acceptsNewPatients: true } });
+    });
+
     const path = (transfer, action) => "/transfers/" + transfer.data._id + "/" + action;
     const owner = async () => String((await Patient.findById(patient._id).lean()).ownerUserId);
+
+    it("lets only a family physician change their personal explicit preference, including a legacy account", async () => {
+        await AdminUser.collection.updateOne({ _id: users.other._id }, { $unset: { acceptsNewPatients: "" } });
+        const capabilities = () => request("/transfer-capabilities", "other");
+        expect((await capabilities()).data).toEqual({ canInitiate: false, acceptsNewPatients: false });
+        for (const actor of ["ips", "doctor", "reception"]) {
+            expect((await preference(actor, true)).status).toBe(403);
+        }
+        expect((await request("/transfer-preference", "other", { acceptsNewPatients: true, targetUserId: String(users.doctor._id) })).status).toBe(400);
+        expect((await preference("other", "true")).status).toBe(400);
+        expect((await capabilities()).data.acceptsNewPatients).toBe(false);
+        expect((await request("/patients/" + patient._id + "/transfer-context", "ips")).data.clinicians).toEqual([]);
+        expect((await preference("other", true)).status).toBe(200);
+        expect((await capabilities()).data.acceptsNewPatients).toBe(true);
+        await Specialist.updateOne({ accountUserId: users.doctor._id }, { $set: { specialite: "Medecin de famille" } });
+        expect((await request("/transfer-capabilities", "doctor")).data.acceptsNewPatients).toBe(false);
+        const directory = await request("/patients/" + patient._id + "/transfer-context", "ips");
+        expect(directory.data.clinicians.map(user => user._id)).toEqual([String(users.other._id)]);
+    });
+
+    it.each(["ips", "doctor"])("rechecks the family physician opt-in at submission and preserves earlier requests (%s)", async sender => {
+        await Patient.updateOne({ _id: patient._id }, { $set: { ownerUserId: users[sender]._id } });
+        const directory = () => request("/patients/" + patient._id + "/transfer-context", sender);
+        expect((await directory()).data.clinicians.map(user => user._id)).toEqual([String(users.other._id)]);
+        expect((await preference("other", false)).status).toBe(200);
+        expect((await directory()).data.clinicians).toEqual([]);
+        const staleSelection = await ask({}, sender);
+        expect(staleSelection.status).toBe(409);
+        expect(staleSelection.error.code).toBe("TRANSFER_RECIPIENT_UNAVAILABLE");
+        expect(await PatientCareTransfer.countDocuments()).toBe(0);
+        expect(await owner()).toBe(String(users[sender]._id));
+        expect((await preference("other", true)).status).toBe(200);
+        const transfer = await ask({}, sender);
+        expect(transfer.status).toBe(201);
+        expect((await preference("other", false)).status).toBe(200);
+        expect((await directory()).data.clinicians).toEqual([]);
+        expect((await request("/transfers", "other")).data.map(item => item._id)).toEqual([transfer.data._id]);
+        expect((await request(path(transfer, "record"), "other")).status).toBe(200);
+        expect((await request(path(transfer, "decision"), "other", { decision: "accept" })).status).toBe(200);
+        expect(await owner()).toBe(String(users.other._id));
+    });
 
     it("records consent, permits only the designated doctor to review, and grants the ordinary patient rights on acceptance", async () => {
         const context = "/patients/" + patient._id + "/transfer-context";
@@ -220,21 +269,96 @@ describe("permanent transfer from IPS to a family physician", () => {
         expect(await PatientAuditLog.countDocuments({ patientId: patient._id, action: "PATIENT_CARE_ACCEPT", actorUserId: users.other._id })).toBe(1);
     });
 
-    it("stops the preview after decline, cancellation or expiry and retains the IPS as holder", async () => {
-        const refused = await ask();
+    it("lets an urgentologist transfer only their own patient, with consent, to the selected family physician", async () => {
+        const context = "/patients/" + patient._id + "/transfer-context";
+        const patientPath = "/api/patients/" + patient._id;
+        const urgentologistId = String(users.doctor._id);
+        const familyId = String(users.other._id);
+
+        expect((await request("/transfer-capabilities", "ips")).data).toEqual({ canInitiate: true, acceptsNewPatients: null });
+        expect((await request("/transfer-capabilities", "doctor")).data).toEqual({ canInitiate: true, acceptsNewPatients: null });
+        expect((await request("/transfer-capabilities", "other")).data).toEqual({ canInitiate: false, acceptsNewPatients: true });
+        expect((await request("/transfer-capabilities", "reception")).status).toBe(403);
+
+        // Ownership and specialty are independent requirements for the sender.
+        expect((await request(context, "doctor")).status).toBe(403);
+        expect((await ask({}, "doctor")).status).toBe(403);
+        await Patient.updateOne({ _id: patient._id }, { $set: { ownerUserId: users.doctor._id } });
+        await Specialist.updateOne({ accountUserId: users.doctor._id }, { $set: { specialite: "Cardiologue" } });
+        expect((await request(context, "doctor")).status).toBe(403);
+        expect((await ask({}, "doctor")).status).toBe(403);
+        await Specialist.updateOne({ accountUserId: users.doctor._id }, { $set: { specialite: "Urgentologue" } });
+
+        const directory = await request(context, "doctor");
+        expect(directory.status).toBe(200);
+        expect(directory.data.clinicians.map(user => user._id)).toEqual([familyId]);
+        expect((await ask({ patientConsent: false }, "doctor")).error.code).toBe("TRANSFER_CONSENT_REQUIRED");
+        expect((await ask({ targetUserId: urgentologistId }, "doctor")).status).toBe(403);
+        expect((await request("/patients/" + patient._id + "/grants", "doctor")).status).toBe(403);
+        expect(await PatientCareTransfer.countDocuments()).toBe(0);
+
+        const transfer = await ask({}, "doctor");
+        expect(transfer.status).toBe(201);
+        expect(transfer.data).toMatchObject({ status: "PENDING", consentRecordedAt: expect.any(String) });
+        expect(await owner()).toBe(urgentologistId);
+        for (const account of ["doctor", "other"]) {
+            expect((await request("/transfers", account)).data.map(item => item._id)).toEqual([transfer.data._id]);
+        }
+        expect((await request(path(transfer, "decision"), "doctor", { decision: "accept" })).status).toBe(403);
+        expect((await request(path(transfer, "cancel"), "ips", {})).status).toBe(403);
+        expect((await request(path(transfer, "record"), "other")).data.profile.clinicalNotes).toBe("Original unchanged synthetic note");
+        expect((await request(patientPath, "other", { prenom: "Too early" }, "PATCH")).status).toBe(404);
+        const accepted = await request(path(transfer, "decision"), "other", { decision: "accept" });
+        expect(accepted.status).toBe(200);
+        expect(accepted.data.status).toBe("ACCEPTED");
+        expect(await owner()).toBe(familyId);
+        expect((await request(patientPath, "doctor", { prenom: "Former owner" }, "PATCH")).status).toBe(404);
+        expect((await request(patientPath, "other", { prenom: "New holder" }, "PATCH")).status).toBe(200);
+        expect((await Patient.findById(patient._id).lean()).prenom).toBe("New holder");
+        expect((await request("/transfers", "doctor")).data[0]).toMatchObject({ status: "ACCEPTED", patient: null });
+        expect(await WriteOperationAuditLog.countDocuments({
+            collectionName: "patientcaretransfers", resourceId: transfer.data._id, operation: "CREATE",
+            actorUserId: users.doctor._id, actorRole: "MEDECIN",
+        })).toBe(1);
+    });
+
+    it("continues to authorize pending IPS transfers recorded before issuer roles were stored", async () => {
+        const transfer = await ask();
+        const transferId = new mongoose.Types.ObjectId(transfer.data._id);
+        await PatientCareTransfer.collection.updateOne({ _id: transferId }, { $unset: { issuerRole: "" } });
+        expect((await request("/transfers", "ips")).data.map(item => item._id)).toEqual([transfer.data._id]);
+        expect((await request(path(transfer, "record"), "other")).status).toBe(200);
+        expect((await request(path(transfer, "decision"), "other", { decision: "accept" })).status).toBe(200);
+        expect(await owner()).toBe(String(users.other._id));
+    });
+
+    it("withdraws temporary access when the issuing urgentologist no longer has the qualifying specialty", async () => {
+        await Patient.updateOne({ _id: patient._id }, { $set: { ownerUserId: users.doctor._id } });
+        const transfer = await ask({}, "doctor");
+        expect(transfer.status).toBe(201);
+        await Specialist.updateOne({ accountUserId: users.doctor._id }, { $set: { specialite: "Cardiologue" } });
+        expect((await request("/transfers", "other")).data).toEqual([]);
+        expect((await request(path(transfer, "record"), "other")).status).toBe(403);
+        expect((await request(path(transfer, "decision"), "other", { decision: "accept" })).status).toBe(403);
+        expect(await owner()).toBe(String(users.doctor._id));
+    });
+
+    it.each(["ips", "doctor"])("stops the preview after decline, cancellation or expiry and retains the holder (%s)", async sender => {
+        await Patient.updateOne({ _id: patient._id }, { $set: { ownerUserId: users[sender]._id } });
+        const refused = await ask({}, sender);
         expect((await request(path(refused, "decision"), "other", { decision: "decline" })).data.status).toBe("DECLINED");
         expect((await request(path(refused, "record"), "other")).status).toBe(403);
-        const withdrawn = await ask();
-        expect((await request(path(withdrawn, "cancel"), "ips", {})).data.status).toBe("CANCELLED");
+        const withdrawn = await ask({}, sender);
+        expect((await request(path(withdrawn, "cancel"), sender, {})).data.status).toBe("CANCELLED");
         expect((await request(path(withdrawn, "record"), "other")).status).toBe(403);
-        const expired = await ask();
+        const expired = await ask({}, sender);
         await PatientCareTransfer.collection.updateOne({ _id: new mongoose.Types.ObjectId(expired.data._id) }, { $set: { expiresAt: new Date(Date.now() - 60000) } });
         expect((await request(path(expired, "record"), "other")).status).toBe(403);
         expect((await request(path(expired, "decision"), "other", { decision: "accept" })).status).toBe(403);
         expect((await request("/transfers", "other")).data).toEqual([]);
-        expect((await ask()).status).toBe(201);
+        expect((await ask({}, sender)).status).toBe(201);
         expect((await PatientCareTransfer.findById(expired.data._id).lean()).status).toBe("EXPIRED");
-        expect(await owner()).toBe(String(users.ips._id));
+        expect(await owner()).toBe(String(users[sender]._id));
     });
 
     it("preserves both records if the receiving physician already has an identifier in conflict", async () => {
@@ -272,5 +396,148 @@ describe("permanent transfer from IPS to a family physician", () => {
         const persisted = await PatientCareTransfer.findById(transfer.data._id).lean();
         expect(["ACCEPTED", "CANCELLED"]).toContain(persisted.status);
         expect(await owner()).toBe(String(persisted.status === "ACCEPTED" ? users.other._id : users.ips._id));
+    });
+});
+
+describe("anonymous general calls for a family physician", () => {
+    const general = (actor, body = { patientConsent: true }) =>
+        request("/patients/" + patient._id + "/general-transfer", actor, body);
+    const accept = (id, actor) => request("/transfers/" + id + "/decision", actor, { decision: "accept" });
+    const reminder = actor => request("/transfer-reminder", actor);
+    const setPreference = acceptsNewPatients => request("/transfer-preference", "other", { acceptsNewPatients });
+    const direct = () => request("/patients/" + patient._id + "/transfers", "ips", {
+        targetUserId: String(users.other._id), patientConsent: true,
+    });
+    const owner = async () => String((await Patient.findById(patient._id).lean()).ownerUserId);
+
+    it.each(["ips", "doctor"])("requires consent from the owning %s and an empty direct directory", async issuer => {
+        await Patient.updateOne({ _id: patient._id }, { $set: { ownerUserId: users[issuer]._id } });
+        const nonOwner = issuer === "ips" ? "doctor" : "ips";
+        expect((await general(nonOwner)).status).toBe(403);
+        expect((await general("reception")).status).toBe(403);
+        expect((await general("other")).status).toBe(403);
+        expect((await general(issuer, { patientConsent: false })).error.code).toBe("TRANSFER_CONSENT_REQUIRED");
+        expect((await general(issuer, { patientConsent: true, targetUserId: String(users.other._id) })).status).toBe(400);
+        expect((await setPreference(true)).status).toBe(200);
+        expect(await general(issuer)).toMatchObject({ status: 409, error: { code: "TRANSFER_RECIPIENT_AVAILABLE" } });
+        expect(await PatientCareTransfer.countDocuments()).toBe(0);
+        expect((await setPreference(false)).status).toBe(200);
+        const call = await general(issuer);
+        expect(call.status).toBe(201);
+        expect(call.data).toMatchObject({ kind: "GENERAL", status: "PENDING", consentRecordedAt: expect.any(String) });
+        expect(await general(issuer)).toMatchObject({ status: 409, error: { code: "TRANSFER_ALREADY_PENDING" } });
+        expect(await PatientCareTransfer.countDocuments()).toBe(1);
+        for (const candidate of ["other", "secondFamily"]) {
+            const list = await request("/transfers", candidate);
+            expect(list.status).toBe(200);
+            expect(list.data).toHaveLength(1);
+            const [invitation] = list.data;
+            expect(invitation).toMatchObject({ _id: call.data._id, patient: null, patientId: null, targetUserId: null, professional: "" });
+            const payload = JSON.stringify(list.data);
+            for (const sensitive of [String(patient._id), patient.nom, patient.prenom, patient.num_assurance_maladie, patient.telephone,
+                patient.courriel, String(users[issuer]._id), users[issuer].username, "Original unchanged synthetic note", "PRIVATE_STORAGE_KEY"]) {
+                expect(payload).not.toContain(sensitive);
+            }
+            expect((await reminder(candidate)).data.incomingGeneral).toBe(true);
+            expect((await request("/transfers/" + call.data._id + "/record", candidate)).status).toBe(403);
+            expect((await request("/transfers/" + call.data._id + "/decision", candidate, { decision: "decline" })).status).toBe(403);
+            expect((await request("/api/patients/" + patient._id, candidate)).status).toBe(404);
+        }
+        expect((await request("/transfers", nonOwner)).data).toEqual([]);
+        expect((await reminder(nonOwner)).data.incomingGeneral).toBe(false);
+        expect((await accept(call.data._id, nonOwner)).status).toBe(403);
+        expect(await owner()).toBe(String(users[issuer]._id));
+    });
+
+    it("allows exactly one of two general-call volunteers to acquire the record, even if neither accepts direct requests", async () => {
+        const call = await general("ips");
+        expect(call.status).toBe(201);
+        // An overdue reminder does not close the invitation.
+        await PatientCareTransfer.collection.updateOne({ _id: new mongoose.Types.ObjectId(call.data._id) }, {
+            $set: { createdAt: new Date(Date.now() - 49 * 60 * 60 * 1000) },
+        });
+        const candidates = ["other", "secondFamily"];
+        const attempts = await Promise.all(candidates.map(actor => accept(call.data._id, actor)));
+        expect(attempts.map(reply => reply.status).sort()).toEqual([200, 403]);
+        const winnerIndex = attempts.findIndex(reply => reply.status === 200);
+        const winner = candidates[winnerIndex], loser = candidates[1 - winnerIndex];
+        expect(attempts[winnerIndex].data).toMatchObject({
+            status: "ACCEPTED", targetUserId: String(users[winner]._id), patientId: String(patient._id),
+        });
+        expect(await owner()).toBe(String(users[winner]._id));
+        expect((await request("/api/patients/" + patient._id, winner, { prenom: "New general holder" }, "PATCH")).status).toBe(200);
+        expect((await request("/api/patients/" + patient._id, loser)).status).toBe(404);
+        expect((await request("/transfers/" + call.data._id + "/record", loser)).status).toBe(403);
+        expect((await request("/transfers", loser)).data).toEqual([]);
+        expect((await reminder(loser)).data.incomingGeneral).toBe(false);
+        expect((await request("/api/patients/" + patient._id, "ips")).status).toBe(404);
+        expect(await PatientAuditLog.countDocuments({ patientId: patient._id, action: "PATIENT_CARE_ACCEPT" })).toBe(1);
+    });
+
+    it("shares one pending transfer slot between direct and general requests", async () => {
+        expect((await setPreference(true)).status).toBe(200);
+        const first = await direct();
+        expect(first.status).toBe(201);
+        expect((await setPreference(false)).status).toBe(200);
+        expect(await general("ips")).toMatchObject({ status: 409, error: { code: "TRANSFER_ALREADY_PENDING" } });
+        expect((await request("/transfers/" + first.data._id + "/cancel", "ips", {})).status).toBe(200);
+        const second = await general("ips");
+        expect(second.status).toBe(201);
+        expect((await setPreference(true)).status).toBe(200);
+        expect(await direct()).toMatchObject({ status: 409, error: { code: "TRANSFER_ALREADY_PENDING" } });
+        expect(await PatientCareTransfer.countDocuments({ status: "PENDING" })).toBe(1);
+    });
+
+    it("returns all open general invitations even after more than 100 calls and 100 more recent decisions", async () => {
+        const start = new Date(Date.now() - 49 * 60 * 60 * 1000);
+        const openPatients = Array.from({ length: 101 }, (_, i) => ({
+            _id: new mongoose.Types.ObjectId(), ownerUserId: users.ips._id, nom: "Synthetic", prenom: "Fixture " + i,
+        }));
+        await Patient.collection.insertMany(openPatients);
+        const invitations = openPatients.map(record => ({
+            _id: new mongoose.Types.ObjectId(), kind: "GENERAL", patientId: record._id, issuerUserId: users.ips._id,
+            issuerRole: "IPS", status: "PENDING", createdAt: start, consentRecordedAt: start,
+        }));
+        await PatientCareTransfer.collection.insertMany(invitations);
+        const now = new Date();
+        await PatientCareTransfer.collection.insertMany(Array.from({ length: 101 }, () => ({
+            kind: "GENERAL", patientId: patient._id, issuerUserId: users.ips._id, issuerRole: "IPS",
+            status: "CANCELLED", createdAt: now, consentRecordedAt: now, resolvedAt: now,
+        })));
+        const ids = invitations.map(item => String(item._id)).sort();
+        const candidate = await request("/transfers", "other");
+        expect(candidate.data.map(item => item._id).sort()).toEqual(ids);
+        expect(candidate.data.every(item => item.patient === null && item.patientId === null)).toBe(true);
+        const issuer = await request("/transfers", "ips");
+        expect(issuer.data.filter(item => item.status === "PENDING").map(item => item._id).sort()).toEqual(ids);
+        expect((await reminder("ips")).data.overdueCount).toBe(101);
+    });
+
+    it("reminds the current issuer after 48 hours, keeps the call open and clears the reminder on cancellation", async () => {
+        const call = await general("ips");
+        expect(call.status).toBe(201);
+        const id = call.data._id;
+        const before = await reminder("ips");
+        expect(before.data.overdueCount).toBe(0);
+        const elapsed = Date.parse(before.data.nextReminderAt) - Date.parse(call.data.createdAt);
+        expect(elapsed).toBe(48 * 60 * 60 * 1000);
+        await PatientCareTransfer.collection.updateOne({ _id: new mongoose.Types.ObjectId(id) }, {
+            $set: { createdAt: new Date(Date.now() - 49 * 60 * 60 * 1000) },
+        });
+        expect((await reminder("ips")).data.overdueCount).toBe(1);
+        expect((await request("/transfers", "ips")).data[0]).toMatchObject({ status: "PENDING", reminderDue: true });
+        expect((await reminder("other")).data.overdueCount).toBe(0);
+        expect((await request("/transfers", "other")).data[0]).toMatchObject({ status: "PENDING", patientId: null });
+        await Patient.updateOne({ _id: patient._id }, { $set: { ownerUserId: users.doctor._id } });
+        expect((await reminder("ips")).data.overdueCount).toBe(0);
+        expect((await request("/transfers", "other")).data).toEqual([]);
+        expect((await reminder("other")).data.incomingGeneral).toBe(false);
+        expect((await accept(id, "other")).status).toBe(403);
+        await Patient.updateOne({ _id: patient._id }, { $set: { ownerUserId: users.ips._id } });
+        expect((await request("/transfers/" + id + "/cancel", "doctor", {})).status).toBe(403);
+        expect((await request("/transfers/" + id + "/cancel", "ips", {})).data.status).toBe("CANCELLED");
+        expect((await reminder("ips")).data).toMatchObject({ overdueCount: 0, nextReminderAt: null });
+        expect((await accept(id, "other")).status).toBe(403);
+        expect(await owner()).toBe(String(users.ips._id));
     });
 });

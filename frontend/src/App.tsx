@@ -7,6 +7,7 @@ import TreatmentDetails from "./pages/TreatmentDetails";
 import QuickMode from "./pages/QuickMode";
 import PatientSummary from "./pages/PatientSummary";
 import Header from "./components/Header";
+import { GeneralTransferNotice } from "./components/clinical/GeneralTransferNotice";
 import { AvailabilityReminder } from "./components/AvailabilityReminder";
 import { isClinicianRole } from "./auth/roles";
 import Footer from "./components/Footer";
@@ -212,6 +213,7 @@ function CoolifyLandingPage() {
 const App: React.FC = () => {
     const i18n = useContext(HomeI18nContext) || { locale: "fr" };
     const targetLang = i18n.locale;
+    const { pathname } = useLocation();
     const { user, isAuthenticated, loginVersion, passwordResetRequired, mustChangePasswordOnNextLogin } = useAuth();
     const { clinics, activeClinic, isLoading: clinicLoading, changeClinic } = useReceptionClinic();
     const receptionClinic = isAuthenticated && user?.role === "RECEPTION" && !clinicLoading && activeClinic
@@ -279,6 +281,11 @@ const App: React.FC = () => {
             {isAuthenticated && loginVersion > 0 && isClinicianRole(user?.role)
                 && !passwordResetRequired && !mustChangePasswordOnNextLogin && (
                     <AvailabilityReminder key={loginVersion} />
+                )}
+            {isAuthenticated && (user?.role === "IPS" || user?.role === "MEDECIN")
+                && !passwordResetRequired && !mustChangePasswordOnNextLogin && !blockingIncident
+                && pathname !== "/clinical-care-transfer" && (
+                    <GeneralTransferNotice key={user.id + ":" + loginVersion} />
                 )}
             {blockingIncident && (
                 <SecurityBlockingAlert

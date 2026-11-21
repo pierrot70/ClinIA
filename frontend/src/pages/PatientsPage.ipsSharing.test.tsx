@@ -1,10 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 import { PatientsPage } from "./PatientsPage";
-const state=vi.hoisted(()=>({user:{id:"synthetic-ips",role:"IPS"},list:vi.fn(),archive:vi.fn(),restore:vi.fn(),support:vi.fn()}));
+const state=vi.hoisted(()=>({user:{id:"synthetic-ips",role:"IPS"},list:vi.fn(),archive:vi.fn(),restore:vi.fn(),support:vi.fn(),capabilities:vi.fn()}));
+vi.mock("../services/clinicalCareAccessApi",()=>({getCareTransferCapabilities:state.capabilities}));
 vi.mock("../hooks/useAuth",()=>({useAuth:()=>({user:state.user,isAuthenticated:true})}));
 vi.mock("../services/patientsApi",async importOriginal=>({...await importOriginal<object>(),fetchPatientsPaginated:state.list,archivePatient:state.archive,restorePatient:state.restore}));
 vi.mock("../services/clinicalSupportAccessApi",()=>({listPhysicianClinicalSupportRequestStatuses:state.support,createPhysicianClinicalSupportRequest:vi.fn()}));
@@ -12,7 +13,7 @@ vi.mock("../components/clinical/OwnerCareSharing",()=>({OwnerCareSharing:({patie
 const patient={_id:"synthetic-patient",nom:"Test",prenom:"Fictif",num_assurance_maladie:"",ownerUserId:"synthetic-ips"};
 function Page(){return <MemoryRouter><HomeI18nContext.Provider value={{locale:"fr-CA"} as React.ContextType<typeof HomeI18nContext>}><PatientsPage/></HomeI18nContext.Provider></MemoryRouter>;}
 const copy=UI_LABELS_FR.patientsPage;
-beforeEach(()=>{vi.clearAllMocks();state.user={id:"synthetic-ips",role:"IPS"};state.list.mockResolvedValue({data:{data:[patient],meta:{page:1,limit:10,total:1,totalPages:1}},meta:{source:"real",model:"unknown"}});state.support.mockResolvedValue({data:[]});vi.stubGlobal("matchMedia",vi.fn(()=>({matches:false,addEventListener:vi.fn(),removeEventListener:vi.fn()})));});
+beforeEach(()=>{vi.clearAllMocks();state.user={id:"synthetic-ips",role:"IPS"};state.list.mockResolvedValue({data:{data:[patient],meta:{page:1,limit:10,total:1,totalPages:1}},meta:{source:"real",model:"unknown"}});state.support.mockResolvedValue({data:[]});state.capabilities.mockResolvedValue({data:{canInitiate:false}});vi.stubGlobal("matchMedia",vi.fn(()=>({matches:false,addEventListener:vi.fn(),removeEventListener:vi.fn()})));});
 afterEach(()=>{cleanup();vi.unstubAllGlobals();});
 describe("IPS own-patient sharing integration",()=>{
  it("exposes sharing from the list owner DTO on desktop and expanded mobile without archive actions",async()=>{
@@ -24,6 +25,22 @@ describe("IPS own-patient sharing integration",()=>{
    expect(state.list).toHaveBeenCalledWith(expect.objectContaining({archiveStatus:"active"}));expect(state.archive).not.toHaveBeenCalled();expect(state.restore).not.toHaveBeenCalled();expect(state.support).not.toHaveBeenCalled();
  });
  it.each([{ownerUserId:"other-owner"},{ownerUserId:undefined},{ownerUserId:"synthetic-ips",archivedAt:"2030-01-01T00:00:00Z"}])("keeps sharing hidden for foreign, missing owner or archived DTO %j",async fields=>{state.list.mockResolvedValue({data:{data:[{...patient,...fields}],meta:{page:1,total:1,totalPages:1}}});render(<Page/>);await screen.findAllByRole("button",{name:copy.table.edit});fireEvent.click(screen.getByRole("button",{name:new RegExp(copy.cards.expand)}));expect(screen.queryByRole("button",{name:UI_LABELS_FR.clinicalCareAccess.manage})).not.toBeInTheDocument();expect(screen.queryByTestId("sharing-patient")).not.toBeInTheDocument();});
- it("does not expose IPS owner sharing to a physician and preserves that role’s existing archive controls",async()=>{state.user={id:"synthetic-ips",role:"MEDECIN"};render(<Page/>);await screen.findAllByRole("button",{name:copy.table.edit});expect(screen.queryByRole("button",{name:UI_LABELS_FR.clinicalCareAccess.manage})).not.toBeInTheDocument();expect(screen.getByRole("button",{name:copy.tabs.archived})).toBeVisible();expect(screen.getByRole("button",{name:copy.table.archive})).toBeVisible();});
+ it("shows transfer actions only for an urgentologist's own active records on desktop and mobile",async()=>{
+    state.user = {id:"synthetic-urgentologist",role:"MEDECIN"};
+    state.capabilities.mockResolvedValue({data:{canInitiate:true}});
+    const own = {...patient,nom:"Responsable",ownerUserId:state.user.id};
+    const records = [own,{...patient,_id:"foreign",nom:"Autre"},{...own,_id:"archived",nom:"Archivé",archivedAt:"2030-01-01T00:00:00Z"}];
+    state.list.mockResolvedValue({data:{data:records,meta:{page:1,total:3,totalPages:1}}});
+    render(<Page/>);
+    const start = {name:UI_LABELS_FR.patientCareTransfer.start};
+    await screen.findByRole("button",start);
+    for (const card of screen.getAllByRole("article")) {
+        fireEvent.click(within(card).getByRole("button",{name:new RegExp(copy.cards.expand)}));
+        const ownsActiveRecord = within(card).queryByRole("heading", {name:"Fictif Responsable"}) !== null;
+        expect(within(card).queryAllByRole("button",start)).toHaveLength(ownsActiveRecord ? 1 : 0);
+    }
+    expect(screen.queryByRole("button",{name:UI_LABELS_FR.clinicalCareAccess.manage})).not.toBeInTheDocument();
+ });
+ it("does not expose IPS owner sharing to a physician and preserves that role’s existing archive controls",async()=>{state.user={id:"synthetic-ips",role:"MEDECIN"};render(<Page/>);await screen.findAllByRole("button",{name:copy.table.edit});expect(screen.queryByRole("button",{name:UI_LABELS_FR.clinicalCareAccess.manage})).not.toBeInTheDocument();expect(screen.queryByRole("button",{name:UI_LABELS_FR.patientCareTransfer.start})).not.toBeInTheDocument();expect(screen.getByRole("button",{name:copy.tabs.archived})).toBeVisible();expect(screen.getByRole("button",{name:copy.table.archive})).toBeVisible();});
  it("returns to active records if an existing archive view becomes an IPS session",async()=>{state.user={id:"synthetic-admin",role:"ADMIN"};const view=render(<Page/>);await screen.findAllByRole("button",{name:copy.table.edit});fireEvent.click(screen.getByRole("button",{name:copy.tabs.archived}));await waitFor(()=>expect(state.list).toHaveBeenLastCalledWith(expect.objectContaining({archiveStatus:"archived"})));state.user={id:"synthetic-ips",role:"IPS"};view.rerender(<Page/>);await waitFor(()=>expect(state.list).toHaveBeenLastCalledWith(expect.objectContaining({archiveStatus:"active"})));expect(screen.queryByRole("button",{name:copy.tabs.archived})).not.toBeInTheDocument();expect(screen.queryByRole("button",{name:copy.table.restore})).not.toBeInTheDocument();});
 });

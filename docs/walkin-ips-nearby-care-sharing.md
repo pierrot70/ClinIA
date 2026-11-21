@@ -72,8 +72,39 @@ ouverte à cette nouvelle IPS.
 
 La responsabilité permanente du dossier reste inchangée. La nouvelle IPS ne
 peut pas remplacer un responsable existant par le bouton de prise en charge,
-qui ne s’applique qu’aux dossiers sans responsable. Aucun parcours de transfert
-entre responsables n’est ajouté par cette évolution.
+qui ne s’applique qu’aux dossiers sans responsable.
+
+## Transfert à un médecin de famille
+
+Depuis **Patients**, l’IPS ou l’urgentologue responsable d’un dossier actif peut
+choisir **Transférer ce dossier**, sélectionner un médecin de famille actif et
+confirmer l’accord du patient. ClinIA vérifie la spécialité de l’urgentologue
+dans l’annuaire professionnel associé à son compte médecin.
+
+La liste propose uniquement les médecins de famille actifs qui ont indiqué
+dans la page des transferts qu’ils acceptent de nouveaux patients. Par défaut,
+un médecin reste absent de cette liste jusqu’à son accord explicite. Il peut
+modifier ce choix à tout moment. ClinIA vérifie encore sa disponibilité à
+l’envoi. Un retrait s’applique aux nouvelles demandes. Les demandes déjà
+reçues restent accessibles au médecin pour décision.
+
+Pour une demande adressée à un médecin en particulier, celui-ci dispose de 24 heures pour consulter le dossier en lecture
+seule et accepter ou refuser la demande. L’acceptation lui attribue le dossier
+et ses droits de modification. Un refus, un retrait par l’émetteur ou
+l’expiration laisse le dossier à son responsable actuel.
+
+### Appel général en l’absence de médecin disponible
+
+Quand la liste de destinataires est vide, l’IPS ou l’urgentologue responsable
+peut recueillir l’accord du patient pour un appel général. Tous les médecins
+de famille actifs peuvent alors voir l’invitation dans ClinIA, y compris ceux
+qui n’ont pas indiqué accepter de nouveaux patients. L’invitation est anonyme.
+Le premier médecin qui accepte obtient la responsabilité du dossier. Les
+autres médecins ne reçoivent aucun accès au dossier par cet appel.
+
+Après 48 heures sans acceptation, ClinIA signale la demande à son émetteur.
+Le délai sert de rappel : la demande reste ouverte jusqu’à sa prise en charge
+ou son retrait par l’émetteur. Ce suivi se fait dans l’application.
 
 ## Autorisation accordée à un médecin ou urgentologue
 
