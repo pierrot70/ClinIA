@@ -1,7 +1,9 @@
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -21,6 +23,7 @@ class ClassificationTests(unittest.TestCase):
         self.write("backend/index.js", "export const synthetic = true;\n")
         self.write("docs/start.md", "# Start\n")
         self.base = self.commit()
+        self.git("update-ref", "refs/remotes/origin/coolify", self.base)
 
     def git(self, *args):
         return subprocess.check_output(["git", "-C", str(self.root), *args], stderr=subprocess.DEVNULL).decode().strip()
@@ -34,6 +37,109 @@ class ClassificationTests(unittest.TestCase):
         self.git("add", "-A")
         self.git("commit", "-qm", "synthetic fixture")
         return self.git("rev-parse", "HEAD")
+
+    def new_branch_event(self, head, **overrides):
+        payload = {"before": "0" * 40, "after": head, "created": True,
+                   "deleted": False, "ref": "refs/heads/maintenance/synthetic-docs"}
+        payload.update(overrides)
+        path = self.root / ".git/event.json"
+        path.write_text(json.dumps(payload))
+        return path
+
+    def classify_new_branch(self, head, **overrides):
+        path = self.new_branch_event(head, **overrides)
+        base, event_head = classifier.event_range("push", path, self.root)
+        return classifier.classify(self.root, "push", base, event_head)
+
+    def test_new_branch_documentation_covers_every_commit(self):
+        self.write("docs/start.md", "# First change\n")
+        self.commit()
+        self.write("scripts/manual.md", "# Second change\n")
+        result = self.classify_new_branch(self.commit())
+        self.assertTrue(result["docs_only"])
+        self.assertEqual(result["changed_files"], ["docs/start.md", "scripts/manual.md"])
+
+    def test_new_branch_application_commit_before_documentation_requires_full_ci(self):
+        self.write("backend/index.js", "export const changed = true;\n")
+        self.commit()
+        self.write("docs/start.md", "# Later documentation\n")
+        result = self.classify_new_branch(self.commit())
+        self.assertFalse(result["docs_only"])
+        self.assertIn("backend/index.js", result["changed_files"])
+
+    def test_new_branch_uses_common_ancestor_when_coolify_has_advanced(self):
+        self.write("docs/start.md", "# Branch documentation\n")
+        head = self.commit()
+        self.git("checkout", "--detach", self.base)
+        self.write("backend/index.js", "export const upstream = true;\n")
+        advanced = self.commit()
+        self.git("update-ref", "refs/remotes/origin/coolify", advanced)
+        result = self.classify_new_branch(head)
+        self.assertTrue(result["docs_only"])
+        self.assertEqual(result["changed_files"], ["docs/start.md"])
+
+    def test_new_branch_missing_coolify_reference_requires_full_ci(self):
+        self.write("docs/start.md", "# Changed\n")
+        head = self.commit()
+        self.git("update-ref", "-d", "refs/remotes/origin/coolify")
+        self.assertFalse(self.classify_new_branch(head)["docs_only"])
+
+    def test_new_branch_disjoint_history_requires_full_ci(self):
+        self.git("checkout", "--orphan", "synthetic-unrelated")
+        self.write("docs/unrelated.md", "# Unrelated\n")
+        self.assertFalse(self.classify_new_branch(self.commit())["docs_only"])
+
+    def test_new_branch_shallow_history_requires_full_ci(self):
+        self.write("docs/start.md", "# Changed\n")
+        head = self.commit()
+        (self.root / ".git/shallow").write_text(head + "\n")
+        self.assertFalse(self.classify_new_branch(head)["docs_only"])
+
+    def test_new_branch_without_own_changes_requires_full_ci(self):
+        self.assertFalse(self.classify_new_branch(self.base)["docs_only"])
+
+    def test_new_branch_requires_explicit_created_flag(self):
+        self.write("docs/start.md", "# Changed\n")
+        head = self.commit()
+        for created in (None, False, "true", 1):
+            with self.subTest(created=created):
+                self.assertFalse(self.classify_new_branch(head, created=created)["docs_only"])
+
+    def test_new_branch_recovery_rejects_coolify_tags_and_deleted_refs(self):
+        self.write("docs/start.md", "# Changed\n")
+        head = self.commit()
+        for ref in ("refs/heads/coolify", "refs/tags/synthetic", "", None):
+            with self.subTest(ref=ref):
+                self.assertFalse(self.classify_new_branch(head, ref=ref)["docs_only"])
+        self.assertFalse(self.classify_new_branch(head, deleted=True)["docs_only"])
+
+    def test_new_branch_invalid_head_requires_full_ci(self):
+        for head in (None, "--not-a-ref", "0" * 40, "f" * 40):
+            with self.subTest(head=head):
+                self.assertFalse(self.classify_new_branch(head)["docs_only"])
+
+    def test_new_branch_rename_cannot_hide_application_code(self):
+        self.git("mv", "backend/index.js", "docs/renamed.md")
+        result = self.classify_new_branch(self.commit())
+        self.assertFalse(result["docs_only"])
+        self.assertIn("backend/index.js", result["changed_files"])
+
+    def test_new_branch_main_writes_documentation_output_from_github_payload(self):
+        self.write("docs/start.md", "# Changed\n")
+        head = self.commit()
+        event_path = self.new_branch_event(head)
+        script = self.root / "scripts/classify-ci-changes.py"
+        script.parent.mkdir(exist_ok=True)
+        script.write_text(Path(classifier.__file__).read_text())
+        manifest = self.root / ".git/changes.json"
+        output = self.root / ".git/github-output"
+        environment = {**os.environ, "GITHUB_EVENT_NAME": "push",
+                       "GITHUB_EVENT_PATH": str(event_path), "GITHUB_OUTPUT": str(output)}
+        result = subprocess.run([sys.executable, str(script), "--output", str(manifest)],
+                                env=environment, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(json.loads(manifest.read_text())["docs_only"])
+        self.assertEqual(output.read_text(), "docs_only=true\n")
 
     def test_documentation_only_and_exact_manifest(self):
         self.write("docs/folder/with spaces.md", "# Test\n")

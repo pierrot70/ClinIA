@@ -1,8 +1,8 @@
 # Contrôles CI pour les changements documentaires
 
-Une PR contenant uniquement des documents autorisés vérifie leur format et
-leurs liens locaux sans installer les dépendances applicatives, compiler le
-frontend ou démarrer MongoDB. Les deux contrôles requis gardent leurs noms
+Un changement contenant uniquement des documents autorisés vérifie leur format
+et leurs liens locaux, y compris lors du premier push sur une nouvelle branche
+de maintenance. Les deux contrôles requis gardent leurs noms
 `Backend tests and audit` et `Frontend tests, build and audit`.
 
 ## Choix du parcours
@@ -32,9 +32,18 @@ Les suppressions et les deux chemins d'un renommage participent au choix ;
 renommer du code en `.md` ne permet pas d'ignorer les tests applicatifs.
 
 Pour une PR, le diff va de l'ancêtre commun des SHA base/head à la tête de PR.
-Pour un push, il compare les SHA before/after. Une comparaison indisponible,
-un nouveau push sans SHA précédent, un changement vide ou un lancement manuel
-conserve le parcours applicatif complet.
+Pour un push sur une branche existante, il compare les SHA before/after.
+
+Lors de la création d'une branche, GitHub indique un SHA before composé de
+zéros. Le classificateur utilise alors l'ancêtre commun entre la tête poussée
+et la référence locale `refs/remotes/origin/coolify`, fournie par le checkout
+avec `fetch-depth: 0`. Le diff couvre tous les commits propres à la branche.
+Un commit applicatif suivi d'un commit documentaire exige donc le CI complet.
+
+Ce calcul s'applique aux créations de branches confirmées par l'événement
+GitHub. Une référence `coolify` absente, un historique incomplet, des historiques
+sans ancêtre commun, une comparaison vide ou ambiguë, la création de `coolify`
+elle-même ou un lancement manuel conservent le parcours applicatif complet.
 
 ## Vérifications documentaires
 

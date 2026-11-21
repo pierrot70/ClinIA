@@ -49,13 +49,26 @@ def classify(root, event, base, head):
     return result
 
 
-def event_range(event, event_file):
+def event_range(event, event_file, root=None):
     try:
         data = json.loads(Path(event_file).read_text(encoding="utf-8"))
         if event == "pull_request":
             return data["pull_request"]["base"]["sha"], data["pull_request"]["head"]["sha"]
-        return data.get("before"), data.get("after")
-    except (OSError, ValueError, KeyError, TypeError):
+        base, head = data.get("before"), data.get("after")
+        if event == "push" and data.get("created") is True and base in ("0" * 40, "0" * 64):
+            ref = data.get("ref")
+            if (root is None or not isinstance(head, str) or not SHA.fullmatch(head)
+                    or not head.strip("0") or not isinstance(ref, str)
+                    or not ref.startswith("refs/heads/") or ref == "refs/heads/coolify"
+                    or data.get("deleted") is not False):
+                return None, None
+            if git(root, "rev-parse", "--is-shallow-repository").strip() != b"false":
+                return None, None
+            # Include every branch commit, even when the last one only edits docs.
+            # checkout fetch-depth: 0 supplies this fixed comparison reference.
+            base = git(root, "merge-base", "--all", "refs/remotes/origin/coolify", head).decode().strip()
+        return base, head
+    except (OSError, ValueError, KeyError, TypeError, subprocess.CalledProcessError, UnicodeError):
         return None, None
 
 
@@ -66,8 +79,10 @@ def main():
     parser.add_argument("--head")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
-    base, head = (args.base, args.head) if args.base or args.head else event_range(args.event, os.environ.get("GITHUB_EVENT_PATH", ""))
-    result = classify(Path(__file__).resolve().parents[1], args.event, base, head)
+    root = Path(__file__).resolve().parents[1]
+    base, head = ((args.base, args.head) if args.base or args.head
+                  else event_range(args.event, os.environ.get("GITHUB_EVENT_PATH", ""), root))
+    result = classify(root, args.event, base, head)
     Path(args.output).write_text(json.dumps(result, ensure_ascii=True) + "\n", encoding="utf-8")
     if os.environ.get("GITHUB_OUTPUT"):
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
