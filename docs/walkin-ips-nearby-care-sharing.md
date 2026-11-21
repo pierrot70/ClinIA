@@ -114,6 +114,33 @@ L’élargissement est manuel et peut se faire avant ce rappel.
 Le paramètre serveur `GENERAL_TRANSFER_MAX_CLINICS` fixe le nombre maximal
 de cliniques contactées par appel, clinique de départ comprise. Sa valeur par défaut est 2.
 
+### Tests en production du 21 novembre 2026
+
+Les deux parcours ont réussi dans Chrome sur la version `302d7ab` de ClinIA.
+Chaque professionnel a utilisé un dossier fictif distinct de Camille.
+
+| Professionnel à l’origine de l’appel | Résultat vérifié dans MongoDB avant le nettoyage |
+| --- | --- |
+| IPS de test | Une demande acceptée après deux accords successifs. Le médecin de famille de Mascouche est devenu responsable du dossier. |
+| Urgentologue de test (`urgent_demo_transfert`) | Une demande acceptée après deux accords successifs. Le même médecin de famille est devenu responsable du second dossier. |
+
+Dans les deux cas, le premier accord simulé portait sur la clinique fictive de départ,
+qui ne comptait aucun médecin de famille. Dans Chrome, le bouton **Étendre l’appel**
+est resté désactivé jusqu’au deuxième accord, qui nommait **GMF Clinique Médicale Mascouche**.
+L’émetteur a alors étendu la demande existante. Le médecin de Mascouche a reçu une
+invitation anonyme et le nom de Camille est apparu après son acceptation.
+
+**Nettoyage vérifié en production.** Les deux dossiers fictifs et leurs deux demandes
+ont été supprimés dans une même transaction. Une lecture MongoDB après validation
+de la transaction a confirmé zéro dossier et zéro demande pour ces deux essais.
+Le compte `urgent_demo_transfert` était toujours inactif.
+
+Les empreintes des **17 entrées d’audit préexistantes** étaient identiques avant et
+après le nettoyage. Elles couvraient 4 entrées du journal patient, 12 du journal
+des opérations d’écriture et 1 du journal d’authentification pour la désactivation
+du compte temporaire. Le nettoyage a ajouté 6 entrées de suppression, soit
+2 dans le journal patient et 4 dans le journal des opérations d’écriture.
+
 ## Autorisation accordée à un médecin ou urgentologue
 
 L’IPS responsable d’un dossier actif peut choisir un médecin ou urgentologue
