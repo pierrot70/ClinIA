@@ -20,9 +20,9 @@ reprennent les mêmes six ordres avec des patients absents de MongoDB au départ
 
 ## Déploiement de la production
 
-Les déploiements ClinIA sur Coolify sont manuels. Au 15 novembre 2026, la
-production est épinglée sur `6e9a71200bab429633d53ad6ef09b6fd851d5c88`
-(`6e9a712`).
+Les déploiements ClinIA sur Coolify sont manuels. Au 21 novembre 2026, la
+production est épinglée sur `46f8a98b33e4820294f9d75b1ca8136751da21d5`
+(`46f8a98`).
 
 Sur `coolify`, les trois commits qui suivent `d143779` sont uniquement
 documentaires. `f954edf` consigne le résultat de la passe WalkIn, `93dae58`
@@ -42,7 +42,9 @@ déploiement applicatif n’était nécessaire pour ces trois commits.
 - [ ] Après environ cinq déploiements applicatifs depuis la dernière passe
   complète, relancer manuellement les 12 scénarios WalkIn sur demande, sans
   pause ajoutée et avec arrêt au premier échec. Dernière passe complète le
-  15 novembre 2026 sur `6e9a712`, avec 12 scénarios réussis sur 12.
+  21 novembre 2026 sur `46f8a98`, avec 12 scénarios réussis sur 12.
+  Le [rapport de cette passe](../../docs/production-validation-walkin-20261121-46f8a98.md)
+  sert de référence pour les prochaines relances.
 
 ## Lancer la passe
 
@@ -98,4 +100,5 @@ nécessaires à la reprise du nettoyage. Les journaux d’audit restent en place
 
 ## Historique des validations en production
 
+- [21 novembre 2026 · `46f8a98` · 12 scénarios sur 12](../../docs/production-validation-walkin-20261121-46f8a98.md)
 - [15 novembre 2026 · `d143779` · 12 scénarios sur 12](../../docs/production-validation-walkin-20261115-d143779.md)
