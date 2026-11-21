@@ -69,6 +69,8 @@ pas partie de ce contrôle léger.
 
 ## Validation sur GitHub du 21 novembre 2026
 
+### Changement uniquement documentaire
+
 Le premier push de la nouvelle branche `maintenance/docs-only-smoke-20261121`
 a validé le parcours documentaire avec le commit
 `64a2f3955d6de5e0c0819e1a456d900b10029545`. Le diff contenait uniquement un ajout
@@ -82,6 +84,23 @@ dans `docs/ci-documentation.md`.
 
 [Exécution CI vérifiée](https://github.com/pierrot70/ClinIA/actions/runs/44915282878) ·
 [Commit documentaire testé](https://github.com/pierrot70/ClinIA/commit/64a2f3955d6de5e0c0819e1a456d900b10029545)
+
+### Changement documentaire et code
+
+Le premier push de la nouvelle branche
+`maintenance/ci-documentation-new-branch-20261121` a validé le parcours complet
+avec le commit `9800d52f496995acb9797de8cf50ee19a2cb4fc5`. Le diff contenait
+`docs/ci-documentation.md` ainsi que les deux fichiers Python
+`scripts/classify-ci-changes.py` et `scripts/test_classify_ci_changes.py`.
+
+- Les 11 étapes applicatives ont été exécutées avec succès, avec les installations,
+  les audits, le contrôle TypeScript, les tests, le build frontend et les intégrations MongoDB.
+- Les contrôles de classification et de documentation ont également réussi.
+- Coolify comptait 62 déploiements avant et après cette passe, avec aucun déploiement actif.
+- La production est restée épinglée sur `46f8a98`.
+
+[Exécution CI complète vérifiée](https://github.com/pierrot70/ClinIA/actions/runs/44914346889) ·
+[Commit mixte testé](https://github.com/pierrot70/ClinIA/commit/9800d52f496995acb9797de8cf50ee19a2cb4fc5)
 
 ## Rejouer les contrôles
 
