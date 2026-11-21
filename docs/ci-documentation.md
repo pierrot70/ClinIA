@@ -45,6 +45,13 @@ GitHub. Une référence `coolify` absente, un historique incomplet, des historiq
 sans ancêtre commun, une comparaison vide ou ambiguë, la création de `coolify`
 elle-même ou un lancement manuel conservent le parcours applicatif complet.
 
+## Vérifier le premier push d’une branche
+
+Créer une nouvelle branche de maintenance depuis `coolify`, puis modifier
+un seul Markdown autorisé. Sur le CI du premier push, vérifier le succès des
+contrôles documentaires et le statut ignoré des étapes applicatives des deux
+jobs requis.
+
 ## Vérifications documentaires
 
 Le vérificateur utilise Python et sa bibliothèque standard, sans installation
