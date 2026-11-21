@@ -24,6 +24,19 @@ Les déploiements ClinIA sur Coolify sont manuels. Au 21 novembre 2026, la
 production est épinglée sur `46f8a98b33e4820294f9d75b1ca8136751da21d5`
 (`46f8a98`).
 
+Les quatre commits suivants sur `coolify`, ajoutés depuis `46f8a98`,
+concernent la documentation et le CI.
+
+| Commit | Changement |
+| --- | --- |
+| `b443f48` | Rapport WalkIn 12/12 sur `46f8a98` et mise à jour du guide |
+| `9800d52` | Classification des pushes documentaires sur une nouvelle branche et tests CI |
+| `f7f4cf1` | Consignation du test GitHub avec un changement uniquement Markdown |
+| `042ab6f` | Consignation du test GitHub mixte, avec code et Markdown |
+
+La décision du 21 novembre 2026 est de conserver `46f8a98` épinglé en production.
+Aucun déploiement manuel n’est nécessaire pour ces quatre commits.
+
 Sur `coolify`, les trois commits qui suivent `d143779` sont uniquement
 documentaires. `f954edf` consigne le résultat de la passe WalkIn, `93dae58`
 documente le déploiement manuel et `b39fe83` ajoute la checklist. Aucun
