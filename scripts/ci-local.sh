@@ -8,7 +8,7 @@ target="${1:-all}"
 step="${2:-all}"
 [[ $# -le 2 ]] || { echo 'Usage: bash scripts/ci-local.sh [all|backend|frontend] [step]' >&2; exit 2; }
 case "$target:$step" in
-    all:all|backend:all|frontend:all|backend:install|frontend:install|backend:audit|frontend:audit|backend:tests|frontend:tests|backend:reauth|backend:mongo|backend:integration|frontend:typecheck|frontend:build) ;;
+    all:all|backend:all|frontend:all|backend:install|frontend:install|backend:audit|frontend:audit|backend:tests|frontend:tests|backend:reauth|backend:mongo|backend:integration|backend:walkin|frontend:walkin|frontend:typecheck|frontend:build) ;;
     *) echo 'Unknown CI target or step.' >&2; exit 2 ;;
 esac
 [[ "${NODE_ENV:-}" != production ]] || { echo 'Run CI on a development or validation host.' >&2; exit 1; }
@@ -41,6 +41,14 @@ run_step() (
             fi
             npm test -- --run
             ;;
+        walkin)
+            if [[ "$component" == backend ]]; then
+                node --test "$root/scripts/walkin-cli.test.mjs"
+                bash "$root/scripts/run-urgentologist-walk-in-integration.sh" --walkin-scenarios
+            else
+                npm test -- --run src/pages/WalkInArrivalPage.chrome.test.jsx
+            fi
+            ;;
         reauth) npm test -- --run services/__tests__/auth.service.test.js --sequence.shuffle --sequence.seed=3 ;;
         mongo) check_docker; docker pull mongo:7 ;;
         integration)
@@ -61,7 +69,7 @@ run_step() (
 run_component() {
     local component="$1" phase
     local -a phases=(install audit typecheck tests build)
-    if [[ "$component" == backend ]]; then phases=(install audit tests reauth mongo integration); fi
+    if [[ "$component" == backend ]]; then phases=(install audit tests reauth mongo walkin integration); fi
     for phase in "${phases[@]}"; do run_step "$component" "$phase"; done
 }
 

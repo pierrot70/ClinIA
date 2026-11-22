@@ -3,6 +3,10 @@
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 test_config=vitest.walkin.config.js
+if [[ "${1:-}" == --walkin-scenarios ]]; then
+    test_config=vitest.walkinScenarios.config.js
+    shift
+fi
 if [[ "${1:-}" == --login-throttle ]]; then
     test_config=vitest.loginThrottle.config.js
     shift

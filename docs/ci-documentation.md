@@ -9,8 +9,8 @@ de maintenance. Les deux contrôles requis gardent leurs noms
 
 Le job `Classify changes and check documentation` teste les outils de contrôle,
 compare les commits de l'événement GitHub et valide les documents modifiés.
-Les deux jobs requis vérifient ensuite son succès. Ils exécutent leurs étapes
-applicatives uniquement si le changement n'est pas purement documentaire.
+Les deux jobs requis vérifient ensuite son succès. Ils choisissent leurs étapes
+selon le périmètre des fichiers modifiés.
 Une erreur d'exécution des outils ou de validation documentaire fait échouer
 les contrôles requis ; elle ne produit pas un succès par simple job ignoré.
 
@@ -25,9 +25,23 @@ La liste documentaire autorisée comprend :
 - `PROJECT_STATE.md`, `RUNNING.md` et les `README.md` à la racine, avec suffixe
   de langue éventuel, par exemple `README.fr.md`.
 
-Les fichiers `AGENTS.md`, le code, la configuration, les workflows `.github/`,
+Une modification limitée aux scripts `chrome.mjs`, `fixtures.mjs`,
+`mongo-check.template.mjs` et `passe.mjs` de `scripts/walkin-chrome/`, avec
+ou sans leur README, déclenche les contrôles WalkIn ciblés. Le guide seul suit
+le parcours documentaire. Le frontend exerce le pilote des 12 scénarios sur le
+formulaire de réception. Le backend teste les inscriptions et leur nettoyage
+sur un replica set MongoDB jetable. Les deux jobs installent et auditent leurs
+dépendances. Le parcours applicatif complet inclut ces tests.
+
+Pour reproduire la voie ciblée avec Node 24 et les dépendances installées,
+exécuter `bash scripts/ci-local.sh frontend walkin`, puis
+`bash scripts/ci-local.sh backend mongo` et `bash scripts/ci-local.sh backend walkin`.
+Le dernier contrôle vérifie que les dossiers et inscriptions d’une autre passe
+portant les mêmes noms sont conservés après le nettoyage.
+
+Les fichiers `AGENTS.md`, le code applicatif, la configuration, les workflows `.github/`,
 les scripts de validation et les Markdown sous les répertoires applicatifs
-restent dans le parcours complet. Une PR mixte reste également complète.
+restent dans le parcours complet. Un changement du backend ou du frontend dans le même diff exige le parcours complet.
 Les suppressions et les deux chemins d'un renommage participent au choix ;
 renommer du code en `.md` ne permet pas d'ignorer les tests applicatifs.
 

@@ -169,8 +169,9 @@ export interface PatientAuditLog {
         | "PATIENT_UPDATE"
         | "PATIENT_ARCHIVE"
         | "PATIENT_RESTORE"
-        | "PATIENT_DELETE";
-    outcome: "SUCCESS" | "FAILED";
+        | "PATIENT_DELETE"
+        | "RECEPTION_RAMQ_LOOKUP";
+    outcome: "SUCCESS" | "FAILED" | "NOT_FOUND";
     actorUserId: string | null;
     actorUsernameMasked: string;
     actorRole: string | null;

@@ -56,6 +56,10 @@ type SelectedWalkInSlot = {
 
 // New routing metadata must agree as a whole. A legacy response remains
 // limited to 100 km; a partial/forged tolerance never expands that bound.
+function formatDistanceKm(distanceKm: number, locale: string) {
+    return new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(distanceKm);
+}
+
 function effectiveSearchDistance(search: NonNullable<WalkInAvailability["search"]>, extendedSearchAccepted: boolean): 100 | 110 | 200 | null {
     if (search.radiusKm === 200) {
         return extendedSearchAccepted && search.maxDistanceKm === 200 && search.toleranceKm === undefined ? 200 : null;
@@ -157,7 +161,7 @@ function AvailabilityOptions({
             <h3 className="font-semibold">{routing.primaryOffer}</h3>
             {destination && <div className="space-y-1 rounded border border-blue-200 bg-blue-50 p-3">
                 <p className="font-semibold">{routing.destination.replace("{name}", destination.nom)}</p>
-                <p>{routing.distance.replace("{distance}", new Intl.NumberFormat(locale).format(destination.distanceKm))}</p>
+                <p>{routing.distance.replace("{distance}", formatDistanceKm(destination.distanceKm, locale))}</p>
                 {availability.prioritySpecialty && <p>{routing.professional.replace("{specialty}", displaySpecialty(availability.prioritySpecialty, locale))}</p>}
             </div>}
             {reminder}
@@ -170,7 +174,7 @@ function AvailabilityOptions({
                 {!availability.earlierAlternatives.length && <p role="status">{routing.noEarlier}</p>}
                 {availability.earlierAlternatives.filter(option => option.clinic?._id && Number.isFinite(option.clinic.distanceKm) && option.clinic.distanceKm >= 0 && option.clinic.distanceKm <= distanceLimit).map((option, index) => <article key={`${option.clinic._id}:${option.specialist._id}:${option.date}:${index}`} className="space-y-2 rounded border bg-white p-3">
                     <p className="font-semibold">{routing.destination.replace("{name}", option.clinic.nom)}</p>
-                    <p>{routing.distance.replace("{distance}", new Intl.NumberFormat(locale).format(option.clinic.distanceKm))}</p>
+                    <p>{routing.distance.replace("{distance}", formatDistanceKm(option.clinic.distanceKm, locale))}</p>
                     <p>{routing.professional.replace("{specialty}", displaySpecialty(option.prioritySpecialty, locale))}</p>
                     <AvailabilityOptions availability={{ today: [], future: [option] }} locale={locale} introduction={introduction} patientKind={patientKind} genericProfessionals={true}
                         onChooseSlot={onChooseSlot ? slot => onChooseSlot({ ...slot, destinationClinic: option.clinic, prioritySpecialty: option.prioritySpecialty, selectionMode: "earlier", ...extendedSelection }) : undefined} />
@@ -681,7 +685,7 @@ export function WalkInArrivalPage() {
                         <span className="block text-slate-600">{selectedSlot.destinationClinic
                             ? routing.destination.replace("{name}", clinicName)
                             : receptionLabel(locale, "assignedClinic", source.assignedClinic).replace("{name}", clinicName)}</span>
-                        {selectedSlot.destinationClinic && <span className="block text-slate-600">{routing.distance.replace("{distance}", new Intl.NumberFormat(locale).format(selectedSlot.destinationClinic.distanceKm))}</span>}
+                        {selectedSlot.destinationClinic && <span className="block text-slate-600">{routing.distance.replace("{distance}", formatDistanceKm(selectedSlot.destinationClinic.distanceKm, locale))}</span>}
                         {selectedSlot.prioritySpecialty && <span className="block text-slate-600">{routing.professional.replace("{specialty}", displaySpecialty(selectedSlot.prioritySpecialty, locale))}</span>}
                     </p>
 

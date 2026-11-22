@@ -30,6 +30,7 @@ CONTRACT = {
         "Run bash ../scripts/ci-local.sh backend install", "Run bash ../scripts/ci-local.sh backend audit",
         "Run bash ../scripts/ci-local.sh backend tests", "Authentication service isolation (regression seed 3)",
         "Prepare disposable MongoDB integration image", "Disposable MongoDB integration (email quota and booking concurrency)",
+        "WalkIn scenarios and cleanup on disposable MongoDB",
         "Archive minimized validation evidence (also on failure)"],
     "Frontend tests, build and audit": [
         "Require successful routing and documentation validation", "Run actions/checkout@v4", "Run actions/setup-node@v4",

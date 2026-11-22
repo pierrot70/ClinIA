@@ -16,19 +16,19 @@ class RequiredCheckGateTests(unittest.TestCase):
             raise AssertionError("Both existing required checks must have an explicit gate")
 
     def run_gate(self, script, result, output, reuse="false", source_id="1234", source_url="https://github.com/synthetic/ci/actions/runs/1234"):
-        environment = {**os.environ, "CHANGES_RESULT": result, "DOCS_ONLY": output,
+        environment = {**os.environ, "CHANGES_RESULT": result, "SCOPE": output,
                        "REUSE_VALIDATED": reuse, "SOURCE_RUN_ID": source_id, "SOURCE_RUN_URL": source_url,
                        "GITHUB_REPOSITORY": "synthetic/ci", "GITHUB_SHA": "a" * 40}
         return subprocess.run(["bash", "-e", "-c", script], env=environment, capture_output=True).returncode
 
     def test_successful_documentation_and_application_routes_pass(self):
         for gate in self.gates:
-            for output in ("true", "false"):
+            for output in ("docs", "walkin", "full"):
                 self.assertEqual(self.run_gate(gate, "success", output), 0)
 
     def test_verified_reuse_requires_a_canonical_proof_reference(self):
         for gate in self.gates:
-            self.assertEqual(self.run_gate(gate, "success", "false", "true"), 0)
+            self.assertEqual(self.run_gate(gate, "success", "full", "true"), 0)
             for source_id, source_url in [
                 ("", ""), ("0", "https://github.com/synthetic/ci/actions/runs/0"),
                 ("1234; false", "https://github.com/synthetic/ci/actions/runs/1234; false"),
@@ -37,19 +37,20 @@ class RequiredCheckGateTests(unittest.TestCase):
                 ("1234", "https://github.com/synthetic/ci/actions/runs/5678"),
             ]:
                 with self.subTest(source_id=source_id, source_url=source_url):
-                    self.assertNotEqual(self.run_gate(gate, "success", "false", "true", source_id, source_url), 0)
+                    self.assertNotEqual(self.run_gate(gate, "success", "full", "true", source_id, source_url), 0)
 
     def test_invalid_or_contradictory_reuse_outputs_never_skip_required_checks(self):
         for gate in self.gates:
-            self.assertNotEqual(self.run_gate(gate, "success", "true", "true"), 0)
+            for scope in ("docs", "walkin"):
+                self.assertNotEqual(self.run_gate(gate, "success", scope, "true"), 0)
             for reuse in ("", "TRUE", "1", "false true"):
-                for docs in ("true", "false"):
-                    self.assertNotEqual(self.run_gate(gate, "success", docs, reuse), 0)
+                for scope in ("docs", "walkin", "full"):
+                    self.assertNotEqual(self.run_gate(gate, "success", scope, reuse), 0)
 
     def test_dependency_failure_or_skipping_never_passes_a_required_check(self):
         for gate in self.gates:
             for result in ("failure", "cancelled", "skipped", ""):
-                for output in ("true", "false", ""):
+                for output in ("docs", "walkin", "full", ""):
                     for reuse in ("true", "false"):
                         with self.subTest(result=result, output=output, reuse=reuse):
                             self.assertNotEqual(self.run_gate(gate, result, output, reuse), 0)
@@ -88,16 +89,23 @@ class PromotionWorkflowContractTests(unittest.TestCase):
             for phase in ("install", "audit"):
                 block = self.step(component, "- run: bash ../scripts/ci-local.sh " + component + " " + phase + "\n")
                 conditions = re.findall(r"(?m)^        if: (.*)$", block)
-                self.assertEqual(conditions, ["${{ needs.changes.outputs.docs_only != 'true' }}"])
+                self.assertEqual(conditions, ["${{ needs.changes.outputs.scope != 'docs' }}"])
 
     def test_heavy_checks_require_a_verified_proof_to_be_reused(self):
-        commands = {"backend": ["backend tests", "backend reauth", "backend mongo", "backend integration"],
+        commands = {"backend": ["backend tests", "backend reauth", "backend integration"],
                     "frontend": ["frontend typecheck", "frontend tests", "frontend build"]}
-        expected = "${{ needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}"
+        expected = "${{ needs.changes.outputs.scope == 'full' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}"
         for component, phases in commands.items():
             for phase in phases:
                 block = self.step(component, "bash ../scripts/ci-local.sh " + phase + "\n")
                 self.assertEqual(re.findall(r"(?m)^        if: (.*)$", block), [expected])
+
+    def test_targeted_validation_is_required_by_the_existing_jobs(self):
+        for phase in ("mongo", "walkin"):
+            block = self.step("backend", "bash ../scripts/ci-local.sh backend " + phase + "\n")
+            self.assertIn("needs.changes.outputs.scope != 'docs' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1')", block)
+        block = self.step("frontend", "bash ../scripts/ci-local.sh frontend walkin\n")
+        self.assertIn("if: ${{ needs.changes.outputs.scope == 'walkin' }}", block)
 
     def test_rerunning_an_application_job_cannot_inherit_old_reuse_outputs(self):
         # A single-job rerun may retain needs.changes outputs from attempt1.
@@ -119,7 +127,7 @@ class PromotionWorkflowContractTests(unittest.TestCase):
         self.assertIn("github.event_name == 'push'", block)
         self.assertIn("github.ref == 'refs/heads/coolify'", block)
         self.assertIn("github.run_attempt == '1'", block)
-        self.assertIn("steps.classify.outputs.docs_only == 'false'", block)
+        self.assertIn("steps.classify.outputs.scope == 'full'", block)
         self.assertEqual(self.workflow.count("GITHUB_TOKEN:"), 1)
         self.assertIn("GITHUB_TOKEN: ${{ github.token }}", block)
         self.assertIn("steps.reuse.outputs.reuse_validated || 'false'", changes)

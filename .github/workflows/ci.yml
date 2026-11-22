@@ -20,7 +20,7 @@ jobs:
     env:
       PYTHONDONTWRITEBYTECODE: "1"
     outputs:
-      docs_only: ${{ steps.classify.outputs.docs_only }}
+      scope: ${{ steps.classify.outputs.scope }}
       reuse_validated: ${{ steps.reuse.outputs.reuse_validated || 'false' }}
       source_run_id: ${{ steps.reuse.outputs.source_run_id }}
       source_run_url: ${{ steps.reuse.outputs.source_run_url }}
@@ -42,7 +42,7 @@ jobs:
         run: python3 scripts/check-documentation.py --changes /tmp/clinia-ci-changes.json
       - name: Find previously validated promotion commit
         id: reuse
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/coolify' && github.run_attempt == '1' && steps.classify.outputs.docs_only == 'false' }}
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/coolify' && github.run_attempt == '1' && steps.classify.outputs.scope == 'full' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python3 scripts/reuse-ci-validation.py --output /tmp/clinia-ci-reuse.json
@@ -65,16 +65,17 @@ jobs:
         working-directory: ${{ github.workspace }}
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
-          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+          SCOPE: ${{ needs.changes.outputs.scope }}
           REUSE_VALIDATED: ${{ github.run_attempt == '1' && needs.changes.outputs.reuse_validated || 'false' }}
           SOURCE_RUN_ID: ${{ needs.changes.outputs.source_run_id }}
           SOURCE_RUN_URL: ${{ needs.changes.outputs.source_run_url }}
         run: |
           test "$CHANGES_RESULT" = success
-          case "$DOCS_ONLY:$REUSE_VALIDATED" in
-            true:false) echo "Documentation checks passed; application tests are not required." ;;
-            false:false) echo "Full application validation required." ;;
-            false:true)
+          case "$SCOPE:$REUSE_VALIDATED" in
+            docs:false) echo "Documentation checks passed; application tests are not required." ;;
+            walkin:false) echo "WalkIn scenario and cleanup validation required." ;;
+            full:false) echo "Full application validation required." ;;
+            full:true)
               [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
               test "$SOURCE_RUN_URL" = "https://github.com/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID"
               echo "Reusing successful full validation for $GITHUB_SHA from $SOURCE_RUN_URL; install and audit remain fresh."
@@ -82,37 +83,40 @@ jobs:
             *) echo "Invalid classification or validation-reuse output." >&2; exit 1 ;;
           esac
       - uses: actions/checkout@v4
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.scope != 'docs' }}
       - uses: actions/setup-node@v4
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.scope != 'docs' }}
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: bash ../scripts/ci-local.sh backend install
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.scope != 'docs' }}
       - run: bash ../scripts/ci-local.sh backend audit
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.scope != 'docs' }}
       - name: Reuse successful application validation
-        if: ${{ needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse_validated == 'true' && github.run_attempt == '1' }}
+        if: ${{ needs.changes.outputs.scope == 'full' && needs.changes.outputs.reuse_validated == 'true' && github.run_attempt == '1' }}
         env:
           SOURCE_RUN_URL: ${{ needs.changes.outputs.source_run_url }}
         run: >-
           printf '%s\n' "Full tests and build for this exact commit already passed: $SOURCE_RUN_URL. Dependencies were installed and audited again in this job."
           | tee -a "$GITHUB_STEP_SUMMARY"
       - run: bash ../scripts/ci-local.sh backend tests
-        if: ${{ needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}
+        if: ${{ needs.changes.outputs.scope == 'full' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}
       - name: Authentication service isolation (regression seed 3)
-        if: ${{ needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}
+        if: ${{ needs.changes.outputs.scope == 'full' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}
         run: bash ../scripts/ci-local.sh backend reauth
       - name: Prepare disposable MongoDB integration image
-        if: ${{ needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}
+        if: ${{ needs.changes.outputs.scope != 'docs' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}
         run: bash ../scripts/ci-local.sh backend mongo
+      - name: WalkIn scenarios and cleanup on disposable MongoDB
+        if: ${{ needs.changes.outputs.scope != 'docs' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}
+        run: bash ../scripts/ci-local.sh backend walkin
       - name: Disposable MongoDB integration (email quota and booking concurrency)
-        if: ${{ needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}
+        if: ${{ needs.changes.outputs.scope == 'full' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}
         run: bash ../scripts/ci-local.sh backend integration
       - name: Archive minimized validation evidence (also on failure)
-        if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.docs_only == 'false' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}
+        if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.scope == 'full' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}
         uses: actions/upload-artifact@v4
         with:
           name: reception-validation-${{ github.sha }}
@@ -133,16 +137,17 @@ jobs:
         working-directory: ${{ github.workspace }}
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
-          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+          SCOPE: ${{ needs.changes.outputs.scope }}
           REUSE_VALIDATED: ${{ github.run_attempt == '1' && needs.changes.outputs.reuse_validated || 'false' }}
           SOURCE_RUN_ID: ${{ needs.changes.outputs.source_run_id }}
           SOURCE_RUN_URL: ${{ needs.changes.outputs.source_run_url }}
         run: |
           test "$CHANGES_RESULT" = success
-          case "$DOCS_ONLY:$REUSE_VALIDATED" in
-            true:false) echo "Documentation checks passed; application tests are not required." ;;
-            false:false) echo "Full application validation required." ;;
-            false:true)
+          case "$SCOPE:$REUSE_VALIDATED" in
+            docs:false) echo "Documentation checks passed; application tests are not required." ;;
+            walkin:false) echo "WalkIn scenario and cleanup validation required." ;;
+            full:false) echo "Full application validation required." ;;
+            full:true)
               [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
               test "$SOURCE_RUN_URL" = "https://github.com/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID"
               echo "Reusing successful full validation for $GITHUB_SHA from $SOURCE_RUN_URL; install and audit remain fresh."
@@ -150,28 +155,31 @@ jobs:
             *) echo "Invalid classification or validation-reuse output." >&2; exit 1 ;;
           esac
       - uses: actions/checkout@v4
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.scope != 'docs' }}
       - uses: actions/setup-node@v4
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.scope != 'docs' }}
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: bash ../scripts/ci-local.sh frontend install
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.scope != 'docs' }}
       - run: bash ../scripts/ci-local.sh frontend audit
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.scope != 'docs' }}
       - name: Reuse successful application validation
-        if: ${{ needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse_validated == 'true' && github.run_attempt == '1' }}
+        if: ${{ needs.changes.outputs.scope == 'full' && needs.changes.outputs.reuse_validated == 'true' && github.run_attempt == '1' }}
         env:
           SOURCE_RUN_URL: ${{ needs.changes.outputs.source_run_url }}
         run: >-
           printf '%s\n' "Full tests and build for this exact commit already passed: $SOURCE_RUN_URL. Dependencies were installed and audited again in this job."
           | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: WalkIn Chrome driver scenarios
+        if: ${{ needs.changes.outputs.scope == 'walkin' }}
+        run: bash ../scripts/ci-local.sh frontend walkin
       - name: TypeScript type check
-        if: ${{ needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}
+        if: ${{ needs.changes.outputs.scope == 'full' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}
         run: bash ../scripts/ci-local.sh frontend typecheck
       - run: bash ../scripts/ci-local.sh frontend tests
-        if: ${{ needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}
+        if: ${{ needs.changes.outputs.scope == 'full' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}
       - run: bash ../scripts/ci-local.sh frontend build
-        if: ${{ needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}
+        if: ${{ needs.changes.outputs.scope == 'full' && (needs.changes.outputs.reuse_validated != 'true' || github.run_attempt != '1') }}

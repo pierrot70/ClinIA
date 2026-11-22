@@ -39,6 +39,7 @@ REQUIRED_STEPS = {
         "Authentication service isolation (regression seed 3)",
         "Prepare disposable MongoDB integration image",
         "Disposable MongoDB integration (email quota and booking concurrency)",
+        "WalkIn scenarios and cleanup on disposable MongoDB",
         "Archive minimized validation evidence (also on failure)",
     ),
     "Frontend tests, build and audit": (

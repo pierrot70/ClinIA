@@ -139,7 +139,32 @@ class ClassificationTests(unittest.TestCase):
                                 env=environment, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(json.loads(manifest.read_text())["docs_only"])
-        self.assertEqual(output.read_text(), "docs_only=true\n")
+        self.assertEqual(output.read_text(), "scope=docs\ndocs_only=true\n")
+
+    def test_walkin_scripts_and_guide_use_targeted_checks(self):
+        for path in classifier.WALKIN_SCRIPTS | {classifier.WALKIN_GUIDE}:
+            self.write(path, "synthetic")
+        head = self.commit()
+        for event in ("push", "pull_request"):
+            self.assertEqual(classifier.classify(self.root, event, self.base, head)["scope"], "walkin")
+        self.assertEqual(self.classify_new_branch(head)["scope"], "walkin")
+
+    def test_walkin_guide_alone_is_documentation(self):
+        self.write(classifier.WALKIN_GUIDE, "# Guide")
+        self.assertEqual(self.classify_new_branch(self.commit())["scope"], "docs")
+
+    def test_walkin_never_masks_application_workflow_or_unknown_changes(self):
+        for path in ("backend/index.js", "frontend/src/App.tsx", ".github/workflows/ci.yml",
+                     "scripts/walkin-chrome/unknown.mjs", "backend/package-lock.json"):
+            with self.subTest(path=path):
+                self.git("checkout", "--detach", self.base)
+                self.write(path, "changed")
+                self.commit()
+                self.write("scripts/walkin-chrome/passe.mjs", "synthetic")
+                head = self.commit()
+                self.assertEqual(self.classify_new_branch(head)["scope"], "full")
+                self.assertEqual(classifier.classify(self.root, "pull_request", self.base, head)["scope"], "full")
+                self.assertEqual(classifier.classify(self.root, "push", self.base, head)["scope"], "full")
 
     def test_documentation_only_and_exact_manifest(self):
         self.write("docs/folder/with spaces.md", "# Test\n")
@@ -184,7 +209,7 @@ class ClassificationTests(unittest.TestCase):
             ("push", "--not-a-ref", self.base), ("push", self.base, self.base),
         ]:
             with self.subTest(event=event, base=base):
-                self.assertFalse(classifier.classify(self.root, event, base, head)["docs_only"])
+                self.assertEqual(classifier.classify(self.root, event, base, head)["scope"], "full")
 
     def test_only_the_document_allowlist_can_skip_application_tests(self):
         for path in ["AGENTS.md", "docs/AGENTS.md", ".github/workflows/ci.md", "frontend/README.md",

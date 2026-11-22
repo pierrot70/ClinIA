@@ -39,6 +39,16 @@ async function searchNew() {
     await screen.findByRole("button", { name: "Refresh available appointments" });
 }
 describe("WalkIn priority destination and assisted GAP", () => {
+    it("rounds the French distance estimate in both the offer and the selected slot", async () => {
+        api.slots.mockResolvedValue({ data: { ...found, selectedClinic: { ...found.selectedClinic!, distanceKm: 17.458 } } });
+        render(<Page locale="fr-CA" />);
+        fireEvent.change(screen.getByRole("textbox"), { target: { value: "SYNTHETIC-INSURANCE" } });
+        fireEvent.click(screen.getByRole("button", { name: "Rechercher le patient" }));
+        const estimate = walkInRoutingLabels("fr-CA").distance.replace("{distance}", "17,5");
+        expect(await screen.findByText(estimate)).toBeVisible();
+        fireEvent.click(screen.getByRole("button", { name: /09:00/ }));
+        expect(screen.getByText(estimate)).toBeVisible();
+    });
     it("opens the new-patient path when an explicit click joins a pending automatic lookup", async () => {
         let finishLookup!: (response: { data: null }) => void;
         api.lookup.mockReturnValueOnce(new Promise(resolve => { finishLookup = resolve; }));

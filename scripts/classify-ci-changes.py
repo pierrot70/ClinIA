@@ -8,6 +8,11 @@ import re
 import subprocess
 
 ROOT_DOCUMENTS = {"PROJECT_STATE.md", "RUNNING.md"}
+WALKIN_SCRIPTS = {
+    "scripts/walkin-chrome/" + name
+    for name in ("chrome.mjs", "fixtures.mjs", "mongo-check.template.mjs", "passe.mjs")
+}
+WALKIN_GUIDE = "scripts/walkin-chrome/README.md"
 SHA = re.compile(r"^[0-9a-fA-F]{40,64}$")
 
 
@@ -26,7 +31,7 @@ def git(root, *args):
 
 
 def classify(root, event, base, head):
-    result = {"docs_only": False, "changed_files": [], "reason": "full application validation"}
+    result = {"scope": "full", "docs_only": False, "changed_files": [], "reason": "full application validation"}
     if event not in ("pull_request", "push"):
         result["reason"] = "manual or unsupported event: full validation"
         return result
@@ -45,7 +50,10 @@ def classify(root, event, base, head):
         return result
     result["changed_files"] = changed
     result["docs_only"] = bool(changed) and all(is_documentation(path) for path in changed)
-    result["reason"] = "documentation only" if result["docs_only"] else "non-documentary or empty change: full validation"
+    if result["docs_only"]:
+        result.update(scope="docs", reason="documentation only")
+    elif WALKIN_SCRIPTS.intersection(changed) and set(changed) <= WALKIN_SCRIPTS | {WALKIN_GUIDE}:
+        result.update(scope="walkin", reason="WalkIn scripts: targeted scenario and cleanup validation")
     return result
 
 
@@ -86,6 +94,7 @@ def main():
     Path(args.output).write_text(json.dumps(result, ensure_ascii=True) + "\n", encoding="utf-8")
     if os.environ.get("GITHUB_OUTPUT"):
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+            output.write("scope=" + result["scope"] + "\n")
             output.write("docs_only=" + str(result["docs_only"]).lower() + "\n")
     print(result["reason"] + "; files=" + str(len(result["changed_files"])))
 

@@ -21,7 +21,13 @@ const PatientAuditLogSchema = new mongoose.Schema(
         },
         outcome: {
             type: String,
-            enum: ["SUCCESS", "FAILED"],
+            enum: ["SUCCESS", "FAILED", "NOT_FOUND"],
+            validate: {
+                validator(outcome) {
+                    return outcome !== "NOT_FOUND" || this.action === "RECEPTION_RAMQ_LOOKUP";
+                },
+                message: "NOT_FOUND is only valid for a reception patient lookup.",
+            },
             required: true,
         },
         actorUserId: {
