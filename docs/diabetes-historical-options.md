@@ -104,3 +104,30 @@ affichaient « Simulated data » et présentaient chacune une explication sous
    ouverte à la discussion. Elle invitait à peser les bénéfices cardiovasculaires
    et glycémiques possibles, les symptômes digestifs et le risque de perte de
    poids involontaire, en tenant compte des préférences du patient.
+
+## Test DT2-CV-58 en production du 22 novembre 2026
+
+**Le test d’affichage a réussi dans Chrome sur le commit `ebaf6b1`.** Dans la
+[démo publique de ClinIA](https://clinique-ai.ca/clinical-demo), le profil
+fictif de 58 ans indiquait un risque cardiovasculaire « High ». Les antécédents
+comprenaient « Atherosclerotic cardiovascular disease » et « Metformin »
+figurait parmi les médicaments en cours.
+
+Depuis « Alternatives and recommendations », le lien « Details » a permis
+d’ouvrir successivement les deux fiches du même résultat. Toutes deux
+affichaient « Simulated data » et expliquaient le rôle de l’antécédent
+cardiovasculaire sous « How to interpret this information? ».
+
+1. **Metformine.** La fiche rappelait que le patient prenait déjà la metformine
+   pour contrôler sa glycémie. Elle invitait à revoir sa fonction rénale et sa
+   tolérance avant de discuter de la poursuite du traitement. Elle précisait
+   que la maladie cardiovasculaire athéroscléreuse justifiait aussi de discuter
+   des traitements qui réduisent le risque de futurs événements cardiovasculaires,
+   même si l’HbA1c est à la cible.
+2. **Option GLP-1.** La fiche « Reassessment of a GLP-1 option » présentait un
+   agoniste du récepteur du GLP-1 dont le bénéfice cardiovasculaire est démontré
+   comme une option à discuter pour réduire ce risque, même si l’HbA1c est à la
+   cible. Elle invitait à tenir compte des effets digestifs et des préférences
+   du patient.
+
+La validation de la formulation clinique par un médecin reste à faire.
