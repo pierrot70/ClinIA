@@ -1715,6 +1715,11 @@ export const UI_LABELS_FR = {
         statusRevoked: "Révoqué",
     },
     walkInWaitlist: {
+        withdraw: "Retirer de la liste d’attente",
+        withdrawPrompt: "Retirer {patient} de la liste d’attente de {clinic} ?",
+        withdrawConfirm: "Confirmer le retrait",
+        withdrawn: "Inscription retirée de la liste d’attente de {clinic}.",
+        withdrawError: "Impossible de confirmer le retrait. Recherchez à nouveau le patient pour vérifier son inscription.",
         enroll: "Inscrire sur la liste d’attente",
         channel: "Mode de contact choisi",
         smsNumber: "Numéro pour les SMS",

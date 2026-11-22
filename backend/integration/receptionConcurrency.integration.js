@@ -14,6 +14,7 @@ import { AdminUser } from "../models/AdminUser.js";
 import { Clinique } from "../models/Clinique.js";
 import { Specialist } from "../models/Specialist.js";
 import { Patient } from "../models/Patient.js";
+import { WalkInWaitlistEntry } from "../models/WalkInWaitlistEntry.js";
 import { Appointment } from "../models/Appointment.js";
 import { AppointmentBookingGuard } from "../models/AppointmentBookingGuard.js";
 import { PatientAuditLog } from "../models/PatientAuditLog.js";
@@ -867,4 +868,66 @@ describe("13. Explicit earlier neighboring appointment comparison", () => {
         expect(await Appointment.countDocuments({ patient: patientId, status: "scheduled" })).toBe(1);
         expect((await request(path, { token: tokens[0], bookingProof: proof })).status).toBe(403);
     });
+});
+
+it("withdraws only the active-clinic waitlist entry and frees one place for the same patient", async () => {
+    const third = await Clinique.create({ nom: "TestClinic3", num_civique: "1", rue: "Synthetic Street", code_postal: "H0H0H0" });
+    const thirdClinic = String(third._id);
+    await Clinique.updateMany({}, { lat: 45, long: -73 });
+    await Specialist.updateMany({}, { $set: { "practiceLocations.$[].walkInDisponibilites": [] } });
+    await AdminUser.updateOne({ _id: receptionUsers[0]._id }, { assignedClinics: [clinic, otherClinic] });
+    await AdminUser.updateOne({ _id: receptionUsers[1]._id }, { assignedClinics: [thirdClinic] });
+    const insuranceNumber = patient(12).num_assurance_maladie;
+    const contacts = { telephone: "5145550101", telephoneSms: "5145550102", courriel: "test12@example.invalid" };
+    const enroll = (location, token, identity) => request("/api/reception/walk-in-waitlist", {
+        token, body: { clinic: location, insuranceNumber, channel: "email", consent: true, ...contacts, ...identity },
+    });
+    const lookup = async (location, token) => {
+        const response = await request(`/api/reception/patient-lookup?clinic=${location}&ramq=${insuranceNumber}`, { token });
+        expect(response.status).toBe(200);
+        return response.data;
+    };
+    const withdraw = (location, token, patientId, entryId, bookingProof) => request("/api/reception/walk-in-waitlist/withdraw", {
+        token, body: { clinic: location, patientId, entryId, bookingProof },
+    });
+
+    const a = await enroll(clinic, tokens[0], { nom: "Synthetic", prenom: "Waitlist" });
+    expect(a.status).toBe(201);
+    const atB = await lookup(otherClinic, tokens[0]);
+    expect(atB.activeWaitlistEntryId).toBeUndefined();
+    const patientId = atB._id;
+    const b = await enroll(otherClinic, tokens[0], { patientId, bookingProof: atB.bookingProof });
+    expect(b.status).toBe(201);
+    const preservedB = await WalkInWaitlistEntry.findById(b.data._id).lean();
+    const atC = await lookup(thirdClinic, tokens[1]);
+    const blocked = await enroll(thirdClinic, tokens[1], { patientId, bookingProof: atC.bookingProof });
+    expect(blocked).toMatchObject({ status: 409, error: { code: "WAITLIST_CLINIC_LIMIT" } });
+
+    const atA = await lookup(clinic, tokens[0]);
+    expect(atA.activeWaitlistEntryId).toBe(a.data._id);
+    expect(await withdraw(clinic, tokens[1], patientId, a.data._id, atA.bookingProof)).toMatchObject({ status: 403 });
+    expect(await withdraw(otherClinic, tokens[0], patientId, b.data._id, atA.bookingProof)).toMatchObject({
+        status: 403, error: { code: "RECEPTION_LOOKUP_REQUIRED" },
+    });
+    expect(await withdraw(clinic, tokens[0], patientId, b.data._id, atA.bookingProof)).toMatchObject({
+        status: 409, error: { code: "WAITLIST_ENTRY_CHANGED" },
+    });
+    const removed = await withdraw(clinic, tokens[0], patientId, a.data._id, atA.bookingProof);
+    expect(removed).toMatchObject({ status: 200, data: { _id: a.data._id, bookingProof: expect.any(String) } });
+    expect(removed.data.bookingProof).not.toBe(atA.bookingProof);
+    expect(await withdraw(clinic, tokens[0], patientId, a.data._id, atA.bookingProof)).toMatchObject({
+        status: 403, error: { code: "RECEPTION_LOOKUP_REQUIRED" },
+    });
+    expect((await lookup(clinic, tokens[0])).activeWaitlistEntryId).toBeUndefined();
+    const c = await enroll(thirdClinic, tokens[1], { patientId, bookingProof: atC.bookingProof });
+    expect(c.status).toBe(201);
+    expect(await WalkInWaitlistEntry.countDocuments({ patient: patientId })).toBe(2);
+    expect(await WalkInWaitlistEntry.findById(b.data._id).lean()).toEqual(preservedB);
+    expect((await lookup(thirdClinic, tokens[1])).activeWaitlistEntryId).toBe(c.data._id);
+    expect(await Patient.countDocuments()).toBe(1);
+    expect(await Patient.findById(patientId).lean()).toMatchObject(contacts);
+    expect(await WriteOperationAuditLog.countDocuments({
+        collectionName: "walkinwaitlistentries", operation: "DELETE", patientId,
+        receptionClinicId: clinic, resourceId: a.data._id, actorUserId: receptionUsers[0]._id,
+    })).toBe(1);
 });

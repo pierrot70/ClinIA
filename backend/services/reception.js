@@ -135,6 +135,39 @@ export async function listWalkInFamilyMedicineOptions({
     return searchWalkInOptions({ clinicId, patientId, previous, now, compareEarlier: compareEarlier === true, extendedSearchAccepted });
 }
 
+export async function withdrawWalkInWaitlist({ clinicId, patientId, entryId, bookingProof, authUser, ip }) {
+    if (authUser?.role !== "RECEPTION") throw { code: "FORBIDDEN", message: "Accès réservé à la réception." };
+    if (![clinicId, patientId, entryId].every(id => typeof id === "string" && /^[a-f\d]{24}$/i.test(id))) {
+        throw invalidInput("Identifiant invalide.");
+    }
+    const session = await mongoose.startSession();
+    try {
+        return await session.withTransaction(async () => {
+            await assertReceptionClinicAccess(clinicId, authUser, session);
+            await consumeReceptionBookingProof({ bookingProof, authUser, clinicId, patientId, session });
+            // Serialize with concurrent enrollments and patient archival.
+            const patient = await Patient.updateOne({ _id: patientId, archivedAt: null },
+                { $inc: { __v: 1 } }, { session, timestamps: false });
+            if (patient.matchedCount !== 1) throw invalidInput("Patient introuvable.");
+            const removed = await WalkInWaitlistEntry.deleteOne({ _id: entryId, clinic: clinicId, patient: patientId }, { session });
+            if (removed.deletedCount !== 1) {
+                throw { code: "WAITLIST_ENTRY_CHANGED", message: "Cette inscription n’est plus active. Recherchez à nouveau le patient." };
+            }
+            await recordWriteOperationAuditEvent({
+                collectionName: "walkinwaitlistentries", operation: "DELETE", outcome: "SUCCESS",
+                actorUserId: authUser.userId, actorUsername: authUser.username, actorRole: "RECEPTION",
+                ip: ip ?? null, resourceId: entryId, patientId, receptionClinicId: clinicId,
+                requestPath: "/api/reception/walk-in-waitlist/withdraw", writeConcern: CLINICAL_WRITE_CONCERN,
+                session, throwOnError: true,
+            });
+            const freshProof = await issueReceptionBookingProof({ authUser, clinicId, patientId, session });
+            return { _id: entryId, bookingProof: freshProof };
+        }, { writeConcern: CLINICAL_WRITE_CONCERN });
+    } finally {
+        await session.endSession();
+    }
+}
+
 export async function enrollWalkInWaitlist({
     clinicId, insuranceNumber, channel, telephone, telephoneSms, courriel, nom, prenom,
     consent, patientId, bookingProof, replaceAppointmentId, authUser, ip,
@@ -424,14 +457,16 @@ export async function findReceptionPatientByRamq({ clinicId, ramq, authUser, aud
     // Use one clinic calendar-day snapshot for both sides of this boundary.
     // Historical scheduled records are signalled, never silently reclassified.
     const today = currentSchedulingDay(now);
-    const [pending, historical] = await Promise.all([
+    const [pending, historical, waitlistEntry] = await Promise.all([
         pendingAppointments(patient._id, clinicId, today),
         Appointment.exists(historicalAttendanceScope(patient._id, clinicId, today)),
+        WalkInWaitlistEntry.exists({ patient: patient._id, clinic: clinicId }),
     ]);
     return { _id: String(patient._id), nom: patient.nom, prenom: patient.prenom,
         bookingProof: await issueReceptionBookingProof({ authUser, clinicId, patientId: patient._id }),
         existingAppointments: pending.map(({ _id, date, time }) => ({ _id: String(_id), date, time })),
         ...(historical ? { hasHistoricalScheduledAppointments: true } : {}),
+        ...(waitlistEntry ? { activeWaitlistEntryId: String(waitlistEntry._id) } : {}),
     };
 }
 

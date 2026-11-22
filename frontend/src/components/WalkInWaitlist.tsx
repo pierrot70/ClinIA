@@ -1,9 +1,10 @@
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 import { receptionLabel } from "../i18n/receptionLabels";
+import { receptionAttendanceLabels } from "../i18n/receptionAttendanceLabels";
 import { walkInWaitlistLabels } from "../i18n/walkInWaitlistLabels";
 import {
-    enrollWalkInWaitlist,
+    enrollWalkInWaitlist, withdrawWalkInWaitlist,
     type WaitlistPatientContext, type WalkInContactChannel,
 } from "../services/receptionWaitlistApi";
 
@@ -16,6 +17,63 @@ const contactErrorClass = "mt-2 rounded bg-red-50 p-2 font-semibold text-red-800
 function isValidTelephone(number: string) {
     const digitCount = number.replace(/\D/g, "").length;
     return number.length <= 32 && /^\+?[\d().\s-]+$/u.test(number) && digitCount >= 7 && digitCount <= 15;
+}
+
+export function WaitlistWithdrawal({ clinic, patientId, name, entryId, bookingProof, locale, onWithdrawn }: {
+    clinic: { _id: string; nom: string };
+    patientId: string;
+    name: string;
+    entryId: string;
+    bookingProof: string;
+    locale: string;
+    onWithdrawn: (bookingProof: string) => void;
+}) {
+    const text = walkInWaitlistLabels(locale);
+    const dialog = useRef<HTMLDialogElement>(null);
+    const pending = useRef(false);
+    const mounted = useRef(false);
+    const [saving, setSaving] = useState(false);
+    const [failed, setFailed] = useState(false);
+    const title = useId();
+
+    useEffect(() => {
+        mounted.current = true;
+        return () => { mounted.current = false; };
+    }, []);
+
+    async function withdraw() {
+        if (pending.current) return;
+        pending.current = true;
+        setSaving(true);
+        const response = await withdrawWalkInWaitlist({ clinic: clinic._id, patientId, entryId, bookingProof });
+        if (!mounted.current) return;
+        pending.current = false;
+        setSaving(false);
+        dialog.current?.close();
+        if ("error" in response || response.data?._id !== entryId || !response.data.bookingProof) {
+            setFailed(true);
+            return;
+        }
+        onWithdrawn(response.data.bookingProof);
+    }
+
+    return <div className="mt-3">
+        <button type="button" disabled={failed} onClick={() => dialog.current?.showModal()}
+            className="rounded border border-red-600 px-3 py-2 text-sm text-red-800 disabled:opacity-50">{text.withdraw}</button>
+        {failed && <p role="alert" className="mt-2 text-red-800">{text.withdrawError}</p>}
+        <dialog ref={dialog} aria-labelledby={title} onCancel={event => { if (pending.current) event.preventDefault(); }}
+            className="m-auto w-full max-w-md rounded-lg bg-white p-5 shadow-lg backdrop:bg-slate-900/40">
+            <h2 id={title} className="font-semibold">{text.withdrawPrompt.replace(/\{patient\}|\{clinic\}/g, token => token === "{clinic}" ? clinic.nom : name)}</h2>
+            <div className="mt-4 flex flex-wrap gap-2">
+                <button type="button" disabled={saving} className="rounded border px-3 py-2" onClick={() => dialog.current?.close()}>
+                    {receptionAttendanceLabels(locale).cancel}
+                </button>
+                <button type="button" disabled={saving} className="rounded bg-red-700 px-3 py-2 text-white disabled:opacity-50" onClick={() => void withdraw()}>
+                    {text.withdrawConfirm}
+                </button>
+            </div>
+        </dialog>
+    </div>;
 }
 
 export function WalkInWaitlistForm({ locale, context }: {

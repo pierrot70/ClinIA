@@ -7,6 +7,7 @@ import {
     findReceptionPatientByRamq,
     listWalkInFamilyMedicineOptions,
     enrollWalkInWaitlist,
+    withdrawWalkInWaitlist,
     listReceptionHistoricalAppointments,
     recordReceptionHistoricalAttendance,
 } from "../services/reception.js";
@@ -103,8 +104,16 @@ router.get("/walk-in-options", async (req, res) => {
 
 const waitlistErrors = {
     FORBIDDEN: 403, INVALID_INPUT: 400, WAITLIST_CONSENT_REQUIRED: 400, RECEPTION_LOOKUP_REQUIRED: 403,
-    RECEPTION_REPLAN_REQUIRED: 409, WAITLIST_SEARCH_CHANGED: 409, WAITLIST_ALREADY_ENROLLED: 409, WAITLIST_CONTACT_IN_USE: 409, WAITLIST_CLINIC_LIMIT: 409,
+    RECEPTION_REPLAN_REQUIRED: 409, WAITLIST_SEARCH_CHANGED: 409, WAITLIST_ALREADY_ENROLLED: 409, WAITLIST_CONTACT_IN_USE: 409, WAITLIST_CLINIC_LIMIT: 409, WAITLIST_ENTRY_CHANGED: 409,
 };
+
+function sendWaitlistError(res, error) {
+    const code = error?.code;
+    if (Object.hasOwn(waitlistErrors, code)) {
+        return res.status(waitlistErrors[code]).json({ error: { code, message: error.message, retryable: false } });
+    }
+    return res.status(500).json({ error: { code: "PERSISTENCE_FAILED", message: "La liste d’attente est indisponible.", retryable: true } });
+}
 
 router.post("/walk-in-waitlist", async (req, res) => {
     res.set("Cache-Control", "no-store");
@@ -116,11 +125,20 @@ router.post("/walk-in-waitlist", async (req, res) => {
         });
         return res.status(201).json({ data, meta: { source: "real", model: "mongo" } });
     } catch (error) {
-        const code = error?.code;
-        if (Object.hasOwn(waitlistErrors, code)) {
-            return res.status(waitlistErrors[code]).json({ error: { code, message: error.message, retryable: false } });
-        }
-        return res.status(500).json({ error: { code: "PERSISTENCE_FAILED", message: "La liste d’attente est indisponible.", retryable: true } });
+        return sendWaitlistError(res, error);
+    }
+});
+
+router.post("/walk-in-waitlist/withdraw", async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    const { clinic, patientId, entryId, bookingProof } = req.body ?? {};
+    try {
+        const data = await withdrawWalkInWaitlist({
+            clinicId: clinic, patientId, entryId, bookingProof, authUser: req.auth, ip: getTrustedRequestIp(req),
+        });
+        return res.status(200).json({ data, meta: { source: "real", model: "mongo" } });
+    } catch (error) {
+        return sendWaitlistError(res, error);
     }
 });
 

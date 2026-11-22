@@ -22,13 +22,28 @@ interface Enrollment extends WaitlistPatientContext {
     consent: true;
 }
 
-export async function enrollWalkInWaitlist(enrollment: Enrollment): Promise<ApiResponse<{ _id: string }>> {
+interface Withdrawal {
+    clinic: string;
+    patientId: string;
+    bookingProof: string;
+    entryId: string;
+}
+
+export function enrollWalkInWaitlist(enrollment: Enrollment) {
+    return postWaitlist<{ _id: string }>("/api/reception/walk-in-waitlist", enrollment);
+}
+
+export function withdrawWalkInWaitlist(withdrawal: Withdrawal) {
+    return postWaitlist<{ _id: string; bookingProof: string }>("/api/reception/walk-in-waitlist/withdraw", withdrawal);
+}
+
+async function postWaitlist<T>(url: string, payload: Enrollment | Withdrawal): Promise<ApiResponse<T>> {
     return withSecurityIncidentGuard((async () => {
         try {
-            const response = await authFetch("/api/reception/walk-in-waitlist", {
-                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(enrollment),
+            const response = await authFetch(url, {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
             });
-            return await response.json() as ApiResponse<{ _id: string }>;
+            return await response.json() as ApiResponse<T>;
         } catch {
             return { error: { code: "PERSISTENCE_FAILED", message: "", retryable: true } };
         }

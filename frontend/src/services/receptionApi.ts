@@ -48,6 +48,7 @@ export interface ReceptionPatient {
     nom: string;
     prenom: string;
     bookingProof?: string;
+    activeWaitlistEntryId?: string;
     existingAppointments?: { _id: string; date: string; time: string }[];
     hasHistoricalScheduledAppointments?: boolean;
 }

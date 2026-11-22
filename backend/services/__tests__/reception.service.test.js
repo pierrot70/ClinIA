@@ -15,6 +15,7 @@ const patientFindOne = vi.fn();
 const patientFindOneAndUpdate = vi.fn();
 const appointmentFind = vi.fn();
 const appointmentExists = vi.fn();
+const waitlistExists = vi.fn();
 const appointmentUpdateOne = vi.fn();
 const appointmentFindOneAndUpdate = vi.fn();
 const appointmentCount = vi.fn();
@@ -43,6 +44,7 @@ vi.mock("../../models/Specialist.js", () => ({
 vi.mock("../../models/Patient.js", () => ({
     Patient: { findOne: patientFindOne, findOneAndUpdate: patientFindOneAndUpdate, exists: patientExists },
 }));
+vi.mock("../../models/WalkInWaitlistEntry.js", () => ({ WalkInWaitlistEntry: { exists: waitlistExists } }));
 vi.mock("../../models/Appointment.js", () => ({ Appointment: { find: appointmentFind, exists: appointmentExists, findOneAndUpdate: appointmentFindOneAndUpdate, updateOne: appointmentUpdateOne, countDocuments: appointmentCount } }));
 
 vi.mock("../../audit/patientAudit.js", () => ({ recordPatientAuditEvent }));
@@ -158,6 +160,7 @@ beforeEach(() => {
     validateReceptionBookingProof.mockResolvedValue();
     appointmentFind.mockReturnValue(resolvedLean([]));
     appointmentExists.mockResolvedValue(null);
+    waitlistExists.mockResolvedValue(null);
     appointmentUpdateOne.mockResolvedValue({ modifiedCount: 1 });
     patientFindOneAndUpdate.mockImplementation(query => patientFindOne(query));
     vi.spyOn(mongoose, "startSession").mockResolvedValue(transactionSession);

@@ -1,7 +1,7 @@
 import { UiMessage } from "../components/i18n/UiMessage";
 import { ReceptionAttendanceDialog } from "../components/guides/ReceptionAttendanceDialog";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { WalkInWaitlistForm } from "../components/WalkInWaitlist";
+import { WalkInWaitlistForm, WaitlistWithdrawal } from "../components/WalkInWaitlist";
 import { walkInWaitlistLabels } from "../i18n/walkInWaitlistLabels";
 import { useUiLabels } from "../hooks/useUiLabels";
 import { labels } from "../i18n/uiLabels";
@@ -319,7 +319,7 @@ export function WalkInArrivalPage() {
     const clinicId = activeClinic?._id || "";
     const existingPatient = selectedPatient || patients[0];
     const pending = existingPatient?.existingAppointments || [];
-    const waitlistForm = <WalkInWaitlistForm locale={locale} context={{
+    const waitlistForm = selectedPatient?.activeWaitlistEntryId ? null : <WalkInWaitlistForm locale={locale} context={{
         clinic: clinicId, insuranceNumber: ramq.trim(), patientId: selectedPatient?._id,
         bookingProof: selectedPatient?.bookingProof, replaceAppointmentId: replacementId,
     }} />;
@@ -768,6 +768,21 @@ export function WalkInArrivalPage() {
                     </div>
                 )}
                 {selectedPatient && <p className="mt-3 text-sm text-slate-700">{receptionLabel(locale, "selectedPatient", source.selectedPatient).replace("{name}", patientName(selectedPatient))}</p>}
+                {activeClinic && selectedPatient?.activeWaitlistEntryId && selectedPatient.bookingProof && (
+                    <WaitlistWithdrawal
+                        key={`${clinicId}:${selectedPatient.activeWaitlistEntryId}:${selectedPatient.bookingProof}`}
+                        clinic={activeClinic} patientId={selectedPatient._id} name={patientName(selectedPatient)}
+                        entryId={selectedPatient.activeWaitlistEntryId} bookingProof={selectedPatient.bookingProof} locale={locale}
+                        onWithdrawn={bookingProof => {
+                            const update = (p: ReceptionPatient) => p._id === selectedPatient._id
+                                ? { ...p, activeWaitlistEntryId: undefined, bookingProof } : p;
+                            setSelectedPatient(current => current && update(current));
+                            setPatients(current => current.map(update));
+                            setMessageKind(null);
+                            setMessage(walkInWaitlistLabels(locale).withdrawn.replace("{clinic}", () => activeClinic.nom));
+                        }}
+                    />
+                )}
                 {historicalNotice}
                 {rescheduled && <p role="status">{replan.success}</p>}
                 {pending.length > 0 && <div ref={pendingRegion} tabIndex={-1} role="status" className={"mt-4 space-y-2 rounded border border-amber-300 bg-amber-50 p-4" + targetClass(guideStep.key === "existing" || guideStep.key === "ambiguous")}>

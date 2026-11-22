@@ -1,16 +1,18 @@
 import React from "react";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
-import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { HOME_STRINGS_FR } from "../i18n/homeStrings";
 import { receptionReplanLabels, receptionReplanTranslations } from "../i18n/receptionReplanLabels";
+import { installNativeDialogTestSupport } from "../testUtils/nativeDialog";
 import { WalkInArrivalPage } from "./WalkInArrivalPage";
 import { urgentologistLabels, urgentologistTranslations, walkInEmergencyReminder } from "../i18n/urgentologistLabels";
 import { receptionLabel } from "../i18n/receptionLabels";
 import { PAGE_UI_TRANSLATIONS } from "../i18n/pageUiLabels";
 import { UI_LABELS_FR } from "../i18n/uiLabels.fr";
 
-const api = vi.hoisted(() => ({ lookup: vi.fn(), slots: vi.fn(), book: vi.fn() }));
+const api = vi.hoisted(() => ({ lookup: vi.fn(), slots: vi.fn(), book: vi.fn(), withdraw: vi.fn() }));
+vi.mock("../services/receptionWaitlistApi", async importOriginal => ({ ...await importOriginal<typeof import("../services/receptionWaitlistApi")>(), withdrawWalkInWaitlist: api.withdraw }));
 vi.mock("../services/receptionApi", () => ({ findReceptionPatientByRamq: api.lookup, fetchWalkInAvailability: api.slots, createWalkInBooking: api.book }));
 vi.mock("../contexts/ReceptionClinicContext", () => ({ useReceptionClinic: () => ({ activeClinic: { _id: "clinic", nom: "Test clinic" }, isLoading: false }) }));
 function Page({ locale = "en-CA" }: { locale?: string }) {
@@ -227,5 +229,62 @@ describe("emergency physician UI caption", () => {
         expect(screen.getByText(`— ${caption}`)).toBeInTheDocument();
         expect(screen.getByText(/Synthetic clinician/)).toBeInTheDocument();
         expect(api.book).not.toHaveBeenCalled();
+    });
+});
+
+describe("active clinic waitlist withdrawal", () => {
+    let restoreDialog: () => void;
+    beforeAll(() => { restoreDialog = installNativeDialogTestSupport(); });
+    afterAll(() => restoreDialog());
+
+    async function selectPatient(enrolled: boolean) {
+        api.lookup.mockResolvedValue({ data: {
+            _id: "patient", prenom: "Test", nom: "Patient", bookingProof: "lookup-proof",
+            existingAppointments: [], ...(enrolled ? { activeWaitlistEntryId: "entry-A" } : {}),
+        } });
+        render(<Page />);
+        fireEvent.change(screen.getByRole("textbox"), { target: { value: "676767" } });
+        fireEvent.click(screen.getByRole("button", { name: "Search for patient" }));
+        const select = await screen.findByRole("button", { name: /Test Patient.*Select/ });
+        expect(screen.queryByRole("button", { name: "Remove from waitlist" })).toBeNull();
+        fireEvent.click(select);
+    }
+
+    it("asks for confirmation, keeps the entry on cancel and uses the fresh proof after withdrawal", async () => {
+        api.withdraw.mockResolvedValue({ data: { _id: "entry-A", bookingProof: "fresh-proof" } });
+        await selectPatient(true);
+        const remove = screen.getByRole("button", { name: "Remove from waitlist" });
+        fireEvent.click(remove);
+        expect(screen.getByRole("dialog", { name: "Remove Test Patient from the waitlist at Test clinic?" })).toBeVisible();
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+        expect(api.withdraw).not.toHaveBeenCalled();
+        expect(screen.queryByRole("dialog")).toBeNull();
+        fireEvent.click(remove);
+        fireEvent.click(screen.getByRole("button", { name: "Confirm removal" }));
+        expect(await screen.findByText("Removed from the waitlist at Test clinic.")).toBeVisible();
+        expect(api.withdraw).toHaveBeenCalledExactlyOnceWith({
+            clinic: "clinic", patientId: "patient", entryId: "entry-A", bookingProof: "lookup-proof",
+        });
+        fireEvent.click(screen.getByRole("button", { name: /Test Patient.*Select/ }));
+        expect(screen.queryByRole("button", { name: "Remove from waitlist" })).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "View available appointments" }));
+        await screen.findByRole("button", { name: "Refresh available appointments" });
+        expect(api.slots).toHaveBeenCalledWith("clinic", "patient", undefined, "fresh-proof");
+    });
+
+    it("offers no withdrawal if the active clinic has no entry", async () => {
+        await selectPatient(false);
+        expect(screen.queryByRole("button", { name: "Remove from waitlist" })).toBeNull();
+        expect(api.withdraw).not.toHaveBeenCalled();
+    });
+
+    it("requires a new lookup when the withdrawal could not be confirmed", async () => {
+        api.withdraw.mockResolvedValue({ error: { code: "WAITLIST_ENTRY_CHANGED" } });
+        await selectPatient(true);
+        fireEvent.click(screen.getByRole("button", { name: "Remove from waitlist" }));
+        fireEvent.click(screen.getByRole("button", { name: "Confirm removal" }));
+        expect(await screen.findByRole("alert")).toHaveTextContent("Search for the patient again");
+        expect(screen.getByRole("button", { name: "Remove from waitlist" })).toBeDisabled();
+        expect(screen.queryByText("Removed from the waitlist at Test clinic.")).toBeNull();
     });
 });
