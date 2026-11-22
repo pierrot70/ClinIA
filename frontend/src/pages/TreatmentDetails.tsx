@@ -1,4 +1,4 @@
-import { SimulatedFrailtyNote } from "../components/clinical/SimulatedFrailtyNote";
+import { SimulatedDiabetesOptionNote } from "../components/clinical/SimulatedDiabetesOptionNote";
 import { CurrentClinicalMedications } from "../components/clinical/SubmittedClinicalContext";
 import { useClinicalResultReturn } from "../contexts/ClinicalResultReturnContext";
 import { labels } from "../i18n/uiLabels";
@@ -229,7 +229,7 @@ const TreatmentDetails: React.FC = () => {
         ) : (
           <p>{t(labels.pageUi.aucunDetailSupplementaireFourniPourCetteOption)}</p>
         )}
-        <SimulatedFrailtyNote context={patientContext} sourceMode={sourceMode} option={treatment.name} />
+        <SimulatedDiabetesOptionNote context={patientContext} sourceMode={sourceMode} option={treatment.name} />
         {treatment.dosage || treatment.duration ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>

@@ -4,7 +4,7 @@ import React from "react";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Treatment } from "../data/types";
-import { SimulatedFrailtyNote } from "./clinical/SimulatedFrailtyNote";
+import { SimulatedDiabetesOptionNote } from "./clinical/SimulatedDiabetesOptionNote";
 import type { ClinicalPayload, EvidenceLevel } from "../types/clinical";
 
 interface Props {
@@ -113,7 +113,7 @@ const TreatmentCard: React.FC<Props> = ({ treatment, patientContext, sourceMode,
         <p className="text-sm text-gray-700">{t(labels.pageUi.aucunDetailSupplementaireFourniPourCetteOption)}</p>
       )}
 
-      <SimulatedFrailtyNote context={patientContext} sourceMode={sourceMode} option={treatment.name} />
+      <SimulatedDiabetesOptionNote context={patientContext} sourceMode={sourceMode} option={treatment.name} />
 
       <div className="flex flex-wrap gap-2 text-xs">
         {flags.includes("wellTolerated") && (
