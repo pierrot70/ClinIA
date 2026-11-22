@@ -4,10 +4,12 @@ import React from "react";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Treatment } from "../data/types";
-import type { EvidenceLevel } from "../types/clinical";
+import { SimulatedFrailtyNote } from "./clinical/SimulatedFrailtyNote";
+import type { ClinicalPayload, EvidenceLevel } from "../types/clinical";
 
 interface Props {
   treatment: ClinicalTreatmentCardData;
+  patientContext?: ClinicalPayload | null;
   resultReturn?: { key: string; save: () => void };
   sourceMode?: string;
   cacheHit?: boolean;
@@ -78,7 +80,7 @@ function getSourceFootnote(sourceMode: string | undefined) {
   return labels.clinicalProvenance.unknown;
 }
 
-const TreatmentCard: React.FC<Props> = ({ treatment, sourceMode, cacheHit, language = "fr", resultReturn }) => {
+const TreatmentCard: React.FC<Props> = ({ treatment, patientContext, sourceMode, cacheHit, language = "fr", resultReturn }) => {
     const { locale: uiLocale, t } = useUiLabels(language);
   const english = language === "en";
   const flags = Array.isArray(treatment.flags) ? treatment.flags : [];
@@ -110,6 +112,8 @@ const TreatmentCard: React.FC<Props> = ({ treatment, sourceMode, cacheHit, langu
       ) : (
         <p className="text-sm text-gray-700">{t(labels.pageUi.aucunDetailSupplementaireFourniPourCetteOption)}</p>
       )}
+
+      <SimulatedFrailtyNote context={patientContext} sourceMode={sourceMode} option={treatment.name} />
 
       <div className="flex flex-wrap gap-2 text-xs">
         {flags.includes("wellTolerated") && (

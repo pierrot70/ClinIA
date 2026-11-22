@@ -640,6 +640,7 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
           <TreatmentCard
             key={i}
             treatment={t}
+            patientContext={patientContext}
             resultReturn={resultReturn ? {
               key: resultKey,
               save: () => resultReturn.save(resultKey, {
