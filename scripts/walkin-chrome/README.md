@@ -113,5 +113,26 @@ nécessaires à la reprise du nettoyage. Les journaux d’audit restent en place
 
 ## Historique des validations en production
 
+### 22 novembre 2026 · Retrait de la liste d’attente de la clinique active · `66d82c0`
+
+Test réussi en production dans Chrome avec le compte RECEPTION et un patient
+fictif. Le patient était inscrit aux cliniques A et B. Une première tentative
+à C a été refusée, la limite de deux cliniques étant atteinte. Après avoir
+confirmé le retrait dans la clinique active A, RECEPTION a repris le même
+dossier à C et l’inscription a réussi.
+
+MongoDB a confirmé un seul dossier patient et exactement deux inscriptions,
+à B et à C. L’inscription à B avait conservé son identifiant et son horodatage
+d’origine. Les affectations habituelles du compte RECEPTION ont été rétablies.
+
+Le nettoyage a supprimé en une transaction le dossier fictif et les deux
+inscriptions restantes. Une seconde lecture de MongoDB a confirmé **0 dossier
+et 0 inscription** pour ce patient. L’empreinte des **9 audits** était identique
+avant et après le nettoyage. Les 5 audits patient couvrent la création du
+dossier et quatre recherches. Les 4 audits d’écriture retracent les inscriptions
+à A, B et C ainsi que le retrait de A.
+
+### Passes complètes des 12 scénarios
+
 - [21 novembre 2026 · `46f8a98` · 12 scénarios sur 12](../../docs/production-validation-walkin-20261121-46f8a98.md)
 - [15 novembre 2026 · `d143779` · 12 scénarios sur 12](../../docs/production-validation-walkin-20261115-d143779.md)
