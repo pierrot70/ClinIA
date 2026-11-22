@@ -15,14 +15,21 @@ describe("fixed English clinical mock sources", () => {
 
     it("describes the synthetic diabetes context without declaring a final diagnosis or celebrating disease", () => {
         for (const mock of [mocks.diabete_type_2, getMockForDiagnosis("diabetes")]) {
-            expect(mock.patient_summary).toContain("This simulated example concerns elevated blood glucose in a type 2 diabetes context.");
+            expect(mock.patient_summary).toContain("type 2 diabetes");
+            expect(mock.patient_summary).not.toMatch(/elevated blood glucose/i);
+            expect(mock.treatments.every(treatment => !("efficacy" in treatment))).toBe(true);
             expect(mock.patient_summary).not.toMatch(/Hooray|Hourra|indicating type 2 diabetes/);
         }
     });
 
-    it("retains the JSON source's contraindications, cautions and illustrative efficacy values", () => {
+    it("retains authored contraindications and cautions and covers metformin continuation once", () => {
         expect(mocks.hypertension.treatments[1]).toMatchObject({name: "Amlodipine", contraindications: ["Severe hypotension"], efficacy: 82});
-        expect(mocks.diabete_type_2.treatments[2]).toMatchObject({name: "Reassessment of a GLP-1 option", contraindications: ["Caution if the clinical context is incomplete"], efficacy: 74});
-        expect(mocks.diabete_type_2.treatments[2].justification).toContain("without replacing clinical judgment");
+        expect(mocks.diabete_type_2.treatments.map(treatment => treatment.name)).toEqual([
+            "Metformin",
+            "Reassessment of a GLP-1 option",
+        ]);
+        expect(mocks.diabete_type_2.treatments[0].contraindications).toEqual(["Severe renal impairment"]);
+        expect(mocks.diabete_type_2.treatments[1].contraindications).toContain("Caution if the clinical context is incomplete");
+        expect(mocks.diabete_type_2.treatments[1].justification).toContain("without replacing clinical judgment");
     });
 });

@@ -188,7 +188,7 @@ describe("simulated primary concern selection", () => {
         expect(result.responsePayload.data.treatments.map(treatment => treatment.name)).toContain("Metformin");
         const authoredMetformin = getMockForDiagnosis(patient.diagnosis).treatments.find(treatment => treatment.name === "Metformin");
         const normalizedMetformin = result.responsePayload.data.treatments.find(treatment => treatment.name === "Metformin");
-        expect(authoredMetformin.justification).toBe("First-line treatment.");
+        expect(authoredMetformin.justification).toContain("If metformin is listed among the current medications");
         expect(normalizedMetformin.justification).toBe(authoredMetformin.justification);
         expect(normalizedMetformin.indication).toBe("");
         expect(result.responsePayload.data.diagnosis.suspected).toBe("Type 2 diabetes");

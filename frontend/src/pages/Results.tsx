@@ -2,9 +2,9 @@ import { useClinicalResultReturn } from "../contexts/ClinicalResultReturnContext
 import { labels } from "../i18n/uiLabels";
 import { useUiLabels } from "../hooks/useUiLabels";
 import { translateUiLabelTree } from "../i18n/pageUiLabels";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useClinicalAnalysis } from "../hooks/useClinicalAnalysis";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useHomeI18n } from "../contexts/HomeI18nContext";
 import { useClinicalAnalysisNavigation } from "../contexts/ClinicalAnalysisNavigationContext";
 import {
@@ -15,10 +15,10 @@ import { SecurityBlockingAlert } from "../components/system/SecurityBlockingAler
 import type { SecurityIncidentBlockingData } from "../types/api";
 import type { ClinicalPayload } from "../types/clinical";
 
+import { CachedResultNotice } from "../components/clinical/CachedResultNotice";
 import AICard from "../components/AICard";
 import ClinicalDemoResult from "../components/ClinicalDemoResult";
 
-import { getClinicalDemoScenario } from "../data/clinicalDemoScenarios";
 
 function buildFallbackPayload(): ClinicalPayload {
     return {
@@ -55,7 +55,10 @@ const ResultsAnalyze: React.FC = () => {
 
     const { result: analysis, loading: loadingAI, error: errorMessage, analyze, responseMeta } = useClinicalAnalysis();
 
-    const demoScenario = getClinicalDemoScenario(baseAnalysisPayload);
+    const navigate = useNavigate();
+    const [viewedCacheResponse, setViewedCacheResponse] = useState<typeof responseMeta>(null);
+    const viewCachedResult = useCallback(() => setViewedCacheResponse(responseMeta), [responseMeta]);
+
 
     const demoData = {
         treatments: analysis?.treatments ?? [],
@@ -169,6 +172,10 @@ const ResultsAnalyze: React.FC = () => {
         });
     }
 
+    if (!loadingAI && analysis && responseMeta?.cacheHit === true && responseMeta !== viewedCacheResponse) {
+        return <CachedResultNotice onEdit={() => navigate(-1)} onView={viewCachedResult} />;
+    }
+
     return (
         <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
             {blockingIncident && (
@@ -242,14 +249,14 @@ const ResultsAnalyze: React.FC = () => {
             </section>
 
             {/* Rendu enrichi partagé */}
-            <ClinicalDemoResult
+            {(analysis || errorMessage) && !loadingAI && <ClinicalDemoResult
                 demoData={demoData as any}
                 sourceMode={sourceMode}
                 cacheHit={responseMeta?.cacheHit}
                 realAI={realAI}
                 patientDisplayName={patientDisplayName}
                 patientContext={baseAnalysisPayload}
-            />
+            />}
         </div>
     );
 };

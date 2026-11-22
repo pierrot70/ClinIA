@@ -5,6 +5,15 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import TreatmentDetails from "./TreatmentDetails";
 
 describe("TreatmentDetails", () => {
+    it.each(["mock", "real"])("handles legacy numeric efficacy according to source %s", sourceMode => {
+        const treatment = { id: "metformin", name: "Metformin", source_fields: { efficacy: 90, notes: "Source note" } };
+        render(<MemoryRouter initialEntries={[{ pathname: "/treatment/metformin", state: { sourceMode, treatment } }]}>
+            <Routes><Route path="/treatment/:id" element={<TreatmentDetails />} /></Routes>
+        </MemoryRouter>);
+        const supplementaryFields = screen.getByText(/Source note/);
+        expect(supplementaryFields.textContent?.includes('"efficacy": 90')).toBe(sourceMode === "real");
+    });
+
     it.each([
         { details: " Source details ", summary: "Summary", justification: "Rationale", indication: "Indication", expected: " Source details " },
         { details: " \t", summary: " Source summary ", justification: "Rationale", indication: "Indication", expected: " Source summary " },

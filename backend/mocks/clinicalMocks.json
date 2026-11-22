@@ -28,29 +28,21 @@
       "glyc",
       "type 2"
     ],
-    "patient_summary": "This simulated example concerns elevated blood glucose in a type 2 diabetes context.",
+    "patient_summary": "This simulated example reviews the submitted type 2 diabetes profile. A glycemic target alone does not establish current glycemic control.",
     "treatments": [
       {
         "name": "Metformin",
-        "justification": "First-line treatment.",
+        "justification": "If metformin is listed among the current medications, review its tolerability and the latest measured HbA1c when discussing continuation.",
         "contraindications": [
           "Severe renal impairment"
-        ],
-        "efficacy": 90
-      },
-      {
-        "name": "Cautious continuation of the current strategy",
-        "justification": "May be reasonable if glycemic control is adequate and tolerability is good.",
-        "contraindications": [],
-        "efficacy": 68
+        ]
       },
       {
         "name": "Reassessment of a GLP-1 option",
         "justification": "May be discussed based on weight, cardiometabolic risk and glycemic goals, without replacing clinical judgment.",
         "contraindications": [
           "Caution if the clinical context is incomplete"
-        ],
-        "efficacy": 74
+        ]
       }
     ]
   },

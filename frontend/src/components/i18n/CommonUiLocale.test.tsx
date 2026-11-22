@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { HomeI18nContext } from "../../contexts/HomeI18nContext";
 import { HOME_STRINGS_FR } from "../../i18n/homeStrings";
 import { COMPONENT_UI_TRANSLATIONS } from "../../i18n/componentUiLabels";
+import { labels } from "../../i18n/uiLabels";
+import { getLocalUiTranslation } from "../../i18n/localUiTranslations";
 import AICard from "../AICard";
 import { DiagnosticHeader } from "../clinical/DiagnosticHeader";
 import { AlternativesPanel } from "../clinical/AlternativesPanel";
@@ -21,11 +23,11 @@ afterEach(cleanup);
 describe("common UI follows the global locale", () => {
     it.each(["en", "es", "ko", "vi", "no", "ja", "zh", "he"])("updates static labels on switch to %s and keeps clinical data intact", locale => {
         const { rerender } = render(<CommonUi locale="fr" />);
-        expect(screen.getByText("Analyse en cours...")).toBeInTheDocument();
+        expect(screen.getByRole("status")).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "Voir les alternatives" }));
         rerender(<CommonUi locale={locale} />);
         const translated = COMPONENT_UI_TRANSLATIONS[locale];
-        expect(screen.getByText(translated.analyseEnCours)).toBeInTheDocument();
+        expect(screen.getByRole("status")).toHaveTextContent(getLocalUiTranslation(labels.pageUi.loading, locale)!);
         expect(screen.getByText(translated.diagnosticSuspecte)).toBeInTheDocument();
         expect(screen.getByRole("button", { name: translated.masquerLesAlternatives })).toBeInTheDocument();
         expect(screen.getByText("Synthetic diagnosis, unchanged")).toBeInTheDocument();

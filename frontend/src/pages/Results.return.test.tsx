@@ -36,9 +36,10 @@ function Harness({ quick = false, entry = "/clinical-demo", initialState, locale
     return <HomeI18nContext.Provider value={{ locale: language, strings: HOME_STRINGS_FR, isTranslating: false, setLocaleFromDropdown: vi.fn(), setLocaleFromVoice: vi.fn() }}>
         <button onClick={() => setLanguage("en-CA")}>English test control</button>
         <ClinicalResultReturnProvider><ClinicalAnalysisNavigationProvider initialPendingClinicalAnalysis={quick ? { payload } : null}>
-            <MemoryRouter initialEntries={[{ pathname: entry, state: initialState }]}>
+            <MemoryRouter initialEntries={["/", { pathname: entry, state: initialState }]}>
                 <LocationProbe />
                 <Routes>
+                    <Route path="/" element={<h1>Search form</h1>} />
                     <Route path="/clinical-demo" element={<ClinicalDemoResult {...view} />} />
                     <Route path="/treatment/:id" element={<TreatmentDetails />} />
                     <Route path="/results" element={<Results />} />
@@ -59,6 +60,11 @@ describe("return to an existing clinical result", () => {
     it.each([false, true])("restores details and repeated returns without another AI request (quick=%s)", async quick => {
         const user = userEvent.setup();
         render(<Harness quick={quick} entry={quick ? "/results" : "/clinical-demo"} />);
+        if (quick) {
+            expect(await screen.findByRole("dialog")).toHaveTextContent("Résultat d’une requête précédente");
+            expect(screen.queryByText("Original cached summary")).not.toBeInTheDocument();
+            await user.click(screen.getByRole("button", { name: "Consulter le résultat" }));
+        }
         const alternatives = await screen.findByRole("button", { name: /^Alternatives et recommandations/ });
         await act(async () => { await user.click(alternatives); });
         expect(screen.getAllByText("Réponse réutilisée depuis le cache.")).toHaveLength(2);
@@ -88,6 +94,7 @@ describe("return to an existing clinical result", () => {
         expect(screen.queryByText("A only")).not.toBeInTheDocument();
         await act(async () => { await user.click(screen.getByRole("link", { name: "← Back to results" })); });
         await waitFor(() => expect(screen.getByRole("heading", { name: "Synthetic option A" })).toBeInTheDocument());
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
         expect(analysisCalls()).toHaveLength(beforeReturn);
         expect(window.localStorage.length).toBe(0);
         expect(window.sessionStorage.length).toBe(0);
@@ -99,6 +106,14 @@ describe("return to an existing clinical result", () => {
         expect(status.textContent).toBeTruthy();
         if (locale !== "fr-CA") expect(status.textContent).not.toContain("L’analyse précédente");
         expect(analysisCalls()).toHaveLength(0);
+    });
+
+    it("returns to the preceding search form without submitting again when editing a cache hit", async () => {
+        const user = userEvent.setup();
+        render(<Harness quick entry="/results" />);
+        await user.click(await screen.findByRole("button", { name: "Modifier les paramètres cliniques" }));
+        expect(await screen.findByRole("heading", { name: "Search form" })).toBeInTheDocument();
+        expect(analysisCalls()).toHaveLength(1);
     });
 
     it("does not analyze on a direct results URL with no pending request", () => {

@@ -94,12 +94,12 @@ export const APPROVED_UI_TRANSLATION_CATALOG = Object.freeze([
     {
         key: "clinicalDemo.cachedResultNotice.title",
         namespace: "clinical-demo",
-        text: "Analyse equivalente deja disponible",
+        text: "Résultat d’une requête précédente",
     },
     {
         key: "clinicalDemo.cachedResultNotice.description",
         namespace: "clinical-demo",
-        text: "ClinIA a trouve une analyse clinique equivalente deja enregistree. Aucun nouvel appel a OpenAI n'a ete necessaire.",
+        text: "ClinIA a retrouvé le résultat d’une requête précédente avec les mêmes paramètres cliniques. Vous pouvez le consulter sans nouvel appel à OpenAI.",
     },
     {
         key: "clinicalDemo.cachedResultNotice.confirmation",
@@ -109,12 +109,12 @@ export const APPROVED_UI_TRANSLATION_CATALOG = Object.freeze([
     {
         key: "clinicalDemo.cachedResultNotice.refreshHint",
         namespace: "clinical-demo",
-        text: "Pour declencher une nouvelle analyse, revenez aux parametres, mettez a jour les renseignements cliniques pertinents, puis cliquez de nouveau sur Analyser. Une relance identique forcee doit etre demandee a un SUPERADMIN.",
+        text: "Pour modifier la demande, revenez aux paramètres cliniques. Pour relancer une demande identique, adressez-vous à un SUPERADMIN.",
     },
     {
         key: "clinicalDemo.cachedResultNotice.editParametersAction",
         namespace: "clinical-demo",
-        text: "Modifier les parametres cliniques",
+        text: "Modifier les paramètres cliniques",
     },
     {
         key: "clinicalDemo.navigation.backToClinicalDemo",

@@ -364,7 +364,7 @@ describe("useTranslation", () => {
             expect(result.current.loading).toBe(false);
         });
 
-        expect(result.current.translated).toBe("Equivalent analysis already available");
+        expect(result.current.translated).toBe("Result from a previous request");
         expect(translateTextMock).not.toHaveBeenCalled();
     });
 

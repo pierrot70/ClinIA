@@ -1,9 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import type { ClinicalPayload, ClinicalAnalysis } from "../types/clinical";
 import type { SecurityIncidentBlockingData } from "../types/api";
 import { authFetch } from "../services/authService";
-
-const MIN_LOADING_INDICATOR_MS = 500;
 
 export type ClinicalAnalysisResponseMeta = {
   source?: string;
@@ -12,6 +10,7 @@ export type ClinicalAnalysisResponseMeta = {
 };
 
 export function useClinicalAnalysis() {
+  const requestVersion = useRef(0);
   const [result, setResult] = useState<ClinicalAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +21,7 @@ export function useClinicalAnalysis() {
   const analyze = useCallback(async (
     payload: ClinicalPayload
   ): Promise<SecurityIncidentBlockingData | null> => {
-    const startedAt = Date.now();
+    const version = ++requestVersion.current;
     setLoading(true);
     setError(null);
     setErrorCode(null);
@@ -36,6 +35,7 @@ export function useClinicalAnalysis() {
         body: JSON.stringify(payload),
       });
       const json = await res.json();
+      if (version !== requestVersion.current) return null;
       if (json?.error) {
         setError(json.error.message || "Erreur lors de l’analyse.");
         setErrorCode(json.error.code || null);
@@ -58,24 +58,20 @@ export function useClinicalAnalysis() {
         );
         return null;
       }
-    } catch (e) {
+    } catch {
+      if (version !== requestVersion.current) return null;
       setError("Erreur réseau ou serveur.");
       setErrorFields([]);
       setResponseMeta(null);
       setResult(null);
       return null;
     } finally {
-      const remainingIndicatorTime = MIN_LOADING_INDICATOR_MS - (Date.now() - startedAt);
-      if (remainingIndicatorTime > 0) {
-        await new Promise<void>((resolve) => {
-          window.setTimeout(resolve, remainingIndicatorTime);
-        });
-      }
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
   }, []);
 
   const resetAnalysis = useCallback(() => {
+    requestVersion.current++;
     setResult(null);
     setError(null);
     setErrorCode(null);

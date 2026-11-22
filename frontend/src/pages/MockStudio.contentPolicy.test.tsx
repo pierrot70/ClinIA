@@ -57,6 +57,17 @@ describe("MockStudio source language", () => {
         expect(JSON.parse(mocks.authFetch.mock.calls[1][1].body)).toEqual(content);
     });
 
+    it("preserves an empty simulated efficacy field when saving an edited option", async () => {
+        render(<Page locale="fr-CA" />);
+        const score = await screen.findByRole("spinbutton");
+        fireEvent.change(score, { target: { value: "" } });
+        fireEvent.click(screen.getByRole("button", { name: UI_LABELS_FR.pageUi.save }));
+        await waitFor(() => expect(mocks.authFetch).toHaveBeenCalledTimes(2));
+        const [option] = JSON.parse(mocks.authFetch.mock.calls[1][1].body).synthetic_condition.treatments;
+        expect(option).not.toHaveProperty("efficacy");
+        expect(option.name).toBe("English option");
+    });
+
     it("authors new simulation defaults in English while keeping generated matching keys unchanged", async () => {
         render(<Page locale="fr-CA" />);
         await screen.findByDisplayValue(content.synthetic_condition.patient_summary);

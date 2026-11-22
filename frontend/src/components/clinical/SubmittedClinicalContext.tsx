@@ -3,6 +3,17 @@ import { clinicalReviewLabels } from '../../i18n/clinicalReviewLabels';
 import { UI_LABELS_FR } from '../../i18n/uiLabels.fr';
 import { localizeClinicalFormFieldLabel } from '../../i18n/clinicalFormFieldLabels';
 
+export function CurrentClinicalMedications({ context, locale }: { context: ClinicalPayload; locale: string }) {
+ const labels = clinicalReviewLabels(locale);
+ const medications = Array.isArray(context.current_medications)
+  ? context.current_medications.filter(value => typeof value === 'string' && value.trim()).join(', ')
+  : '';
+ return <div>
+  <h2 className="mb-1 text-sm font-semibold text-gray-800">{labels.medications}</h2>
+  <p className="text-sm text-gray-700" dir="auto" translate={medications ? 'no' : undefined}>{medications || labels.missing}</p>
+ </div>;
+}
+
 // Show the submitted values, never infer patient details from generated prose.
 // The allowlist also excludes ephemeral authorization/control fields.
 export function SubmittedClinicalContext({ context, locale }: { context?: ClinicalPayload | null; locale: string }) {

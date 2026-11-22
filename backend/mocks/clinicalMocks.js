@@ -30,28 +30,25 @@ export const mockHypertension = {
 
 export const mockDiabetes = {
     patient_summary:
-        "This simulated example concerns elevated blood glucose in a type 2 diabetes context. Treatments and lifestyle changes can help stabilize blood glucose.",
+        "This simulated example reviews the submitted type 2 diabetes profile. A glycemic target alone does not establish current glycemic control.",
     treatments: [
         {
             name: "Metformin",
             justification:
-                "A recommended, well-tolerated first-line treatment.",
-            contraindications: ["Severe renal impairment"],
-            efficacy: 90
+                "If metformin is listed among the current medications, review its tolerability and the latest measured HbA1c when discussing continuation.",
+            contraindications: ["Severe renal impairment"]
         },
         {
             name: "Weight loss",
             justification:
                 "May improve insulin sensitivity and lower blood glucose.",
-            contraindications: [],
-            efficacy: 60
+            contraindications: []
         },
         {
             name: "SGLT2 inhibitors",
             justification:
                 "Promote glucose excretion in the urine.",
-            contraindications: ["History of severe urinary tract infections"],
-            efficacy: 75
+            contraindications: ["History of severe urinary tract infections"]
         }
     ]
 };

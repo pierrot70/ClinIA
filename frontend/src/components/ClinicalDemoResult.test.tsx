@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import ClinicalDemoResult from "./ClinicalDemoResult";
+import { EXAMPLE_CASES } from "../data/clinicalExampleCases";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 
 const { captureTreatmentTable, captureQuestionCard } = vi.hoisted(() => ({ captureTreatmentTable: vi.fn(), captureQuestionCard: vi.fn() }));
@@ -29,6 +30,23 @@ vi.mock("./ClinicalRelevanceByAgeChart", () => ({
 }));
 
 describe("ClinicalDemoResult", () => {
+    it("shows the submitted diabetes medications instead of ranking the first simulated option", () => {
+        const data = { treatments: [{ name: "Metformin" }, { name: "Reassessment of a GLP-1 option" }] };
+        const view = (medications: string[]) => <ClinicalDemoResult
+            demoData={data as any} sourceMode="mock" alternativesInitiallyOpen
+            patientContext={{ ...EXAMPLE_CASES.diabetesType255, current_medications: medications }}
+        />;
+        const { rerender } = render(view(["Metformin"]));
+        expect(screen.getByRole("heading", { name: "Médicaments actuels" })).toBeVisible();
+        expect(screen.getByText("Metformin")).toHaveAttribute("translate", "no");
+        expect(screen.queryByText(/priority option/)).not.toBeInTheDocument();
+        rerender(view(["Different submitted medication"]));
+        expect(screen.getByText("Different submitted medication")).toBeVisible();
+        expect(screen.queryByText("Metformin")).not.toBeInTheDocument();
+        rerender(view([]));
+        expect(screen.getByText("Non renseigné")).toBeVisible();
+    });
+
     it("keeps English clinical questions while UI switches from English to Spanish", () => {
         const data = { summary: "Synthetic summary", treatments: [{ name: "Inhibiteur SGLT2" }], questions: [] };
         const view = (locale: string) => <HomeI18nContext.Provider value={{ locale } as any}><ClinicalDemoResult demoData={data as any} /></HomeI18nContext.Provider>;

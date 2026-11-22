@@ -13,7 +13,7 @@ type Treatment = {
     name: string;
     justification: string;
     contraindications: string[];
-    efficacy: number;
+    efficacy?: number;
 };
 
 type MockEntry = {
@@ -411,7 +411,7 @@ const MockStudio: React.FC = () => {
                                                 <input
                                                     type="number"
                                                     className="w-full border rounded px-2 py-1 text-xs"
-                                                    value={treatment.efficacy}
+                                                    value={treatment.efficacy ?? ""}
                                                     min={0}
                                                     max={100}
                                                     onChange={(e) =>
@@ -419,7 +419,7 @@ const MockStudio: React.FC = () => {
                                                             const c = [...prev.treatments];
                                                             c[index] = {
                                                                 ...c[index],
-                                                                efficacy: Number(e.target.value) || 0,
+                                                                efficacy: e.target.value === "" ? undefined : Number(e.target.value),
                                                             };
                                                             return { ...prev, treatments: c };
                                                         })

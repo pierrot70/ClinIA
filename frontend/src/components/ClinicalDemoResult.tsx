@@ -10,7 +10,7 @@ import ClinicalReferenceList from "./ClinicalReferenceList";
 import { ClinicalSafetySections } from "./clinical/ClinicalSafetySections";
 
 import { ClinicalAnalysis, type ClinicalPayload } from "../types/clinical";
-import { SubmittedClinicalContext } from "./clinical/SubmittedClinicalContext";
+import { CurrentClinicalMedications, SubmittedClinicalContext } from "./clinical/SubmittedClinicalContext";
 import { clinicalReviewLabels } from "../i18n/clinicalReviewLabels";
 import { HomeI18nContext } from "../contexts/HomeI18nContext";
 import { getClinicalResultStrings } from "../i18n/clinicalResultStrings";
@@ -606,15 +606,19 @@ const ClinicalDemoResult: React.FC<ClinicalDemoResultProps> = ({
       {mappedTreatments.length > 0 && !hasIADetails && (
         <>
           <section className="bg-white border rounded-xl p-4 shadow-xs flex flex-col sm:flex-row gap-4 justify-between items-start">
-            <div>
-              <h2 className="text-sm font-semibold text-gray-800 mb-1">{contentStrings.suggestedTreatment}</h2>
-              <p className="text-sm text-gray-700">
-                <SuggestedTreatmentDescription
-                  treatmentName={mappedTreatments[0]?.name || ""}
-                  language={contentLanguage}
-                />
-              </p>
-            </div>
+            {sourceMode === "mock" && patientContext?.diabetes_context ? (
+              <CurrentClinicalMedications context={patientContext} locale={targetLang} />
+            ) : (
+              <div>
+                <h2 className="text-sm font-semibold text-gray-800 mb-1">{contentStrings.suggestedTreatment}</h2>
+                <p className="text-sm text-gray-700">
+                  <SuggestedTreatmentDescription
+                    treatmentName={mappedTreatments[0]?.name || ""}
+                    language={contentLanguage}
+                  />
+                </p>
+              </div>
+            )}
             <div className="text-right text-sm max-w-[16rem]">
               <div className="text-xs text-gray-500">{contentStrings.clinicalReference}</div>
               <div className="text-base font-semibold text-primary">

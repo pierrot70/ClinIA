@@ -1,3 +1,4 @@
+import { CurrentClinicalMedications } from "../components/clinical/SubmittedClinicalContext";
 import { useClinicalResultReturn } from "../contexts/ClinicalResultReturnContext";
 import { labels } from "../i18n/uiLabels";
 import { useUiLabels } from "../hooks/useUiLabels";
@@ -158,8 +159,12 @@ const TreatmentDetails: React.FC = () => {
   const monitoringItems = normalizeList(treatment.monitoring);
   const contraindicationItems = normalizeList(treatment.contraindications);
   const relevanceLabel = getClinicalRelevanceLabel(treatment);
-  const sourceLabel = getSourceLabel(
-    snapshot ? snapshot.view.sourceMode : locationState?.treatment ? locationState.sourceMode : fallbackTreatment ? "mock" : undefined
+  const sourceMode = snapshot ? snapshot.view.sourceMode : locationState?.treatment ? locationState.sourceMode : fallbackTreatment ? "mock" : undefined;
+  const sourceLabel = getSourceLabel(sourceMode);
+  const patientContext = snapshot?.view.patientContext;
+  // Older simulated options can carry an unqualified numeric fixture score.
+  const sourceFields = Object.entries(treatment.source_fields ?? {}).filter(
+    ([key, value]) => !(sourceMode === "mock" && key === "efficacy" && typeof value === "number")
   );
   const cacheHit = snapshot ? snapshot.view.cacheHit : locationState?.treatment ? locationState.cacheHit : undefined;
   const surveillanceLabel =
@@ -181,6 +186,9 @@ const TreatmentDetails: React.FC = () => {
         <p className="text-sm text-gray-600">{treatment.class ? <span dir="auto" translate="no">{treatment.class}</span> : t(labels.pageUi.treatment)}</p>
       </div>
 
+      {sourceMode === "mock" && patientContext?.diabetes_context && (
+        <CurrentClinicalMedications context={patientContext} locale={uiLocale} />
+      )}
       <section className="grid sm:grid-cols-3 gap-4 text-sm">
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-xs">
           <div className="text-xs text-gray-500">{t(labels.pageUi.pertinenceClinique)}</div>
@@ -236,10 +244,10 @@ const TreatmentDetails: React.FC = () => {
         ) : null}
       </section>
 
-      {treatment.source_fields && Object.keys(treatment.source_fields).length > 0 && (
+      {sourceFields.length > 0 && (
         <section className="rounded-xl border border-gray-200 bg-white p-4">
           <h2 className="font-semibold text-sm mb-2">{t(labels.clinicalResultIntegrity.sourceFields)}</h2>
-          <pre dir="auto" translate="no" className="whitespace-pre-wrap break-words text-sm">{JSON.stringify(treatment.source_fields, null, 2)}</pre>
+          <pre dir="auto" translate="no" className="whitespace-pre-wrap break-words text-sm">{JSON.stringify(Object.fromEntries(sourceFields), null, 2)}</pre>
         </section>
       )}
       <section className="grid gap-4 sm:grid-cols-2">

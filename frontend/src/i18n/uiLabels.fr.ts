@@ -921,13 +921,13 @@ export const UI_LABELS_FR = {
                 "Recherche clinique plus rapide. Alternatives comparables. Références consultables.",
         },
         cachedResultNotice: {
-            title: "Analyse equivalente deja disponible",
+            title: "Résultat d’une requête précédente",
             description:
-                "ClinIA a trouve une analyse clinique equivalente deja enregistree. Aucun nouvel appel a OpenAI n'a ete necessaire.",
+                "ClinIA a retrouvé le résultat d’une requête précédente avec les mêmes paramètres cliniques. Vous pouvez le consulter sans nouvel appel à OpenAI.",
             viewResultAction: "Consulter le résultat",
             refreshHint:
-                "Pour declencher une nouvelle analyse, revenez aux parametres, mettez a jour les renseignements cliniques pertinents, puis cliquez de nouveau sur Analyser. Une relance identique forcee doit etre demandee a un SUPERADMIN.",
-            editParametersAction: "Modifier les parametres cliniques",
+                "Pour modifier la demande, revenez aux paramètres cliniques. Pour relancer une demande identique, adressez-vous à un SUPERADMIN.",
+            editParametersAction: "Modifier les paramètres cliniques",
         },
         navigation: {
             backToClinicalDemo: "Retour a",

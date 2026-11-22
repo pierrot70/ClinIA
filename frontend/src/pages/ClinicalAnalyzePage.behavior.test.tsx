@@ -165,7 +165,9 @@ describe("ClinicalAnalyzePage", () => {
         configureClinicalAnalysisSlots({ ...idle, loading: true, responseMeta: { source } }, { ...idle }, { ...idle });
         render(<MemoryRouter><ClinicalAnalyzePage /></MemoryRouter>);
         fireEvent.click(screen.getByRole("button", { name: "submit-clinical-form" }));
-        expect(screen.getByRole("status")).toHaveTextContent("Analyse clinique en cours…");
+        expect(screen.getByRole("status")).toHaveTextContent(/Chargement/);
+        expect(document.querySelector(".clinia-neon-loader")).toBeNull();
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
         expect(screen.getByRole("status")).not.toHaveTextContent(/OpenAI|GPT/i);
     });
 
@@ -299,15 +301,16 @@ describe("ClinicalAnalyzePage", () => {
             fireEvent.click(screen.getByRole("button", { name: "submit-clinical-form" }));
         });
 
+        expect(clinicalResultSpy).not.toHaveBeenCalled();
         expect(screen.getByRole("dialog")).toHaveTextContent(
-            "Analyse equivalente deja disponible"
+            "Résultat d’une requête précédente"
         );
 
         const viewResult = screen.getByRole("button", { name: "Consulter le résultat" });
         expect(viewResult).toHaveFocus();
         expect(screen.queryByRole("button", { name: /pris connaissance/ })).not.toBeInTheDocument();
         fireEvent.keyDown(document, { key: "Tab" });
-        expect(screen.getByRole("button", { name: "Modifier les parametres cliniques" })).toHaveFocus();
+        expect(screen.getByRole("button", { name: "Modifier les paramètres cliniques" })).toHaveFocus();
         fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
         expect(viewResult).toHaveFocus();
         const callsBeforeDismiss = analyzeMock.mock.calls.length;

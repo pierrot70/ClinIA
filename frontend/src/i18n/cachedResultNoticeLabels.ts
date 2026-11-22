@@ -3,10 +3,10 @@ import { UI_LABELS_FR } from "./uiLabels.fr";
 type NoticeLabels = { [K in keyof typeof UI_LABELS_FR.clinicalDemo.cachedResultNotice]: string };
 const translations: Record<string, NoticeLabels> = {
   en: {
-    title: "Equivalent analysis already available",
-    description: "ClinIA found an equivalent clinical analysis that was already saved. No new OpenAI request was needed.",
+    title: "Result from a previous request",
+    description: "ClinIA found a saved result for the same clinical parameters. You can view it without a new OpenAI request.",
     viewResultAction: "View result",
-    refreshHint: "To trigger a new analysis, return to the parameters, update the relevant clinical information, then click Analyze again. A forced rerun of an identical request must be requested from a SUPERADMIN.",
+    refreshHint: "To change the request, return to the clinical parameters. To rerun an identical request, contact a SUPERADMIN.",
     editParametersAction: "Edit clinical parameters",
   },
   es: {

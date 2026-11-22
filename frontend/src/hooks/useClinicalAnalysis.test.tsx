@@ -53,15 +53,21 @@ describe('useClinicalAnalysis', () => {
     });
     const { result } = renderHook(() => useClinicalAnalysis());
 
-    await act(async () => {
-      await result.current.analyze({
-        age: 55,
-        sex: 'male',
-        symptoms: ['Hypertension'],
-        medical_history: [],
-        current_medications: [],
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        await result.current.analyze({
+          age: 55,
+          sex: 'male',
+          symptoms: ['Hypertension'],
+          medical_history: [],
+          current_medications: [],
+        });
       });
-    });
+      expect(result.current.loading).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
 
     expect(result.current.responseMeta).toEqual({
       cacheHit: true,
@@ -69,6 +75,25 @@ describe('useClinicalAnalysis', () => {
       model: 'gpt-4.1-mini',
     });
     expect(JSON.stringify(result.current.responseMeta)).not.toContain('patient');
+  });
+
+  it('ignores an old cache hit after the user changes clinical parameters', async () => {
+    let finish!: (response: Response) => void;
+    const pending = new Promise<Response>(resolve => { finish = resolve; });
+    mockAuthFetch.mockReturnValueOnce(pending);
+    const payload = { age: 55, sex: 'male' as const, symptoms: [], medical_history: [], current_medications: [] };
+    const { result } = renderHook(() => useClinicalAnalysis());
+    let first: ReturnType<typeof result.current.analyze>;
+    act(() => { first = result.current.analyze(payload); });
+    act(() => result.current.resetAnalysis());
+    mockAuthFetch.mockResolvedValueOnce({ json: async () => ({ data: { hypothesis: 'New result' }, meta: { cacheHit: false } }) });
+    await act(async () => { await result.current.analyze({ ...payload, age: 56 }); });
+    await act(async () => {
+      finish(Response.json({ data: { hypothesis: 'Old result' }, meta: { cacheHit: true } }));
+      await first;
+    });
+    expect(result.current.result).toEqual({ hypothesis: 'New result' });
+    expect(result.current.responseMeta?.cacheHit).toBe(false);
   });
 
   it('should set error on API error', async () => {
