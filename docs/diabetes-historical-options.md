@@ -81,3 +81,26 @@ dans « Endocrinology » était « Type 2 diabetes », avec un âge de 55 ans et
    source et « Metformin » sous « Current medications ». La vérification de
    tout le texte visible a confirmé l’absence du champ `efficacy` et de la
    valeur `90`.
+
+## Test DT2-78-LOW-FRAILTY en production du 22 novembre 2026
+
+**Résultat du test d’affichage en Chrome : réussi sur le commit `8a8640e`.**
+Dans la [démo publique de ClinIA](https://clinique-ai.ca/clinical-demo), le cas
+« Endocrinology » → « Type 2 diabetes » a été repris en portant l’âge à 78 ans.
+Les paramètres soumis affichaient « Frailty » à « Low » et la metformine
+figurait parmi les médicaments en cours.
+
+Depuis « Alternatives and recommendations », le lien « Details » de chaque
+carte a été ouvert successivement pour ce même résultat. Les deux fiches
+affichaient « Simulated data » et présentaient chacune une explication sous
+« How to interpret this information? ».
+
+1. **Metformine.** L’encadré précisait qu’avec une faible fragilité déclarée,
+   l’âge seul ne justifie pas l’arrêt de la metformine déjà prise. Pour discuter
+   de sa poursuite, la fiche invitait à examiner la fonction rénale, la tolérance
+   et la dernière HbA1c mesurée au regard de l’objectif individuel du patient.
+2. **Option GLP-1.** Après le retour aux résultats, la fiche « Reassessment of
+   a GLP-1 option » indiquait que la faible fragilité laissait cette option
+   ouverte à la discussion. Elle invitait à peser les bénéfices cardiovasculaires
+   et glycémiques possibles, les symptômes digestifs et le risque de perte de
+   poids involontaire, en tenant compte des préférences du patient.
