@@ -18,6 +18,25 @@ reprennent les mêmes six ordres avec des patients absents de MongoDB au départ
 | 5 | 11 | Courriel → appel → SMS |
 | 6 | 12 | Courriel → SMS → appel |
 
+## Noms des entités fictives
+
+En staging et en production, utiliser `type_lettre_sha8` pour le nom affiché
+de chaque nouvelle entité fictive. Écrire le type en minuscules. La lettre
+majuscule (A, B, C…) distingue les entités d’un même type. Garder la même
+lettre pour la même entité tout au long du parcours. Le suffixe `sha8`
+correspond aux huit premiers caractères du SHA Git de la version applicative testée.
+
+| Entité fictive | Exemple pour la version `66d82c09` |
+| --- | --- |
+| Patient | `patient_A_66d82c09` |
+| Patient sans rendez-vous (WalkIn) | `walkin_A_66d82c09` |
+| IPS | `ips_A_66d82c09` |
+| Urgentologue | `urgentologue_A_66d82c09` |
+| Clinique | `clinique_A_66d82c09` |
+
+Par exemple, si `walkin_A_66d82c09` passe de `clinique_A_66d82c09` à
+`clinique_C_66d82c09`, son nom affiché reste `walkin_A_66d82c09` dans les deux cliniques.
+
 ## Déploiement de la production
 
 Les déploiements ClinIA sur Coolify sont manuels. Au 21 novembre 2026, la
