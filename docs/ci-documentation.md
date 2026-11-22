@@ -116,6 +116,17 @@ avec le commit `9800d52f496995acb9797de8cf50ee19a2cb4fc5`. Le diff contenait
 [Exécution CI complète vérifiée](https://github.com/pierrot70/ClinIA/actions/runs/44914346889) ·
 [Commit mixte testé](https://github.com/pierrot70/ClinIA/commit/9800d52f496995acb9797de8cf50ee19a2cb4fc5)
 
+## Validation du CI ciblé WalkIn du 22 novembre 2026
+
+Le premier push sur `maintenance/walkin-targeted-ci-smoke-20261122` modifiait
+uniquement `scripts/walkin-chrome/fixtures.mjs` et son guide `README.md`.
+Le CI ciblé a réussi en 41 secondes. [Commit `d4bc6e2`](https://github.com/pierrot70/ClinIA/commit/d4bc6e26b4b8c8852b149cfbb5ffafe588f32817) · [Exécution GitHub Actions](https://github.com/pierrot70/ClinIA/actions/runs/45049078684)
+
+- Le pilote Chrome a validé les 12 scénarios WalkIn sur le formulaire de réception. [Journal frontend](https://github.com/pierrot70/ClinIA/actions/runs/45049078684/job/137290016338)
+- Les 13 tests sur MongoDB jetable ont réussi, dont le contrôle de nettoyage des données de la passe. Le journal confirme aussi la suppression du conteneur sans volume persistant (`CLEANUP_OK`). [Journal backend](https://github.com/pierrot70/ClinIA/actions/runs/45049078684/job/137290016348)
+- Les contrôles Markdown, les liens locaux et les audits npm ont réussi. GitHub a ignoré les suites applicatives complètes, le contrôle TypeScript et la compilation frontend.
+- Le push n’a déclenché aucun déploiement Coolify. L’historique de ClinIA comptait 69 déploiements avant et après la passe, et la production est restée épinglée sur `4cded3ec`.
+
 ## Rejouer les contrôles
 
 Depuis la racine, avec Git, Python 3 et Bash disponibles :
