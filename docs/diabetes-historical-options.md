@@ -58,3 +58,26 @@ Le rapport local de reprise distingue les structures effectivement lues en
 production, le rejeu isolé des sous-structures récupérées et les tests de
 fixtures. Une revue de logiciel par agents ne constitue pas une validation
 clinique humaine.
+
+## Tests DT2-55 en production du 22 novembre 2026
+
+Les deux parcours ont réussi dans Chrome sur `clinique-ai.ca`, au commit
+`f2ab1d9`, avec l’interface en anglais (Canada). Le cas fictif sélectionné
+dans « Endocrinology » était « Type 2 diabetes », avec un âge de 55 ans et
+« Metformin » dans la liste des médicaments actuels.
+
+1. **Résultat en cache avec le compte médecin de test `test1` — réussi.**
+   Après le clic sur « Analyze », ClinIA a affiché la fenêtre centrée
+   « Result from a previous request » avant de montrer le résultat. Le message
+   indiquait qu’une réponse enregistrée correspondait aux paramètres et
+   qu’elle pouvait être consultée sans nouvel appel à OpenAI. Après le clic
+   sur « View result », le résumé affichait « Current medications » puis
+   « Metformin ». Les trois fiches de cette réponse historique portaient sur
+   les agonistes du GLP-1, les inhibiteurs du SGLT2 et le groupe « Other agents ».
+2. **Fiche de metformine dans la démo publique — réussi.**
+   Après déconnexion de `test1`, le même cas a été ouvert sur `/clinical-demo`.
+   Dans « Alternatives and recommendations », le lien « Details » de la carte
+   « Metformin » a ouvert la fiche. Elle affichait « Simulated data » comme
+   source et « Metformin » sous « Current medications ». La vérification de
+   tout le texte visible a confirmé l’absence du champ `efficacy` et de la
+   valeur `90`.
