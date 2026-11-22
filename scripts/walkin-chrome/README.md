@@ -139,6 +139,24 @@ nécessaires à la reprise du nettoyage. Les journaux d’audit restent en place
 
 ## Historique des validations en production
 
+### 22 novembre 2026 · Recherche sans résultat et distance proposée · `4cded3ec`
+
+Test réussi en production dans Chrome avec le compte de test RECEPTION, depuis
+le Département de médecine familiale de St Mary’s.
+
+- **Recherche.** Pour un numéro fictif sans correspondance, ClinIA a ouvert
+  « Nouveau patient ». MongoDB a confirmé qu’aucun dossier patient n’a été créé.
+- **Audit.** MongoDB a enregistré un seul événement `RECEPTION_RAMQ_LOOKUP`
+  avec le résultat `NOT_FOUND` et `patientId: null`. Le numéro recherché
+  ne figurait pas dans l’événement.
+- **Distance.** Après l’ajout d’un créneau temporaire à l’IPS de test à GMF
+  Clinique Médicale Mascouche, RECEPTION a actualisé les disponibilités.
+  Chrome a affiché « À environ 28,5 km de la clinique actuelle, à vol d’oiseau. »
+  pour une distance calculée de 28,54696 km.
+- **Nettoyage.** Le créneau temporaire a été retiré. La vérification finale
+  a confirmé que l’horaire de l’IPS était identique à son état initial et que
+  l’événement d’audit était conservé.
+
 ### 22 novembre 2026 · Retrait de la liste d’attente de la clinique active · `66d82c0`
 
 Test réussi en production dans Chrome avec le compte RECEPTION et un patient
