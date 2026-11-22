@@ -131,3 +131,68 @@ cardiovasculaire sous « How to interpret this information? ».
    du patient.
 
 La validation de la formulation clinique par un médecin reste à faire.
+
+## Bilan pour la revue médicale des trois cas de diabète
+
+Les tests du 22 novembre 2026 ont confirmé l’affichage des trois cas fictifs
+en production. La revue clinique reste ouverte. Pour chaque cas, cochez une
+conclusion et notez votre avis dans le tableau. Ajoutez une ligne par correction.
+
+### DT2-55 — Metformine déjà en cours à 55 ans
+
+La fiche simulée présente la metformine parmi les traitements en cours et invite
+à revoir sa tolérance et la dernière HbA1c mesurée. Le score « efficacy: 90 »
+a été retiré. Le texte distingue-t-il clairement la poursuite du traitement et
+la discussion d’une autre option ? Comprend-on que le dossier fournit une cible
+d’HbA1c et que la valeur mesurée reste à vérifier ? Dans la réponse historique,
+les explications sur les agonistes du GLP-1, les inhibiteurs du SGLT2 et le
+groupe « Other agents » sont-elles assez précises ?
+
+- [ ] Acceptable en l’état
+- [ ] À corriger
+
+| Avis du médecin | Phrase ou élément à revoir | Correction ou formulation proposée |
+| --- | --- | --- |
+| | | |
+
+### DT2-78-LOW-FRAILTY — Fragilité déclarée faible à 78 ans
+
+La fiche de metformine explique que l’âge seul ne justifie pas son arrêt.
+La fiche GLP-1 invite à peser le bénéfice attendu, les effets digestifs et
+le risque de perte de poids involontaire, en tenant compte des préférences
+du patient. Les deux fiches donnent-elles un poids approprié à la faible
+fragilité ? Quelle information sur ce patient manquerait pour discuter de
+chaque option ?
+
+- [ ] Acceptable en l’état
+- [ ] À corriger
+
+| Avis du médecin | Phrase ou élément à revoir | Correction ou formulation proposée |
+| --- | --- | --- |
+| | | |
+
+### DT2-CV-58 — Maladie cardiovasculaire athéroscléreuse documentée à 58 ans
+
+La fiche de metformine distingue son rôle dans le contrôle glycémique de
+l’objectif de prévention cardiovasculaire. La fiche GLP-1 précise que la
+discussion porte sur un médicament dont le bénéfice cardiovasculaire est
+démontré, même si l’HbA1c est à la cible. Cette distinction est-elle exacte
+et assez claire pour guider la discussion ? Le graphique mentionne aussi les
+inhibiteurs du SGLT2. Faudrait-il expliquer leur présence dans la légende ou
+leur consacrer une fiche ?
+
+- [ ] Acceptable en l’état
+- [ ] À corriger
+
+| Avis du médecin | Phrase ou élément à revoir | Correction ou formulation proposée |
+| --- | --- | --- |
+| | | |
+
+### Langue d’affichage des trois cas
+
+Les explications cliniques sont en anglais, y compris dans l’interface
+française. Cet affichage convient-il à la lecture en consultation ?
+
+| Avis du médecin sur la langue | Adaptation souhaitée |
+| --- | --- |
+| | |
