@@ -37,6 +37,13 @@ correspond aux huit premiers caractères du SHA Git de la version applicative te
 Par exemple, si `walkin_A_66d82c09` passe de `clinique_A_66d82c09` à
 `clinique_C_66d82c09`, son nom affiché reste `walkin_A_66d82c09` dans les deux cliniques.
 
+Dans la passe Chrome, les scénarios 1 à 6 utilisent `patient_A` à `patient_F`
+et les scénarios 7 à 12 utilisent `walkin_A` à `walkin_F`. Le script ajoute le
+suffixe de l’image applicative au début de la passe. Le formulaire conserve
+`Essai` comme prénom et affiche l’identifiant complet dans le champ **Nom**.
+Deux passes sur la même version réutilisent les mêmes noms. Le numéro
+d’assurance maladie fictif et les courriels distinguent leurs dossiers.
+
 ## Déploiement de la production
 
 Les déploiements ClinIA sur Coolify sont manuels. Au 21 novembre 2026, la

@@ -9,7 +9,7 @@ import { listWalkInFamilyMedicineOptions } from './services/reception.js';
 import { buildPatientSearchKeys } from './utils/patientSearchKeys.js';
 
 
-const { fixtures, action, index, state, target } = __WALKIN_INPUT__;
+const { fixtures, action, index, state, target, revision } = __WALKIN_INPUT__;
 const { clinicId: expectedClinicId, original, userId } = target;
 assert.equal(process.env.NODE_ENV,'production');
 await mongoose.connect(process.env.MONGO_URI,{serverSelectionTimeoutMS:5000});
@@ -23,11 +23,17 @@ const current=user.assignedClinics.map(String), temporary=[original[0],clinicId]
 const db=mongoose.connection.db;
 
 assert.equal(fixtures.length,12);
-for (const f of fixtures) {
+// Une passe déjà préparée conserve ses anciens noms jusqu’au nettoyage.
+if (revision !== undefined) assert.match(revision, /^[0-9a-f]{40}$/);
+for (const [position, f] of fixtures.entries()) {
+ assert.equal(f.scenario,position+1);
+ assert.equal(f.type,position<6?'existant':'nouveau');
  assert.match(f.insurance,/^WLFX\d{8}$/);
  const suffix=f.insurance.slice(4);
+ const expectedName=revision === undefined ? 'PasseWalkIn'+suffix :
+  [position<6?'patient':'walkin', 'ABCDEF'[position%6], revision.slice(0,8)].join('_');
  assert.deepEqual([f.first,f.last,f.email,f.oldEmail],[
-  'Essai', 'PasseWalkIn'+suffix, 'apres-passe-'+suffix+'@example.invalid', 'avant-passe-'+suffix+'@example.invalid',
+  'Essai', expectedName, 'apres-passe-'+suffix+'@example.invalid', 'avant-passe-'+suffix+'@example.invalid',
  ]);
 }
 const i=index;
@@ -36,7 +42,7 @@ const scopeEntries={clinic:new mongoose.Types.ObjectId(clinicId),enrolledBy:new 
 const entryProjection={_id:1,patient:1,channel:1,consentedAt:1};
 const byEntry=()=>db.collection('walkinwaitlistentries').find(scopeEntries,{projection:entryProjection}).sort({_id:1}).toArray();
 const byFixture=(f)=>db.collection('patients').find({$or:[
- {healthInsuranceNumberSearch:f.insurance},{num_assurance_maladie:f.insurance},{nom:f.last,prenom:f.first},{courriel:{$in:[f.oldEmail,f.email]}}
+ {healthInsuranceNumberSearch:f.insurance},{num_assurance_maladie:f.insurance},...(revision === undefined ? [{nom:f.last,prenom:f.first}] : []),{courriel:{$in:[f.oldEmail,f.email]}}
 ]},{projection:{_id:1,nom:1,prenom:1,ownerUserId:1,courriel:1,telephone:1,telephoneSms:1,num_assurance_maladie:1,healthInsuranceNumberSearch:1,updatedAt:1}}).limit(3).toArray();
 const set=async(from,to)=>assert.equal((await AdminUser.updateOne({...scoped,assignedClinics:from},{$set:{assignedClinics:to}},{runValidators:true})).modifiedCount,1);
 const read=async f=>{
@@ -45,6 +51,10 @@ const read=async f=>{
  return {patients,entries};
 };
 if(action==='preflight' || action==='prepare'){
+ if (revision !== undefined) {
+  const { readImageRevision }=await import('./services/validationReports.js');
+  assert.equal((await readImageRevision()).commit,revision,'La version déployée a changé.');
+ }
  assert.deepEqual(current,original);
  for(const f of fixtures){
   assert.deepEqual(await byFixture(f),[]);
